@@ -22,6 +22,8 @@ type MeetingSettings = {
   participantVideo?: boolean;
   screenShare?: boolean;
   password?: string;
+  passwordHash?: string;
+  passwordSalt?: string;
   encryption?: boolean;
   joinBeforeHost?: boolean;
   chat?: boolean;
@@ -218,6 +220,14 @@ const getBearerToken = (request: express.Request) => {
   const header = request.headers.authorization || '';
   const [scheme, token] = header.split(' ');
   return scheme?.toLowerCase() === 'bearer' ? token : '';
+};
+
+const getUserByToken = (token: unknown) => {
+  const rawToken = String(token || '');
+  const session = rawToken ? sessions.get(hashToken(rawToken)) : null;
+  if (!session || new Date(session.expiresAt).getTime() <= Date.now()) return null;
+  const user = users.get(session.userId);
+  return user ? getPublicUser(user) : null;
 };
 
 const runRoomMigrations = async () => {
@@ -530,17 +540,12 @@ const loadDatabase = async () => {
 
 const authenticateToken = (request: AuthedRequest, response: express.Response, next: express.NextFunction) => {
   const token = getBearerToken(request);
-  const session = token ? sessions.get(hashToken(token)) : null;
-  if (!session || new Date(session.expiresAt).getTime() <= Date.now()) {
+  const user = getUserByToken(token);
+  if (!user) {
     response.status(401).json({ error: 'Compte requis pour accéder aux réunions.' });
     return;
   }
-  const user = users.get(session.userId);
-  if (!user) {
-    response.status(401).json({ error: 'Session invalide.' });
-    return;
-  }
-  request.user = getPublicUser(user);
+  request.user = user;
   next();
 };
 
@@ -571,9 +576,38 @@ const findMeetingByAccessValue = (value: unknown) => {
 };
 
 const validateMeetingPassword = (meeting: Meeting, password: unknown) => {
+  const providedPassword = String(password || '').trim();
+  if (meeting.settings.passwordHash && meeting.settings.passwordSalt) {
+    if (!providedPassword) return false;
+    const { hash } = hashPassword(providedPassword, meeting.settings.passwordSalt);
+    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(meeting.settings.passwordHash, 'hex'));
+  }
+
   const expectedPassword = String(meeting.settings.password || '').trim().toLowerCase();
-  const providedPassword = String(password || '').trim().toLowerCase();
-  return !expectedPassword || expectedPassword === providedPassword;
+  return !expectedPassword || expectedPassword === providedPassword.toLowerCase();
+};
+
+const isMeetingModerator = (meeting: Meeting, user: PublicUser) =>
+  meeting.host_id === user.id || meeting.co_host_id === user.id;
+
+const getLobbyParticipant = (meetingId: number, userId: number) =>
+  (lobby.get(meetingId) || []).find((item) => item.user_id === userId) || null;
+
+const canEnterMeeting = (meeting: Meeting, user: PublicUser) =>
+  isMeetingModerator(meeting, user) || getLobbyParticipant(meeting.id, user.id)?.status === 'accepted';
+
+const sanitizeMediaState = (value: unknown) => {
+  const media = value as Partial<{ audio: boolean; video: boolean; screen: boolean }> | null;
+  return {
+    audio: Boolean(media?.audio),
+    video: Boolean(media?.video),
+    screen: Boolean(media?.screen),
+  };
+};
+
+const getPublicMeeting = (meeting: Meeting): Meeting => {
+  const { password: _password, passwordHash: _passwordHash, passwordSalt: _passwordSalt, ...settings } = meeting.settings || {};
+  return { ...meeting, settings };
 };
 
 const addLobbyParticipant = async (
@@ -583,10 +617,11 @@ const addLobbyParticipant = async (
 ) => {
   const rows = lobby.get(meeting.id) || [];
   const existing = rows.find((item) => item.user_id === user.id);
+  const nextStatus = existing?.status === 'accepted' && status === 'requested' ? 'accepted' : status;
   const participant = {
     meeting_id: meeting.id,
     user_id: user.id,
-    status,
+    status: nextStatus,
     name: user.name,
     avatar: user.avatar,
   } satisfies LobbyParticipant;
@@ -601,7 +636,8 @@ const addLobbyParticipant = async (
 const normalizeMeetingPayload = (body: Record<string, unknown>, currentUser: PublicUser, existing?: Meeting): Meeting => {
   const startTime = String(body.startTime || body.start_time || existing?.start_time || new Date().toISOString());
   const duration = Math.max(15, Number(body.duration || existing?.duration || 60));
-  const settings = {
+  const incomingSettings = (body.settings as MeetingSettings | undefined) || {};
+  const settings: MeetingSettings = {
     waitingRoom: true,
     participantAudio: true,
     participantVideo: true,
@@ -612,8 +648,19 @@ const normalizeMeetingPayload = (body: Record<string, unknown>, currentUser: Pub
     linkSharing: true,
     externalAccess: true,
     ...(existing?.settings || {}),
-    ...((body.settings as MeetingSettings | undefined) || {}),
+    ...incomingSettings,
   };
+  if (Object.prototype.hasOwnProperty.call(incomingSettings, 'password')) {
+    const rawPassword = String(incomingSettings.password || '').trim();
+    delete settings.password;
+    delete settings.passwordHash;
+    delete settings.passwordSalt;
+    if (rawPassword) {
+      const { salt, hash } = hashPassword(rawPassword);
+      settings.passwordSalt = salt;
+      settings.passwordHash = hash;
+    }
+  }
 
   return {
     id: existing?.id || nextMeetingId++,
@@ -777,7 +824,7 @@ app.post('/api/auth/guest-join', async (request, response) => {
   const session = await createSession(guest);
   response.status(201).json({
     ...session,
-    meeting,
+    meeting: getPublicMeeting(meeting),
     lobbyStatus: lobbyParticipant.status,
   });
 });
@@ -794,7 +841,9 @@ app.post('/api/auth/logout', authenticateToken, async (request, response) => {
 });
 
 app.get('/api/meetings', authenticateToken, (_request, response) => {
-  response.json([...meetings.values()].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()));
+  response.json([...meetings.values()]
+    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+    .map(getPublicMeeting));
 });
 
 app.post('/api/meetings', authenticateToken, async (request: AuthedRequest, response) => {
@@ -803,7 +852,7 @@ app.post('/api/meetings', authenticateToken, async (request: AuthedRequest, resp
   lobby.set(meeting.id, []);
   mediaRequests.set(meeting.id, []);
   await saveDatabase();
-  response.status(201).json(meeting);
+  response.status(201).json(getPublicMeeting(meeting));
 });
 
 app.get('/api/meetings/participant-suggestions', authenticateToken, (request, response) => {
@@ -829,7 +878,7 @@ app.post('/api/meetings/join-lookup', authenticateToken, (request, response) => 
     return;
   }
 
-  response.json(meeting);
+  response.json(getPublicMeeting(meeting));
 });
 
 app.get('/api/meetings/link/:meetingLink', authenticateToken, (request, response) => {
@@ -838,7 +887,7 @@ app.get('/api/meetings/link/:meetingLink', authenticateToken, (request, response
     response.status(404).json({ error: 'Réunion introuvable' });
     return;
   }
-  response.json(meeting);
+  response.json(getPublicMeeting(meeting));
 });
 
 app.put('/api/meetings/:meetingId', authenticateToken, async (request: AuthedRequest, response) => {
@@ -848,7 +897,7 @@ app.put('/api/meetings/:meetingId', authenticateToken, async (request: AuthedReq
     response.status(404).json({ error: 'Réunion introuvable' });
     return;
   }
-  const canManage = existing.host_id === request.user!.id || existing.co_host_id === request.user!.id;
+  const canManage = isMeetingModerator(existing, request.user!);
   if (!canManage) {
     response.status(403).json({ error: 'Seul l’hôte peut modifier cette réunion.' });
     return;
@@ -856,13 +905,13 @@ app.put('/api/meetings/:meetingId', authenticateToken, async (request: AuthedReq
   const updated = normalizeMeetingPayload(request.body || {}, request.user!, existing);
   meetings.set(meetingId, updated);
   await saveDatabase();
-  response.json(updated);
+  response.json(getPublicMeeting(updated));
 });
 
 app.delete('/api/meetings/:meetingId', authenticateToken, async (request: AuthedRequest, response) => {
   const meetingId = Number(request.params.meetingId);
   const meeting = meetings.get(meetingId);
-  if (meeting && meeting.host_id !== request.user!.id && meeting.co_host_id !== request.user!.id) {
+  if (meeting && !isMeetingModerator(meeting, request.user!)) {
     response.status(403).json({ error: 'Seul l’hôte peut supprimer cette réunion.' });
     return;
   }
@@ -873,8 +922,19 @@ app.delete('/api/meetings/:meetingId', authenticateToken, async (request: Authed
   response.status(204).end();
 });
 
-app.get('/api/meetings/:meetingId/lobby', authenticateToken, (request, response) => {
-  response.json(lobby.get(Number(request.params.meetingId)) || []);
+app.get('/api/meetings/:meetingId/lobby', authenticateToken, (request: AuthedRequest, response) => {
+  const meetingId = Number(request.params.meetingId);
+  const meeting = meetings.get(meetingId);
+  if (!meeting) {
+    response.status(404).json({ error: 'RÃ©union introuvable' });
+    return;
+  }
+  const rows = lobby.get(meetingId) || [];
+  if (isMeetingModerator(meeting, request.user!)) {
+    response.json(rows);
+    return;
+  }
+  response.json(rows.filter((item) => item.user_id === request.user!.id));
 });
 
 app.post('/api/meetings/:meetingId/join-request', authenticateToken, async (request: AuthedRequest, response) => {
@@ -885,9 +945,7 @@ app.post('/api/meetings/:meetingId/join-request', authenticateToken, async (requ
     return;
   }
 
-  const expectedPassword = String(meeting.settings.password || '').trim().toLowerCase();
-  const password = String(request.body?.password || '').trim().toLowerCase();
-  if (expectedPassword && expectedPassword !== password) {
+  if (!validateMeetingPassword(meeting, request.body?.password)) {
     response.status(403).json({ error: 'Mot de passe de réunion incorrect' });
     return;
   }
@@ -906,19 +964,19 @@ app.post('/api/meetings/:meetingId/start-notify', authenticateToken, async (requ
     response.status(404).json({ error: 'Réunion introuvable' });
     return;
   }
-  if (meeting.host_id !== request.user!.id && meeting.co_host_id !== request.user!.id) {
+  if (!isMeetingModerator(meeting, request.user!)) {
     response.status(403).json({ error: 'Seul l’hôte peut démarrer cette réunion.' });
     return;
   }
   meeting.is_active = true;
   await saveDatabase();
-  response.json({ success: true, notifiedCount: Math.max(0, meeting.participant_count - 1), meeting });
+  response.json({ success: true, notifiedCount: Math.max(0, meeting.participant_count - 1), meeting: getPublicMeeting(meeting) });
 });
 
 app.post('/api/meetings/:meetingId/lobby/respond', authenticateToken, async (request: AuthedRequest, response) => {
   const meetingId = Number(request.params.meetingId);
   const meeting = meetings.get(meetingId);
-  if (!meeting || (meeting.host_id !== request.user!.id && meeting.co_host_id !== request.user!.id)) {
+  if (!meeting || !isMeetingModerator(meeting, request.user!)) {
     response.status(403).json({ error: 'Seul l’hôte peut gérer le lobby.' });
     return;
   }
@@ -933,11 +991,26 @@ app.post('/api/meetings/:meetingId/lobby/respond', authenticateToken, async (req
 
 app.post('/api/meetings/:meetingId/media-requests', authenticateToken, async (request: AuthedRequest, response) => {
   const meetingId = Number(request.params.meetingId);
+  const meeting = meetings.get(meetingId);
+  if (!meeting) {
+    response.status(404).json({ error: 'RÃ©union introuvable' });
+    return;
+  }
+  if (!isMeetingModerator(meeting, request.user!)) {
+    response.status(403).json({ error: 'Seul lâ€™hÃ´te peut demander un contrÃ´le mÃ©dia.' });
+    return;
+  }
+  const targetUserId = Number(request.body?.targetUserId);
+  const targetUser = users.get(targetUserId);
+  if (!targetUser || !canEnterMeeting(meeting, getPublicUser(targetUser))) {
+    response.status(404).json({ error: 'Participant introuvable dans cette rÃ©union.' });
+    return;
+  }
   const requestRows = mediaRequests.get(meetingId) || [];
   const item: MediaRequest = {
     id: `media-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     meetingId,
-    targetUserId: Number(request.body?.targetUserId || 1),
+    targetUserId,
     requestedBy: request.user!.id,
     requestedByName: request.user!.name,
     kind: request.body?.kind === 'camera' ? 'camera' : 'mic',
@@ -950,16 +1023,25 @@ app.post('/api/meetings/:meetingId/media-requests', authenticateToken, async (re
   response.status(201).json(item);
 });
 
-app.get('/api/meetings/:meetingId/media-requests', authenticateToken, (request, response) => {
+app.get('/api/meetings/:meetingId/media-requests', authenticateToken, (request: AuthedRequest, response) => {
+  const meeting = meetings.get(Number(request.params.meetingId));
+  if (!meeting || !canEnterMeeting(meeting, request.user!)) {
+    response.status(403).json({ error: 'AccÃ¨s refusÃ© Ã  cette rÃ©union.' });
+    return;
+  }
   const rows = mediaRequests.get(Number(request.params.meetingId)) || [];
-  response.json(rows.filter((item) => item.status === 'pending'));
+  response.json(rows.filter((item) => item.status === 'pending' && item.targetUserId === request.user!.id));
 });
 
-app.post('/api/meetings/:meetingId/media-requests/:requestId/respond', authenticateToken, async (request, response) => {
+app.post('/api/meetings/:meetingId/media-requests/:requestId/respond', authenticateToken, async (request: AuthedRequest, response) => {
   const rows = mediaRequests.get(Number(request.params.meetingId)) || [];
   const item = rows.find((row) => row.id === request.params.requestId);
   if (!item) {
     response.status(404).json({ error: 'Demande introuvable' });
+    return;
+  }
+  if (item.targetUserId !== request.user!.id) {
+    response.status(403).json({ error: 'Cette demande ne vous est pas destinÃ©e.' });
     return;
   }
   item.status = request.body?.status === 'rejected' ? 'rejected' : 'accepted';
@@ -970,7 +1052,7 @@ app.post('/api/meetings/:meetingId/media-requests/:requestId/respond', authentic
 
 app.get('/api/actus/events', authenticateToken, (_request, response) => {
   response.json([...meetings.values()].map((meeting) => ({
-    ...meeting,
+    ...getPublicMeeting(meeting),
     is_public: Boolean(meeting.settings.externalAccess),
     is_invited: true,
     my_lobby_status: null,
@@ -978,7 +1060,68 @@ app.get('/api/actus/events', authenticateToken, (_request, response) => {
   })));
 });
 
+io.use((socket, next) => {
+  const user = getUserByToken(socket.handshake.auth?.token);
+  if (!user) {
+    next(new Error('Session invalide.'));
+    return;
+  }
+  socket.data.user = user;
+  next();
+});
+
 io.on('connection', (socket) => {
+  socket.use((packet, next) => {
+    const [eventName, payload, callback] = packet as [string, Record<string, unknown> | undefined, ((response: unknown) => void) | undefined];
+    const user = socket.data.user as PublicUser | undefined;
+    if (!user) {
+      next(new Error('Session invalide.'));
+      return;
+    }
+
+    if (eventName === 'meeting:join') {
+      const meetingId = Number(payload?.meetingId);
+      const meeting = meetings.get(meetingId);
+      if (!meeting) {
+        callback?.({ ok: false, error: 'RÃ©union invalide' });
+        return;
+      }
+      if (!canEnterMeeting(meeting, user)) {
+        callback?.({ ok: false, error: 'AccÃ¨s non autorisÃ© Ã  cette rÃ©union.' });
+        return;
+      }
+      packet[1] = {
+        ...(payload || {}),
+        meetingId: String(meetingId),
+        userId: user.id,
+        name: user.name,
+        avatar: user.avatar,
+        media: sanitizeMediaState(payload?.media),
+      };
+      next();
+      return;
+    }
+
+    if (eventName === 'meeting:media-updated') {
+      const meetingId = String(payload?.meetingId || '');
+      if (!meetingId || meetingId !== String(socket.data.meetingId || '')) return;
+      packet[1] = { ...(payload || {}), media: sanitizeMediaState(payload?.media) };
+      next();
+      return;
+    }
+
+    if (['meeting:offer', 'meeting:answer', 'meeting:ice-candidate'].includes(eventName)) {
+      const meetingId = String(payload?.meetingId || '');
+      const targetSocketId = String(payload?.targetSocketId || '');
+      const participants = meetingParticipants.get(meetingId);
+      if (meetingId !== String(socket.data.meetingId || '') || !participants?.has(socket.id) || !participants.has(targetSocketId)) return;
+      next();
+      return;
+    }
+
+    next();
+  });
+
   socket.on('meeting:join', (payload, callback) => {
     const meetingId = String(payload?.meetingId || '');
     if (!meetingId) {
