@@ -93,6 +93,11 @@ export interface MeetingParticipantSuggestion {
   email?: string;
 }
 
+export interface LunaMeetingResponse {
+  answer: string;
+  configured: boolean;
+}
+
 export const meetingService = {
   async getMeetings(): Promise<Meeting[]> {
     const response = await fetch(apiUrl('/api/meetings'), { headers: getAuthHeaders() });
@@ -258,5 +263,21 @@ export const meetingService = {
       throw new Error(error.error || 'Réponse à la demande impossible');
     }
     return response.json();
+  },
+
+  async askLuna(meetingId: number, prompt: string, tone: 'professional' | 'casual' | 'creative' = 'professional'): Promise<LunaMeetingResponse> {
+    const response = await fetch(apiUrl('/api/ai/luna'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ meetingId, prompt, tone }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || 'Luna IA est indisponible pour le moment.');
+    }
+    return {
+      answer: String(data.answer || ''),
+      configured: Boolean(data.configured),
+    };
   }
 };

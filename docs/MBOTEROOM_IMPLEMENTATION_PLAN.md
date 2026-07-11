@@ -13,6 +13,7 @@ Priorite critique:
 - Renforcer les autorisations lobby et demandes media.
 - Ajouter une documentation des evenements Socket.IO.
 - Maintenir `npm.cmd run lint` et `npm.cmd run build`.
+- Integrer Luna IA de facon serveur-side, sans exposer les cles, avec fallback clair si le fournisseur IA est indisponible.
 
 Priorite haute:
 

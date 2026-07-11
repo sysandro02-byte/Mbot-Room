@@ -606,6 +606,169 @@
   opacity: 0.42;
 }
 
+.meeting-room-luna-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.meeting-room-luna-hero {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(91, 0, 232, .1), rgba(6, 182, 212, .1));
+  color: #12345d;
+  margin-bottom: 12px;
+}
+
+.meeting-room-luna-hero span {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: #5b00e8;
+  box-shadow: 0 10px 22px rgba(91, 0, 232, .22);
+}
+
+.meeting-room-luna-hero strong,
+.meeting-room-luna-hero p {
+  display: block;
+}
+
+.meeting-room-luna-hero strong {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.meeting-room-luna-hero p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #52627a;
+}
+
+.meeting-room-luna-suggestions {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.meeting-room-luna-suggestions button {
+  border: 1px solid rgba(91, 0, 232, .16);
+  background: #f8f5ff;
+  color: #4c1d95;
+  border-radius: 12px;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.meeting-room-luna-suggestions button:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+
+.meeting-room-luna-list {
+  flex: 1;
+  min-height: 170px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 3px;
+}
+
+.meeting-room-luna-list article {
+  border-radius: 16px;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.meeting-room-luna-list article.is-luna {
+  background: #fff;
+  color: #172554;
+  border: 1px solid #e9ddff;
+}
+
+.meeting-room-luna-list article.is-user {
+  background: #dcf8c6;
+  color: #172014;
+  align-self: flex-end;
+  max-width: 92%;
+}
+
+.meeting-room-luna-list strong,
+.meeting-room-luna-list p,
+.meeting-room-luna-list small {
+  display: block;
+}
+
+.meeting-room-luna-list strong {
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 4px;
+}
+
+.meeting-room-luna-list p {
+  margin: 0;
+}
+
+.meeting-room-luna-list small {
+  margin-top: 8px;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.meeting-room-luna-input {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 12px;
+  border-top: 1px solid #e6dcff;
+}
+
+.meeting-room-luna-input input {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid #ded8cf;
+  padding: 0 14px;
+  font-weight: 750;
+  color: #111827;
+  outline: none;
+}
+
+.meeting-room-luna-input input:focus {
+  border-color: #5b00e8;
+  box-shadow: 0 0 0 3px rgba(91, 0, 232, .12);
+}
+
+.meeting-room-luna-input button {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #5b00e8;
+  color: #fff;
+  cursor: pointer;
+}
+
+.meeting-room-luna-input button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
 .meeting-room-chat-emoji-popover {
   position: absolute;
   right: 54px;

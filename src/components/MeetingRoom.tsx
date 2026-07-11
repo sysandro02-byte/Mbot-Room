@@ -2,6 +2,7 @@ import { ChangeEvent, FormEvent, ReactNode, useEffect, useMemo, useRef, useState
 import {
   AtSign,
   Bell,
+  Bot,
   Check,
   Copy,
   Download,
@@ -17,6 +18,7 @@ import {
   PhoneOff,
   Send,
   ShieldCheck,
+  Sparkles,
   Smile,
   Upload,
   UserPlus,
@@ -32,7 +34,7 @@ import { useMeetingMeshWebRTC } from '../hooks/useMeetingMeshWebRTC';
 import { cn } from '../lib/utils';
 import './MeetingRoom.css';
 
-type Panel = 'chat' | 'participants' | 'details' | 'files' | 'poll' | 'reactions' | null;
+type Panel = 'chat' | 'participants' | 'details' | 'files' | 'poll' | 'reactions' | 'luna' | null;
 type RoomLayout = 'grid' | 'speaker' | 'compact';
 type ChatTab = 'discussion' | 'polls' | 'files';
 type BooleanMeetingSetting = 'waitingRoom' | 'joinBeforeHost' | 'participantAudio' | 'participantVideo' | 'chat' | 'reactions' | 'recording' | 'screenShare' | 'encryption' | 'linkSharing' | 'externalAccess';
@@ -82,6 +84,13 @@ type RoomMessage = {
   time: string;
   text: string;
   reaction: string;
+};
+
+type LunaMessage = {
+  id: string;
+  sender: 'user' | 'luna';
+  text: string;
+  configured?: boolean;
 };
 
 type SharedFile = {
@@ -165,6 +174,16 @@ export default function MeetingRoom({ meeting, joinOptions, onLeave }: MeetingRo
     reaction: '',
   }]);
   const [messageDraft, setMessageDraft] = useState('');
+  const [lunaMessages, setLunaMessages] = useState<LunaMessage[]>([
+    {
+      id: 'luna-welcome',
+      sender: 'luna',
+      text: 'Bonjour, je suis Luna IA. Je peux aider à résumer, préparer une décision, clarifier une idée ou proposer les prochaines actions de cette réunion.',
+      configured: true,
+    },
+  ]);
+  const [lunaDraft, setLunaDraft] = useState('');
+  const [isLunaThinking, setIsLunaThinking] = useState(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => setElapsedSeconds((value) => value + 1), 1000);
@@ -492,6 +511,32 @@ export default function MeetingRoom({ meeting, joinOptions, onLeave }: MeetingRo
       ...current,
       [participantId]: { ...current[participantId], ...patch },
     }));
+  };
+
+  const askLuna = async (prompt?: string) => {
+    const text = String(prompt || lunaDraft).trim().slice(0, 1800);
+    if (!text || isLunaThinking) return;
+    setLunaMessages((current) => [...current, { id: `luna-user-${Date.now()}`, sender: 'user', text }]);
+    setLunaDraft('');
+    setIsLunaThinking(true);
+    try {
+      const result = await meetingService.askLuna(meeting.id, text, 'professional');
+      setLunaMessages((current) => [...current, {
+        id: `luna-answer-${Date.now()}`,
+        sender: 'luna',
+        text: result.answer || 'Luna n’a pas pu générer une réponse complète.',
+        configured: result.configured,
+      }]);
+    } catch (error) {
+      setLunaMessages((current) => [...current, {
+        id: `luna-error-${Date.now()}`,
+        sender: 'luna',
+        text: error instanceof Error ? error.message : 'Luna IA est indisponible pour le moment.',
+        configured: false,
+      }]);
+    } finally {
+      setIsLunaThinking(false);
+    }
   };
 
   const pendingMediaRequest = mediaRequests[0] || null;
@@ -939,6 +984,16 @@ export default function MeetingRoom({ meeting, joinOptions, onLeave }: MeetingRo
               onClose={() => setPanel(null)}
             />
           )}
+          {panel === 'luna' && (
+            <LunaPanel
+              messages={lunaMessages}
+              draft={lunaDraft}
+              isThinking={isLunaThinking}
+              setDraft={setLunaDraft}
+              onAsk={(prompt) => void askLuna(prompt)}
+              onClose={() => setPanel(null)}
+            />
+          )}
         </section>
 
         <footer className="meeting-room-controls">
@@ -950,6 +1005,7 @@ export default function MeetingRoom({ meeting, joinOptions, onLeave }: MeetingRo
           <Control label="Fichiers" active={panel === 'files'} icon={<FileText />} onClick={() => openControlPanel('files')} />
           <Control label="Sondage" active={panel === 'poll'} icon={<Bell />} onClick={() => openControlPanel('poll')} />
           <Control label="Emojis" active={panel === 'reactions'} icon={<Smile />} onClick={() => roomSettings.reactions === false ? setHostNotice("Les réactions sont désactivées par l'hôte.") : openControlPanel('reactions')} />
+          <Control label="Luna IA" active={panel === 'luna'} icon={<Bot />} onClick={() => openControlPanel('luna')} />
           <Control label="Enregistrer" active={recording} icon={<span className="meeting-record-dot" />} onClick={toggleRecordingControl} />
           <Control label="Détails" active={panel === 'details'} icon={<ShieldCheck />} onClick={() => openControlPanel('details')} />
           <Control label="Plus" active={roomMenuOpen} icon={<MoreVertical />} onClick={toggleMoreControls} />
@@ -1255,6 +1311,76 @@ function ChatPanel({
             ))}
           </div>
         )}
+      </form>
+    </aside>
+  );
+}
+
+function LunaPanel({
+  messages,
+  draft,
+  isThinking,
+  setDraft,
+  onAsk,
+  onClose,
+}: {
+  messages: LunaMessage[];
+  draft: string;
+  isThinking: boolean;
+  setDraft: (value: string) => void;
+  onAsk: (prompt?: string) => void;
+  onClose: () => void;
+}) {
+  const quickPrompts = [
+    'Résume les points importants de cette réunion.',
+    'Propose les prochaines actions et responsables.',
+    'Aide-moi à formuler une décision claire.',
+  ];
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    onAsk();
+  };
+
+  return (
+    <aside className="meeting-room-panel-card meeting-room-luna-panel">
+      <PanelHeader title="Luna IA" onClose={onClose} />
+      <div className="meeting-room-luna-hero">
+        <span><Sparkles size={18} /></span>
+        <div>
+          <strong>Assistante MBotéRoom</strong>
+          <p>Réponses liées à cette réunion, sans accès aux secrets ni à l’audio non fourni.</p>
+        </div>
+      </div>
+      <div className="meeting-room-luna-suggestions">
+        {quickPrompts.map((prompt) => (
+          <button type="button" key={prompt} disabled={isThinking} onClick={() => onAsk(prompt)}>
+            {prompt}
+          </button>
+        ))}
+      </div>
+      <div className="meeting-room-luna-list">
+        {messages.map((message) => (
+          <article key={message.id} className={message.sender === 'user' ? 'is-user' : 'is-luna'}>
+            <strong>{message.sender === 'user' ? 'Vous' : 'Luna IA'}</strong>
+            <p>{message.text}</p>
+            {message.sender === 'luna' && message.configured === false && <small>Fournisseur IA non configuré ou indisponible.</small>}
+          </article>
+        ))}
+        {isThinking && (
+          <article className="is-luna">
+            <strong>Luna IA</strong>
+            <p>Luna réfléchit...</p>
+          </article>
+        )}
+      </div>
+      <form className="meeting-room-luna-input" onSubmit={submit}>
+        <input
+          value={draft}
+          maxLength={1800}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder="Demander à Luna..."
+        />
+        <button type="submit" disabled={isThinking || !draft.trim()}><Send size={16} /></button>
       </form>
     </aside>
   );

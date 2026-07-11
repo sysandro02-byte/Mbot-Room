@@ -150,6 +150,8 @@ type RoomSessionRow = {
   expires_at: string;
 };
 
+type LunaTone = 'professional' | 'casual' | 'creative';
+
 type AuthedRequest = express.Request & {
   user?: PublicUser;
 };
@@ -610,6 +612,86 @@ const getPublicMeeting = (meeting: Meeting): Meeting => {
   return { ...meeting, settings };
 };
 
+const normalizePlainText = (value: unknown) => String(value || '').replace(/\s+/g, ' ').trim();
+
+const parseCommaList = (value: unknown) =>
+  String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const getGroqModels = () => {
+  const primary = parseCommaList(process.env.GROQ_MODEL || 'llama-3.1-8b-instant');
+  const fallback = parseCommaList(process.env.GROQ_FALLBACK_MODELS || 'llama-3.1-8b-instant,openai/gpt-oss-20b,openai/gpt-oss-120b,meta-llama/llama-4-scout-17b-16e-instruct');
+  return Array.from(new Set([...primary, ...fallback]));
+};
+
+const buildLunaFallback = (prompt: string) => {
+  const lower = normalizePlainText(prompt).toLowerCase();
+  if (!lower) return 'Je n’ai pas reçu de message à traiter.';
+  if (/(résume|resume|synthèse|synthese|compte rendu|compte-rendu)/i.test(lower)) {
+    return 'Fonctionnalité non configurée. Active GROQ_API_KEY pour générer un vrai résumé de réunion.';
+  }
+  if (/(ordre du jour|agenda|plan)/i.test(lower)) {
+    return 'Fonctionnalité non configurée. Je pourrai préparer un ordre du jour dès que le fournisseur IA sera actif.';
+  }
+  if (/(action|tâche|tache|décision|decision)/i.test(lower)) {
+    return 'Fonctionnalité non configurée. Je pourrai extraire les décisions et tâches avec un fournisseur IA actif.';
+  }
+  return 'Fonctionnalité non configurée. Ajoute GROQ_API_KEY dans .env pour activer Luna IA.';
+};
+
+const normalizeLunaResponse = (value: unknown, prompt: string) => {
+  const cleaned = normalizePlainText(value);
+  if (!cleaned) return buildLunaFallback(prompt);
+  return cleaned
+    .replace(/^je suis mbote[,.\s-]*/i, 'Je suis Luna IA, assistante de réunion MBotéRoom. ')
+    .slice(0, 1800);
+};
+
+const completeWithGroq = async (system: string, prompt: string) => {
+  const apiKey = String(process.env.GROQ_API_KEY || '').trim();
+  if (!apiKey) return null;
+
+  for (const model of getGroqModels()) {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.4,
+        max_tokens: 700,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: prompt },
+        ],
+      }),
+      signal: AbortSignal.timeout(Number(process.env.GROQ_TIMEOUT_MS || 30000)),
+    }).catch(() => null);
+
+    if (!response?.ok) continue;
+    const data = await response.json().catch(() => null);
+    const text = data?.choices?.[0]?.message?.content;
+    if (text) return normalizePlainText(text);
+  }
+
+  return null;
+};
+
+const buildLunaMeetingSystemPrompt = (meeting: Meeting, user: PublicUser, tone: LunaTone) => `
+Tu es Luna IA, assistante officielle de MBoteRoom.
+Tu aides pendant une réunion en ligne: résumer, préparer une réponse, clarifier une décision, proposer un ordre du jour, extraire des tâches et améliorer la communication.
+Réponds en français par défaut.
+Reste factuelle. Ne prétends jamais avoir transcrit l'audio, vu la vidéo ou consulté des fichiers si le contexte n'est pas fourni.
+Ne révèle jamais de secrets, tokens, mots de passe ou contenu .env.
+Réunion: ${meeting.title}.
+Utilisateur: ${user.name}.
+Ton demandé: ${tone}.
+`.trim();
+
 const addLobbyParticipant = async (
   meeting: Meeting,
   user: PublicUser,
@@ -1048,6 +1130,31 @@ app.post('/api/meetings/:meetingId/media-requests/:requestId/respond', authentic
   item.respondedAt = new Date().toISOString();
   await saveDatabase();
   response.json(item);
+});
+
+app.post('/api/ai/luna', authenticateToken, async (request: AuthedRequest, response) => {
+  const prompt = normalizePlainText(request.body?.prompt).slice(0, 1800);
+  const tone = ['professional', 'casual', 'creative'].includes(String(request.body?.tone))
+    ? String(request.body?.tone) as LunaTone
+    : 'professional';
+  const meetingId = Number(request.body?.meetingId);
+  const meeting = meetings.get(meetingId);
+
+  if (!prompt) {
+    response.status(400).json({ error: 'Message requis pour Luna IA.' });
+    return;
+  }
+  if (!meeting || !canEnterMeeting(meeting, request.user!)) {
+    response.status(403).json({ error: 'Accès refusé à cette réunion.' });
+    return;
+  }
+
+  const system = buildLunaMeetingSystemPrompt(meeting, request.user!, tone);
+  const answer = await completeWithGroq(system, prompt);
+  response.json({
+    answer: normalizeLunaResponse(answer, prompt),
+    configured: Boolean(answer),
+  });
 });
 
 app.get('/api/actus/events', authenticateToken, (_request, response) => {
