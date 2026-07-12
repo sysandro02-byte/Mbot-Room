@@ -1,4 +1,4 @@
-import dotenv from 'dotenv';
+﻿import dotenv from 'dotenv';
 import express from 'express';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -32,6 +32,8 @@ type MeetingSettings = {
   lunaSummary?: boolean;
   linkSharing?: boolean;
   externalAccess?: boolean;
+  isPublic?: boolean;
+  visibility?: string;
 };
 
 type Meeting = {
@@ -76,13 +78,24 @@ type User = {
   username: string;
   email: string;
   avatar: string;
+  phoneNumber?: string;
+  organization?: string;
+  jobTitle?: string;
+  mboteUserId?: string;
   passwordHash: string;
   passwordSalt: string;
   isGuest?: boolean;
   createdAt: string;
 };
 
-type PublicUser = Omit<User, 'passwordHash' | 'passwordSalt'>;
+type UserRole = 'admin' | 'user' | 'guest';
+
+type PublicUser = Omit<User, 'passwordHash' | 'passwordSalt'> & {
+  role: UserRole;
+  permissions: string[];
+};
+
+type AdminActivityType = 'user' | 'meeting' | 'report' | 'ban' | 'recording';
 
 type Session = {
   tokenHash: string;
@@ -91,12 +104,21 @@ type Session = {
   expiresAt: string;
 };
 
+type PasswordResetRequest = {
+  tokenHash: string;
+  userId: number;
+  createdAt: string;
+  expiresAt: string;
+  usedAt?: string;
+};
+
 type DatabaseState = {
   users: User[];
   meetings: Meeting[];
   lobby: LobbyParticipant[];
   mediaRequests: MediaRequest[];
   sessions: Session[];
+  passwordResetRequests?: PasswordResetRequest[];
   nextUserId: number;
   nextMeetingId: number;
 };
@@ -158,9 +180,11 @@ type AuthedRequest = express.Request & {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.basename(__dirname) === 'dist' ? path.dirname(__dirname) : __dirname;
-const dataDir = path.join(rootDir, 'data');
+const dataDir = process.env.MBOTE_ROOM_DATA_DIR
+  ? path.resolve(process.env.MBOTE_ROOM_DATA_DIR)
+  : path.join(rootDir, 'data');
 const dbPath = path.join(dataDir, 'mbote-room-db.json');
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.MBOTE_ROOM_DISABLE_POSTGRES === '1' ? '' : process.env.DATABASE_URL;
 const pgPool = databaseUrl ? new pg.Pool({ connectionString: databaseUrl }) : null;
 const app = express();
 const httpServer = createServer(app);
@@ -173,6 +197,7 @@ const io = new Server(httpServer, {
 
 const users = new Map<number, User>();
 const sessions = new Map<string, Session>();
+const passwordResetRequests = new Map<string, PasswordResetRequest>();
 const meetings = new Map<number, Meeting>();
 const lobby = new Map<number, LobbyParticipant[]>();
 const mediaRequests = new Map<number, MediaRequest[]>();
@@ -194,15 +219,101 @@ const demoUsers = [
   { id: '4', name: 'Sarah Tech', username: 'sarah', avatar: 'https://ui-avatars.com/api/?name=Sarah+Tech&background=be185d&color=fff' },
 ];
 
+const adminPermissions = [
+  'admin.dashboard.view',
+  'admin.users.view',
+  'admin.meetings.view',
+  'admin.live_meetings.view',
+  'admin.recordings.view',
+  'admin.reports.view',
+  'admin.bans.view',
+  'admin.statistics.view',
+  'admin.audit_logs.view',
+  'admin.storage.view',
+  'meeting.admin.join',
+];
+
+const getConfiguredAdminEmails = () => String(process.env.ADMIN_EMAILS || '')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+
+const getUserRole = (user: Pick<User, 'id' | 'email' | 'isGuest'>): UserRole => {
+  if (user.isGuest) return 'guest';
+  if (Number(user.id) === 1 || getConfiguredAdminEmails().includes(String(user.email || '').toLowerCase())) {
+    return 'admin';
+  }
+  return 'user';
+};
+
 const getPublicUser = (user: User): PublicUser => {
   const { passwordHash: _passwordHash, passwordSalt: _passwordSalt, ...publicUser } = user;
-  return publicUser;
+  const role = getUserRole(user);
+  return {
+    ...publicUser,
+    role,
+    permissions: role === 'admin' ? adminPermissions : [],
+  };
+};
+
+const isAdminUser = (user?: PublicUser | null) => {
+  if (!user) return false;
+  return user.role === 'admin'
+    || Number(user.id) === 1
+    || getConfiguredAdminEmails().includes(String(user.email || '').toLowerCase());
+};
+
+type ApiErrorCode =
+  | 'ADMIN_ACCESS_DENIED'
+  | 'AUTH_REQUIRED'
+  | 'EMAIL_ALREADY_EXISTS'
+  | 'EXTERNAL_AUTH_NOT_CONFIGURED'
+  | 'EXTERNAL_AUTH_PROFILE_UNAVAILABLE'
+  | 'EXTERNAL_AUTH_STATE_INVALID'
+  | 'INVALID_CREDENTIALS'
+  | 'INVALID_EMAIL'
+  | 'LOBBY_HOST_REQUIRED'
+  | 'LUNA_ACCESS_DENIED'
+  | 'LUNA_PROMPT_REQUIRED'
+  | 'MEDIA_REQUEST_ACCESS_DENIED'
+  | 'MEDIA_REQUEST_FORBIDDEN'
+  | 'MEDIA_REQUEST_NOT_FOUND'
+  | 'MEETING_ACCESS_DENIED'
+  | 'MEETING_HOST_REQUIRED'
+  | 'MEETING_NOT_FOUND'
+  | 'MEETING_PASSWORD_INVALID'
+  | 'PARTICIPANT_NOT_FOUND'
+  | 'PASSWORD_TOO_SHORT'
+  | 'PASSWORD_RESET_INVALID'
+  | 'PASSWORD_RESET_NOT_CONFIGURED'
+  | 'VALIDATION_ERROR';
+
+const sendApiError = (
+  response: express.Response,
+  status: number,
+  code: ApiErrorCode,
+  error: string,
+  details?: Record<string, unknown>,
+) => {
+  response.status(status).json({
+    error,
+    code,
+    ...(details ? { details } : {}),
+  });
+};
+
+const requireAdmin = (request: AuthedRequest, response: express.Response, next: express.NextFunction) => {
+  if (!isAdminUser(request.user)) {
+    sendApiError(response, 403, 'ADMIN_ACCESS_DENIED', 'Accès administrateur refusé.');
+    return;
+  }
+  next();
 };
 
 const normalizeEmail = (value: unknown) => String(value || '').trim().toLowerCase();
 
 const createAvatar = (name: string) =>
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'MBoté')}&background=7c3aed&color=fff&bold=true`;
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'MBotÃ©')}&background=7c3aed&color=fff&bold=true`;
 
 const hashPassword = (password: string, salt = crypto.randomBytes(16).toString('hex')) => ({
   salt,
@@ -409,6 +520,7 @@ const saveLocalDatabase = async () => {
     lobby: [...lobby.values()].flat(),
     mediaRequests: [...mediaRequests.values()].flat(),
     sessions: [...sessions.values()],
+    passwordResetRequests: [...passwordResetRequests.values()],
     nextUserId,
     nextMeetingId,
   };
@@ -451,6 +563,7 @@ const loadDatabase = async () => {
       lobby.clear();
       mediaRequests.clear();
       sessions.clear();
+      passwordResetRequests.clear();
 
       for (const user of userResult.rows) {
         users.set(Number(user.id), {
@@ -526,12 +639,18 @@ const loadDatabase = async () => {
     lobby.clear();
     mediaRequests.clear();
     sessions.clear();
+    passwordResetRequests.clear();
     for (const user of state.users || []) users.set(Number(user.id), user);
     for (const meeting of state.meetings || []) meetings.set(Number(meeting.id), meeting);
     for (const [meetingId, rows] of restoreRowsByMeeting(state.lobby || [])) lobby.set(meetingId, rows as LobbyParticipant[]);
     for (const [meetingId, rows] of restoreRowsByMeeting(state.mediaRequests || [])) mediaRequests.set(meetingId, rows as MediaRequest[]);
     for (const session of state.sessions || []) {
       if (new Date(session.expiresAt).getTime() > Date.now()) sessions.set(session.tokenHash, session);
+    }
+    for (const resetRequest of state.passwordResetRequests || []) {
+      if (!resetRequest.usedAt && new Date(resetRequest.expiresAt).getTime() > Date.now()) {
+        passwordResetRequests.set(resetRequest.tokenHash, resetRequest);
+      }
     }
     nextUserId = Math.max(Number(state.nextUserId || 1), ...[...users.keys()].map((id) => id + 1), 1);
     nextMeetingId = Math.max(Number(state.nextMeetingId || 1), ...[...meetings.keys()].map((id) => id + 1), 1);
@@ -544,24 +663,99 @@ const authenticateToken = (request: AuthedRequest, response: express.Response, n
   const token = getBearerToken(request);
   const user = getUserByToken(token);
   if (!user) {
-    response.status(401).json({ error: 'Compte requis pour accéder aux réunions.' });
+    sendApiError(response, 401, 'AUTH_REQUIRED', 'Compte requis pour accéder aux réunions.');
     return;
   }
   request.user = user;
   next();
 };
 
-const createSession = async (user: User) => {
+const createSession = async (user: User, rememberMe = false) => {
   const token = createToken();
+  const durationMs = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 12 * 60 * 60 * 1000;
   const session: Session = {
     tokenHash: hashToken(token),
     userId: user.id,
     createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    expiresAt: new Date(Date.now() + durationMs).toISOString(),
   };
   sessions.set(session.tokenHash, session);
   await saveDatabase();
-  return { token, user: getPublicUser(user) };
+  return { token, user: getPublicUser(user), expiresAt: session.expiresAt };
+};
+
+const getRequestOrigin = (request: express.Request) => {
+  const origin = String(request.headers.origin || '').trim();
+  if (origin) return origin.replace(/\/+$/, '');
+  const protocol = String(request.headers['x-forwarded-proto'] || request.protocol || 'http').split(',')[0];
+  return `${protocol}://${request.get('host')}`;
+};
+
+const getMboteAuthConfig = (request: express.Request) => {
+  const baseUrl = String(process.env.MBOTE_AUTH_BASE_URL || process.env.MBOTE_API_BASE_URL || '').trim().replace(/\/+$/, '');
+  const clientId = String(process.env.MBOTE_AUTH_CLIENT_ID || '').trim();
+  const clientSecret = String(process.env.MBOTE_AUTH_CLIENT_SECRET || '').trim();
+  const redirectUri = String(process.env.MBOTE_AUTH_REDIRECT_URI || `${getRequestOrigin(request)}/api/auth/mbote/callback`).trim();
+  const authorizeUrl = String(process.env.MBOTE_AUTH_AUTHORIZE_URL || (baseUrl ? `${baseUrl}/api/oauth/authorize` : '')).trim();
+  const tokenUrl = String(process.env.MBOTE_AUTH_TOKEN_URL || (baseUrl ? `${baseUrl}/api/oauth/token` : '')).trim();
+  const profileUrl = String(process.env.MBOTE_AUTH_PROFILE_URL || (baseUrl ? `${baseUrl}/api/auth/me` : '')).trim();
+  return { baseUrl, clientId, clientSecret, redirectUri, authorizeUrl, tokenUrl, profileUrl };
+};
+
+const mboteOAuthStates = new Map<string, { redirectTo: string; createdAt: number }>();
+
+const normalizeRedirectPath = (value: unknown) => {
+  const redirectTo = String(value || '/app').trim();
+  return redirectTo.startsWith('/') && !redirectTo.startsWith('//') ? redirectTo : '/app';
+};
+
+const normalizeExternalProfile = (value: any) => {
+  const source = value?.user || value?.profile || value;
+  const email = normalizeEmail(source?.email);
+  const id = String(source?.id || source?.userId || source?.user_id || '').trim();
+  const name = String(source?.name || source?.displayName || source?.username || email.split('@')[0] || '').trim();
+  if (!email || !id || !name) return null;
+  return {
+    id,
+    name,
+    username: String(source?.username || email.split('@')[0] || `mbote-${id}`).trim().toLowerCase(),
+    email,
+    avatar: String(source?.avatar || source?.avatar_url || source?.avatarUrl || ''),
+    phoneNumber: String(source?.phoneNumber || source?.phone_number || ''),
+  };
+};
+
+const findOrCreateMboteUser = async (profile: NonNullable<ReturnType<typeof normalizeExternalProfile>>) => {
+  const existing = [...users.values()].find((user) => (
+    normalizeEmail(user.email) === profile.email
+    || (user.mboteUserId && user.mboteUserId === profile.id)
+  ));
+  if (existing) {
+    existing.name = existing.name || profile.name;
+    existing.username = existing.username || profile.username;
+    existing.avatar = existing.avatar || profile.avatar || createAvatar(profile.name);
+    existing.phoneNumber = existing.phoneNumber || profile.phoneNumber;
+    existing.mboteUserId = profile.id;
+    await saveDatabase();
+    return existing;
+  }
+
+  const { salt, hash } = hashPassword(createToken());
+  const user: User = {
+    id: nextUserId++,
+    name: profile.name,
+    username: profile.username,
+    email: profile.email,
+    avatar: profile.avatar || createAvatar(profile.name),
+    phoneNumber: profile.phoneNumber,
+    mboteUserId: profile.id,
+    passwordSalt: salt,
+    passwordHash: hash,
+    createdAt: new Date().toISOString(),
+  };
+  users.set(user.id, user);
+  await saveDatabase();
+  return user;
 };
 
 const createMeetingLink = () => `room-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -612,6 +806,108 @@ const getPublicMeeting = (meeting: Meeting): Meeting => {
   return { ...meeting, settings };
 };
 
+const getAdminPeriodStart = (period: unknown) => {
+  const now = new Date();
+  const value = String(period || '30d');
+  if (value === '7d') return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  if (value === 'month') return new Date(now.getFullYear(), now.getMonth(), 1);
+  return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+};
+
+const buildDailyAdminUsage = (startDate: Date) => {
+  const days = Math.max(7, Math.ceil((Date.now() - startDate.getTime()) / (24 * 60 * 60 * 1000)));
+  return Array.from({ length: Math.min(days, 30) }, (_, index) => {
+    const date = new Date(Date.now() - (Math.min(days, 30) - index - 1) * 24 * 60 * 60 * 1000);
+    const label = new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short' }).format(date);
+    return {
+      label,
+      meetings: [...meetings.values()].filter((meeting) => new Date(meeting.start_time).toDateString() === date.toDateString()).length,
+      users: [...users.values()].filter((user) => new Date(user.createdAt).toDateString() === date.toDateString()).length,
+    };
+  });
+};
+
+const buildAdminStatPoints = (values: number[]) => {
+  const padded = values.length >= 8 ? values : [...Array.from({ length: 8 - values.length }, () => 0), ...values];
+  return padded.map((value, index) => value + index + 1);
+};
+
+const buildAdminActivities = (limit = 5) => {
+  const userActivities = [...users.values()]
+    .filter((user) => !user.isGuest)
+    .map((user) => ({
+      id: `user-${user.id}`,
+      type: 'user' as AdminActivityType,
+      title: 'Nouvel utilisateur inscrit',
+      description: `${user.name || user.email} vient de s'inscrire`,
+      createdAt: user.createdAt,
+    }));
+  const meetingActivities = [...meetings.values()].map((meeting) => ({
+    id: `meeting-${meeting.id}`,
+    type: 'meeting' as AdminActivityType,
+    title: meeting.is_active ? 'RÃ©union dÃ©marrÃ©e' : 'Nouvelle rÃ©union crÃ©Ã©e',
+    description: `Titre : ${meeting.title}`,
+    createdAt: meeting.start_time,
+  }));
+  return [...userActivities, ...meetingActivities]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, limit);
+};
+
+const buildAdminDashboard = (period: unknown) => {
+  const startDate = getAdminPeriodStart(period);
+  const allUsers = [...users.values()];
+  const allMeetings = [...meetings.values()];
+  const periodMeetings = allMeetings.filter((meeting) => new Date(meeting.start_time) >= startDate);
+  const liveMeetings = allMeetings.filter((meeting) => meeting.is_active);
+  const usage = buildDailyAdminUsage(startDate);
+  const totalMeetingMinutes = allMeetings.reduce((sum, meeting) => sum + Math.max(0, Number(meeting.duration || 0)) * Math.max(1, meeting.participant_count || 1), 0);
+  const guests = allUsers.filter((user) => user.isGuest).length;
+  const activeUsers = Math.max(0, allUsers.length - guests);
+  const countryBuckets = new Map<string, { name: string; flag: string; count: number }>();
+
+  for (const user of allUsers) {
+    const record = user as User & { country?: string; countryCode?: string };
+    const countryName = record.country || 'Autres';
+    const countryCode = String(record.countryCode || '').toUpperCase();
+    const flag = countryCode === 'CG' ? 'ðŸ‡¨ðŸ‡¬'
+      : countryCode === 'FR' ? 'ðŸ‡«ðŸ‡·'
+        : countryCode === 'CM' ? 'ðŸ‡¨ðŸ‡²'
+          : countryCode === 'CD' ? 'ðŸ‡¨ðŸ‡©'
+            : 'ðŸŒ';
+    const current = countryBuckets.get(countryName) || { name: countryName, flag, count: 0 };
+    current.count += 1;
+    countryBuckets.set(countryName, current);
+  }
+
+  const countries = [...countryBuckets.entries()].map(([id, value]) => ({
+    id,
+    ...value,
+    percentage: allUsers.length ? Number(((value.count / allUsers.length) * 100).toFixed(1)) : 0,
+  })).sort((a, b) => b.count - a.count);
+
+  return {
+    stats: [
+      { id: 'users', label: 'Utilisateurs total', value: allUsers.length, evolution: 0, helper: 'ce mois', points: buildAdminStatPoints(usage.map((item) => item.users)) },
+      { id: 'meetings', label: 'RÃ©unions crÃ©Ã©es', value: periodMeetings.length, evolution: 0, helper: 'ce mois', points: buildAdminStatPoints(usage.map((item) => item.meetings)) },
+      { id: 'live', label: 'RÃ©unions en direct', value: liveMeetings.length, evolution: 0, helper: 'En ce moment', points: buildAdminStatPoints(usage.map((item) => item.meetings)) },
+      { id: 'hours', label: 'Heures de rÃ©union', value: Math.round(totalMeetingMinutes / 60), suffix: 'h', evolution: 0, helper: 'au total', points: buildAdminStatPoints(usage.map((item) => item.meetings * 2)) },
+      { id: 'recordings', label: 'Enregistrements', value: allMeetings.filter((meeting) => meeting.settings.recording).length, evolution: 0, helper: 'au total', points: buildAdminStatPoints(usage.map(() => 0)) },
+    ],
+    liveMeetings: liveMeetings.map(getPublicMeeting),
+    recentActivity: buildAdminActivities(5),
+    usage,
+    distribution: {
+      active: activeUsers,
+      guests,
+      inactive: 0,
+      banned: 0,
+    },
+    countries,
+    permissions: adminPermissions,
+  };
+};
+
 const normalizePlainText = (value: unknown) => String(value || '').replace(/\s+/g, ' ').trim();
 
 const parseCommaList = (value: unknown) =>
@@ -628,24 +924,24 @@ const getGroqModels = () => {
 
 const buildLunaFallback = (prompt: string) => {
   const lower = normalizePlainText(prompt).toLowerCase();
-  if (!lower) return 'Je n’ai pas reçu de message à traiter.';
-  if (/(résume|resume|synthèse|synthese|compte rendu|compte-rendu)/i.test(lower)) {
-    return 'Fonctionnalité non configurée. Active GROQ_API_KEY pour générer un vrai résumé de réunion.';
+  if (!lower) return 'Je nâ€™ai pas reÃ§u de message Ã  traiter.';
+  if (/(rÃ©sume|resume|synthÃ¨se|synthese|compte rendu|compte-rendu)/i.test(lower)) {
+    return 'FonctionnalitÃ© non configurÃ©e. Active GROQ_API_KEY pour gÃ©nÃ©rer un vrai rÃ©sumÃ© de rÃ©union.';
   }
   if (/(ordre du jour|agenda|plan)/i.test(lower)) {
-    return 'Fonctionnalité non configurée. Je pourrai préparer un ordre du jour dès que le fournisseur IA sera actif.';
+    return 'FonctionnalitÃ© non configurÃ©e. Je pourrai prÃ©parer un ordre du jour dÃ¨s que le fournisseur IA sera actif.';
   }
-  if (/(action|tâche|tache|décision|decision)/i.test(lower)) {
-    return 'Fonctionnalité non configurée. Je pourrai extraire les décisions et tâches avec un fournisseur IA actif.';
+  if (/(action|tÃ¢che|tache|dÃ©cision|decision)/i.test(lower)) {
+    return 'FonctionnalitÃ© non configurÃ©e. Je pourrai extraire les dÃ©cisions et tÃ¢ches avec un fournisseur IA actif.';
   }
-  return 'Fonctionnalité non configurée. Ajoute GROQ_API_KEY dans .env pour activer Luna IA.';
+  return 'FonctionnalitÃ© non configurÃ©e. Ajoute GROQ_API_KEY dans .env pour activer Luna IA.';
 };
 
 const normalizeLunaResponse = (value: unknown, prompt: string) => {
   const cleaned = normalizePlainText(value);
   if (!cleaned) return buildLunaFallback(prompt);
   return cleaned
-    .replace(/^je suis mbote[,.\s-]*/i, 'Je suis Luna IA, assistante de réunion MBotéRoom. ')
+    .replace(/^je suis mbote[,.\s-]*/i, 'Je suis Luna IA, assistante de rÃ©union MBotÃ©Room. ')
     .slice(0, 1800);
 };
 
@@ -683,13 +979,13 @@ const completeWithGroq = async (system: string, prompt: string) => {
 
 const buildLunaMeetingSystemPrompt = (meeting: Meeting, user: PublicUser, tone: LunaTone) => `
 Tu es Luna IA, assistante officielle de MBoteRoom.
-Tu aides pendant une réunion en ligne: résumer, préparer une réponse, clarifier une décision, proposer un ordre du jour, extraire des tâches et améliorer la communication.
-Réponds en français par défaut.
-Reste factuelle. Ne prétends jamais avoir transcrit l'audio, vu la vidéo ou consulté des fichiers si le contexte n'est pas fourni.
-Ne révèle jamais de secrets, tokens, mots de passe ou contenu .env.
-Réunion: ${meeting.title}.
+Tu aides pendant une rÃ©union en ligne: rÃ©sumer, prÃ©parer une rÃ©ponse, clarifier une dÃ©cision, proposer un ordre du jour, extraire des tÃ¢ches et amÃ©liorer la communication.
+RÃ©ponds en franÃ§ais par dÃ©faut.
+Reste factuelle. Ne prÃ©tends jamais avoir transcrit l'audio, vu la vidÃ©o ou consultÃ© des fichiers si le contexte n'est pas fourni.
+Ne rÃ©vÃ¨le jamais de secrets, tokens, mots de passe ou contenu .env.
+RÃ©union: ${meeting.title}.
 Utilisateur: ${user.name}.
-Ton demandé: ${tone}.
+Ton demandÃ©: ${tone}.
 `.trim();
 
 const addLobbyParticipant = async (
@@ -746,7 +1042,7 @@ const normalizeMeetingPayload = (body: Record<string, unknown>, currentUser: Pub
 
   return {
     id: existing?.id || nextMeetingId++,
-    title: String(body.title || existing?.title || 'Réunion MBoté').trim().slice(0, 160),
+    title: String(body.title || existing?.title || 'RÃ©union MBotÃ©').trim().slice(0, 160),
     description: String(body.description || existing?.description || '').trim().slice(0, 1000),
     host_id: Number(body.host_id || body.hostId || existing?.host_id || currentUser.id),
     co_host_id: body.coHostId || body.co_host_id ? Number(body.coHostId || body.co_host_id) : existing?.co_host_id,
@@ -765,18 +1061,18 @@ async function seedDatabase() {
   const { salt, hash } = hashPassword('MboteRoom2026!');
   const user: User = {
     id: nextUserId++,
-    name: 'Hôte MBoté',
+    name: 'HÃ´te MBotÃ©',
     username: 'hote',
     email: 'hote@mbote.local',
-    avatar: createAvatar('Hôte MBoté'),
+    avatar: createAvatar('HÃ´te MBotÃ©'),
     passwordSalt: salt,
     passwordHash: hash,
     createdAt: new Date().toISOString(),
   };
   users.set(user.id, user);
   const seedMeeting = normalizeMeetingPayload({
-    title: 'Réunion de démonstration MBoté',
-    description: 'Salle prête pour tester le lobby, la vidéo, le micro, le chat et le partage de lien.',
+    title: 'RÃ©union de dÃ©monstration MBotÃ©',
+    description: 'Salle prÃªte pour tester le lobby, la vidÃ©o, le micro, le chat et le partage de lien.',
     startTime: new Date(Date.now() - 5 * 60_000).toISOString(),
     duration: 90,
     settings: {
@@ -822,26 +1118,42 @@ app.get('/api/health', (_request, response) => {
   });
 });
 
+app.get('/api/public/meetings', (_request, response) => {
+  const publicMeetings = [...meetings.values()]
+    .filter((meeting) => {
+      const settings = meeting.settings || {};
+      return settings.isPublic === true || settings.visibility === 'public';
+    })
+    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+    .slice(0, 12)
+    .map(getPublicMeeting);
+
+  response.json(publicMeetings);
+});
+
 app.post('/api/auth/register', async (request, response) => {
   const name = String(request.body?.name || '').trim();
   const email = normalizeEmail(request.body?.email);
   const password = String(request.body?.password || '');
   const username = String(request.body?.username || email.split('@')[0] || '').trim().toLowerCase();
+  const phoneNumber = String(request.body?.phoneNumber || '').trim().slice(0, 40);
+  const organization = String(request.body?.organization || '').trim().slice(0, 120);
+  const jobTitle = String(request.body?.jobTitle || '').trim().slice(0, 120);
 
   if (!name || !email || !password) {
-    response.status(400).json({ error: 'Nom, email et mot de passe sont requis.' });
+    sendApiError(response, 400, 'VALIDATION_ERROR', 'Nom, email et mot de passe sont requis.');
     return;
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    response.status(400).json({ error: 'Email invalide.' });
+    sendApiError(response, 400, 'INVALID_EMAIL', 'Email invalide.');
     return;
   }
   if (password.length < 8) {
-    response.status(400).json({ error: 'Le mot de passe doit contenir au moins 8 caractères.' });
+    sendApiError(response, 400, 'PASSWORD_TOO_SHORT', 'Le mot de passe doit contenir au moins 8 caractères.');
     return;
   }
   if ([...users.values()].some((user) => user.email === email)) {
-    response.status(409).json({ error: 'Un compte existe déjà avec cet email.' });
+    sendApiError(response, 409, 'EMAIL_ALREADY_EXISTS', 'Un compte existe déjà avec cet email.');
     return;
   }
 
@@ -852,13 +1164,16 @@ app.post('/api/auth/register', async (request, response) => {
     username,
     email,
     avatar: createAvatar(name),
+    phoneNumber,
+    organization,
+    jobTitle,
     passwordSalt: salt,
     passwordHash: hash,
     createdAt: new Date().toISOString(),
   };
   users.set(user.id, user);
   await saveDatabase();
-  response.status(201).json(await createSession(user));
+  response.status(201).json(await createSession(user, true));
 });
 
 app.post('/api/auth/login', async (request, response) => {
@@ -866,25 +1181,161 @@ app.post('/api/auth/login', async (request, response) => {
   const password = String(request.body?.password || '');
   const user = [...users.values()].find((item) => item.email === email);
   if (!user || !verifyPassword(password, user)) {
-    response.status(401).json({ error: 'Email ou mot de passe incorrect.' });
+    sendApiError(response, 401, 'INVALID_CREDENTIALS', 'Email ou mot de passe incorrect.');
     return;
   }
-  response.json(await createSession(user));
+  response.json(await createSession(user, Boolean(request.body?.rememberMe)));
+});
+
+app.get('/api/auth/mbote/start', (request, response) => {
+  const config = getMboteAuthConfig(request);
+  if (!config.authorizeUrl || !config.clientId || !config.tokenUrl || !config.profileUrl) {
+    sendApiError(
+      response,
+      503,
+      'EXTERNAL_AUTH_NOT_CONFIGURED',
+      "L'authentification MBoté doit être configurée avec MBOTE_AUTH_BASE_URL, MBOTE_AUTH_CLIENT_ID et MBOTE_AUTH_PROFILE_URL.",
+    );
+    return;
+  }
+
+  const state = createToken();
+  mboteOAuthStates.set(state, {
+    redirectTo: normalizeRedirectPath(request.query.redirect),
+    createdAt: Date.now(),
+  });
+
+  const url = new URL(config.authorizeUrl);
+  url.searchParams.set('client_id', config.clientId);
+  url.searchParams.set('redirect_uri', config.redirectUri);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('scope', 'profile email');
+  url.searchParams.set('state', state);
+  response.json({ url: url.toString() });
+});
+
+app.get('/api/auth/mbote/callback', async (request, response) => {
+  const code = String(request.query.code || '').trim();
+  const state = String(request.query.state || '').trim();
+  const storedState = mboteOAuthStates.get(state);
+  mboteOAuthStates.delete(state);
+
+  if (!code || !storedState || Date.now() - storedState.createdAt > 10 * 60 * 1000) {
+    response.redirect(`/connexion?externalAuth=failed&reason=${encodeURIComponent('Session MBoté expirée ou invalide.')}`);
+    return;
+  }
+
+  const config = getMboteAuthConfig(request);
+  try {
+    const tokenResponse = await fetch(config.tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        code,
+        client_id: config.clientId,
+        client_secret: config.clientSecret || undefined,
+        redirect_uri: config.redirectUri,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const tokenPayload = await tokenResponse.json().catch(() => ({}));
+    if (!tokenResponse.ok || !tokenPayload.access_token) throw new Error(tokenPayload.error || 'Token MBoté indisponible.');
+
+    const profileResponse = await fetch(config.profileUrl, {
+      headers: { Authorization: `Bearer ${tokenPayload.access_token}` },
+      signal: AbortSignal.timeout(15000),
+    });
+    const profilePayload = await profileResponse.json().catch(() => ({}));
+    if (!profileResponse.ok) throw new Error(profilePayload.error || 'Profil MBoté indisponible.');
+
+    const profile = normalizeExternalProfile(profilePayload);
+    if (!profile) throw new Error('Profil MBoté incomplet.');
+
+    const user = await findOrCreateMboteUser(profile);
+    const session = await createSession(user, true);
+    const callbackHtml = `<!doctype html><html><body><script>
+      localStorage.setItem('user', ${JSON.stringify(JSON.stringify(session.user))});
+      localStorage.setItem('token', ${JSON.stringify(session.token)});
+      window.dispatchEvent(new CustomEvent('mbote-room-auth-changed'));
+      window.opener?.postMessage(${JSON.stringify({ type: 'MBOTE_ROOM_AUTH_SUCCESS', session, redirectTo: storedState.redirectTo })}, window.location.origin);
+      window.location.replace(${JSON.stringify(storedState.redirectTo)});
+    </script></body></html>`;
+    response.type('html').send(callbackHtml);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Authentification MBoté impossible.';
+    response.redirect(`/connexion?externalAuth=failed&reason=${encodeURIComponent(message)}`);
+  }
+});
+
+app.post('/api/auth/forgot-password', async (request, response) => {
+  const email = normalizeEmail(request.body?.email);
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    sendApiError(response, 400, 'INVALID_EMAIL', 'Adresse e-mail invalide.');
+    return;
+  }
+
+  const user = [...users.values()].find((item) => item.email === email && !item.isGuest);
+  if (!user) {
+    response.json({ success: true, message: 'Si un compte existe, un lien de réinitialisation sera envoyé.' });
+    return;
+  }
+
+  const token = createToken();
+  const requestItem: PasswordResetRequest = {
+    tokenHash: hashToken(token),
+    userId: user.id,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+  };
+  passwordResetRequests.set(requestItem.tokenHash, requestItem);
+  await saveDatabase();
+
+  response.json({
+    success: true,
+    message: 'Un lien de réinitialisation a été généré pour ce compte.',
+    resetUrl: process.env.NODE_ENV === 'production' ? undefined : `/reinitialiser-mot-de-passe?token=${encodeURIComponent(token)}`,
+  });
+});
+
+app.post('/api/auth/reset-password', async (request, response) => {
+  const token = String(request.body?.token || '').trim();
+  const password = String(request.body?.password || '');
+  const resetRequest = token ? passwordResetRequests.get(hashToken(token)) : null;
+  if (!resetRequest || resetRequest.usedAt || new Date(resetRequest.expiresAt).getTime() <= Date.now()) {
+    sendApiError(response, 400, 'PASSWORD_RESET_INVALID', 'Lien de réinitialisation invalide ou expiré.');
+    return;
+  }
+  if (password.length < 8) {
+    sendApiError(response, 400, 'PASSWORD_TOO_SHORT', 'Le mot de passe doit contenir au moins 8 caractères.');
+    return;
+  }
+  const user = users.get(resetRequest.userId);
+  if (!user) {
+    sendApiError(response, 400, 'PASSWORD_RESET_INVALID', 'Lien de réinitialisation invalide ou expiré.');
+    return;
+  }
+  const { salt, hash } = hashPassword(password);
+  user.passwordSalt = salt;
+  user.passwordHash = hash;
+  resetRequest.usedAt = new Date().toISOString();
+  await saveDatabase();
+  response.json({ success: true });
 });
 
 app.post('/api/auth/guest-join', async (request, response) => {
   const name = String(request.body?.name || '').trim().slice(0, 80);
   const meeting = findMeetingByAccessValue(request.body?.meetingCode);
   if (!name) {
-    response.status(400).json({ error: 'Votre nom est requis pour rejoindre la salle d’attente.' });
+    sendApiError(response, 400, 'VALIDATION_ERROR', 'Votre nom est requis pour rejoindre la salle d’attente.');
     return;
   }
   if (!meeting) {
-    response.status(404).json({ error: 'Réunion introuvable.' });
+    sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
     return;
   }
   if (!validateMeetingPassword(meeting, request.body?.password)) {
-    response.status(403).json({ error: 'ID ou mot de passe de réunion incorrect.' });
+    sendApiError(response, 403, 'MEETING_PASSWORD_INVALID', 'ID ou mot de passe de réunion incorrect.');
     return;
   }
 
@@ -903,7 +1354,7 @@ app.post('/api/auth/guest-join', async (request, response) => {
   users.set(guest.id, guest);
   const publicGuest = getPublicUser(guest);
   const lobbyParticipant = await addLobbyParticipant(meeting, publicGuest, 'requested');
-  const session = await createSession(guest);
+  const session = await createSession(guest, false);
   response.status(201).json({
     ...session,
     meeting: getPublicMeeting(meeting),
@@ -922,6 +1373,53 @@ app.post('/api/auth/logout', authenticateToken, async (request, response) => {
   response.json({ success: true });
 });
 
+app.get('/api/admin/dashboard', authenticateToken, requireAdmin, (request, response) => {
+  response.json(buildAdminDashboard(request.query.period));
+});
+
+app.get('/api/admin/search', authenticateToken, requireAdmin, (request, response) => {
+  const query = String(request.query.q || '').trim().toLowerCase().slice(0, 80);
+  if (!query) {
+    response.json({ meetings: [], users: [] });
+    return;
+  }
+
+  const normalized = query.replace(/\s+/g, '');
+  response.json({
+    meetings: [...meetings.values()]
+      .filter((meeting) => (
+        meeting.title.toLowerCase().includes(query)
+        || meeting.host_name.toLowerCase().includes(query)
+        || String(meeting.id).includes(normalized)
+        || meeting.meeting_link.toLowerCase().includes(query)
+        || String(meeting.settings.meetingAccessId || '').toLowerCase().includes(normalized)
+      ))
+      .slice(0, 10)
+      .map(getPublicMeeting),
+    users: [...users.values()]
+      .filter((user) => !user.isGuest)
+      .filter((user) => (
+        user.name.toLowerCase().includes(query)
+        || user.email.toLowerCase().includes(query)
+        || user.username.toLowerCase().includes(query)
+      ))
+      .slice(0, 10)
+      .map((user) => ({ id: user.id, name: user.name, email: user.email })),
+  });
+});
+
+app.post('/api/admin/meetings/:meetingId/join', authenticateToken, requireAdmin, async (request: AuthedRequest, response) => {
+  const meeting = meetings.get(Number(request.params.meetingId));
+  if (!meeting) {
+    sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
+    return;
+  }
+
+  console.info(`Admin ${request.user?.id} joined meeting ${meeting.id}`);
+  await addLobbyParticipant(meeting, request.user!, 'accepted');
+  response.json({ success: true, meeting: getPublicMeeting(meeting) });
+});
+
 app.get('/api/meetings', authenticateToken, (_request, response) => {
   response.json([...meetings.values()]
     .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
@@ -934,6 +1432,7 @@ app.post('/api/meetings', authenticateToken, async (request: AuthedRequest, resp
   lobby.set(meeting.id, []);
   mediaRequests.set(meeting.id, []);
   await saveDatabase();
+  io.emit('meeting:created', getPublicMeeting(meeting));
   response.status(201).json(getPublicMeeting(meeting));
 });
 
@@ -951,12 +1450,12 @@ app.post('/api/meetings/join-lookup', authenticateToken, (request, response) => 
   const meeting = findMeetingByAccessValue(request.body?.value);
 
   if (!meeting) {
-    response.status(404).json({ error: 'Réunion introuvable' });
+    sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
     return;
   }
 
   if (!validateMeetingPassword(meeting, request.body?.password)) {
-    response.status(403).json({ error: 'Mot de passe de réunion incorrect' });
+    sendApiError(response, 403, 'MEETING_PASSWORD_INVALID', 'Mot de passe de réunion incorrect.');
     return;
   }
 
@@ -966,7 +1465,7 @@ app.post('/api/meetings/join-lookup', authenticateToken, (request, response) => 
 app.get('/api/meetings/link/:meetingLink', authenticateToken, (request, response) => {
   const meeting = [...meetings.values()].find((item) => item.meeting_link === request.params.meetingLink);
   if (!meeting) {
-    response.status(404).json({ error: 'Réunion introuvable' });
+    sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
     return;
   }
   response.json(getPublicMeeting(meeting));
@@ -976,17 +1475,18 @@ app.put('/api/meetings/:meetingId', authenticateToken, async (request: AuthedReq
   const meetingId = Number(request.params.meetingId);
   const existing = meetings.get(meetingId);
   if (!existing) {
-    response.status(404).json({ error: 'Réunion introuvable' });
+    sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
     return;
   }
   const canManage = isMeetingModerator(existing, request.user!);
   if (!canManage) {
-    response.status(403).json({ error: 'Seul l’hôte peut modifier cette réunion.' });
+    sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte peut modifier cette réunion.');
     return;
   }
   const updated = normalizeMeetingPayload(request.body || {}, request.user!, existing);
   meetings.set(meetingId, updated);
   await saveDatabase();
+  io.emit('meeting:updated', getPublicMeeting(updated));
   response.json(getPublicMeeting(updated));
 });
 
@@ -994,13 +1494,14 @@ app.delete('/api/meetings/:meetingId', authenticateToken, async (request: Authed
   const meetingId = Number(request.params.meetingId);
   const meeting = meetings.get(meetingId);
   if (meeting && !isMeetingModerator(meeting, request.user!)) {
-    response.status(403).json({ error: 'Seul l’hôte peut supprimer cette réunion.' });
+    sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte peut supprimer cette réunion.');
     return;
   }
   meetings.delete(meetingId);
   lobby.delete(meetingId);
   mediaRequests.delete(meetingId);
   await saveDatabase();
+  io.emit('meeting:cancelled', { meetingId });
   response.status(204).end();
 });
 
@@ -1008,7 +1509,7 @@ app.get('/api/meetings/:meetingId/lobby', authenticateToken, (request: AuthedReq
   const meetingId = Number(request.params.meetingId);
   const meeting = meetings.get(meetingId);
   if (!meeting) {
-    response.status(404).json({ error: 'RÃ©union introuvable' });
+    sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
     return;
   }
   const rows = lobby.get(meetingId) || [];
@@ -1023,12 +1524,12 @@ app.post('/api/meetings/:meetingId/join-request', authenticateToken, async (requ
   const meetingId = Number(request.params.meetingId);
   const meeting = meetings.get(meetingId);
   if (!meeting) {
-    response.status(404).json({ error: 'Réunion introuvable' });
+    sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
     return;
   }
 
   if (!validateMeetingPassword(meeting, request.body?.password)) {
-    response.status(403).json({ error: 'Mot de passe de réunion incorrect' });
+    sendApiError(response, 403, 'MEETING_PASSWORD_INVALID', 'Mot de passe de réunion incorrect.');
     return;
   }
 
@@ -1043,15 +1544,16 @@ app.post('/api/meetings/:meetingId/join-request', authenticateToken, async (requ
 app.post('/api/meetings/:meetingId/start-notify', authenticateToken, async (request: AuthedRequest, response) => {
   const meeting = meetings.get(Number(request.params.meetingId));
   if (!meeting) {
-    response.status(404).json({ error: 'Réunion introuvable' });
+    sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
     return;
   }
   if (!isMeetingModerator(meeting, request.user!)) {
-    response.status(403).json({ error: 'Seul l’hôte peut démarrer cette réunion.' });
+    sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte peut démarrer cette réunion.');
     return;
   }
   meeting.is_active = true;
   await saveDatabase();
+  io.emit('meeting:started', getPublicMeeting(meeting));
   response.json({ success: true, notifiedCount: Math.max(0, meeting.participant_count - 1), meeting: getPublicMeeting(meeting) });
 });
 
@@ -1059,7 +1561,7 @@ app.post('/api/meetings/:meetingId/lobby/respond', authenticateToken, async (req
   const meetingId = Number(request.params.meetingId);
   const meeting = meetings.get(meetingId);
   if (!meeting || !isMeetingModerator(meeting, request.user!)) {
-    response.status(403).json({ error: 'Seul l’hôte peut gérer le lobby.' });
+    sendApiError(response, 403, 'LOBBY_HOST_REQUIRED', 'Seul l’hôte peut gérer le lobby.');
     return;
   }
   const userId = Number(request.body?.userId);
@@ -1075,17 +1577,17 @@ app.post('/api/meetings/:meetingId/media-requests', authenticateToken, async (re
   const meetingId = Number(request.params.meetingId);
   const meeting = meetings.get(meetingId);
   if (!meeting) {
-    response.status(404).json({ error: 'RÃ©union introuvable' });
+    sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
     return;
   }
   if (!isMeetingModerator(meeting, request.user!)) {
-    response.status(403).json({ error: 'Seul lâ€™hÃ´te peut demander un contrÃ´le mÃ©dia.' });
+    sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte peut demander un contrôle média.');
     return;
   }
   const targetUserId = Number(request.body?.targetUserId);
   const targetUser = users.get(targetUserId);
   if (!targetUser || !canEnterMeeting(meeting, getPublicUser(targetUser))) {
-    response.status(404).json({ error: 'Participant introuvable dans cette rÃ©union.' });
+    sendApiError(response, 404, 'PARTICIPANT_NOT_FOUND', 'Participant introuvable dans cette réunion.');
     return;
   }
   const requestRows = mediaRequests.get(meetingId) || [];
@@ -1108,7 +1610,7 @@ app.post('/api/meetings/:meetingId/media-requests', authenticateToken, async (re
 app.get('/api/meetings/:meetingId/media-requests', authenticateToken, (request: AuthedRequest, response) => {
   const meeting = meetings.get(Number(request.params.meetingId));
   if (!meeting || !canEnterMeeting(meeting, request.user!)) {
-    response.status(403).json({ error: 'AccÃ¨s refusÃ© Ã  cette rÃ©union.' });
+    sendApiError(response, 403, 'MEDIA_REQUEST_ACCESS_DENIED', 'Accès refusé à cette réunion.');
     return;
   }
   const rows = mediaRequests.get(Number(request.params.meetingId)) || [];
@@ -1119,11 +1621,11 @@ app.post('/api/meetings/:meetingId/media-requests/:requestId/respond', authentic
   const rows = mediaRequests.get(Number(request.params.meetingId)) || [];
   const item = rows.find((row) => row.id === request.params.requestId);
   if (!item) {
-    response.status(404).json({ error: 'Demande introuvable' });
+    sendApiError(response, 404, 'MEDIA_REQUEST_NOT_FOUND', 'Demande introuvable.');
     return;
   }
   if (item.targetUserId !== request.user!.id) {
-    response.status(403).json({ error: 'Cette demande ne vous est pas destinÃ©e.' });
+    sendApiError(response, 403, 'MEDIA_REQUEST_FORBIDDEN', 'Cette demande ne vous est pas destinée.');
     return;
   }
   item.status = request.body?.status === 'rejected' ? 'rejected' : 'accepted';
@@ -1141,11 +1643,11 @@ app.post('/api/ai/luna', authenticateToken, async (request: AuthedRequest, respo
   const meeting = meetings.get(meetingId);
 
   if (!prompt) {
-    response.status(400).json({ error: 'Message requis pour Luna IA.' });
+    sendApiError(response, 400, 'LUNA_PROMPT_REQUIRED', 'Message requis pour Luna IA.');
     return;
   }
   if (!meeting || !canEnterMeeting(meeting, request.user!)) {
-    response.status(403).json({ error: 'Accès refusé à cette réunion.' });
+    sendApiError(response, 403, 'LUNA_ACCESS_DENIED', 'Accès refusé à cette réunion.');
     return;
   }
 
@@ -1167,10 +1669,35 @@ app.get('/api/actus/events', authenticateToken, (_request, response) => {
   })));
 });
 
+type RealtimeErrorCode =
+  | 'REALTIME_AUTH_REQUIRED'
+  | 'REALTIME_MEETING_INVALID'
+  | 'REALTIME_MEETING_ACCESS_DENIED'
+  | 'REALTIME_NOT_JOINED'
+  | 'REALTIME_TARGET_INVALID';
+
+type RealtimeCallbackError = {
+  ok: false;
+  code: RealtimeErrorCode;
+  error: string;
+};
+
+const createRealtimeError = (code: RealtimeErrorCode, error: string): RealtimeCallbackError => ({
+  ok: false,
+  code,
+  error,
+});
+
+const createRealtimeConnectionError = (code: RealtimeErrorCode, message: string) => {
+  const error = new Error(message) as Error & { data?: { code: RealtimeErrorCode; error: string } };
+  error.data = { code, error: message };
+  return error;
+};
+
 io.use((socket, next) => {
   const user = getUserByToken(socket.handshake.auth?.token);
   if (!user) {
-    next(new Error('Session invalide.'));
+    next(createRealtimeConnectionError('REALTIME_AUTH_REQUIRED', 'Session invalide.'));
     return;
   }
   socket.data.user = user;
@@ -1182,7 +1709,7 @@ io.on('connection', (socket) => {
     const [eventName, payload, callback] = packet as [string, Record<string, unknown> | undefined, ((response: unknown) => void) | undefined];
     const user = socket.data.user as PublicUser | undefined;
     if (!user) {
-      next(new Error('Session invalide.'));
+      next(createRealtimeConnectionError('REALTIME_AUTH_REQUIRED', 'Session invalide.'));
       return;
     }
 
@@ -1190,11 +1717,11 @@ io.on('connection', (socket) => {
       const meetingId = Number(payload?.meetingId);
       const meeting = meetings.get(meetingId);
       if (!meeting) {
-        callback?.({ ok: false, error: 'RÃ©union invalide' });
+        callback?.(createRealtimeError('REALTIME_MEETING_INVALID', 'Réunion invalide.'));
         return;
       }
       if (!canEnterMeeting(meeting, user)) {
-        callback?.({ ok: false, error: 'AccÃ¨s non autorisÃ© Ã  cette rÃ©union.' });
+        callback?.(createRealtimeError('REALTIME_MEETING_ACCESS_DENIED', 'Accès non autorisé à cette réunion.'));
         return;
       }
       packet[1] = {
@@ -1211,7 +1738,10 @@ io.on('connection', (socket) => {
 
     if (eventName === 'meeting:media-updated') {
       const meetingId = String(payload?.meetingId || '');
-      if (!meetingId || meetingId !== String(socket.data.meetingId || '')) return;
+      if (!meetingId || meetingId !== String(socket.data.meetingId || '')) {
+        callback?.(createRealtimeError('REALTIME_NOT_JOINED', 'Vous devez rejoindre la réunion avant cette action.'));
+        return;
+      }
       packet[1] = { ...(payload || {}), media: sanitizeMediaState(payload?.media) };
       next();
       return;
@@ -1221,7 +1751,10 @@ io.on('connection', (socket) => {
       const meetingId = String(payload?.meetingId || '');
       const targetSocketId = String(payload?.targetSocketId || '');
       const participants = meetingParticipants.get(meetingId);
-      if (meetingId !== String(socket.data.meetingId || '') || !participants?.has(socket.id) || !participants.has(targetSocketId)) return;
+      if (meetingId !== String(socket.data.meetingId || '') || !participants?.has(socket.id) || !participants.has(targetSocketId)) {
+        callback?.(createRealtimeError('REALTIME_TARGET_INVALID', 'Participant cible introuvable.'));
+        return;
+      }
       next();
       return;
     }
@@ -1232,7 +1765,7 @@ io.on('connection', (socket) => {
   socket.on('meeting:join', (payload, callback) => {
     const meetingId = String(payload?.meetingId || '');
     if (!meetingId) {
-      callback?.({ ok: false, error: 'Réunion invalide' });
+      callback?.(createRealtimeError('REALTIME_MEETING_INVALID', 'Réunion invalide.'));
       return;
     }
 
@@ -1272,6 +1805,36 @@ io.on('connection', (socket) => {
     socket.to(`meeting:${meetingId}`).emit('meeting:participant-media-updated', participant);
   });
 
+  socket.on('meeting:chat-message', (payload) => {
+    const meetingId = String(payload?.meetingId || socket.data.meetingId || '');
+    const roomName = String(socket.data.roomName || '');
+    const user = socket.data.user as PublicUser | undefined;
+    if (!user || !meetingId || roomName !== `meeting:${meetingId}`) return;
+    const text = normalizePlainText(payload?.text).slice(0, 800);
+    if (!text) return;
+    io.to(roomName).emit('meeting:chat-message', {
+      id: `${Date.now()}-${socket.id}`,
+      meetingId,
+      userId: user.id,
+      sender: user.name || user.email || 'Participant',
+      text,
+      time: new Date().toISOString(),
+    });
+  });
+
+  socket.on('meeting:hand-raised', (payload) => {
+    const meetingId = String(payload?.meetingId || socket.data.meetingId || '');
+    const roomName = String(socket.data.roomName || '');
+    const user = socket.data.user as PublicUser | undefined;
+    if (!user || !meetingId || roomName !== `meeting:${meetingId}`) return;
+    socket.to(roomName).emit('meeting:hand-raised', {
+      meetingId,
+      userId: user.id,
+      name: user.name || user.email || 'Participant',
+      raised: Boolean(payload?.raised),
+    });
+  });
+
   for (const eventName of ['meeting:offer', 'meeting:answer', 'meeting:ice-candidate']) {
     socket.on(eventName, (payload) => {
       if (!payload?.targetSocketId) return;
@@ -1307,5 +1870,5 @@ app.get('*', (_request, response) => {
 const port = Number(process.env.PORT || 3004);
 await loadDatabase();
 httpServer.listen(port, () => {
-  console.log(`MBoté Room API listening on http://localhost:${port}`);
+  console.log(`MBotÃ© Room API listening on http://localhost:${port}`);
 });

@@ -70,6 +70,34 @@ a {
   padding: 0 12px;
 }
 
+.simple-info-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #f7f9ff;
+}
+
+.simple-info-page section {
+  width: min(100%, 560px);
+  padding: 34px;
+  border: 1px solid #dce3f0;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 18px 40px rgba(28, 45, 90, 0.08);
+}
+
+.simple-info-page h1 {
+  margin: 0 0 12px;
+  color: #101b40;
+}
+
+.simple-info-page p {
+  margin: 0;
+  color: #617096;
+  line-height: 1.6;
+}
+
 @media (max-width: 520px) {
   .account-bar {
     left: 10px;

@@ -149,7 +149,7 @@ export function useMeetingMeshWebRTC({
     socket.auth = { token: authService.getToken() };
     if (!socket.connected) socket.connect();
 
-    const onParticipants = (response: { ok?: boolean; error?: string; participants?: ServerMeetingParticipant[] }) => {
+    const onParticipants = (response: { ok?: boolean; code?: string; error?: string; participants?: ServerMeetingParticipant[] }) => {
       if (!response?.ok) {
         onNotice?.(response?.error || 'Connexion temps réel de la réunion impossible.');
         return;
