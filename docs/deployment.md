@@ -6,6 +6,12 @@
 - Backend Express + Socket.IO : Render.
 - Base de données : PostgreSQL Render via `DATABASE_URL`.
 
+## Etat actuel
+
+- Vercel production : `https://mbote-room.vercel.app`
+- Render PostgreSQL : `mbote-room-db`
+- Render API : creation bloquee tant que la branche `main` n'existe pas dans le depot GitHub `https://github.com/sysandro02-byte/Mbot-Room`.
+
 ## Variables Vercel
 
 Configurer dans le dashboard Vercel :
