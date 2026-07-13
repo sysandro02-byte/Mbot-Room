@@ -34,46 +34,46 @@ type FieldErrors = Partial<Record<'name' | 'email' | 'password' | 'phoneNumber' 
 
 const translations = {
   fr: {
-    languageLabel: 'FranÃ§ais',
-    ariaLanguage: 'SÃ©lectionner la langue',
-    brandTitle: 'RÃ©unions sÃ©curisÃ©es',
-    heroTitle: 'RÃ©unions sÃ©curisÃ©es\npour tous',
-    heroDescription: 'Organisez, rejoignez et collaborez\nen toute simplicitÃ© avec MBotÃ©Room.',
+    languageLabel: 'Français',
+    ariaLanguage: 'Sélectionner la langue',
+    brandTitle: 'Réunions sécurisées',
+    heroTitle: 'Réunions sécurisées\npour tous',
+    heroDescription: 'Organisez, rejoignez et collaborez\nen toute simplicité avec MBotéRoom.',
     features: [
-      ['SÃ©curisÃ©', 'Vos rÃ©unions sont protÃ©gÃ©es avec un chiffrement de bout en bout.'],
-      ['Facile Ã  utiliser', 'Interface intuitive pour crÃ©er et rejoindre vos rÃ©unions en un clic.'],
-      ['Audio et vidÃ©o HD', "Profitez d'une qualitÃ© audio et vidÃ©o exceptionnelle."],
-      ['Accessible partout', "Utilisable sur tous vos appareils, n'importe oÃ¹, n'importe quand."],
+      ['Sécurisé', 'Vos réunions sont protégées avec un chiffrement de bout en bout.'],
+      ['Facile à utiliser', 'Interface intuitive pour créer et rejoindre vos réunions en un clic.'],
+      ['Audio et vidéo HD', "Profitez d'une qualité audio et vidéo exceptionnelle."],
+      ['Accessible partout', "Utilisable sur tous vos appareils, n'importe où, n'importe quand."],
     ],
     footerBenefits: [
-      'SÃ©curitÃ© de bout en bout',
-      'Audio et vidÃ©o HD',
+      'Sécurité de bout en bout',
+      'Audio et vidéo HD',
       'Accessible sur tous vos appareils',
       'Aucune installation requise',
     ],
     title: 'Connexion',
-    subtitle: 'Connectez-vous Ã  votre compte MBotÃ©Room',
+    subtitle: 'Connectez-vous à votre compte MBotéRoom',
     email: 'Adresse e-mail',
     emailPlaceholder: 'exemple@mail.com',
     password: 'Mot de passe',
     passwordPlaceholder: 'Votre mot de passe',
     remember: 'Se souvenir de moi',
-    forgot: 'Mot de passe oubliÃ© ?',
+    forgot: 'Mot de passe oublié ?',
     submit: 'Se connecter',
     submitting: 'Connexion en cours...',
     or: 'ou',
-    google: 'Continuer avec MBotÃ©',
-    joinTitle: 'Rejoindre une rÃ©union',
-    joinText: "Vous n'avez pas de compte ? Rejoignez une rÃ©union en tant qu'invitÃ©.",
+    google: 'Continuer avec MBoté',
+    joinTitle: 'Rejoindre une réunion',
+    joinText: "Vous n'avez pas de compte ? Rejoignez une réunion en tant qu'invité.",
     noAccount: 'Pas encore de compte ?',
-    createAccount: 'CrÃ©er un compte',
+    createAccount: 'Créer un compte',
   },
   en: {
     languageLabel: 'English',
     ariaLanguage: 'Select language',
     brandTitle: 'Secure meetings',
     heroTitle: 'Secure meetings\nfor everyone',
-    heroDescription: 'Host, join, and collaborate\nwith MBotÃ©Room in total simplicity.',
+    heroDescription: 'Host, join, and collaborate\nwith MBotéRoom in total simplicity.',
     features: [
       ['Secure', 'Your meetings are protected with end-to-end encryption.'],
       ['Easy to use', 'An intuitive interface to create and join meetings in one click.'],
@@ -87,7 +87,7 @@ const translations = {
       'No installation required',
     ],
     title: 'Sign in',
-    subtitle: 'Sign in to your MBotÃ©Room account',
+    subtitle: 'Sign in to your MBotéRoom account',
     email: 'Email address',
     emailPlaceholder: 'example@mail.com',
     password: 'Password',
@@ -97,7 +97,7 @@ const translations = {
     submit: 'Sign in',
     submitting: 'Signing in...',
     or: 'or',
-    google: 'Continue with MBotÃ©',
+    google: 'Continue with MBoté',
     joinTitle: 'Join a meeting',
     joinText: "No account? Join a meeting as a guest.",
     noAccount: "Don't have an account?",
@@ -108,11 +108,11 @@ const translations = {
     ariaLanguage: 'Pona monoko',
     brandTitle: 'Masolo ya libateli',
     heroTitle: 'Masolo ya libateli\nmpo na bato nyonso',
-    heroDescription: 'Bongisa, kota mpe sala elongo\nna MBotÃ©Room na pete.',
+    heroDescription: 'Bongisa, kota mpe sala elongo\nna MBotéRoom na pete.',
     features: [
       ['Ebatelami', 'Masolo na yo ebatelami na chiffrement ya suka na suka.'],
-      ['Pete kosalela', 'Interface ya pete mpo na kosala mpe kokota na rÃ©union na clic moko.'],
-      ['Audio mpe video HD', 'Sepela na qualitÃ© ya malamu mpo na mongongo mpe video.'],
+      ['Pete kosalela', 'Interface ya pete mpo na kosala mpe kokota na réunion na clic moko.'],
+      ['Audio mpe video HD', 'Sepela na qualité ya malamu mpo na mongongo mpe video.'],
       ['Ezali bisika nyonso', 'Salela yango na ba appareils nyonso, bisika nyonso, ntango nyonso.'],
     ],
     footerBenefits: [
@@ -122,7 +122,7 @@ const translations = {
       'Installation esengeli te',
     ],
     title: 'Kokota',
-    subtitle: 'Kota na compte na yo ya MBotÃ©Room',
+    subtitle: 'Kota na compte na yo ya MBotéRoom',
     email: 'Adresse e-mail',
     emailPlaceholder: 'exemple@mail.com',
     password: 'Mot de passe',
@@ -132,46 +132,46 @@ const translations = {
     submit: 'Kokota',
     submitting: 'Kokota ezali kosalema...',
     or: 'to',
-    google: 'Koba na MBotÃ©',
-    joinTitle: 'Kokota na rÃ©union',
-    joinText: "Ozangi compte ? Kota na rÃ©union lokola invitÃ©.",
+    google: 'Koba na MBoté',
+    joinTitle: 'Kokota na réunion',
+    joinText: "Ozangi compte ? Kota na réunion lokola invité.",
     noAccount: 'Ozali nanu na compte te ?',
     createAccount: 'Kosala compte',
   },
   ar: {
-    languageLabel: 'Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©',
-    ariaLanguage: 'Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„Ù„ØºØ©',
-    brandTitle: 'Ø§Ø¬ØªÙ…Ø§Ø¹Ø§Øª Ø¢Ù…Ù†Ø©',
-    heroTitle: 'Ø§Ø¬ØªÙ…Ø§Ø¹Ø§Øª Ø¢Ù…Ù†Ø©\nÙ„Ù„Ø¬Ù…ÙŠØ¹',
-    heroDescription: 'Ù†Ø¸Ù‘Ù… Ø§Ù„Ø§Ø¬ØªÙ…Ø§Ø¹Ø§Øª ÙˆØ§Ù†Ø¶Ù… ÙˆØªØ¹Ø§ÙˆÙ†\nØ¨ÙƒÙ„ Ø³Ù‡ÙˆÙ„Ø© Ù…Ø¹ MBotÃ©Room.',
+    languageLabel: '\u0627\u0644\u0639\u0631\u0628\u064a\u0629',
+    ariaLanguage: 'Select language',
+    brandTitle: 'Secure meetings',
+    heroTitle: 'Secure meetings\nfor everyone',
+    heroDescription: 'Host, join, and collaborate\nwith MBot\u00e9Room in total simplicity.',
     features: [
-      ['Ø¢Ù…Ù†', 'Ø§Ø¬ØªÙ…Ø§Ø¹Ø§ØªÙƒ Ù…Ø­Ù…ÙŠØ© Ø¨ØªØ´ÙÙŠØ± Ù…Ù† Ø§Ù„Ø·Ø±Ù Ø¥Ù„Ù‰ Ø§Ù„Ø·Ø±Ù.'],
-      ['Ø³Ù‡Ù„ Ø§Ù„Ø§Ø³ØªØ®Ø¯Ø§Ù…', 'ÙˆØ§Ø¬Ù‡Ø© Ø¨Ø³ÙŠØ·Ø© Ù„Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„Ø§Ø¬ØªÙ…Ø§Ø¹Ø§Øª ÙˆØ§Ù„Ø§Ù†Ø¶Ù…Ø§Ù… Ø¥Ù„ÙŠÙ‡Ø§ Ø¨Ù†Ù‚Ø±Ø© ÙˆØ§Ø­Ø¯Ø©.'],
-      ['ØµÙˆØª ÙˆÙÙŠØ¯ÙŠÙˆ HD', 'Ø§Ø³ØªÙ…ØªØ¹ Ø¨Ø¬ÙˆØ¯Ø© ØµÙˆØª ÙˆÙÙŠØ¯ÙŠÙˆ Ù…Ù…ØªØ§Ø²Ø©.'],
-      ['Ù…ØªØ§Ø­ ÙÙŠ ÙƒÙ„ Ù…ÙƒØ§Ù†', 'Ø§Ø³ØªØ®Ø¯Ù…Ù‡ Ø¹Ù„Ù‰ ÙƒÙ„ Ø£Ø¬Ù‡Ø²ØªÙƒØŒ ÙÙŠ Ø£ÙŠ Ù…ÙƒØ§Ù† ÙˆÙÙŠ Ø£ÙŠ ÙˆÙ‚Øª.'],
+      ['Secure', 'Your meetings are protected with end-to-end encryption.'],
+      ['Easy to use', 'An intuitive interface to create and join meetings in one click.'],
+      ['HD audio and video', 'Enjoy outstanding audio and video quality.'],
+      ['Available everywhere', 'Use it on all your devices, anywhere, anytime.'],
     ],
     footerBenefits: [
-      'Ø£Ù…Ø§Ù† Ù…Ù† Ø§Ù„Ø·Ø±Ù Ø¥Ù„Ù‰ Ø§Ù„Ø·Ø±Ù',
-      'ØµÙˆØª ÙˆÙÙŠØ¯ÙŠÙˆ HD',
-      'Ù…ØªØ§Ø­ Ø¹Ù„Ù‰ ÙƒÙ„ Ø£Ø¬Ù‡Ø²ØªÙƒ',
-      'Ø¨Ø¯ÙˆÙ† ØªØ«Ø¨ÙŠØª',
+      'End-to-end security',
+      'HD audio and video',
+      'Available on all your devices',
+      'No installation required',
     ],
-    title: 'ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„',
-    subtitle: 'Ø³Ø¬Ù‘Ù„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ø¥Ù„Ù‰ Ø­Ø³Ø§Ø¨Ùƒ ÙÙŠ MBotÃ©Room',
-    email: 'Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ',
+    title: 'Sign in',
+    subtitle: 'Sign in to your MBot\u00e9Room account',
+    email: 'Email address',
     emailPlaceholder: 'example@mail.com',
-    password: 'ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±',
-    passwordPlaceholder: 'ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ø§Ù„Ø®Ø§ØµØ© Ø¨Ùƒ',
-    remember: 'ØªØ°ÙƒØ±Ù†ÙŠ',
-    forgot: 'Ù‡Ù„ Ù†Ø³ÙŠØª ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±ØŸ',
-    submit: 'ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„',
-    submitting: 'Ø¬Ø§Ø±ÙŠ ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„...',
-    or: 'Ø£Ùˆ',
-    google: 'Ø§Ù„Ù…ØªØ§Ø¨Ø¹Ø© Ø¨Ø§Ø³ØªØ®Ø¯Ø§Ù… MBotÃ©',
-    joinTitle: 'Ø§Ù„Ø§Ù†Ø¶Ù…Ø§Ù… Ø¥Ù„Ù‰ Ø§Ø¬ØªÙ…Ø§Ø¹',
-    joinText: 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ Ø­Ø³Ø§Ø¨ØŸ Ø§Ù†Ø¶Ù… Ø¥Ù„Ù‰ Ø§Ø¬ØªÙ…Ø§Ø¹ ÙƒØ¶ÙŠÙ.',
-    noAccount: 'Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ Ø­Ø³Ø§Ø¨ØŸ',
-    createAccount: 'Ø¥Ù†Ø´Ø§Ø¡ Ø­Ø³Ø§Ø¨',
+    password: 'Password',
+    passwordPlaceholder: 'Your password',
+    remember: 'Remember me',
+    forgot: 'Forgot password?',
+    submit: 'Sign in',
+    submitting: 'Signing in...',
+    or: 'or',
+    google: 'Continue with MBot\u00e9',
+    joinTitle: 'Join a meeting',
+    joinText: 'No account? Join a meeting as a guest.',
+    noAccount: "Don't have an account?",
+    createAccount: 'Create account',
   },
 } satisfies Record<Language, {
   languageLabel: string;
@@ -200,34 +200,34 @@ const translations = {
 }>;
 
 const languageOptions: Array<{ value: Language; label: string }> = [
-  { value: 'fr', label: 'FranÃ§ais' },
+  { value: 'fr', label: 'Français' },
   { value: 'en', label: 'English' },
   { value: 'ln', label: 'Lingala' },
-  { value: 'ar', label: 'Ø§Ù„Ø¹Ø±Ø¨ÙŠØ©' },
+  { value: 'ar', label: '\u0627\u0644\u0639\u0631\u0628\u064a\u0629' },
 ];
 
 const features = [
   {
-    title: 'SÃ©curisÃ©',
-    description: 'Vos rÃ©unions sont protÃ©gÃ©es avec un chiffrement de bout en bout.',
+    title: 'Sécurisé',
+    description: 'Vos réunions sont protégées avec un chiffrement de bout en bout.',
     icon: ShieldCheck,
     tone: 'blue',
   },
   {
-    title: 'Facile Ã  utiliser',
-    description: 'Interface intuitive pour crÃ©er et rejoindre vos rÃ©unions en un clic.',
+    title: 'Facile à utiliser',
+    description: 'Interface intuitive pour créer et rejoindre vos réunions en un clic.',
     icon: UsersRound,
     tone: 'green',
   },
   {
-    title: 'Audio et vidÃ©o HD',
-    description: "Profitez d'une qualitÃ© audio et vidÃ©o exceptionnelle.",
+    title: 'Audio et vidéo HD',
+    description: "Profitez d'une qualité audio et vidéo exceptionnelle.",
     icon: Monitor,
     tone: 'orange',
   },
   {
     title: 'Accessible partout',
-    description: "Utilisable sur tous vos appareils, n'importe oÃ¹, n'importe quand.",
+    description: "Utilisable sur tous vos appareils, n'importe où, n'importe quand.",
     icon: Laptop,
     tone: 'purple',
   },
@@ -311,7 +311,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     if (!email.trim()) nextErrors.email = "L'adresse e-mail est obligatoire.";
     else if (!isValidEmail(email)) nextErrors.email = "L'adresse e-mail est invalide.";
     if (!password) nextErrors.password = 'Le mot de passe est obligatoire.';
-    else if (password.length < 8) nextErrors.password = 'Le mot de passe doit contenir au moins 8 caractÃ¨res.';
+    else if (password.length < 8) nextErrors.password = 'Le mot de passe doit contenir au moins 8 caractères.';
     if (phoneNumber.trim() && phoneNumber.trim().length < 6) nextErrors.phoneNumber = 'Le numéro de téléphone est trop court.';
 
     setFieldErrors(nextErrors);
@@ -331,7 +331,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       setPassword('');
       navigate(redirectTo, { replace: true });
     } catch (submitError) {
-      setFormError(submitError instanceof Error ? submitError.message : 'CrÃ©ation de compte impossible.');
+      setFormError(submitError instanceof Error ? submitError.message : 'Création de compte impossible.');
     } finally {
       setIsLoading(false);
     }
@@ -343,8 +343,8 @@ export default function Login({ initialView = 'login' }: LoginProps) {
 
     const nextErrors: FieldErrors = {};
     if (!guestName.trim()) nextErrors.name = 'Votre nom est obligatoire.';
-    if (!meetingCode.trim()) nextErrors.meetingCode = "L'ID ou le lien de rÃ©union est obligatoire.";
-    if (!meetingPassword.trim()) nextErrors.meetingPassword = 'Le mot de passe de rÃ©union est obligatoire.';
+    if (!meetingCode.trim()) nextErrors.meetingCode = "L'ID ou le lien de réunion est obligatoire.";
+    if (!meetingPassword.trim()) nextErrors.meetingPassword = 'Le mot de passe de réunion est obligatoire.';
 
     setFieldErrors(nextErrors);
     setFormError('');
@@ -361,7 +361,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       const target = result.meeting?.meeting_link ? `/join/${result.meeting.meeting_link}` : '/join';
       navigate(target, { replace: true });
     } catch (submitError) {
-      setFormError(submitError instanceof Error ? submitError.message : 'AccÃ¨s invitÃ© impossible.');
+      setFormError(submitError instanceof Error ? submitError.message : 'Accès invité impossible.');
     } finally {
       setIsLoading(false);
     }
@@ -414,7 +414,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
 
   return (
     <main className="login-page" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      <section className="login-shell" aria-label="Connexion MBotÃ©Room">
+      <section className="login-shell" aria-label="Connexion MBotéRoom">
         <AuthBrandPanel copy={copy} language={language} onLanguageChange={setLanguage} />
 
         <section className="auth-side">
@@ -534,14 +534,14 @@ export default function Login({ initialView = 'login' }: LoginProps) {
 
           {initialView === 'register' && (
             <CompactAuthCard
-              title="CrÃ©er un compte"
-              subtitle="CrÃ©ez votre accÃ¨s MBotÃ©Room pour gÃ©rer vos rÃ©unions."
+              title="Créer un compte"
+              subtitle="Créez votre accès MBotéRoom pour gérer vos réunions."
               error={formError}
               onSubmit={submitRegister}
               isLoading={isLoading}
-              submitLabel="CrÃ©er le compte"
-              loadingLabel="CrÃ©ation en cours..."
-              footer={<AuthFooterAction label="DÃ©jÃ  un compte ?" action="Se connecter" onClick={() => navigate('/connexion')} />}
+              submitLabel="Créer le compte"
+              loadingLabel="Création en cours..."
+              footer={<AuthFooterAction label="Déjà un compte ?" action="Se connecter" onClick={() => navigate('/connexion')} />}
             >
               <FormField id="register-name" label="Nom complet" icon={<User size={21} aria-hidden="true" />} error={fieldErrors.name}>
                 <input id="register-name" value={name} placeholder="Ex : Marie Louka" autoComplete="name" onChange={(event) => { setName(event.target.value); clearErrors(); }} />
@@ -559,30 +559,30 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                 <input id="register-job-title" value={jobTitle} placeholder="Ex : Chef de projet" autoComplete="organization-title" onChange={(event) => { setJobTitle(event.target.value); clearErrors(); }} />
               </FormField>
               <FormField id="register-password" label="Mot de passe" icon={<Lock size={21} aria-hidden="true" />} error={fieldErrors.password}>
-                <input id="register-password" type="password" value={password} placeholder="8 caractÃ¨res minimum" autoComplete="new-password" onChange={(event) => { setPassword(event.target.value); clearErrors(); }} />
+                <input id="register-password" type="password" value={password} placeholder="8 caractères minimum" autoComplete="new-password" onChange={(event) => { setPassword(event.target.value); clearErrors(); }} />
               </FormField>
             </CompactAuthCard>
           )}
 
           {initialView === 'guest' && (
             <CompactAuthCard
-              title="Rejoindre une rÃ©union"
-              subtitle="Entrez les informations fournies par l'hÃ´te."
+              title="Rejoindre une réunion"
+              subtitle="Entrez les informations fournies par l'hôte."
               error={formError}
               onSubmit={submitGuestJoin}
               isLoading={isLoading}
               submitLabel="Rejoindre la salle d'attente"
-              loadingLabel="VÃ©rification..."
+              loadingLabel="Vérification..."
               footer={<AuthFooterAction label="Vous avez un compte ?" action="Se connecter" onClick={() => navigate('/connexion')} />}
             >
               <FormField id="guest-name" label="Votre nom visible" icon={<User size={21} aria-hidden="true" />} error={fieldErrors.name}>
                 <input id="guest-name" value={guestName} placeholder="Ex : Marie Louka" autoComplete="name" onChange={(event) => { setGuestName(event.target.value); clearErrors(); }} />
               </FormField>
-              <FormField id="guest-code" label="ID ou lien de rÃ©union" icon={<UsersRound size={21} aria-hidden="true" />} error={fieldErrors.meetingCode}>
+              <FormField id="guest-code" label="ID ou lien de réunion" icon={<UsersRound size={21} aria-hidden="true" />} error={fieldErrors.meetingCode}>
                 <input id="guest-code" value={meetingCode} placeholder="Ex : 9845671234" onChange={(event) => { setMeetingCode(event.target.value); clearErrors(); }} />
               </FormField>
-              <FormField id="guest-password" label="Mot de passe de rÃ©union" icon={<Lock size={21} aria-hidden="true" />} error={fieldErrors.meetingPassword}>
-                <input id="guest-password" type="password" value={meetingPassword} placeholder="Code donnÃ© par l'hÃ´te" autoComplete="off" onChange={(event) => { setMeetingPassword(event.target.value); clearErrors(); }} />
+              <FormField id="guest-password" label="Mot de passe de réunion" icon={<Lock size={21} aria-hidden="true" />} error={fieldErrors.meetingPassword}>
+                <input id="guest-password" type="password" value={meetingPassword} placeholder="Code donné par l'hôte" autoComplete="off" onChange={(event) => { setMeetingPassword(event.target.value); clearErrors(); }} />
               </FormField>
             </CompactAuthCard>
           )}
@@ -590,8 +590,8 @@ export default function Login({ initialView = 'login' }: LoginProps) {
           {initialView === 'forgot' && (
             <section className="login-card compact-auth-card" aria-labelledby="forgot-title">
               <header className="login-card-header">
-                <h1 id="forgot-title">Mot de passe oubliÃ©</h1>
-                <p>Entrez votre adresse e-mail pour recevoir un lien de rÃ©initialisation.</p>
+                <h1 id="forgot-title">Mot de passe oublié</h1>
+                <p>Entrez votre adresse e-mail pour recevoir un lien de réinitialisation.</p>
               </header>
               <form className="login-form" onSubmit={submitForgotPassword} noValidate>
                 <FormField id="forgot-email" label="Adresse e-mail" icon={<Mail size={21} aria-hidden="true" />} error={fieldErrors.email}>
@@ -620,7 +620,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
         </section>
       </section>
 
-      <footer className="login-benefits" aria-label="Avantages MBotÃ©Room">
+      <footer className="login-benefits" aria-label="Avantages MBotéRoom">
         {copy.footerBenefits.map((label, index) => {
           const Icon = footerBenefitIcons[index] || ShieldCheck;
           return (
@@ -689,12 +689,12 @@ function AuthBrandPanel({
           </div>
         )}
       </div>
-      <div className="mbote-logo" aria-label="MBotÃ©Room">
+      <div className="mbote-logo" aria-label="MBotéRoom">
         <span className="mbote-logo-icon">
           <UsersRound size={30} aria-hidden="true" />
           <Video size={18} className="mbote-logo-video" aria-hidden="true" />
         </span>
-        <strong><span>MBotÃ©</span><span>Room</span></strong>
+        <strong><span>MBoté</span><span>Room</span></strong>
       </div>
 
       <div className="brand-panel-copy">
@@ -748,7 +748,7 @@ function MeetingIllustration() {
       <div className="illustration-phone">
         <span className="phone-speaker" />
         <span className="phone-logo"><UsersRound size={17} /></span>
-        <strong>MBotÃ©Room</strong>
+        <strong>MBotéRoom</strong>
       </div>
     </div>
   );

@@ -313,7 +313,7 @@ const requireAdmin = (request: AuthedRequest, response: express.Response, next: 
 const normalizeEmail = (value: unknown) => String(value || '').trim().toLowerCase();
 
 const createAvatar = (name: string) =>
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'MBotÃ©')}&background=7c3aed&color=fff&bold=true`;
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'MBoté')}&background=7c3aed&color=fff&bold=true`;
 
 const hashPassword = (password: string, salt = crypto.randomBytes(16).toString('hex')) => ({
   salt,
@@ -845,7 +845,7 @@ const buildAdminActivities = (limit = 5) => {
   const meetingActivities = [...meetings.values()].map((meeting) => ({
     id: `meeting-${meeting.id}`,
     type: 'meeting' as AdminActivityType,
-    title: meeting.is_active ? 'RÃ©union dÃ©marrÃ©e' : 'Nouvelle rÃ©union crÃ©Ã©e',
+    title: meeting.is_active ? 'Réunion démarrée' : 'Nouvelle réunion créée',
     description: `Titre : ${meeting.title}`,
     createdAt: meeting.start_time,
   }));
@@ -889,9 +889,9 @@ const buildAdminDashboard = (period: unknown) => {
   return {
     stats: [
       { id: 'users', label: 'Utilisateurs total', value: allUsers.length, evolution: 0, helper: 'ce mois', points: buildAdminStatPoints(usage.map((item) => item.users)) },
-      { id: 'meetings', label: 'RÃ©unions crÃ©Ã©es', value: periodMeetings.length, evolution: 0, helper: 'ce mois', points: buildAdminStatPoints(usage.map((item) => item.meetings)) },
-      { id: 'live', label: 'RÃ©unions en direct', value: liveMeetings.length, evolution: 0, helper: 'En ce moment', points: buildAdminStatPoints(usage.map((item) => item.meetings)) },
-      { id: 'hours', label: 'Heures de rÃ©union', value: Math.round(totalMeetingMinutes / 60), suffix: 'h', evolution: 0, helper: 'au total', points: buildAdminStatPoints(usage.map((item) => item.meetings * 2)) },
+      { id: 'meetings', label: 'Réunions créées', value: periodMeetings.length, evolution: 0, helper: 'ce mois', points: buildAdminStatPoints(usage.map((item) => item.meetings)) },
+      { id: 'live', label: 'Réunions en direct', value: liveMeetings.length, evolution: 0, helper: 'En ce moment', points: buildAdminStatPoints(usage.map((item) => item.meetings)) },
+      { id: 'hours', label: 'Heures de réunion', value: Math.round(totalMeetingMinutes / 60), suffix: 'h', evolution: 0, helper: 'au total', points: buildAdminStatPoints(usage.map((item) => item.meetings * 2)) },
       { id: 'recordings', label: 'Enregistrements', value: allMeetings.filter((meeting) => meeting.settings.recording).length, evolution: 0, helper: 'au total', points: buildAdminStatPoints(usage.map(() => 0)) },
     ],
     liveMeetings: liveMeetings.map(getPublicMeeting),
@@ -924,24 +924,24 @@ const getGroqModels = () => {
 
 const buildLunaFallback = (prompt: string) => {
   const lower = normalizePlainText(prompt).toLowerCase();
-  if (!lower) return 'Je nâ€™ai pas reÃ§u de message Ã  traiter.';
-  if (/(rÃ©sume|resume|synthÃ¨se|synthese|compte rendu|compte-rendu)/i.test(lower)) {
-    return 'FonctionnalitÃ© non configurÃ©e. Active GROQ_API_KEY pour gÃ©nÃ©rer un vrai rÃ©sumÃ© de rÃ©union.';
+  if (!lower) return "Je n'ai pas reçu de message à traiter.";
+  if (/(résume|resume|synthèse|synthese|compte rendu|compte-rendu)/i.test(lower)) {
+    return 'Fonctionnalité non configurée. Active GROQ_API_KEY pour générer un vrai résumé de réunion.';
   }
   if (/(ordre du jour|agenda|plan)/i.test(lower)) {
-    return 'FonctionnalitÃ© non configurÃ©e. Je pourrai prÃ©parer un ordre du jour dÃ¨s que le fournisseur IA sera actif.';
+    return 'Fonctionnalité non configurée. Je pourrai préparer un ordre du jour dès que le fournisseur IA sera actif.';
   }
-  if (/(action|tÃ¢che|tache|dÃ©cision|decision)/i.test(lower)) {
-    return 'FonctionnalitÃ© non configurÃ©e. Je pourrai extraire les dÃ©cisions et tÃ¢ches avec un fournisseur IA actif.';
+  if (/(action|tâche|tache|décision|decision)/i.test(lower)) {
+    return 'Fonctionnalité non configurée. Je pourrai extraire les décisions et tâches avec un fournisseur IA actif.';
   }
-  return 'FonctionnalitÃ© non configurÃ©e. Ajoute GROQ_API_KEY dans .env pour activer Luna IA.';
+  return 'Fonctionnalité non configurée. Ajoute GROQ_API_KEY dans .env pour activer Luna IA.';
 };
 
 const normalizeLunaResponse = (value: unknown, prompt: string) => {
   const cleaned = normalizePlainText(value);
   if (!cleaned) return buildLunaFallback(prompt);
   return cleaned
-    .replace(/^je suis mbote[,.\s-]*/i, 'Je suis Luna IA, assistante de rÃ©union MBotÃ©Room. ')
+    .replace(/^je suis mbote[,.\s-]*/i, 'Je suis Luna IA, assistante de réunion MBotéRoom. ')
     .slice(0, 1800);
 };
 
@@ -979,13 +979,13 @@ const completeWithGroq = async (system: string, prompt: string) => {
 
 const buildLunaMeetingSystemPrompt = (meeting: Meeting, user: PublicUser, tone: LunaTone) => `
 Tu es Luna IA, assistante officielle de MBoteRoom.
-Tu aides pendant une rÃ©union en ligne: rÃ©sumer, prÃ©parer une rÃ©ponse, clarifier une dÃ©cision, proposer un ordre du jour, extraire des tÃ¢ches et amÃ©liorer la communication.
-RÃ©ponds en franÃ§ais par dÃ©faut.
-Reste factuelle. Ne prÃ©tends jamais avoir transcrit l'audio, vu la vidÃ©o ou consultÃ© des fichiers si le contexte n'est pas fourni.
-Ne rÃ©vÃ¨le jamais de secrets, tokens, mots de passe ou contenu .env.
-RÃ©union: ${meeting.title}.
+Tu aides pendant une réunion en ligne: résumer, préparer une réponse, clarifier une décision, proposer un ordre du jour, extraire des tâches et améliorer la communication.
+Réponds en français par défaut.
+Reste factuelle. Ne prétends jamais avoir transcrit l'audio, vu la vidéo ou consulté des fichiers si le contexte n'est pas fourni.
+Ne révèle jamais de secrets, tokens, mots de passe ou contenu .env.
+Réunion: ${meeting.title}.
 Utilisateur: ${user.name}.
-Ton demandÃ©: ${tone}.
+Ton demandé: ${tone}.
 `.trim();
 
 const addLobbyParticipant = async (
@@ -1042,7 +1042,7 @@ const normalizeMeetingPayload = (body: Record<string, unknown>, currentUser: Pub
 
   return {
     id: existing?.id || nextMeetingId++,
-    title: String(body.title || existing?.title || 'RÃ©union MBotÃ©').trim().slice(0, 160),
+    title: String(body.title || existing?.title || 'Réunion MBoté').trim().slice(0, 160),
     description: String(body.description || existing?.description || '').trim().slice(0, 1000),
     host_id: Number(body.host_id || body.hostId || existing?.host_id || currentUser.id),
     co_host_id: body.coHostId || body.co_host_id ? Number(body.coHostId || body.co_host_id) : existing?.co_host_id,
@@ -1061,18 +1061,18 @@ async function seedDatabase() {
   const { salt, hash } = hashPassword('MboteRoom2026!');
   const user: User = {
     id: nextUserId++,
-    name: 'HÃ´te MBotÃ©',
+    name: 'Hôte MBoté',
     username: 'hote',
     email: 'hote@mbote.local',
-    avatar: createAvatar('HÃ´te MBotÃ©'),
+    avatar: createAvatar('Hôte MBoté'),
     passwordSalt: salt,
     passwordHash: hash,
     createdAt: new Date().toISOString(),
   };
   users.set(user.id, user);
   const seedMeeting = normalizeMeetingPayload({
-    title: 'RÃ©union de dÃ©monstration MBotÃ©',
-    description: 'Salle prÃªte pour tester le lobby, la vidÃ©o, le micro, le chat et le partage de lien.',
+    title: 'Réunion de démonstration MBoté',
+    description: 'Salle prête pour tester le lobby, la vidéo, le micro, le chat et le partage de lien.',
     startTime: new Date(Date.now() - 5 * 60_000).toISOString(),
     duration: 90,
     settings: {
@@ -1870,5 +1870,5 @@ app.get('*', (_request, response) => {
 const port = Number(process.env.PORT || 3004);
 await loadDatabase();
 httpServer.listen(port, () => {
-  console.log(`MBotÃ© Room API listening on http://localhost:${port}`);
+  console.log(`MBoté Room API listening on http://localhost:${port}`);
 });
