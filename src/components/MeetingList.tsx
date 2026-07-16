@@ -1595,6 +1595,36 @@ function NewMeetingModal({
     setSelectedParticipants((current) => current.filter((participant) => participant.id !== participantId));
   };
 
+  const addParticipantEmails = () => {
+    const candidates = participantQuery
+      .split(/[\s,;]+/)
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean);
+    if (!candidates.length) return;
+
+    const invalidEmail = candidates.find((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+    if (invalidEmail) {
+      showFormError(`L'adresse ${invalidEmail} n'est pas valide.`);
+      return;
+    }
+
+    setSelectedParticipants((current) => {
+      const knownEmails = new Set(current.map((participant) => String(participant.email || '').toLowerCase()));
+      const additions = candidates
+        .filter((email) => !knownEmails.has(email))
+        .map((email) => ({ id: `email:${email}`, name: email, username: '', avatar: '', email }));
+      const nextParticipants = [...current, ...additions];
+      setSettings((currentSettings) => ({
+        ...currentSettings,
+        participantCapacity: Math.max(currentSettings.participantCapacity || 1, nextParticipants.length + 1),
+      }));
+      return nextParticipants;
+    });
+    setParticipantQuery('');
+    setParticipantSuggestions([]);
+    setFormError('');
+  };
+
   const showFormError = (message: string) => {
     setFormError(message);
   };
@@ -1622,15 +1652,15 @@ function NewMeetingModal({
   };
 
   const buildPayload = (action: MeetingCreateAction) => {
-    const participantIds = selectedParticipants.map((participant) => participant.id);
-    const participantCapacity = Math.max(settings.participantCapacity || 1, participantIds.length + 1);
+    const participantEmails = selectedParticipants.map((participant) => participant.email || participant.id);
+    const participantCapacity = Math.max(settings.participantCapacity || 1, participantEmails.length + 1);
     return ({
       type,
       title: title.trim(),
       description: description.trim() || selectedParticipants.map((participant) => participant.name).join(', '),
       startTime: new Date(`${date}T${time}`).toISOString(),
       duration: Number.parseInt(duration, 10) || 60,
-      participants: participantIds,
+      participants: participantEmails,
       settings: { ...settings, participantCapacity },
       action,
     });
@@ -1779,14 +1809,22 @@ function NewMeetingModal({
               <input
                 value={participantQuery}
                 onChange={(event) => setParticipantQuery(event.target.value)}
-                placeholder="Tapez la premiere lettre d'un ami"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ',' || event.key === ';') {
+                    event.preventDefault();
+                    addParticipantEmails();
+                  }
+                }}
+                placeholder="Saisissez une ou plusieurs adresses e-mail"
+                inputMode="email"
+                aria-label="Adresses e-mail des participants"
               />
             </div>
             <button
               type="button"
-              aria-label="Selectionner des participants"
+              aria-label="Ajouter les adresses e-mail"
               aria-haspopup="dialog"
-              onClick={() => setShowParticipantPicker(true)}
+              onClick={() => participantQuery.includes('@') ? addParticipantEmails() : setShowParticipantPicker(true)}
             >
               <UserPlus size={22} strokeWidth={2.8} />
             </button>
@@ -1796,7 +1834,7 @@ function NewMeetingModal({
               {selectedParticipants.map((participant) => (
                 <button type="button" key={participant.id} onClick={() => removeParticipant(participant.id)}>
                   <img src={participant.avatar || `https://i.pravatar.cc/80?u=${participant.id}`} alt="" />
-                  <span>{participant.name}</span>
+                  <span>{participant.email || participant.name}</span>
                   <X size={14} />
                 </button>
               ))}

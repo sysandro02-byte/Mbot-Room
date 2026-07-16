@@ -131,6 +131,23 @@ export const authService = {
     window.location.assign(String(result.url));
   },
 
+  consumeMboteAuthCallback() {
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const token = params.get('mboteToken');
+    const rawUser = params.get('mboteUser');
+    if (!token || !rawUser) return null;
+
+    try {
+      const user = normalizeUser(JSON.parse(rawUser));
+      if (!user.id) throw new Error('Profil MBoté incomplet.');
+      saveSession({ user, token }, true);
+      const requestedRedirect = params.get('redirect') || '/app';
+      return requestedRedirect.startsWith('/') && !requestedRedirect.startsWith('//') ? requestedRedirect : '/app';
+    } finally {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    }
+  },
+
   async forgotPassword(email: string) {
     const response = await fetch(apiUrl('/api/auth/forgot-password'), {
       method: 'POST',

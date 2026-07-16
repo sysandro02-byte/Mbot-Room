@@ -98,10 +98,71 @@ export interface LunaMeetingResponse {
   configured: boolean;
 }
 
+export interface DashboardTip {
+  id: string;
+  title: string;
+  body: string;
+  actionLabel: string;
+  actionPath: string;
+  isActive: boolean;
+  startsAt?: string;
+  endsAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EndedMeetingParticipant {
+  id: string;
+  name: string;
+  role: 'Hôte' | 'Participant' | 'Invité';
+  avatar?: string;
+  online?: boolean;
+}
+
+export interface EndedMeetingPayload {
+  meeting: Meeting;
+  publicId: string;
+  status: 'active' | 'ended';
+  startedAt: string;
+  endedAt: string;
+  durationMinutes: number;
+  timezone: string;
+  userRole: 'host' | 'participant' | 'guest';
+  participants: EndedMeetingParticipant[];
+  summary: {
+    bullets: string[];
+    decisions: string[];
+    actions: string[];
+    nextMeeting?: string;
+    processingStatus: 'ready' | 'fallback' | 'pending';
+  };
+  nextActions: Array<{ id: string; label: string; completed: boolean }>;
+  recording: {
+    available: boolean;
+    retentionDays: number;
+    url?: string | null;
+  };
+  permissions: {
+    canDownloadSummary: boolean;
+    canShareSummary: boolean;
+    canViewRecording: boolean;
+    canExportChat: boolean;
+    canRate: boolean;
+  };
+  guestRestrictions: boolean;
+}
+
 export const meetingService = {
   async getMeetings(): Promise<Meeting[]> {
     const response = await fetch(apiUrl('/api/meetings'), { headers: getAuthHeaders() });
     return response.json();
+  },
+
+  async getDashboardTips(): Promise<DashboardTip[]> {
+    const response = await fetch(apiUrl('/api/dashboard/tips'), { headers: getAuthHeaders() });
+    if (!response.ok) return [];
+    const data = await response.json().catch(() => []);
+    return Array.isArray(data) ? data : [];
   },
 
   async getActusEvents(): Promise<ActusEvent[]> {
@@ -181,6 +242,17 @@ export const meetingService = {
     if (Array.isArray(data?.data)) return data.data;
     if (Array.isArray(data?.rows)) return data.rows;
     return [];
+  },
+
+  async getEndedMeeting(meetingId: string | number): Promise<EndedMeetingPayload> {
+    const response = await fetch(apiUrl(`/api/meetings/${encodeURIComponent(String(meetingId))}/ended`), {
+      headers: getAuthHeaders(),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || 'Impossible de charger la fin de réunion.');
+    }
+    return data as EndedMeetingPayload;
   },
 
   async requestJoin(meetingId: number, userId?: number, password?: string): Promise<{ success: boolean; status?: 'accepted' | 'requested' }> {

@@ -84,6 +84,27 @@ type RealtimeHandRaised = {
   raised?: boolean;
 };
 
+type MediaErrorKind =
+  | 'permission-denied'
+  | 'no-device'
+  | 'device-busy'
+  | 'device-lost'
+  | 'insecure-context'
+  | 'unsupported'
+  | 'unknown';
+
+type MediaErrorInfo = {
+  kind: MediaErrorKind;
+  title: string;
+  detail: string;
+};
+
+type TileMenuState = {
+  id: string;
+  self: boolean;
+  name: string;
+} | null;
+
 type LunaSummary = {
   updatedAt: string;
   liveSummary: string;
@@ -129,6 +150,50 @@ const formatMeetingId = (value: string) => {
 
 const getCurrentTime = () => new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(new Date());
 
+const getMediaErrorInfo = (error: unknown): MediaErrorInfo => {
+  if (window.isSecureContext === false) {
+    return {
+      kind: 'insecure-context',
+      title: 'Connexion non sécurisée',
+      detail: 'La caméra et le microphone nécessitent HTTPS ou localhost.',
+    };
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return {
+      kind: 'unsupported',
+      title: 'Navigateur non compatible',
+      detail: 'Ce navigateur ne prend pas en charge les périphériques audio ou vidéo.',
+    };
+  }
+  const name = error instanceof DOMException ? error.name : '';
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return {
+      kind: 'permission-denied',
+      title: 'Permission refusée',
+      detail: 'Autorisez la caméra et le microphone dans votre navigateur, puis réessayez.',
+    };
+  }
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+    return {
+      kind: 'no-device',
+      title: 'Aucun périphérique détecté',
+      detail: 'Aucun microphone ou aucune caméra utilisable n’a été détecté.',
+    };
+  }
+  if (name === 'NotReadableError' || name === 'TrackStartError') {
+    return {
+      kind: 'device-busy',
+      title: 'Périphérique occupé',
+      detail: 'Fermez les autres applications qui utilisent votre caméra ou votre micro.',
+    };
+  }
+  return {
+    kind: 'unknown',
+    title: 'Média indisponible',
+    detail: 'Impossible d’ouvrir vos périphériques audio ou vidéo.',
+  };
+};
+
 const extractBulletLines = (text: string) =>
   text
     .split(/\n+/)
@@ -171,13 +236,18 @@ export default function GuestMeetingPage() {
   const [isLoadingMeeting, setIsLoadingMeeting] = useState(true);
   const [meetingError, setMeetingError] = useState('');
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [mediaError, setMediaError] = useState('');
+  const [mediaError, setMediaError] = useState<MediaErrorInfo | null>(null);
+  const [availableDevices, setAvailableDevices] = useState<MediaDeviceInfo[]>([]);
   const [microphoneEnabled, setMicrophoneEnabled] = useState(joinOptions.mic !== false);
   const [cameraEnabled, setCameraEnabled] = useState(joinOptions.camera !== false);
   const [microphoneLevel, setMicrophoneLevel] = useState(0);
   const [handRaised, setHandRaised] = useState(false);
   const [activePanel, setActivePanel] = useState<MeetingPanel>(null);
   const [showGuestBanner, setShowGuestBanner] = useState(true);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [tileMenu, setTileMenu] = useState<TileMenuState>(null);
+  const [pinnedParticipantId, setPinnedParticipantId] = useState<string | null>(null);
+  const [hideLocalPreview, setHideLocalPreview] = useState(false);
   const [notice, setNotice] = useState('');
   const [messages, setMessages] = useState<LocalMessage[]>(() => [{
     id: 'system-welcome',
@@ -209,8 +279,8 @@ export default function GuestMeetingPage() {
   const mediaState = useMemo(() => ({
     audio: microphoneEnabled && Boolean(localStream?.getAudioTracks().length),
     video: cameraEnabled && Boolean(localStream?.getVideoTracks().length),
-    screen: false,
-  }), [cameraEnabled, localStream, microphoneEnabled]);
+    screen: isSharingScreen,
+  }), [cameraEnabled, isSharingScreen, localStream, microphoneEnabled]);
 
   const { remoteParticipants } = useMeetingMeshWebRTC({
     meetingId: meeting?.id || 0,
@@ -223,12 +293,31 @@ export default function GuestMeetingPage() {
     onNotice: setNotice,
   });
 
+  const guestBannerStorageKey = useMemo(
+    () => `mboteroom.guest-banner.dismissed.${meeting?.id || meetingId || 'unknown'}`,
+    [meeting?.id, meetingId],
+  );
+
   const stopLocalMedia = useCallback(() => {
     localStreamRef.current?.getTracks().forEach((track) => track.stop());
     localStreamRef.current = null;
     setLocalStream(null);
     setMicrophoneLevel(0);
   }, []);
+
+  const refreshAvailableDevices = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      setAvailableDevices([]);
+      return;
+    }
+    const devices = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+    setAvailableDevices(devices);
+  }, []);
+
+  const dismissGuestBanner = () => {
+    sessionStorage.setItem(guestBannerStorageKey, 'true');
+    setShowGuestBanner(false);
+  };
 
   useEffect(() => {
     if (!authService.isAuthenticated()) {
@@ -292,8 +381,47 @@ export default function GuestMeetingPage() {
   }, [currentUser?.id, currentUser?.isGuest, location.state, locationState?.meeting, meetingId, navigate]);
 
   useEffect(() => {
+    setShowGuestBanner(sessionStorage.getItem(guestBannerStorageKey) !== 'true');
+  }, [guestBannerStorageKey]);
+
+  useEffect(() => {
+    void refreshAvailableDevices();
+    if (!navigator.mediaDevices?.addEventListener) return undefined;
+    const handleDeviceChange = () => {
+      void refreshAvailableDevices();
+      if (localStreamRef.current && localStreamRef.current.getTracks().some((track) => track.readyState === 'ended')) {
+        setMediaError({
+          kind: 'device-lost',
+          title: 'Périphérique déconnecté',
+          detail: 'Un périphérique audio ou vidéo a été retiré pendant la réunion.',
+        });
+      }
+    };
+    navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
+    return () => navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+  }, [refreshAvailableDevices]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!(event.target as HTMLElement).closest('.guest-tile-menu-wrap')) setTileMenu(null);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setTileMenu(null);
+        setLeaveConfirmOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setMediaError('Votre navigateur ne prend pas en charge la caméra et le microphone.');
+      setMediaError(getMediaErrorInfo(new DOMException('Unsupported', 'NotSupportedError')));
       return undefined;
     }
 
@@ -327,13 +455,14 @@ export default function GuestMeetingPage() {
 
         localStreamRef.current = stream;
         setLocalStream(stream);
-        setMediaError('');
+        setMediaError(null);
+        void refreshAvailableDevices();
       } catch (error) {
-        setMediaError(error instanceof DOMException && error.name === 'NotAllowedError'
-          ? 'Autorisez la caméra et le micro pour participer à la réunion.'
-          : 'Impossible d’ouvrir vos périphériques audio ou vidéo.');
+        setMediaError(getMediaErrorInfo(error));
         setMicrophoneEnabled(false);
         setCameraEnabled(false);
+        microphoneEnabledRef.current = false;
+        cameraEnabledRef.current = false;
       }
     };
 
@@ -343,7 +472,7 @@ export default function GuestMeetingPage() {
       cancelled = true;
       stopLocalMedia();
     };
-  }, [settings.noiseReduction, stopLocalMedia]);
+  }, [refreshAvailableDevices, settings.noiseReduction, stopLocalMedia]);
 
   useEffect(() => {
     if (!localVideoRef.current) return;
@@ -404,10 +533,16 @@ export default function GuestMeetingPage() {
   const secureMeeting = meeting?.settings?.encryption !== false;
   const meetingAccessId = meeting ? formatMeetingId(getMeetingAccessCode(meeting)) : formatMeetingId(meetingId);
   const localIsActiveSpeaker = microphoneEnabled && microphoneLevel > 0.12;
-  const primaryRemote = remoteParticipants.find((participant) => participant.userId === String(meeting?.host_id || '')) || remoteParticipants[0];
-  const secondaryParticipants = remoteParticipants
-    .filter((participant) => participant.socketId !== primaryRemote?.socketId)
-    .slice(0, 3);
+  const sortedRemoteParticipants = useMemo(() => {
+    const pinned = pinnedParticipantId
+      ? remoteParticipants.find((participant) => participant.socketId === pinnedParticipantId || participant.userId === pinnedParticipantId)
+      : null;
+    const rest = remoteParticipants.filter((participant) => participant.socketId !== pinned?.socketId);
+    return pinned ? [pinned, ...rest] : rest;
+  }, [pinnedParticipantId, remoteParticipants]);
+  const primaryParticipant = sortedRemoteParticipants.find((participant) => participant.userId === String(meeting?.host_id || '')) || sortedRemoteParticipants[0];
+  const secondaryParticipants = sortedRemoteParticipants.filter((participant) => participant.socketId !== primaryParticipant?.socketId);
+  const gridParticipantCount = 1 + secondaryParticipants.length + (hideLocalPreview ? 0 : 1);
 
   useEffect(() => {
     if (!meeting?.id) return undefined;
@@ -534,6 +669,59 @@ export default function GuestMeetingPage() {
     });
   };
 
+  const retryMedia = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMediaError(getMediaErrorInfo(new DOMException('Unsupported', 'NotSupportedError')));
+      return;
+    }
+    try {
+      stopLocalMedia();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: settings.noiseReduction,
+          autoGainControl: true,
+        },
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user',
+        },
+      });
+      microphoneEnabledRef.current = true;
+      cameraEnabledRef.current = true;
+      stream.getTracks().forEach((track) => {
+        track.enabled = true;
+      });
+      localStreamRef.current = stream;
+      setLocalStream(stream);
+      setMicrophoneEnabled(true);
+      setCameraEnabled(true);
+      setMediaError(null);
+      void refreshAvailableDevices();
+    } catch (error) {
+      setMediaError(getMediaErrorInfo(error));
+    }
+  };
+
+  const continueWithoutCamera = () => {
+    cameraEnabledRef.current = false;
+    setCameraEnabled(false);
+    localStreamRef.current?.getVideoTracks().forEach((track) => {
+      track.enabled = false;
+    });
+    setMediaError(null);
+  };
+
+  const continueWithoutMicrophone = () => {
+    microphoneEnabledRef.current = false;
+    setMicrophoneEnabled(false);
+    localStreamRef.current?.getAudioTracks().forEach((track) => {
+      track.enabled = false;
+    });
+    setMediaError(null);
+  };
+
   const toggleHandRaised = () => {
     const nextValue = !handRaised;
     setHandRaised(nextValue);
@@ -633,8 +821,7 @@ export default function GuestMeetingPage() {
   };
 
   const leaveMeeting = async () => {
-    const confirmed = window.confirm('Voulez-vous quitter la réunion ?');
-    if (!confirmed) return;
+    setLeaveConfirmOpen(false);
     const targetMeetingId = String(meeting?.id || meetingId || 'terminee');
     const endedState = {
       guest: Boolean(currentUser?.isGuest),
@@ -715,36 +902,44 @@ export default function GuestMeetingPage() {
   return (
     <main className={['guest-meeting-page', lunaVisible ? 'has-luna-panel' : '', lunaReduced ? 'is-luna-reduced' : ''].filter(Boolean).join(' ')}>
       <header className="guest-meeting-header">
-        <Link className="guest-meeting-brand" to="/rejoindre-une-reunion" aria-label="Accueil MBotéRoom">
+        <Link
+          className="guest-meeting-brand"
+          to="/rejoindre-une-reunion"
+          aria-label="Accueil MBot?Room"
+          onClick={(event) => {
+            event.preventDefault();
+            setLeaveConfirmOpen(true);
+          }}
+        >
           <span className="guest-meeting-brand-icon">
             <UsersRound size={27} aria-hidden="true" />
             <Video size={14} aria-hidden="true" />
           </span>
-          <strong>MBoté<span>Room</span></strong>
+          <strong>MBot?<span>Room</span></strong>
         </Link>
 
-        <section className="guest-meeting-title" aria-label="Informations de réunion">
+        <section className="guest-meeting-title" aria-label="Informations de r?union">
           <div>
             <h1>{meeting.title}</h1>
-            <LockKeyhole size={16} aria-hidden="true" />
+            {secureMeeting && <LockKeyhole size={16} aria-hidden="true" />}
           </div>
           <span className={secureMeeting ? 'is-secure' : ''}>
             <ShieldCheck size={17} aria-hidden="true" />
-            {secureMeeting ? 'Réunion sécurisée' : 'Réunion standard'}
+            {secureMeeting ? 'R?union s?curis?e' : 'R?union standard'}
           </span>
         </section>
 
-        <nav className="guest-meeting-header-actions" aria-label="Actions invité">
-          <span className="guest-meeting-account-badge"><UserRound size={18} aria-hidden="true" />Invité</span>
+        <nav className="guest-meeting-header-actions" aria-label="Actions invit?">
+          <span className="guest-meeting-account-badge" title="Mode invit? : certaines fonctions avanc?es sont limit?es."><UserRound size={18} aria-hidden="true" />Invit?</span>
           {isLunaRoute ? (
             <button className="guest-meeting-register guest-meeting-share-link" type="button" onClick={() => void copyMeetingLink()}>
               <Clipboard size={18} aria-hidden="true" />
               Partager un lien
             </button>
           ) : (
-            <Link className="guest-meeting-register" to="/inscription">Créer un compte</Link>
+            <Link className="guest-meeting-register" to="/inscription" state={{ meeting, guestName: localName, returnTo: location.pathname }}>Cr?er un compte</Link>
           )}
-          <button className="guest-meeting-header-leave" type="button" onClick={() => void leaveMeeting()}>
+          <button className="guest-meeting-header-leave" type="button" onClick={() => setLeaveConfirmOpen(true)}>
             <LogOut size={19} aria-hidden="true" />
             Quitter
           </button>
@@ -752,47 +947,89 @@ export default function GuestMeetingPage() {
       </header>
 
       <div className="guest-meeting-layout">
-        <section className="guest-meeting-main" aria-label="Réunion en cours">
+        <section className="guest-meeting-main" aria-label="R?union en cours">
           {showGuestBanner && !isLunaRoute && (
             <aside className="guest-meeting-banner">
               <Info size={21} aria-hidden="true" />
-              <p>Vous participez en tant qu’invité. Créez un compte pour accéder à plus de fonctionnalités.</p>
-              <Link to="/inscription">Créer un compte</Link>
-              <button type="button" aria-label="Fermer la bannière invité" onClick={() => setShowGuestBanner(false)}>
+              <p>Vous participez en tant qu?invit?. Cr?ez un compte pour acc?der ? plus de fonctionnalit?s.</p>
+              <Link to="/inscription" state={{ meeting, guestName: localName, returnTo: location.pathname }}>Cr?er un compte</Link>
+              <button type="button" aria-label="Fermer la banni?re invit?" onClick={dismissGuestBanner}>
                 <X size={19} aria-hidden="true" />
               </button>
             </aside>
           )}
 
-          {(notice || mediaError) && (
-            <p className="guest-meeting-notice" role="alert">{notice || mediaError}</p>
+          {notice && <p className="guest-meeting-notice" role="status">{notice}</p>}
+          {mediaError && (
+            <MediaErrorNotice
+              error={mediaError}
+              devices={availableDevices}
+              onRetry={() => void retryMedia()}
+              onWithoutCamera={continueWithoutCamera}
+              onWithoutMicrophone={continueWithoutMicrophone}
+              onOpenSettings={() => setActivePanel('settings')}
+            />
           )}
 
-          <section className="guest-meeting-grid" aria-label="Participants vidéo">
-            {primaryRemote ? (
-              <RemoteParticipantTile participant={primaryRemote} hostName={hostName} large activeSpeaker={!localIsActiveSpeaker && primaryRemote.media.audio} />
+          <section className="guest-meeting-grid" data-count={gridParticipantCount} aria-label="Participants vid?o">
+            {primaryParticipant ? (
+              <RemoteParticipantTile
+                participant={primaryParticipant}
+                hostName={hostName}
+                large={gridParticipantCount > 2}
+                activeSpeaker={!localIsActiveSpeaker && primaryParticipant.media.audio}
+                pinned={pinnedParticipantId === primaryParticipant.socketId || pinnedParticipantId === primaryParticipant.userId}
+                menuOpen={tileMenu?.id === primaryParticipant.socketId}
+                onMenu={() => setTileMenu(tileMenu?.id === primaryParticipant.socketId ? null : { id: primaryParticipant.socketId, self: false, name: primaryParticipant.name })}
+                onPin={() => {
+                  setPinnedParticipantId((current) => (current === primaryParticipant.socketId ? null : primaryParticipant.socketId));
+                  setTileMenu(null);
+                }}
+                onToast={setToastMessage}
+              />
             ) : (
-              <HostPlaceholderTile hostName={hostName} meeting={meeting} large activeSpeaker={!localIsActiveSpeaker} />
+              <HostPlaceholderTile hostName={hostName} meeting={meeting} large={gridParticipantCount > 2} activeSpeaker={!localIsActiveSpeaker} />
             )}
 
             {secondaryParticipants.map((participant) => (
-              <RemoteParticipantTile key={participant.socketId} participant={participant} hostName={hostName} />
+              <RemoteParticipantTile
+                key={participant.socketId}
+                participant={participant}
+                hostName={hostName}
+                pinned={pinnedParticipantId === participant.socketId || pinnedParticipantId === participant.userId}
+                menuOpen={tileMenu?.id === participant.socketId}
+                onMenu={() => setTileMenu(tileMenu?.id === participant.socketId ? null : { id: participant.socketId, self: false, name: participant.name })}
+                onPin={() => {
+                  setPinnedParticipantId((current) => (current === participant.socketId ? null : participant.socketId));
+                  setTileMenu(null);
+                }}
+                onToast={setToastMessage}
+              />
             ))}
 
-            {Array.from({ length: Math.max(0, 3 - secondaryParticipants.length) }).map((_, index) => (
-              <PlaceholderTile key={`empty-${index}`} index={index} />
-            ))}
-
-            <LocalParticipantTile
-              videoRef={localVideoRef}
-              localName={localName}
-              cameraEnabled={cameraEnabled}
-              microphoneEnabled={microphoneEnabled}
-              handRaised={handRaised}
-              activeSpeaker={localIsActiveSpeaker}
-              mediaError={mediaError}
-              mirror={settings.mirrorVideo}
-            />
+            {!hideLocalPreview && (
+              <LocalParticipantTile
+                videoRef={localVideoRef}
+                localName={localName}
+                cameraEnabled={cameraEnabled}
+                microphoneEnabled={microphoneEnabled}
+                handRaised={handRaised}
+                activeSpeaker={localIsActiveSpeaker}
+                mediaError={mediaError}
+                mirror={settings.mirrorVideo}
+                menuOpen={tileMenu?.id === 'local'}
+                onMenu={() => setTileMenu(tileMenu?.id === 'local' ? null : { id: 'local', self: true, name: localName })}
+                onPin={() => {
+                  setPinnedParticipantId((current) => (current === 'local' ? null : 'local'));
+                  setTileMenu(null);
+                }}
+                onHidePreview={() => {
+                  setHideLocalPreview(true);
+                  setTileMenu(null);
+                }}
+                onToast={setToastMessage}
+              />
+            )}
           </section>
 
           {activePanel && (
@@ -829,7 +1066,7 @@ export default function GuestMeetingPage() {
             onTogglePanel={togglePanel}
             onToggleShare={() => void toggleScreenShare()}
             onToggleRecording={toggleRecording}
-            onLeave={() => void leaveMeeting()}
+            onLeave={() => setLeaveConfirmOpen(true)}
           />
         </section>
 
@@ -881,6 +1118,22 @@ export default function GuestMeetingPage() {
         </button>
       )}
 
+      {leaveConfirmOpen && (
+        <div className="guest-leave-modal-backdrop" role="presentation" onClick={() => setLeaveConfirmOpen(false)}>
+          <section className="guest-leave-modal" role="dialog" aria-modal="true" aria-labelledby="guest-leave-title" onClick={(event) => event.stopPropagation()}>
+            <header>
+              <h2 id="guest-leave-title">Quitter la réunion ?</h2>
+              <button type="button" aria-label="Fermer" onClick={() => setLeaveConfirmOpen(false)}><X size={20} /></button>
+            </header>
+            <p>Votre micro, votre caméra, le partage d’écran et la connexion temps réel seront arrêtés.</p>
+            <footer>
+              <button type="button" onClick={() => setLeaveConfirmOpen(false)}>Annuler</button>
+              <button type="button" className="is-danger" onClick={() => void leaveMeeting()}>Quitter la réunion</button>
+            </footer>
+          </section>
+        </div>
+      )}
+
       {toastMessage && (
         <div className="guest-meeting-toast" role="status" aria-live="polite">
           <CheckCircle2 size={18} aria-hidden="true" />
@@ -891,16 +1144,62 @@ export default function GuestMeetingPage() {
   );
 }
 
+function MediaErrorNotice({
+  error,
+  devices,
+  onRetry,
+  onWithoutCamera,
+  onWithoutMicrophone,
+  onOpenSettings,
+}: {
+  error: MediaErrorInfo;
+  devices: MediaDeviceInfo[];
+  onRetry: () => void;
+  onWithoutCamera: () => void;
+  onWithoutMicrophone: () => void;
+  onOpenSettings: () => void;
+}) {
+  const microphones = devices.filter((device) => device.kind === 'audioinput').length;
+  const cameras = devices.filter((device) => device.kind === 'videoinput').length;
+
+  return (
+    <aside className={`guest-media-error is-${error.kind}`} role="alert">
+      <BadgeInfo size={22} aria-hidden="true" />
+      <div>
+        <strong>{error.title}</strong>
+        <p>{error.detail}</p>
+        <small>{microphones} micro détecté{microphones > 1 ? 's' : ''} · {cameras} caméra détectée{cameras > 1 ? 's' : ''}</small>
+      </div>
+      <div className="guest-media-error-actions">
+        <button type="button" onClick={onRetry}>Réessayer</button>
+        <button type="button" onClick={onOpenSettings}>Paramètres</button>
+        <button type="button" onClick={onWithoutCamera}>Sans caméra</button>
+        <button type="button" onClick={onWithoutMicrophone}>Sans micro</button>
+      </div>
+    </aside>
+  );
+}
+
 function RemoteParticipantTile({
   participant,
   hostName,
   large = false,
   activeSpeaker = false,
+  pinned = false,
+  menuOpen,
+  onMenu,
+  onPin,
+  onToast,
 }: {
   participant: RemoteMeetingParticipant;
   hostName: string;
   large?: boolean;
   activeSpeaker?: boolean;
+  pinned?: boolean;
+  menuOpen: boolean;
+  onMenu: () => void;
+  onPin: () => void;
+  onToast: (message: string) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -913,7 +1212,7 @@ function RemoteParticipantTile({
   const isHost = participant.name === hostName;
 
   return (
-    <article className={['guest-video-tile', large ? 'is-large' : '', activeSpeaker ? 'is-speaking' : ''].filter(Boolean).join(' ')}>
+    <article className={['guest-video-tile', large ? 'is-large' : '', activeSpeaker ? 'is-speaking' : '', pinned ? 'is-pinned' : ''].filter(Boolean).join(' ')}>
       {participant.stream && participant.media.video ? (
         <video ref={videoRef} autoPlay playsInline />
       ) : participant.avatar ? (
@@ -922,8 +1221,18 @@ function RemoteParticipantTile({
         <AvatarFallback name={participant.name} />
       )}
       {activeSpeaker && <span className="guest-active-speaker"><Volume2 size={16} aria-hidden="true" />Intervenant actif</span>}
-      <TileMenu label={`Plus d’actions pour ${participant.name}`} />
-      <NameBadge microphoneEnabled={participant.media.audio} name={`${participant.name}${isHost ? ' (Hôte)' : ''}`} />
+      <TileMenu
+        label={`Plus d?actions pour ${participant.name}`}
+        open={menuOpen}
+        items={[
+          { label: pinned ? 'D?s?pingler' : '?pingler', action: onPin },
+          { label: 'Plein ?cran', action: () => onToast('Double-cliquez sur la carte pour l?afficher en plein ?cran.') },
+          { label: 'Envoyer un message priv?', action: () => onToast('Les messages priv?s seront activ?s avec l?API messages.') },
+          { label: 'Signaler le participant', action: () => onToast('Signalement enregistr?. Connexion support ? finaliser.') },
+        ]}
+        onToggle={onMenu}
+      />
+      <NameBadge microphoneEnabled={participant.media.audio} name={`${participant.name}${isHost ? ' (H?te)' : ''}`} />
     </article>
   );
 }
@@ -933,18 +1242,7 @@ function HostPlaceholderTile({ hostName, meeting, large, activeSpeaker }: { host
     <article className={['guest-video-tile', 'is-placeholder', large ? 'is-large' : '', activeSpeaker ? 'is-speaking' : ''].filter(Boolean).join(' ')}>
       {meeting.host_avatar ? <img src={meeting.host_avatar} alt="" /> : <AvatarFallback name={hostName} />}
       {activeSpeaker && <span className="guest-active-speaker"><Volume2 size={16} aria-hidden="true" />Intervenant actif</span>}
-      <TileMenu label={`Plus d’actions pour ${hostName}`} />
-      <NameBadge microphoneEnabled name={`${hostName} (Hôte)`} />
-    </article>
-  );
-}
-
-function PlaceholderTile({ index }: { index: number }) {
-  return (
-    <article className="guest-video-tile is-empty">
-      <span><UsersRound size={34} aria-hidden="true" /></span>
-      <strong>Place disponible</strong>
-      <small>Participant {index + 1}</small>
+      <NameBadge microphoneEnabled name={`${hostName} (H?te)`} />
     </article>
   );
 }
@@ -966,6 +1264,11 @@ function LocalParticipantTile({
   activeSpeaker,
   mediaError,
   mirror,
+  menuOpen,
+  onMenu,
+  onPin,
+  onHidePreview,
+  onToast,
 }: {
   videoRef: RefObject<HTMLVideoElement | null>;
   localName: string;
@@ -973,8 +1276,13 @@ function LocalParticipantTile({
   microphoneEnabled: boolean;
   handRaised: boolean;
   activeSpeaker: boolean;
-  mediaError: string;
+  mediaError: MediaErrorInfo | null;
   mirror: boolean;
+  menuOpen: boolean;
+  onMenu: () => void;
+  onPin: () => void;
+  onHidePreview: () => void;
+  onToast: (message: string) => void;
 }) {
   return (
     <article className={['guest-video-tile', 'is-self', activeSpeaker ? 'is-speaking' : ''].filter(Boolean).join(' ')}>
@@ -984,22 +1292,62 @@ function LocalParticipantTile({
         <div className="guest-camera-off">
           <UserRound size={42} aria-hidden="true" />
           <strong>{mediaError ? 'Média indisponible' : 'Caméra désactivée'}</strong>
-          {mediaError && <small>{mediaError}</small>}
+          {mediaError && <small>{mediaError.detail}</small>}
         </div>
       )}
       {activeSpeaker && <span className="guest-active-speaker"><Volume2 size={16} aria-hidden="true" />Vous parlez</span>}
-      {handRaised && <span className="guest-hand-raised"><Hand size={16} aria-hidden="true" />Main levée</span>}
-      <TileMenu label="Plus d’actions pour votre tuile" />
-      <NameBadge microphoneEnabled={microphoneEnabled} name={`${localName} (invité)`} self />
+      {handRaised && <span className="guest-hand-raised"><Hand size={16} aria-hidden="true" />Main lev?e</span>}
+      <TileMenu
+        label="Plus d?actions pour votre tuile"
+        open={menuOpen}
+        items={[
+          { label: '?pingler ma vid?o', action: onPin },
+          { label: 'Masquer mon aper?u', action: onHidePreview },
+          { label: 'Modifier mon nom', action: () => onToast('La modification du nom invit? sera reli?e au profil invit?.') },
+          { label: 'Choisir un arri?re-plan', action: () => onToast('Les arri?re-plans seront appliqu?s depuis la salle d?attente.') },
+          { label: 'Afficher les statistiques r?seau', action: () => onToast('Statistiques r?seau : connexion temps r?el active.') },
+          { label: 'Signaler un probl?me', action: () => onToast('Signalement enregistr?. Connexion support ? finaliser.') },
+        ]}
+        onToggle={onMenu}
+      />
+      <NameBadge microphoneEnabled={microphoneEnabled} name={`${localName} (invit?)`} self />
     </article>
   );
 }
 
-function TileMenu({ label }: { label: string }) {
+function TileMenu({
+  label,
+  open,
+  items,
+  onToggle,
+}: {
+  label: string;
+  open: boolean;
+  items: Array<{ label: string; action: () => void }>;
+  onToggle: () => void;
+}) {
   return (
-    <button className="guest-tile-menu" type="button" aria-label={label}>
-      <MoreHorizontal size={21} aria-hidden="true" />
-    </button>
+    <div className="guest-tile-menu-wrap">
+      <button className="guest-tile-menu" type="button" aria-label={label} aria-expanded={open} onClick={onToggle}>
+        <MoreHorizontal size={21} aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="guest-tile-dropdown" role="menu">
+          {items.map((item) => (
+            <button
+              type="button"
+              role="menuitem"
+              key={item.label}
+              onClick={() => {
+                item.action();
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

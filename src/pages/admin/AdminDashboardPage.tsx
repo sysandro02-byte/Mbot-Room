@@ -35,10 +35,12 @@ import {
   AdminDashboardStat,
   adminDashboardService,
 } from '../../services/adminDashboardService';
-import { getMeetingAccessCode, Meeting } from '../../services/meetingService';
+import { DashboardTip, getMeetingAccessCode, Meeting } from '../../services/meetingService';
 import './AdminDashboardPage.css';
 
 type ActivityTone = 'green' | 'blue' | 'orange' | 'red' | 'violet';
+
+type DashboardTipDraft = Pick<DashboardTip, 'title' | 'body' | 'actionLabel' | 'actionPath' | 'isActive'>;
 
 const statIcons: Record<AdminDashboardStat['id'], ReactNode> = {
   users: <UsersRound size={29} />,
@@ -125,6 +127,16 @@ export default function AdminDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeMeetingMenu, setActiveMeetingMenu] = useState<number | null>(null);
+  const [dashboardTips, setDashboardTips] = useState<DashboardTip[]>([]);
+  const [tipDraft, setTipDraft] = useState({
+    title: 'Astuce du jour',
+    body: '',
+    actionLabel: 'Essayer maintenant',
+    actionPath: '/app/whiteboard',
+    isActive: true,
+  });
+  const [editingTipId, setEditingTipId] = useState<string | null>(null);
+  const [isSavingTip, setIsSavingTip] = useState(false);
   const [toast, setToast] = useState('');
   const abortRef = useRef<AbortController | null>(null);
 
@@ -144,6 +156,18 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     void loadDashboard();
   }, [period]);
+
+  const loadDashboardTips = async () => {
+    try {
+      setDashboardTips(await adminDashboardService.getDashboardTips());
+    } catch (tipError) {
+      setToast(tipError instanceof Error ? tipError.message : 'Astuces indisponibles.');
+    }
+  };
+
+  useEffect(() => {
+    void loadDashboardTips();
+  }, []);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => setDebouncedSearch(searchTerm.trim().toLowerCase()), 280);
@@ -220,6 +244,78 @@ export default function AdminDashboardPage() {
     }
     setToast('Aucun résultat administrateur trouvé.');
   };
+  const resetTipDraft = () => {
+    setTipDraft({
+      title: 'Astuce du jour',
+      body: '',
+      actionLabel: 'Essayer maintenant',
+      actionPath: '/app/whiteboard',
+      isActive: true,
+    });
+    setEditingTipId(null);
+  };
+
+  const submitDashboardTip = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!tipDraft.body.trim()) {
+      setToast('Le contenu de l’astuce est obligatoire.');
+      return;
+    }
+    setIsSavingTip(true);
+    try {
+      if (editingTipId) {
+        await adminDashboardService.updateDashboardTip(editingTipId, tipDraft);
+        setToast('Astuce mise à jour.');
+      } else {
+        await adminDashboardService.createDashboardTip(tipDraft);
+        setToast('Astuce publiée.');
+      }
+      resetTipDraft();
+      await loadDashboardTips();
+    } catch (tipError) {
+      setToast(tipError instanceof Error ? tipError.message : 'Enregistrement impossible.');
+    } finally {
+      setIsSavingTip(false);
+    }
+  };
+
+  const editDashboardTip = (tip: DashboardTip) => {
+    setEditingTipId(tip.id);
+    setTipDraft({
+      title: tip.title,
+      body: tip.body,
+      actionLabel: tip.actionLabel,
+      actionPath: tip.actionPath,
+      isActive: tip.isActive,
+    });
+  };
+
+  const toggleDashboardTip = async (tip: DashboardTip) => {
+    try {
+      await adminDashboardService.updateDashboardTip(tip.id, {
+        title: tip.title,
+        body: tip.body,
+        actionLabel: tip.actionLabel,
+        actionPath: tip.actionPath,
+        isActive: !tip.isActive,
+      });
+      await loadDashboardTips();
+      setToast(!tip.isActive ? 'Astuce activée.' : 'Astuce désactivée.');
+    } catch (tipError) {
+      setToast(tipError instanceof Error ? tipError.message : 'Mise à jour impossible.');
+    }
+  };
+
+  const deleteDashboardTip = async (tipId: string) => {
+    try {
+      await adminDashboardService.deleteDashboardTip(tipId);
+      if (editingTipId === tipId) resetTipDraft();
+      await loadDashboardTips();
+      setToast('Astuce supprimée.');
+    } catch (tipError) {
+      setToast(tipError instanceof Error ? tipError.message : 'Suppression impossible.');
+    }
+  };
 
   if (error && !dashboard) {
     return (
@@ -295,6 +391,18 @@ export default function AdminDashboardPage() {
               onToast={setToast}
             />
             <RecentActivityCard activities={dashboard?.recentActivity || []} />
+            <DashboardTipsCard
+              tips={dashboardTips}
+              draft={tipDraft}
+              editingTipId={editingTipId}
+              isSaving={isSavingTip}
+              onDraftChange={setTipDraft}
+              onSubmit={submitDashboardTip}
+              onEdit={editDashboardTip}
+              onToggle={(tip) => void toggleDashboardTip(tip)}
+              onDelete={(tipId) => void deleteDashboardTip(tipId)}
+              onCancel={resetTipDraft}
+            />
             <UsageStatisticsCard usage={dashboard?.usage || []} />
             <UserDistributionCard distribution={dashboard?.distribution || { active: 0, guests: 0, inactive: 0, banned: 0 }} />
             <CountriesCard countries={dashboard?.countries || []} />
@@ -444,6 +552,87 @@ function RecentActivityCard({ activities }: { activities: AdminActivity[] }) {
   );
 }
 
+function DashboardTipsCard({
+  tips,
+  draft,
+  editingTipId,
+  isSaving,
+  onDraftChange,
+  onSubmit,
+  onEdit,
+  onToggle,
+  onDelete,
+  onCancel,
+}: {
+  tips: DashboardTip[];
+  draft: DashboardTipDraft;
+  editingTipId: string | null;
+  isSaving: boolean;
+  onDraftChange: (draft: DashboardTipDraft) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onEdit: (tip: DashboardTip) => void;
+  onToggle: (tip: DashboardTip) => void;
+  onDelete: (tipId: string) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <section className="admin-tips-card">
+      <header>
+        <div>
+          <h2>Astuces du jour</h2>
+          <p>Programmez les messages qui défilent sur l’accueil utilisateur.</p>
+        </div>
+        <span>{tips.filter((tip) => tip.isActive).length} active(s)</span>
+      </header>
+
+      <form className="admin-tip-form" onSubmit={onSubmit}>
+        <label>
+          <span>Titre</span>
+          <input value={draft.title} onChange={(event) => onDraftChange({ ...draft, title: event.target.value })} required maxLength={80} />
+        </label>
+        <label>
+          <span>Message</span>
+          <textarea value={draft.body} onChange={(event) => onDraftChange({ ...draft, body: event.target.value })} required rows={3} maxLength={220} />
+        </label>
+        <div className="admin-tip-form-grid">
+          <label>
+            <span>Bouton</span>
+            <input value={draft.actionLabel} onChange={(event) => onDraftChange({ ...draft, actionLabel: event.target.value })} required maxLength={40} />
+          </label>
+          <label>
+            <span>Route</span>
+            <input value={draft.actionPath} onChange={(event) => onDraftChange({ ...draft, actionPath: event.target.value })} required placeholder="/app/whiteboard" />
+          </label>
+        </div>
+        <label className="admin-tip-toggle">
+          <input type="checkbox" checked={draft.isActive} onChange={(event) => onDraftChange({ ...draft, isActive: event.target.checked })} />
+          <span>Astuce active</span>
+        </label>
+        <div className="admin-tip-actions">
+          {editingTipId && <button type="button" onClick={onCancel}>Annuler</button>}
+          <button type="submit" disabled={isSaving}>{isSaving ? 'Enregistrement...' : editingTipId ? 'Mettre à jour' : 'Publier'}</button>
+        </div>
+      </form>
+
+      <div className="admin-tip-list" aria-label="Astuces programmées">
+        {tips.length ? tips.map((tip) => (
+          <article key={tip.id} className={tip.isActive ? 'is-active' : ''}>
+            <div>
+              <strong>{tip.title}</strong>
+              <p>{tip.body}</p>
+              <small>{tip.actionLabel} · {tip.actionPath}</small>
+            </div>
+            <div>
+              <button type="button" onClick={() => onEdit(tip)}>Modifier</button>
+              <button type="button" onClick={() => onToggle(tip)}>{tip.isActive ? 'Désactiver' : 'Activer'}</button>
+              <button type="button" className="is-danger" onClick={() => onDelete(tip.id)}>Supprimer</button>
+            </div>
+          </article>
+        )) : <p className="admin-empty">Aucune astuce programmée.</p>}
+      </div>
+    </section>
+  );
+}
 function UsageStatisticsCard({ usage }: { usage: Array<{ label: string; meetings: number; users: number }> }) {
   const meetingPoints = buildPolylinePoints(usage.map((item) => item.meetings), 560, 180);
   const userPoints = buildPolylinePoints(usage.map((item) => item.users), 560, 180);

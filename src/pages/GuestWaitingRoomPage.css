@@ -811,3 +811,207 @@
     animation-iteration-count: 1 !important;
   }
 }
+.waiting-header-meeting {
+  text-align: center;
+}
+
+.waiting-header-meeting span {
+  justify-content: center;
+}
+
+.waiting-notice {
+  animation: waiting-notice-float 3.2s ease-in-out infinite, waiting-notice-glow 3.2s ease-in-out infinite;
+}
+
+.waiting-notice-icon {
+  animation: waiting-icon-pulse 1.8s ease-in-out infinite;
+}
+
+.device-settings-card > header {
+  position: relative;
+  padding-right: 48px;
+}
+
+.device-settings-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid #dbe3f4;
+  border-radius: 10px;
+  background: #fff;
+  color: #516080;
+  cursor: pointer;
+}
+
+.device-settings-close:hover {
+  border-color: #b9c7ee;
+  color: #315cf5;
+  background: #f6f8ff;
+}
+
+.device-settings-card.is-hidden {
+  display: none;
+}
+
+@keyframes waiting-notice-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes waiting-notice-glow {
+  0%, 100% { box-shadow: 0 8px 24px rgba(49, 76, 244, 0.06); }
+  50% { box-shadow: 0 14px 34px rgba(49, 76, 244, 0.16); }
+}
+
+@keyframes waiting-icon-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waiting-notice,
+  .waiting-notice-icon {
+    animation: none;
+  }
+}
+.waiting-settings-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(8, 18, 43, 0.58);
+  backdrop-filter: blur(5px);
+}
+
+.waiting-settings-modal {
+  position: relative;
+  width: min(100%, 450px);
+  padding: 32px;
+  border: 1px solid #dbe3f4;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 28px 80px rgba(8, 18, 43, 0.28);
+  text-align: center;
+}
+
+.waiting-settings-modal > button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: #f2f5fb;
+  color: #516080;
+  cursor: pointer;
+}
+
+.waiting-settings-modal-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 16px;
+  place-items: center;
+  border-radius: 50%;
+  background: #eef2ff;
+  color: #315cf5;
+}
+
+.waiting-settings-modal h2 {
+  margin: 0;
+  color: #17213c;
+  font-size: 23px;
+}
+
+.waiting-settings-modal p {
+  margin: 12px 0 8px;
+  color: #59678c;
+  line-height: 1.55;
+}
+
+.waiting-settings-modal strong {
+  display: block;
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  color: #9f2430;
+  background: #fff3f4;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.waiting-video-preview::before,
+.waiting-video-preview video {
+  transition: filter .25s ease, transform .25s ease, opacity .25s ease, background .25s ease;
+}
+
+.background-option {
+  position: relative;
+  overflow: hidden;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.background-option:hover {
+  transform: translateY(-2px);
+  border-color: #aebdf2;
+  box-shadow: 0 8px 20px rgba(48, 76, 244, .12);
+}
+
+.background-option-office {
+  background: linear-gradient(135deg, #eee5d8, #c7d5cd);
+}
+
+.background-option-gradient {
+  color: #fff;
+  background: linear-gradient(135deg, #65c6ff, #304cf4 62%, #17224d);
+}
+
+.background-option-blur {
+  background: linear-gradient(135deg, rgba(225, 232, 252, .72), rgba(194, 208, 247, .88));
+  backdrop-filter: blur(5px);
+}
+
+.background-option-custom {
+  background: linear-gradient(135deg, #f4eeff, #e6efff);
+}
+
+.premium-account-card {
+  position: relative;
+  overflow: hidden;
+  animation: premium-card-float 4s ease-in-out infinite;
+}
+
+.premium-account-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 20%, rgba(255, 255, 255, .5) 46%, transparent 72%);
+  transform: translateX(-120%);
+  animation: premium-card-shine 5s ease-in-out infinite;
+}
+
+@keyframes premium-card-float {
+  0%, 100% { transform: translateY(0); box-shadow: 0 12px 32px rgba(23, 37, 78, .045); }
+  50% { transform: translateY(-5px); box-shadow: 0 20px 42px rgba(48, 76, 244, .14); }
+}
+
+@keyframes premium-card-shine {
+  0%, 55% { transform: translateX(-120%); }
+  85%, 100% { transform: translateX(120%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .premium-account-card,
+  .premium-account-card::before {
+    animation: none;
+  }
+}

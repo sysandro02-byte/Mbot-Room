@@ -1,0 +1,669 @@
+:root {
+  --mbote-blue: #2f5bea;
+  --mbote-blue-strong: #2448d8;
+  --mbote-indigo: #5237f4;
+  --mbote-dark: #101b3c;
+  --mbote-text: #172346;
+  --mbote-muted: #63708f;
+  --mbote-border: #dce2ef;
+  --mbote-surface: #ffffff;
+  --mbote-page: #f7f9ff;
+  --mbote-success: #15965b;
+  --mbote-success-soft: #effbf5;
+  --mbote-danger: #d84040;
+  --mbote-sidebar: #061428;
+  --mbote-sidebar-2: #0b1d38;
+  --mbote-radius-xs: 8px;
+  --mbote-radius-sm: 10px;
+  --mbote-radius-md: 12px;
+  --mbote-radius-lg: 16px;
+  --mbote-shadow-soft: 0 14px 34px rgba(16, 27, 60, .07);
+  --mbote-shadow-popover: 0 18px 44px rgba(16, 27, 60, .16);
+  --mbote-focus: 0 0 0 4px rgba(47, 91, 234, .16);
+  --mbote-button-height: 46px;
+  --mbote-control-height: 44px;
+  --mbote-ease: 180ms ease;
+}
+
+html {
+  background: var(--mbote-page);
+}
+
+body {
+  background: var(--mbote-page);
+  color: var(--mbote-dark);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font-weight: 800;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 0 !important;
+  box-shadow: var(--mbote-focus) !important;
+}
+
+.login-page,
+.guest-join-page,
+.guest-waiting-page,
+.meeting-ended-page,
+.user-dashboard,
+.admin-dashboard-page,
+.meeting-join-page,
+.meeting-list-page,
+.meeting-room-page {
+  --login-primary: var(--mbote-blue);
+  --login-blue: var(--mbote-blue);
+  --login-primary-dark: var(--mbote-dark);
+  --login-border: var(--mbote-border);
+  --login-background: var(--mbote-page);
+  --guest-primary: var(--mbote-blue);
+  --guest-primary-dark: var(--mbote-dark);
+  --guest-border: var(--mbote-border);
+  --guest-success: var(--mbote-success);
+  --guest-success-soft: var(--mbote-success-soft);
+  --waiting-primary: var(--mbote-blue);
+  --waiting-dark: var(--mbote-dark);
+  --waiting-border: var(--mbote-border);
+  --waiting-success: var(--mbote-success);
+  --waiting-danger: var(--mbote-danger);
+  --dashboard-blue: var(--mbote-blue);
+  --admin-blue: var(--mbote-blue);
+}
+
+.dashboard-sidebar,
+.admin-sidebar {
+  background: radial-gradient(circle at 30% 0%, rgba(47, 91, 234, .22), transparent 30%), linear-gradient(180deg, var(--mbote-sidebar), var(--mbote-sidebar-2)) !important;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, .08);
+}
+
+.dashboard-logo-icon,
+.admin-brand-icon,
+.meeting-ended-brand-icon,
+.brand-icon,
+.guest-brand-icon,
+.waiting-brand-icon {
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, var(--mbote-blue), var(--mbote-indigo)) !important;
+  box-shadow: 0 10px 22px rgba(47, 91, 234, .22) !important;
+}
+
+.dashboard-sidebar-nav a,
+.admin-sidebar-nav a {
+  min-height: 50px !important;
+  border-radius: var(--mbote-radius-sm) !important;
+  font-weight: 850 !important;
+}
+
+.dashboard-sidebar-nav a:hover,
+.dashboard-sidebar-nav a:focus-visible,
+.dashboard-sidebar-nav a.is-active,
+.admin-sidebar-nav a:hover,
+.admin-sidebar-nav a:focus-visible,
+.admin-sidebar-nav a.is-active {
+  background: linear-gradient(135deg, var(--mbote-blue), var(--mbote-indigo)) !important;
+  color: #fff !important;
+}
+
+.dashboard-topbar,
+.admin-topbar,
+.meeting-ended-header,
+.guest-header,
+.waiting-header,
+.guest-meeting-header {
+  border-bottom: 1px solid var(--mbote-border) !important;
+  background: rgba(255, 255, 255, .96) !important;
+  backdrop-filter: blur(14px);
+}
+
+.dashboard-icon-button,
+.admin-topbar-icon,
+.dashboard-mobile-menu,
+.admin-mobile-menu,
+.dashboard-user-menu > button,
+.meeting-ended-actions a,
+.meeting-ended-actions button,
+.guest-meeting-account-badge,
+.waiting-guest-status,
+.guest-status-pill,
+.language-selector > button {
+  min-height: var(--mbote-control-height) !important;
+  border: 1px solid var(--mbote-border) !important;
+  border-radius: var(--mbote-radius-sm) !important;
+  background: #fff !important;
+  color: var(--mbote-dark) !important;
+  box-shadow: none !important;
+}
+
+.dashboard-icon-button,
+.admin-topbar-icon,
+.dashboard-mobile-menu,
+.admin-mobile-menu {
+  width: var(--mbote-control-height) !important;
+  padding: 0 !important;
+}
+
+.primary-login-button,
+.guest-join-submit,
+.dashboard-create-button,
+.admin-new-meeting-button,
+.meeting-ended-join,
+.meeting-join-button,
+.join-primary-btn,
+.new-meeting-create,
+.meeting-new-button,
+.premium-account-card a:not(.premium-learn-more),
+.meeting-room-modal-actions .primary {
+  min-height: var(--mbote-button-height) !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--mbote-radius-sm) !important;
+  background: linear-gradient(135deg, var(--mbote-blue), var(--mbote-indigo)) !important;
+  color: #fff !important;
+  box-shadow: 0 12px 24px rgba(47, 91, 234, .18) !important;
+}
+
+.google-login-button,
+.mbote-auth-button,
+.join-cancel-btn,
+.meeting-ended-home,
+.waiting-leave-button,
+.guest-meeting-header-leave,
+.meeting-edit-secondary,
+.view-all-meetings-button,
+.dashboard-tip-action,
+.meeting-rating-submit,
+.meeting-ended-summary button,
+.meeting-ended-participants header button,
+.recent-meetings-all,
+.equipment-card-header button,
+.meeting-room-view,
+.meeting-room-icon,
+.meeting-room-upload-btn,
+.meeting-room-link-btn {
+  min-height: var(--mbote-control-height) !important;
+  border: 1px solid var(--mbote-border) !important;
+  border-radius: var(--mbote-radius-sm) !important;
+  background: #fff !important;
+  color: var(--mbote-blue) !important;
+  box-shadow: none !important;
+}
+
+.meeting-ended-quit,
+.guest-meeting-header-leave,
+.waiting-leave-button,
+.meeting-room-modal-actions .danger,
+.meeting-room-leave,
+.guest-meeting-leave,
+.waiting-controls-leave {
+  border-color: rgba(216, 64, 64, .28) !important;
+  color: #fff !important;
+  background: var(--mbote-danger) !important;
+}
+
+.meeting-ended-home,
+.waiting-leave-button,
+.guest-meeting-header-leave {
+  color: var(--mbote-danger) !important;
+  background: #fff !important;
+}
+
+.primary-login-button:hover:not(:disabled),
+.guest-join-submit:hover:not(:disabled),
+.dashboard-create-button:hover:not(:disabled),
+.admin-new-meeting-button:hover:not(:disabled),
+.meeting-ended-join:hover:not(:disabled),
+.meeting-join-button:hover:not(:disabled),
+.join-primary-btn:hover:not(:disabled),
+.new-meeting-create:hover:not(:disabled),
+.meeting-new-button:hover:not(:disabled),
+.google-login-button:hover:not(:disabled),
+.mbote-auth-button:hover:not(:disabled),
+.join-cancel-btn:hover:not(:disabled),
+.meeting-ended-actions a:hover,
+.meeting-ended-actions button:hover,
+.dashboard-icon-button:hover,
+.admin-topbar-icon:hover,
+.dashboard-user-menu > button:hover {
+  transform: translateY(-1px);
+}
+
+.dashboard-create-dropdown,
+.dashboard-profile-dropdown,
+.dashboard-meeting-menu > div,
+.dashboard-help-menu,
+.dashboard-notification-panel,
+.admin-row-menu > div,
+.meeting-title-menu-panel,
+.meeting-recent-options-menu,
+.meeting-room-header-menu,
+.meeting-room-participant-menu,
+.guest-tile-dropdown,
+.language-menu {
+  border: 1px solid var(--mbote-border) !important;
+  border-radius: var(--mbote-radius-md) !important;
+  background: #fff !important;
+  color: var(--mbote-dark) !important;
+  box-shadow: var(--mbote-shadow-popover) !important;
+}
+
+.dashboard-create-dropdown button,
+.dashboard-profile-dropdown a,
+.dashboard-profile-dropdown button,
+.dashboard-meeting-menu > div button,
+.dashboard-help-menu button,
+.admin-row-menu > div button,
+.meeting-title-menu-panel button,
+.meeting-recent-options-menu button,
+.meeting-room-header-menu button,
+.meeting-room-participant-menu button,
+.guest-tile-dropdown button,
+.language-menu button {
+  min-height: 40px !important;
+  border-radius: var(--mbote-radius-xs) !important;
+  color: var(--mbote-dark) !important;
+  font-weight: 800 !important;
+}
+
+.dashboard-create-dropdown button:hover,
+.dashboard-profile-dropdown a:hover,
+.dashboard-profile-dropdown button:hover,
+.dashboard-meeting-menu > div button:hover,
+.dashboard-help-menu button:hover,
+.admin-row-menu > div button:hover,
+.meeting-title-menu-panel button:hover,
+.meeting-recent-options-menu button:hover,
+.meeting-room-header-menu button:hover,
+.meeting-room-participant-menu button:hover,
+.guest-tile-dropdown button:hover,
+.language-menu button:hover,
+.language-menu button.is-selected {
+  background: #eef3ff !important;
+  color: var(--mbote-blue) !important;
+}
+
+.login-card,
+.guest-join-card,
+.guest-side-card,
+.guest-recent-card,
+.waiting-card,
+.waiting-sidebar > section,
+.meeting-ended-card,
+.meeting-rating-card,
+.meeting-ended-side-card,
+.meeting-ended-account-card,
+.dashboard-card,
+.admin-card,
+.meeting-ended-modal,
+.dashboard-shortcuts-modal,
+.guest-leave-modal,
+.meeting-room-modal,
+.meeting-list-card {
+  border: 1px solid var(--mbote-border) !important;
+  border-radius: var(--mbote-radius-lg) !important;
+  background: var(--mbote-surface) !important;
+  box-shadow: var(--mbote-shadow-soft) !important;
+}
+
+input,
+select,
+textarea,
+.form-input-wrapper,
+.dashboard-search,
+.admin-search,
+.guest-input-wrapper,
+.join-input-wrapper,
+.waiting-device-select {
+  border-radius: var(--mbote-radius-sm) !important;
+}
+
+.guest-meeting-controls,
+.waiting-controls,
+.meeting-room-controls {
+  border-radius: var(--mbote-radius-lg) !important;
+  background: linear-gradient(180deg, #101b3c, #071226) !important;
+  box-shadow: 0 18px 42px rgba(5, 13, 30, .22) !important;
+}
+
+@media (max-width: 760px) {
+  .dashboard-topbar,
+  .admin-topbar,
+  .meeting-ended-header,
+  .guest-header,
+  .waiting-header,
+  .guest-meeting-header {
+    min-height: 64px !important;
+  }
+
+  .dashboard-create-button,
+  .admin-new-meeting-button,
+  .meeting-ended-actions a,
+  .meeting-ended-actions button {
+    min-height: 44px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* Strict unified pass for pages that still had local button/menu variants. */
+.waiting-brand-logo,
+.guest-join-logo,
+.meeting-title-icon,
+.meeting-room-brand-icon,
+.new-meeting-brand-icon {
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, var(--mbote-blue), var(--mbote-indigo)) !important;
+  color: #fff !important;
+  box-shadow: 0 10px 22px rgba(47, 91, 234, .22) !important;
+}
+
+.waiting-create-account,
+.join-direct-btn,
+.meeting-plan-button,
+.meeting-share-row-button,
+.meeting-delete-card footer button,
+.meeting-edit-card footer button,
+.meeting-launch-card footer button,
+.meeting-room-end-btn,
+.meeting-room-poll-add,
+.meeting-room-poll-footer button,
+.luna-link-button,
+.open-luna-button,
+.guest-meeting-register,
+.guest-meeting-share-link {
+  min-height: var(--mbote-control-height) !important;
+  border-radius: var(--mbote-radius-sm) !important;
+  font-weight: 850 !important;
+  transition: transform var(--mbote-ease), box-shadow var(--mbote-ease), background-color var(--mbote-ease), border-color var(--mbote-ease) !important;
+}
+
+.waiting-create-account,
+.meeting-plan-button,
+.meeting-edit-card footer button.primary,
+.meeting-launch-card footer button.primary,
+.meeting-room-poll-footer button,
+.guest-meeting-register,
+.guest-meeting-share-link {
+  border: 1px solid transparent !important;
+  background: linear-gradient(135deg, var(--mbote-blue), var(--mbote-indigo)) !important;
+  color: #fff !important;
+  box-shadow: 0 12px 24px rgba(47, 91, 234, .18) !important;
+}
+
+.join-direct-btn,
+.meeting-share-row-button,
+.meeting-delete-card footer button,
+.meeting-edit-card footer button,
+.meeting-launch-card footer button,
+.meeting-room-poll-add,
+.luna-link-button,
+.open-luna-button {
+  border: 1px solid var(--mbote-border) !important;
+  background: #fff !important;
+  color: var(--mbote-blue) !important;
+  box-shadow: none !important;
+}
+
+.meeting-delete-card footer button.danger,
+.meeting-room-end-btn,
+.meeting-recent-options-danger,
+.meeting-room-participant-menu .danger,
+.guest-leave-modal footer .is-danger {
+  border-color: rgba(216, 64, 64, .28) !important;
+  background: var(--mbote-danger) !important;
+  color: #fff !important;
+}
+
+.waiting-create-account:hover:not(:disabled),
+.join-direct-btn:hover:not(:disabled),
+.meeting-plan-button:hover:not(:disabled),
+.meeting-share-row-button:hover:not(:disabled),
+.meeting-delete-card footer button:hover:not(:disabled),
+.meeting-edit-card footer button:hover:not(:disabled),
+.meeting-launch-card footer button:hover:not(:disabled),
+.meeting-room-end-btn:hover:not(:disabled),
+.meeting-room-poll-add:hover:not(:disabled),
+.meeting-room-poll-footer button:hover:not(:disabled),
+.luna-link-button:hover:not(:disabled),
+.open-luna-button:hover:not(:disabled),
+.guest-meeting-register:hover:not(:disabled),
+.guest-meeting-share-link:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.device-settings-card,
+.meeting-information-card,
+.guest-information-card,
+.premium-account-card,
+.meeting-delete-card,
+.meeting-edit-card,
+.meeting-launch-card,
+.meeting-room-panel-card,
+.meeting-room-modal-card,
+.guest-meeting-side-card,
+.luna-panel,
+.join-secure-card,
+.join-ready-card,
+.join-waiting-card {
+  border: 1px solid var(--mbote-border) !important;
+  border-radius: var(--mbote-radius-lg) !important;
+  background: var(--mbote-surface) !important;
+  box-shadow: var(--mbote-shadow-soft) !important;
+}
+
+.waiting-notice,
+.device-setting,
+.background-option,
+.meeting-stat-card,
+.meeting-tool-card,
+.dashboard-tip-card,
+.dashboard-security-card,
+.admin-stat-card {
+  border-radius: var(--mbote-radius-md) !important;
+  border-color: var(--mbote-border) !important;
+}
+
+.device-setting-title > span,
+.background-option,
+.waiting-control span,
+.guest-control span,
+.meeting-room-control span,
+.meeting-ended-check,
+.meeting-ended-summary header span,
+.meeting-ended-account-card > span,
+.dashboard-shortcut-icon,
+.admin-stat-card > div > span {
+  border-radius: var(--mbote-radius-md) !important;
+}
+
+.background-option,
+.device-setting-title button,
+.waiting-control,
+.guest-control,
+.meeting-room-control,
+.meeting-tool-card,
+.dashboard-shortcut,
+.admin-row-menu > button,
+.meeting-title-menu-button,
+.meeting-recent-options > button,
+.guest-tile-menu,
+.meeting-room-dots {
+  transition: transform var(--mbote-ease), box-shadow var(--mbote-ease), background-color var(--mbote-ease), border-color var(--mbote-ease) !important;
+}
+
+.background-option:hover,
+.device-setting-title button:hover,
+.meeting-tool-card:hover:not(:disabled),
+.dashboard-shortcut:hover,
+.admin-row-menu > button:hover,
+.meeting-title-menu-button:hover,
+.meeting-recent-options > button:hover,
+.guest-tile-menu:hover,
+.meeting-room-dots:hover {
+  transform: translateY(-1px);
+}
+
+.background-option.is-active,
+.background-option:focus-visible {
+  border-color: var(--mbote-blue) !important;
+  background: #eef3ff !important;
+  color: var(--mbote-blue) !important;
+}
+
+.device-setting select,
+.meeting-edit-card input,
+.meeting-edit-card textarea,
+.join-card input,
+.join-card select,
+.login-card input,
+.guest-join-card input,
+.guest-join-card select {
+  border: 1px solid var(--mbote-border) !important;
+  border-radius: var(--mbote-radius-sm) !important;
+  background: #fff !important;
+  color: var(--mbote-dark) !important;
+}
+
+.device-setting select:focus,
+.meeting-edit-card input:focus,
+.meeting-edit-card textarea:focus,
+.join-card input:focus,
+.join-card select:focus,
+.login-card input:focus,
+.guest-join-card input:focus,
+.guest-join-card select:focus {
+  border-color: var(--mbote-blue) !important;
+  box-shadow: var(--mbote-focus) !important;
+  outline: 0 !important;
+}
+
+.meeting-title-menu-panel,
+.meeting-recent-options-menu,
+.admin-row-menu > div,
+.dashboard-create-dropdown,
+.dashboard-profile-dropdown,
+.dashboard-meeting-menu > div,
+.guest-tile-dropdown,
+.meeting-room-header-menu,
+.meeting-room-participant-menu {
+  overflow: hidden;
+}
+
+.meeting-title-menu-panel button,
+.meeting-recent-options-menu button,
+.admin-row-menu > div button,
+.dashboard-create-dropdown button,
+.dashboard-profile-dropdown a,
+.dashboard-profile-dropdown button,
+.dashboard-meeting-menu > div button,
+.guest-tile-dropdown button,
+.meeting-room-header-menu button,
+.meeting-room-participant-menu button {
+  width: 100% !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+@media (max-width: 760px) {
+  .waiting-header-actions,
+  .guest-meeting-header-actions,
+  .meeting-ended-actions,
+  .dashboard-topbar-actions,
+  .admin-topbar-actions {
+    gap: 8px !important;
+  }
+
+  .waiting-create-account,
+  .waiting-leave-button,
+  .guest-meeting-header-leave,
+  .meeting-ended-actions a,
+  .meeting-ended-actions button {
+    border-radius: var(--mbote-radius-sm) !important;
+  }
+}
+
+/* Dashboard mobile shortcut sizing: compact square action buttons instead of full-width bands. */
+@media (max-width: 760px) {
+  .dashboard-shortcuts {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+  }
+
+  .dashboard-shortcut {
+    aspect-ratio: 1 / 1 !important;
+    min-height: 0 !important;
+    max-height: 168px !important;
+    padding: 14px !important;
+    align-content: start !important;
+    gap: 8px !important;
+    overflow: hidden !important;
+  }
+
+  .dashboard-shortcut-icon {
+    width: 48px !important;
+    height: 48px !important;
+    flex: 0 0 48px !important;
+  }
+
+  .dashboard-shortcut strong {
+    margin-top: 4px !important;
+    font-size: 14px !important;
+    line-height: 1.18 !important;
+  }
+
+  .dashboard-shortcut p {
+    display: -webkit-box !important;
+    overflow: hidden !important;
+    -webkit-line-clamp: 2 !important;
+    -webkit-box-orient: vertical !important;
+    font-size: 12px !important;
+    line-height: 1.28 !important;
+  }
+
+  .dashboard-shortcut-arrow {
+    right: 12px !important;
+    bottom: 12px !important;
+    width: 32px !important;
+    height: 32px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .dashboard-shortcuts {
+    gap: 10px !important;
+  }
+
+  .dashboard-shortcut {
+    padding: 12px !important;
+  }
+
+  .dashboard-shortcut-icon {
+    width: 44px !important;
+    height: 44px !important;
+  }
+}

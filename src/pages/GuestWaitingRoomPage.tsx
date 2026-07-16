@@ -19,6 +19,7 @@ import {
   UsersRound,
   Video,
   Volume2,
+  X,
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { getMeetingAccessCode, Meeting, meetingService } from '../services/meetingService';
@@ -73,6 +74,7 @@ export default function GuestWaitingRoomPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const customBackgroundInputRef = useRef<HTMLInputElement | null>(null);
+  const deviceSettingsRef = useRef<HTMLElement | null>(null);
   const microphoneEnabledRef = useRef(true);
   const cameraEnabledRef = useRef(true);
   const [meeting, setMeeting] = useState<Meeting | null>(null);
@@ -88,6 +90,7 @@ export default function GuestWaitingRoomPage() {
   const [microphoneLevel, setMicrophoneLevel] = useState(0);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('none');
   const [customBackgroundUrl, setCustomBackgroundUrl] = useState('');
+  const [showDeviceSettings, setShowDeviceSettings] = useState(true);
   const [permissionStatus, setPermissionStatus] = useState<PermissionStatus>('checking');
   const [mediaError, setMediaError] = useState('');
   const [isTestingSpeaker, setIsTestingSpeaker] = useState(false);
@@ -421,6 +424,19 @@ export default function GuestWaitingRoomPage() {
     navigate('/rejoindre-une-reunion', { replace: true });
   };
 
+  const openDeviceSettings = (openStatusModal = false) => {
+    setShowDeviceSettings(true);
+    if (openStatusModal) setIsSettingsOpen(true);
+    window.setTimeout(() => {
+      deviceSettingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 0);
+  };
+
+  const selectBackgroundMode = (mode: BackgroundMode) => {
+    setBackgroundMode(mode);
+    setMediaError('');
+  };
+
   return (
     <main className="guest-waiting-page">
       <header className="waiting-header">
@@ -482,10 +498,18 @@ export default function GuestWaitingRoomPage() {
               <span className="video-guest-label"><UserRound size={20} aria-hidden="true" />{guestName} (invité)</span>
             </section>
 
-            <section className="device-settings-card" aria-labelledby="device-settings-title">
+            <section ref={deviceSettingsRef} className={`device-settings-card${showDeviceSettings ? '' : ' is-hidden'}`} aria-labelledby="device-settings-title">
               <header>
                 <h2 id="device-settings-title">Vérifiez vos paramètres</h2>
                 <p>Assurez-vous que tout fonctionne correctement.</p>
+                <button
+                  className="device-settings-close"
+                  type="button"
+                  aria-label="Fermer les paramètres"
+                  onClick={() => setShowDeviceSettings(false)}
+                >
+                  <X size={20} aria-hidden="true" />
+                </button>
               </header>
 
               <DeviceSetting
@@ -542,11 +566,11 @@ export default function GuestWaitingRoomPage() {
               <section className="background-settings" aria-label="Changer le fond">
                 <h3>Changer le fond</h3>
                 <div className="background-options">
-                  <BackgroundButton mode="none" active={backgroundMode === 'none'} label="Aucun" icon={<CircleOff />} onClick={setBackgroundMode} />
-                  <BackgroundButton mode="blur" active={backgroundMode === 'blur'} label="Flou" icon={<MonitorUp />} onClick={setBackgroundMode} />
-                  <BackgroundButton mode="office" active={backgroundMode === 'office'} label="Bureau" icon={<ImageIcon />} onClick={setBackgroundMode} />
-                  <BackgroundButton mode="gradient" active={backgroundMode === 'gradient'} label="Dégradé bleu" icon={<Sparkles />} onClick={setBackgroundMode} />
-                  <button className={backgroundMode === 'custom' ? 'background-option is-active' : 'background-option'} type="button" onClick={() => customBackgroundInputRef.current?.click()}>
+                  <BackgroundButton mode="none" active={backgroundMode === 'none'} label="Aucun" icon={<CircleOff />} onClick={selectBackgroundMode} />
+                  <BackgroundButton mode="blur" active={backgroundMode === 'blur'} label="Flou" icon={<MonitorUp />} onClick={selectBackgroundMode} />
+                  <BackgroundButton mode="office" active={backgroundMode === 'office'} label="Bureau" icon={<ImageIcon />} onClick={selectBackgroundMode} />
+                  <BackgroundButton mode="gradient" active={backgroundMode === 'gradient'} label="Dégradé bleu" icon={<Sparkles />} onClick={selectBackgroundMode} />
+                  <button className={backgroundMode === 'custom' ? 'background-option background-option-custom is-active' : 'background-option background-option-custom'} type="button" aria-pressed={backgroundMode === 'custom'} onClick={() => customBackgroundUrl ? selectBackgroundMode('custom') : customBackgroundInputRef.current?.click()}>
                     <FileImage size={22} aria-hidden="true" />
                     Image
                   </button>
@@ -557,18 +581,33 @@ export default function GuestWaitingRoomPage() {
           </div>
 
           {isSettingsOpen && (
-            <section className="advanced-settings" aria-label="Paramètres avancés">
-              <h2>Paramètres avancés</h2>
-              <p>Statut média : {permissionStatus === 'ready' ? 'caméra et micro prêts' : permissionStatus === 'partial' ? 'accès partiel' : permissionStatus === 'checking' ? 'vérification en cours' : 'accès refusé'}.</p>
-            </section>
+            <div className="waiting-settings-modal-backdrop" role="presentation" onMouseDown={() => setIsSettingsOpen(false)}>
+              <section
+                className="waiting-settings-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="waiting-settings-modal-title"
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                <button type="button" aria-label="Fermer" onClick={() => setIsSettingsOpen(false)}>
+                  <X size={20} aria-hidden="true" />
+                </button>
+                <span className="waiting-settings-modal-icon" aria-hidden="true"><BadgeInfo size={27} /></span>
+                <h2 id="waiting-settings-modal-title">Paramètres avancés</h2>
+                <p>{mediaError || `Statut média : ${permissionStatus === 'ready' ? 'caméra et micro prêts' : permissionStatus === 'partial' ? 'accès partiel' : permissionStatus === 'checking' ? 'vérification en cours' : 'accès refusé'}.`}</p>
+                {permissionStatus === 'denied' && (
+                  <strong>Autorisez la caméra et le microphone dans les paramètres de votre navigateur, puis rechargez la page.</strong>
+                )}
+              </section>
+            </div>
           )}
 
           <nav className="waiting-controls" aria-label="Contrôles de la salle d’attente">
-            <ControlButton icon={microphoneEnabled ? <Mic /> : <CircleOff />} label="Micro" active={microphoneEnabled} onClick={toggleMicrophone} />
-            <ControlButton icon={cameraEnabled ? <Camera /> : <CircleOff />} label="Caméra" active={cameraEnabled} onClick={toggleCamera} />
-            <ControlButton icon={<Volume2 />} label="Tester l'audio" active onClick={() => void testSpeaker()} />
-            <ControlButton icon={<ImageIcon />} label="Arrière-plan" active={backgroundMode !== 'none'} onClick={() => customBackgroundInputRef.current?.click()} />
-            <ControlButton icon={<Settings />} label="Paramètres" active={isSettingsOpen} onClick={() => setIsSettingsOpen((current) => !current)} />
+            <ControlButton icon={microphoneEnabled ? <Mic /> : <CircleOff />} label="Micro" active={microphoneEnabled} onClick={() => openDeviceSettings()} />
+            <ControlButton icon={cameraEnabled ? <Camera /> : <CircleOff />} label="Caméra" active={cameraEnabled} onClick={() => openDeviceSettings()} />
+            <ControlButton icon={<Volume2 />} label="Tester l'audio" active onClick={() => openDeviceSettings()} />
+            <ControlButton icon={<ImageIcon />} label="Arrière-plan" active={backgroundMode !== 'none'} onClick={() => openDeviceSettings()} />
+            <ControlButton icon={<Settings />} label="Paramètres" active={isSettingsOpen} onClick={() => openDeviceSettings(true)} />
             <button className="waiting-controls-leave" type="button" onClick={handleQuit}>
               <LogOut size={22} aria-hidden="true" />
               Quitter
@@ -640,7 +679,7 @@ function DeviceSetting({
 
 function BackgroundButton({ mode, label, icon, active, onClick }: { mode: BackgroundMode; label: string; icon: React.ReactNode; active: boolean; onClick: (mode: BackgroundMode) => void }) {
   return (
-    <button className={active ? 'background-option is-active' : 'background-option'} type="button" onClick={() => onClick(mode)}>
+    <button className={`background-option background-option-${mode}${active ? ' is-active' : ''}`} type="button" onClick={() => onClick(mode)} aria-pressed={active}>
       {icon}
       {label}
     </button>

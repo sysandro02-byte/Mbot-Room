@@ -1,4 +1,4 @@
-﻿import { FocusEvent, FormEvent, KeyboardEvent, useMemo, useState } from 'react';
+﻿import { FocusEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronDown,
@@ -9,6 +9,7 @@ import {
   Globe2,
   Laptop,
   Lock,
+  LoaderCircle,
   LogIn,
   Mail,
   Monitor,
@@ -63,6 +64,7 @@ const translations = {
     submitting: 'Connexion en cours...',
     or: 'ou',
     google: 'Continuer avec MBoté',
+    mboteLoading: 'Redirection vers MBoté...',
     joinTitle: 'Rejoindre une réunion',
     joinText: "Vous n'avez pas de compte ? Rejoignez une réunion en tant qu'invité.",
     noAccount: 'Pas encore de compte ?',
@@ -98,6 +100,7 @@ const translations = {
     submitting: 'Signing in...',
     or: 'or',
     google: 'Continue with MBoté',
+    mboteLoading: 'Redirecting to MBoté...',
     joinTitle: 'Join a meeting',
     joinText: "No account? Join a meeting as a guest.",
     noAccount: "Don't have an account?",
@@ -133,6 +136,7 @@ const translations = {
     submitting: 'Kokota ezali kosalema...',
     or: 'to',
     google: 'Koba na MBoté',
+    mboteLoading: 'Kokende na MBoté...',
     joinTitle: 'Kokota na réunion',
     joinText: "Ozangi compte ? Kota na réunion lokola invité.",
     noAccount: 'Ozali nanu na compte te ?',
@@ -168,6 +172,7 @@ const translations = {
     submitting: 'Signing in...',
     or: 'or',
     google: 'Continue with MBot\u00e9',
+    mboteLoading: 'Redirecting to MBot\u00e9...',
     joinTitle: 'Join a meeting',
     joinText: 'No account? Join a meeting as a guest.',
     noAccount: "Don't have an account?",
@@ -193,6 +198,7 @@ const translations = {
   submitting: string;
   or: string;
   google: string;
+  mboteLoading: string;
   joinTitle: string;
   joinText: string;
   noAccount: string;
@@ -257,11 +263,27 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [meetingPassword, setMeetingPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isMboteLoading, setIsMboteLoading] = useState(false);
   const [formError, setFormError] = useState('');
+  const [externalAuthModalMessage, setExternalAuthModalMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const copy = translations[language];
+
+  useEffect(() => {
+    try {
+      const callbackRedirect = authService.consumeMboteAuthCallback();
+      if (callbackRedirect) navigate(callbackRedirect, { replace: true });
+    } catch (error) {
+      setExternalAuthModalMessage(error instanceof Error ? error.message : "La connexion avec MBoté n'a pas abouti.");
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    if (searchParams.get('externalAuth') !== 'failed') return;
+    setExternalAuthModalMessage(searchParams.get('reason') || "La connexion avec MBoté n'a pas abouti.");
+  }, [searchParams]);
 
   const redirectTo = useMemo(() => {
     const raw = searchParams.get('redirect') || '/app';
@@ -368,14 +390,14 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   };
 
   const startMboteLogin = async () => {
-    if (isLoading) return;
-    setIsLoading(true);
+    if (isLoading || isMboteLoading) return;
+    setIsMboteLoading(true);
     setFormError('');
     try {
       await authService.startMboteAuth(redirectTo);
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : "Authentification MBoté indisponible.");
-      setIsLoading(false);
+      setExternalAuthModalMessage(error instanceof Error ? error.message : "Authentification MBoté indisponible.");
+      setIsMboteLoading(false);
     }
   };
 
@@ -497,7 +519,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                   </p>
                 )}
 
-                <button className="primary-login-button" type="submit" disabled={isLoading}>
+                <button className="primary-login-button" type="submit" disabled={isLoading || isMboteLoading}>
                   <LogIn size={21} aria-hidden="true" />
                   {isLoading ? copy.submitting : copy.submit}
                 </button>
@@ -508,9 +530,15 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                   <span />
                 </div>
 
-                <button className="google-login-button mbote-auth-button" type="button" onClick={() => void startMboteLogin()} disabled={isLoading}>
-                  <MboteAuthIcon />
-                  {copy.google}
+                <button
+                  className="google-login-button mbote-auth-button"
+                  type="button"
+                  onClick={() => void startMboteLogin()}
+                  disabled={isLoading || isMboteLoading}
+                  aria-busy={isMboteLoading}
+                >
+                  {isMboteLoading ? <LoaderCircle className="mbote-auth-spinner" size={22} aria-hidden="true" /> : <MboteAuthIcon />}
+                  <span aria-live="polite">{isMboteLoading ? copy.mboteLoading : copy.google}</span>
                 </button>
 
                 <button className="join-meeting-card" type="button" onClick={goToGuestJoin} onKeyDown={handleGuestKeyDown}>
@@ -631,7 +659,34 @@ export default function Login({ initialView = 'login' }: LoginProps) {
           );
         })}
       </footer>
+
+      {externalAuthModalMessage && (
+        <ExternalAuthErrorModal
+          message={externalAuthModalMessage}
+          onClose={() => setExternalAuthModalMessage('')}
+        />
+      )}
     </main>
+  );
+}
+
+function ExternalAuthErrorModal({ message, onClose }: { message: string; onClose: () => void }) {
+  return (
+    <div className="auth-modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="auth-modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="auth-modal-title"
+        aria-describedby="auth-modal-message"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <span className="auth-modal-icon" aria-hidden="true">!</span>
+        <h2 id="auth-modal-title">Connexion MBoté impossible</h2>
+        <p id="auth-modal-message">{message}</p>
+        <button type="button" onClick={onClose} autoFocus>Fermer</button>
+      </section>
+    </div>
   );
 }
 

@@ -2135,20 +2135,20 @@
 
 .new-meeting-cover-remove {
   display: inline-flex;
-  min-height: 40px;
-  width: min(100%, 260px);
+  min-height: 32px;
+  width: fit-content;
   align-items: center;
   justify-content: center;
   justify-self: center;
   margin: 4px auto 14px;
-  padding: 0 18px;
+  padding: 0 12px;
   border: 1px solid rgba(210, 61, 104, 0.18);
   border-radius: 999px;
   background: #fff1f5;
   color: #d23d68;
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 950;
   text-align: center;
   transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;

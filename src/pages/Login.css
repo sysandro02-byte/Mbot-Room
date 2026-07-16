@@ -731,6 +731,18 @@
   opacity: 0.7;
 }
 
+.mbote-auth-spinner {
+  flex: 0 0 auto;
+  color: #315cec;
+  animation: mbote-auth-spin 800ms linear infinite;
+}
+
+@keyframes mbote-auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .mbote-auth-icon {
   position: relative;
   display: grid;
@@ -1138,3 +1150,10 @@
     animation-iteration-count: 1 !important;
   }
 }
+.auth-modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: rgba(15, 23, 42, .58); backdrop-filter: blur(4px); }
+.auth-modal { width: min(100%, 430px); padding: 30px; border: 1px solid #dbe4f3; border-radius: 22px; background: #fff; box-shadow: 0 24px 70px rgba(15, 23, 42, .24); text-align: center; }
+.auth-modal-icon { display: grid; width: 54px; height: 54px; margin: 0 auto 18px; place-items: center; border-radius: 50%; background: #fff1f2; color: #dc2626; font-size: 30px; font-weight: 800; }
+.auth-modal h2 { margin: 0; color: #17213c; font-size: 22px; }
+.auth-modal p { margin: 12px 0 24px; color: #64748b; line-height: 1.6; }
+.auth-modal button { width: 100%; min-height: 46px; border: 0; border-radius: 12px; background: linear-gradient(135deg, #315cf5, #5437f5); color: #fff; font: inherit; font-weight: 750; cursor: pointer; }
+.auth-modal button:focus-visible { outline: 3px solid rgba(49, 92, 245, .3); outline-offset: 3px; }

@@ -329,6 +329,7 @@
 .admin-stat-card,
 .admin-live-meetings-card,
 .admin-activity-card,
+.admin-tips-card,
 .admin-usage-card,
 .admin-distribution-card,
 .admin-countries-card {
@@ -414,6 +415,7 @@
 
 .admin-live-meetings-card,
 .admin-activity-card,
+.admin-tips-card,
 .admin-usage-card,
 .admin-distribution-card,
 .admin-countries-card {
@@ -422,6 +424,7 @@
 
 .admin-live-meetings-card > header,
 .admin-activity-card > header,
+.admin-tips-card > header,
 .admin-usage-card > header,
 .admin-countries-card > header {
   display: flex;
@@ -433,6 +436,7 @@
 
 .admin-live-meetings-card h2,
 .admin-activity-card h2,
+.admin-tips-card h2,
 .admin-usage-card h2,
 .admin-distribution-card h2,
 .admin-countries-card h2 {
@@ -979,4 +983,180 @@
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
   }
+}
+
+.admin-tips-card {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.admin-tips-card > header p {
+  margin: 5px 0 0;
+  color: #667390;
+  font-size: 13px;
+}
+
+.admin-tips-card > header > span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #eaf9f0;
+  color: #087843;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.admin-tip-form {
+  display: grid;
+  gap: 11px;
+  padding: 13px;
+  border: 1px solid #e5ebf5;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
+.admin-tip-form label {
+  display: grid;
+  gap: 6px;
+  color: #1a2540;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-tip-form input,
+.admin-tip-form textarea {
+  width: 100%;
+  border: 1px solid #d9e1ee;
+  border-radius: 8px;
+  background: #fff;
+  color: #101936;
+  font: inherit;
+  font-size: 13px;
+}
+
+.admin-tip-form input {
+  min-height: 40px;
+  padding: 0 11px;
+}
+
+.admin-tip-form textarea {
+  resize: vertical;
+  padding: 10px 11px;
+}
+
+.admin-tip-form input:focus,
+.admin-tip-form textarea:focus {
+  border-color: #2f5bea;
+  outline: 3px solid rgba(47, 91, 234, 0.16);
+}
+
+.admin-tip-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 10px;
+}
+
+.admin-tip-toggle {
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.admin-tip-toggle input {
+  width: 18px;
+  min-height: 18px;
+  accent-color: #2f5bea;
+}
+
+.admin-tip-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.admin-tip-actions button,
+.admin-tip-list article button {
+  min-height: 36px;
+  border: 1px solid #dce4f2;
+  border-radius: 8px;
+  background: #fff;
+  color: #20304e;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.admin-tip-actions button {
+  padding: 0 14px;
+}
+
+.admin-tip-actions button[type="submit"] {
+  border-color: #2f5bea;
+  background: #2f5bea;
+  color: #fff;
+}
+
+.admin-tip-actions button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.admin-tip-list {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-tip-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid #e5ebf5;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.admin-tip-list article.is-active {
+  border-color: #b9ecd1;
+  background: #f6fff9;
+}
+
+.admin-tip-list strong,
+.admin-tip-list p,
+.admin-tip-list small {
+  display: block;
+}
+
+.admin-tip-list p {
+  margin: 5px 0;
+  color: #53617e;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.admin-tip-list small {
+  color: #667390;
+  font-size: 12px;
+}
+
+.admin-tip-list article > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.admin-tip-list article button {
+  padding: 0 10px;
+}
+
+.admin-tip-list article button.is-danger {
+  border-color: #ffd6d6;
+  color: #d84040;
 }

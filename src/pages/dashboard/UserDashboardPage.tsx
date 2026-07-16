@@ -1,5 +1,5 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
   BarChart3,
@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { socket } from '../../lib/socket';
 import { authService } from '../../services/authService';
-import { getMeetingAccessCode, getMeetingJoinUrl, Meeting, meetingService } from '../../services/meetingService';
+import { DashboardTip, getMeetingAccessCode, getMeetingJoinUrl, Meeting, meetingService } from '../../services/meetingService';
 import './UserDashboardPage.css';
 
 type MeetingTab = 'today' | 'tomorrow' | 'week';
@@ -53,8 +53,36 @@ type CalendarCell = {
   hasMeeting: boolean;
 };
 
+type DashboardNotification = {
+  id: string;
+  title: string;
+  body: string;
+  meetingId: number;
+};
+
 const DAY_MS = 86_400_000;
 const tipStorageKey = 'mboteroom.dashboard.tip.dismissed';
+const messageCountStorageKey = 'mboteroom.dashboard.messages.unread';
+const readNotificationsStorageKey = 'mboteroom.dashboard.notifications.read';
+const fallbackDashboardTip: DashboardTip = {
+  id: 'fallback-whiteboard',
+  title: 'Astuce du jour',
+  body: 'Utilisez le tableau blanc pour collaborer visuellement avec votre équipe en temps réel.',
+  actionLabel: 'Essayer maintenant',
+  actionPath: '/app/whiteboard',
+  isActive: true,
+  createdAt: new Date(0).toISOString(),
+  updatedAt: new Date(0).toISOString(),
+};
+
+const loadReadNotifications = () => {
+  try {
+    const stored = JSON.parse(localStorage.getItem(readNotificationsStorageKey) || '[]');
+    return Array.isArray(stored) ? stored.filter((value): value is string => typeof value === 'string') : [];
+  } catch {
+    return [];
+  }
+};
 
 const sameDay = (a: Date, b: Date) => (
   a.getFullYear() === b.getFullYear()
@@ -83,6 +111,8 @@ const getFirstName = (nameOrEmail?: string) => {
   return fallback.split(/[ .@]/).filter(Boolean)[0] || fallback;
 };
 
+const getGreeting = () => (new Date().getHours() >= 18 ? 'Bonsoir' : 'Bonjour');
+
 const getInitials = (nameOrEmail?: string) => {
   const value = nameOrEmail || 'MBotéRoom';
   return value
@@ -92,6 +122,17 @@ const getInitials = (nameOrEmail?: string) => {
     .join('')
     .slice(0, 2)
     .toUpperCase();
+};
+
+const isUserMeeting = (meeting: Meeting, user: ReturnType<typeof authService.getCurrentUser>) => {
+  const userId = Number(user?.id);
+  const userEmail = String(user?.email || '').toLowerCase();
+  const participants = (meeting.settings?.participants || []).map((participant) => participant.toLowerCase());
+  return (
+    (Number.isFinite(userId) && (meeting.host_id === userId || meeting.co_host_id === userId))
+    || (userEmail.length > 0 && participants.includes(userEmail))
+    || meeting.is_active
+  );
 };
 
 const isMeetingInTab = (meeting: Meeting, tab: MeetingTab) => {
@@ -130,18 +171,38 @@ export default function UserDashboardPage() {
   const [loadError, setLoadError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [meetingTab, setMeetingTab] = useState<MeetingTab>('today');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
+  const [helpMenuOpen, setHelpMenuOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [readNotifications, setReadNotifications] = useState<string[]>(loadReadNotifications);
   const [activeMeetingMenu, setActiveMeetingMenu] = useState<number | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [calendarMeetingDate, setCalendarMeetingDate] = useState<Date | null>(null);
+  const [scheduleDate, setScheduleDate] = useState<Date | null>(null);
+  const [scheduleTitle, setScheduleTitle] = useState('Nouvelle réunion');
+  const [scheduleTime, setScheduleTime] = useState('09:00');
+  const [scheduleDuration, setScheduleDuration] = useState(60);
+  const [isScheduling, setIsScheduling] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [messageCount, setMessageCount] = useState(() => {
+    const stored = Number(localStorage.getItem(messageCountStorageKey) || 0);
+    return Number.isFinite(stored) ? Math.max(0, Math.min(99, stored)) : 0;
+  });
   const [toast, setToast] = useState('');
   const [tipVisible, setTipVisible] = useState(() => localStorage.getItem(tipStorageKey) !== new Date().toDateString());
+  const [dashboardTips, setDashboardTips] = useState<DashboardTip[]>([fallbackDashboardTip]);
+  const [activeTipIndex, setActiveTipIndex] = useState(0);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const createMenuRef = useRef<HTMLDivElement | null>(null);
+  const notificationRef = useRef<HTMLDivElement | null>(null);
+  const helpMenuRef = useRef<HTMLDivElement | null>(null);
+  const calendarClickTimerRef = useRef<number | null>(null);
 
   const loadMeetings = async () => {
     setIsLoading(true);
@@ -161,6 +222,32 @@ export default function UserDashboardPage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const loadDashboardTips = async () => {
+      const tips = await meetingService.getDashboardTips().catch(() => []);
+      if (!cancelled) {
+        setDashboardTips(tips.length ? tips : [fallbackDashboardTip]);
+        setActiveTipIndex(0);
+      }
+    };
+    void loadDashboardTips();
+    const refreshTips = () => void loadDashboardTips();
+    socket.on('dashboard:tips-updated', refreshTips);
+    return () => {
+      cancelled = true;
+      socket.off('dashboard:tips-updated', refreshTips);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (dashboardTips.length <= 1) return undefined;
+    const timer = window.setInterval(() => {
+      setActiveTipIndex((index) => (index + 1) % dashboardTips.length);
+    }, 7000);
+    return () => window.clearInterval(timer);
+  }, [dashboardTips.length]);
+
+  useEffect(() => {
     const timeoutId = window.setTimeout(() => setDebouncedSearch(searchTerm.trim().toLowerCase()), 260);
     return () => window.clearTimeout(timeoutId);
   }, [searchTerm]);
@@ -170,6 +257,8 @@ export default function UserDashboardPage() {
       const target = event.target as Node;
       if (profileMenuRef.current && !profileMenuRef.current.contains(target)) setProfileMenuOpen(false);
       if (createMenuRef.current && !createMenuRef.current.contains(target)) setCreateMenuOpen(false);
+      if (notificationRef.current && !notificationRef.current.contains(target)) setNotificationPanelOpen(false);
+      if (helpMenuRef.current && !helpMenuRef.current.contains(target)) setHelpMenuOpen(false);
       if (!(event.target as HTMLElement).closest('.dashboard-meeting-menu')) setActiveMeetingMenu(null);
     };
     document.addEventListener('mousedown', closeMenus);
@@ -184,8 +273,12 @@ export default function UserDashboardPage() {
     socket.on('meeting:updated', refresh);
     socket.on('meeting:cancelled', refresh);
     socket.on('meeting:started', refresh);
+    const handleNewMessage = () => {
+      setMessageCount((count) => Math.min(99, count + 1));
+      setToast('Nouveau message reçu.');
+    };
     socket.on('notification:new', () => setToast('Nouvelle notification reçue.'));
-    socket.on('message:new', () => setToast('Nouveau message reçu.'));
+    socket.on('message:new', handleNewMessage);
     socket.on('calendar:event-updated', refresh);
     return () => {
       socket.off('meeting:created', refresh);
@@ -193,9 +286,39 @@ export default function UserDashboardPage() {
       socket.off('meeting:cancelled', refresh);
       socket.off('meeting:started', refresh);
       socket.off('notification:new');
-      socket.off('message:new');
+      socket.off('message:new', handleNewMessage);
       socket.off('calendar:event-updated', refresh);
     };
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(messageCountStorageKey, String(messageCount));
+  }, [messageCount]);
+
+  useEffect(() => {
+    localStorage.setItem(readNotificationsStorageKey, JSON.stringify(readNotifications));
+  }, [readNotifications]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSearchOpen(false);
+        setNotificationPanelOpen(false);
+        setHelpMenuOpen(false);
+        setCreateMenuOpen(false);
+        setProfileMenuOpen(false);
+        setShortcutsOpen(false);
+        setSidebarOpen(false);
+        setCalendarMeetingDate(null);
+        setScheduleDate(null);
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        document.querySelector<HTMLInputElement>('.dashboard-search input')?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   useEffect(() => {
@@ -204,15 +327,20 @@ export default function UserDashboardPage() {
     return () => window.clearTimeout(timeoutId);
   }, [toast]);
 
+  useEffect(() => () => {
+    if (calendarClickTimerRef.current) window.clearTimeout(calendarClickTimerRef.current);
+  }, []);
+
   const now = Date.now();
+  const userMeetings = useMemo(() => meetings.filter((meeting) => isUserMeeting(meeting, currentUser)), [meetings, currentUser]);
   const upcomingMeetings = useMemo(() => meetings
     .filter((meeting) => new Date(meeting.start_time).getTime() + meeting.duration * 60_000 > now)
     .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()), [meetings, now]);
 
-  const recentMeetings = useMemo(() => meetings
+  const recentMeetings = useMemo(() => userMeetings
     .filter((meeting) => new Date(meeting.start_time).getTime() + meeting.duration * 60_000 <= now || meeting.is_active)
     .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime())
-    .slice(0, 3), [meetings, now]);
+    .slice(0, 3), [userMeetings, now]);
 
   const visibleUpcomingMeetings = useMemo(() => {
     const byTab = upcomingMeetings.filter((meeting) => isMeetingInTab(meeting, meetingTab));
@@ -226,12 +354,35 @@ export default function UserDashboardPage() {
     )).slice(0, 8);
   }, [debouncedSearch, meetingTab, upcomingMeetings]);
 
-  const calendarCells = useMemo(() => buildCalendarCells(calendarMonth, meetings), [calendarMonth, meetings]);
-  const notificationCount = upcomingMeetings.filter((meeting) => sameDay(new Date(meeting.start_time), new Date())).length;
-  const messageCount = 0;
+  const searchResults = useMemo(() => {
+    if (!debouncedSearch) return [];
+    const normalized = debouncedSearch.replace(/\s+/g, '');
+    return meetings.filter((meeting) => (
+      meeting.title.toLowerCase().includes(debouncedSearch)
+      || meeting.host_name.toLowerCase().includes(debouncedSearch)
+      || getMeetingAccessCode(meeting).toLowerCase().includes(normalized)
+      || String(meeting.id).includes(normalized)
+    )).slice(0, 6);
+  }, [debouncedSearch, meetings]);
+
+  const calendarCells = useMemo(() => buildCalendarCells(calendarMonth, userMeetings), [calendarMonth, userMeetings]);
+  const calendarMeetingsForSelectedDate = useMemo(() => {
+    if (!calendarMeetingDate) return [];
+    return userMeetings
+      .filter((meeting) => sameDay(new Date(meeting.start_time), calendarMeetingDate))
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  }, [calendarMeetingDate, userMeetings]);
+  const notifications = useMemo<DashboardNotification[]>(() => upcomingMeetings.slice(0, 5).map((meeting) => ({
+    id: `meeting-${meeting.id}`,
+    title: 'Réunion à venir',
+    body: `${meeting.title} · ${formatTime(meeting.start_time)}`,
+    meetingId: meeting.id,
+  })), [upcomingMeetings]);
+  const notificationCount = notifications.filter((notification) => !readNotifications.includes(notification.id)).length;
   const secureLabel = meetings.some((meeting) => meeting.settings?.encryption === false)
     ? 'Vos réunions utilisent les protections activées par chaque hôte.'
     : 'Vos réunions sont protégées selon la configuration de sécurité active.';
+  const activeTip = dashboardTips[activeTipIndex % Math.max(1, dashboardTips.length)] || fallbackDashboardTip;
 
   const startInstantMeeting = async () => {
     if (isCreating) return;
@@ -337,12 +488,68 @@ export default function UserDashboardPage() {
     setTipVisible(false);
   };
 
+  const openCalendarMeetings = (date: Date) => {
+    if (calendarClickTimerRef.current) window.clearTimeout(calendarClickTimerRef.current);
+    calendarClickTimerRef.current = window.setTimeout(() => {
+      setSelectedDate(date);
+      setCalendarMeetingDate(date);
+      calendarClickTimerRef.current = null;
+    }, 220);
+  };
+
+  const openScheduleModal = (date: Date) => {
+    if (calendarClickTimerRef.current) {
+      window.clearTimeout(calendarClickTimerRef.current);
+      calendarClickTimerRef.current = null;
+    }
+    setSelectedDate(date);
+    setScheduleDate(date);
+    setScheduleTitle('Nouvelle réunion');
+    setScheduleTime('09:00');
+    setScheduleDuration(60);
+  };
+
+  const submitScheduleFromCalendar = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!scheduleDate || isScheduling) return;
+    const [hours, minutes] = scheduleTime.split(':').map(Number);
+    const startDate = new Date(scheduleDate);
+    startDate.setHours(Number.isFinite(hours) ? hours : 9, Number.isFinite(minutes) ? minutes : 0, 0, 0);
+    setIsScheduling(true);
+    try {
+      const meeting = await meetingService.scheduleMeeting({
+        title: scheduleTitle.trim() || 'Nouvelle réunion',
+        description: 'Réunion programmée depuis le calendrier MBotéRoom.',
+        startTime: startDate.toISOString(),
+        duration: scheduleDuration,
+        settings: {
+          waitingRoom: true,
+          participantAudio: true,
+          participantVideo: true,
+          screenShare: true,
+          encryption: true,
+          chat: true,
+          reactions: true,
+          linkSharing: true,
+        },
+      });
+      setMeetings((current) => [meeting, ...current.filter((item) => item.id !== meeting.id)]);
+      setScheduleDate(null);
+      setToast('Réunion programmée.');
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : 'Programmation impossible.');
+    } finally {
+      setIsScheduling(false);
+    }
+  };
+
   return (
     <main className="user-dashboard">
       <DashboardSidebar
         user={currentUser}
         messageCount={messageCount}
         open={sidebarOpen}
+        onMessagesOpened={() => setMessageCount(0)}
         onClose={() => setSidebarOpen(false)}
         onLogout={() => void authService.logout()}
       />
@@ -350,8 +557,8 @@ export default function UserDashboardPage() {
 
       <section className="dashboard-workspace">
         <header className="dashboard-topbar">
-          <button className="dashboard-mobile-menu" type="button" aria-label="Ouvrir le menu" onClick={() => setSidebarOpen(true)}>
-            <Menu size={24} aria-hidden="true" />
+          <button className="dashboard-mobile-menu" type="button" aria-label={sidebarOpen ? 'Fermer le menu' : 'Ouvrir le menu'} aria-controls="dashboard-sidebar" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen((value) => !value)}>
+            {sidebarOpen ? <X size={24} aria-hidden="true" /> : <Menu size={24} aria-hidden="true" />}
           </button>
           <form className="dashboard-search" onSubmit={submitSearch}>
             <Search size={19} aria-hidden="true" />
@@ -360,27 +567,90 @@ export default function UserDashboardPage() {
               value={searchTerm}
               placeholder="Rechercher une réunion ou un contact..."
               aria-label="Rechercher une réunion ou un contact"
-              onChange={(event) => setSearchTerm(event.target.value)}
+              aria-expanded={searchOpen}
+              onFocus={() => setSearchOpen(true)}
+              onChange={(event) => {
+                setSearchTerm(event.target.value);
+                setSearchOpen(true);
+              }}
             />
+            {searchOpen && debouncedSearch && (
+              <div className="dashboard-search-results" role="listbox">
+                <strong>Réunions</strong>
+                {searchResults.length ? searchResults.map((meeting) => (
+                  <button key={meeting.id} type="button" role="option" onClick={() => {
+                    setSearchOpen(false);
+                    navigate(`/reunions/${meeting.id}`, { state: { meeting } });
+                  }}>
+                    <span>{meeting.title}</span>
+                    <small>{formatMeetingId(meeting)} · {meeting.host_name}</small>
+                  </button>
+                )) : <p>Aucun résultat.</p>}
+              </div>
+            )}
           </form>
           <nav className="dashboard-topbar-actions" aria-label="Actions du tableau de bord">
-            <button className="dashboard-icon-button" type="button" aria-label={`${notificationCount} notifications`} onClick={() => setToast('Centre de notifications à connecter au backend.')}>
-              <Bell size={22} aria-hidden="true" />
-              {notificationCount > 0 && <span>{notificationCount}</span>}
-            </button>
-            <button className="dashboard-icon-button" type="button" aria-label="Centre d'aide" onClick={() => navigate('/aide')}>
-              <CircleHelp size={23} aria-hidden="true" />
-            </button>
+            <div className="dashboard-panel-menu" ref={notificationRef}>
+              <button className="dashboard-icon-button" type="button" aria-label={`${notificationCount} notifications`} aria-expanded={notificationPanelOpen} onClick={() => {
+                setHelpMenuOpen(false);
+                setCreateMenuOpen(false);
+                setSearchOpen(false);
+                setNotificationPanelOpen((value) => !value);
+              }}>
+                <Bell size={22} aria-hidden="true" />
+                {notificationCount > 0 && <span>{notificationCount}</span>}
+              </button>
+              {notificationPanelOpen && (
+                <div className="dashboard-notification-panel">
+                  <header>
+                    <strong>Notifications</strong>
+                    <button type="button" onClick={() => setReadNotifications(notifications.map((notification) => notification.id))}>Tout marquer comme lu</button>
+                  </header>
+                  {notifications.length ? notifications.map((notification) => (
+                    <button type="button" key={notification.id} className={readNotifications.includes(notification.id) ? '' : 'is-unread'} onClick={() => {
+                      setReadNotifications((current) => [...new Set([...current, notification.id])]);
+                      setNotificationPanelOpen(false);
+                      navigate(`/reunions/${notification.meetingId}`);
+                    }}>
+                      <strong>{notification.title}</strong>
+                      <small>{notification.body}</small>
+                    </button>
+                  )) : <p>Aucune notification.</p>}
+                </div>
+              )}
+            </div>
+            <div className="dashboard-panel-menu" ref={helpMenuRef}>
+              <button className="dashboard-icon-button" type="button" aria-label="Centre d'aide" aria-expanded={helpMenuOpen} onClick={() => {
+                setNotificationPanelOpen(false);
+                setCreateMenuOpen(false);
+                setSearchOpen(false);
+                setHelpMenuOpen((value) => !value);
+              }}>
+                <CircleHelp size={23} aria-hidden="true" />
+              </button>
+              {helpMenuOpen && (
+                <div className="dashboard-help-menu">
+                  <button type="button" onClick={() => navigate('/aide')}>Centre d’aide</button>
+                  <button type="button" onClick={() => { setHelpMenuOpen(false); setShortcutsOpen(true); }}>Tutoriel et raccourcis</button>
+                  <button type="button" onClick={() => navigate('/aide?section=report')}>Signaler un problème</button>
+                </div>
+              )}
+            </div>
             <div className="dashboard-create-menu" ref={createMenuRef}>
-              <button className="dashboard-create-button" type="button" aria-expanded={createMenuOpen} onClick={() => setCreateMenuOpen((value) => !value)} disabled={isCreating}>
+              <button className="dashboard-create-button" type="button" aria-label="Créer une réunion" aria-expanded={createMenuOpen} onClick={() => {
+                setNotificationPanelOpen(false);
+                setHelpMenuOpen(false);
+                setSearchOpen(false);
+                setCreateMenuOpen((value) => !value);
+              }} disabled={isCreating}>
                 <Plus size={21} aria-hidden="true" />
                 {isCreating ? 'Création...' : 'Créer une réunion'}
                 <ChevronDown size={17} aria-hidden="true" />
               </button>
               {createMenuOpen && (
                 <div className="dashboard-create-dropdown">
-                  <button type="button" onClick={() => void startInstantMeeting()}><Video size={18} />Réunion instantanée</button>
-                  <button type="button" onClick={() => navigate('/reunions')}><CalendarDays size={18} />Programmer une réunion</button>
+                  <button type="button" onClick={() => void startInstantMeeting()}><Video size={18} />Démarrer maintenant</button>
+                  <button type="button" onClick={() => navigate('/app/meetings')}><CalendarDays size={18} />Programmer une réunion</button>
                 </div>
               )}
             </div>
@@ -391,20 +661,19 @@ export default function UserDashboardPage() {
               </button>
               {profileMenuOpen && (
                 <div className="dashboard-profile-dropdown">
-                  <Link to="/profil">Mon profil</Link>
-                  <Link to="/parametres">Paramètres</Link>
+                  <Link to="/app/profile">Mon profil</Link>
+                  <Link to="/app/settings">Préférences</Link>
                   <button type="button" onClick={() => void authService.logout()}>Déconnexion</button>
                 </div>
               )}
             </div>
           </nav>
         </header>
-
         <div className="dashboard-content">
           <section className="dashboard-main-column">
             <header className="dashboard-welcome">
-              <h1>Bonjour, {getFirstName(currentUser?.name || currentUser?.email)} ! <span aria-hidden="true">👋</span></h1>
-              <p>Voici un aperçu de vos réunions et activités.</p>
+              <h1>{getGreeting()}, {getFirstName(currentUser?.name || currentUser?.email)} ! <span aria-hidden="true">👋</span></h1>
+              <p>{upcomingMeetings.length ? `${upcomingMeetings.length} réunion${upcomingMeetings.length > 1 ? 's' : ''} à venir` : 'Aucune réunion à venir'} · {notificationCount ? `${notificationCount} notification${notificationCount > 1 ? 's' : ''} non lue${notificationCount > 1 ? 's' : ''}` : 'Vous êtes à jour'}.</p>
             </header>
 
             <section className="dashboard-shortcuts" aria-label="Raccourcis de réunion">
@@ -462,10 +731,10 @@ export default function UserDashboardPage() {
               <section className="dashboard-tip-card">
                 <span><Star size={25} aria-hidden="true" /></span>
                 <div>
-                  <strong>Astuce du jour</strong>
-                  <p>Utilisez le tableau blanc pour collaborer visuellement avec votre équipe en temps réel.</p>
+                  <strong>{activeTip.title}</strong>
+                  <p>{activeTip.body}</p>
                 </div>
-                <button className="dashboard-tip-action" type="button" onClick={() => navigate('/tableau-blanc')}>Essayer maintenant</button>
+                <button className="dashboard-tip-action" type="button" onClick={() => navigate(activeTip.actionPath || '/app')}>{activeTip.actionLabel}</button>
                 <button className="dashboard-tip-close" type="button" aria-label="Fermer l’astuce" onClick={dismissTip}><X size={19} /></button>
               </section>
             )}
@@ -488,7 +757,7 @@ export default function UserDashboardPage() {
             <section className="dashboard-card dashboard-calendar">
               <header className="dashboard-card-header">
                 <h2>Mon calendrier</h2>
-                <button type="button" onClick={() => navigate('/calendrier')}>Voir le calendrier</button>
+                <button type="button" onClick={() => navigate('/app/calendar')}>Voir le calendrier</button>
               </header>
               <div className="calendar-month-row">
                 <strong>{new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(calendarMonth)}</strong>
@@ -510,7 +779,9 @@ export default function UserDashboardPage() {
                       sameDay(cell.date, selectedDate) ? 'is-selected' : '',
                       cell.hasMeeting ? 'has-meeting' : '',
                     ].filter(Boolean).join(' ')}
-                    onClick={() => setSelectedDate(cell.date)}
+                    aria-label={`${new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full' }).format(cell.date)}. Cliquez pour voir les réunions, double-cliquez pour programmer.`}
+                    onClick={() => openCalendarMeetings(cell.date)}
+                    onDoubleClick={() => openScheduleModal(cell.date)}
                   >
                     {cell.label}
                   </button>
@@ -521,7 +792,7 @@ export default function UserDashboardPage() {
             <section className="dashboard-card dashboard-recents">
               <header className="dashboard-card-header">
                 <h2>Réunions récentes</h2>
-                <button type="button" onClick={() => navigate('/reunions/recentes')}>Voir tout</button>
+                <button type="button" onClick={() => navigate('/app/recordings')}>Voir tout</button>
               </header>
               {recentMeetings.length ? recentMeetings.map((meeting, index) => (
                 <article className="recent-meeting-row" key={meeting.id}>
@@ -541,6 +812,87 @@ export default function UserDashboardPage() {
         </div>
       </section>
 
+      {shortcutsOpen && (
+        <div className="dashboard-modal-backdrop" role="presentation" onClick={() => setShortcutsOpen(false)}>
+          <section className="dashboard-shortcuts-modal" role="dialog" aria-modal="true" aria-labelledby="keyboard-shortcuts-title" onClick={(event) => event.stopPropagation()}>
+            <header>
+              <h2 id="keyboard-shortcuts-title">Raccourcis clavier</h2>
+              <button type="button" aria-label="Fermer" onClick={() => setShortcutsOpen(false)}><X size={20} /></button>
+            </header>
+            <ul>
+              <li><kbd>Entrée</kbd><span>Ouvrir le premier résultat de recherche</span></li>
+              <li><kbd>Échap</kbd><span>Fermer ce panneau</span></li>
+            </ul>
+          </section>
+        </div>
+      )}
+
+      {calendarMeetingDate && (
+        <div className="dashboard-modal-backdrop" role="presentation" onClick={() => setCalendarMeetingDate(null)}>
+          <section className="dashboard-day-modal" role="dialog" aria-modal="true" aria-labelledby="dashboard-day-modal-title" onClick={(event) => event.stopPropagation()}>
+            <header>
+              <div>
+                <h2 id="dashboard-day-modal-title">Réunions programmées</h2>
+                <p>{new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full' }).format(calendarMeetingDate)}</p>
+              </div>
+              <button type="button" aria-label="Fermer" onClick={() => setCalendarMeetingDate(null)}><X size={20} /></button>
+            </header>
+            {calendarMeetingsForSelectedDate.length ? (
+              <div className="dashboard-day-meetings">
+                {calendarMeetingsForSelectedDate.map((meeting) => (
+                  <article key={meeting.id}>
+                    <time>{formatTime(meeting.start_time)}</time>
+                    <div>
+                      <strong>{meeting.title}</strong>
+                      <small>ID: {formatMeetingId(meeting)} · {formatDuration(meeting.duration)}</small>
+                    </div>
+                    <button type="button" onClick={() => navigate(`/reunions/${meeting.id}`, { state: { meeting } })}>Ouvrir</button>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="dashboard-empty">Aucune réunion programmée pour cette date.</p>
+            )}
+          </section>
+        </div>
+      )}
+
+      {scheduleDate && (
+        <div className="dashboard-modal-backdrop" role="presentation" onClick={() => setScheduleDate(null)}>
+          <form className="dashboard-schedule-modal" role="dialog" aria-modal="true" aria-labelledby="dashboard-schedule-modal-title" onSubmit={submitScheduleFromCalendar} onClick={(event) => event.stopPropagation()}>
+            <header>
+              <div>
+                <h2 id="dashboard-schedule-modal-title">Programmer une réunion</h2>
+                <p>{new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full' }).format(scheduleDate)}</p>
+              </div>
+              <button type="button" aria-label="Fermer" onClick={() => setScheduleDate(null)}><X size={20} /></button>
+            </header>
+            <label>
+              <span>Titre</span>
+              <input value={scheduleTitle} onChange={(event) => setScheduleTitle(event.target.value)} required maxLength={160} />
+            </label>
+            <div className="dashboard-schedule-fields">
+              <label>
+                <span>Heure</span>
+                <input type="time" value={scheduleTime} onChange={(event) => setScheduleTime(event.target.value)} required />
+              </label>
+              <label>
+                <span>Durée</span>
+                <select value={scheduleDuration} onChange={(event) => setScheduleDuration(Number(event.target.value))}>
+                  <option value={30}>30 minutes</option>
+                  <option value={60}>1 heure</option>
+                  <option value={90}>1 h 30</option>
+                  <option value={120}>2 heures</option>
+                </select>
+              </label>
+            </div>
+            <button className="dashboard-schedule-submit" type="submit" disabled={isScheduling}>
+              {isScheduling ? 'Programmation...' : 'Programmer la réunion'}
+            </button>
+          </form>
+        </div>
+      )}
+
       {toast && <div className="dashboard-toast" role="status" aria-live="polite">{toast}</div>}
     </main>
   );
@@ -550,63 +902,94 @@ function DashboardSidebar({
   user,
   messageCount,
   open,
+  onMessagesOpened,
   onClose,
   onLogout,
 }: {
   user: ReturnType<typeof authService.getCurrentUser>;
   messageCount: number;
   open: boolean;
+  onMessagesOpened: () => void;
   onClose: () => void;
   onLogout: () => void;
 }) {
+  const location = useLocation();
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const isAdmin = user?.role === 'admin';
+
   const navItems = [
-    { label: 'Accueil', icon: <Home size={21} />, to: '/app', active: true },
-    { label: 'Réunions', icon: <CalendarDays size={21} />, to: '/reunions' },
-    { label: 'Rejoindre', icon: <SquareArrowOutUpRight size={21} />, to: '/rejoindre-une-reunion' },
-    { label: 'Calendrier', icon: <CalendarDays size={21} />, to: '/calendrier' },
-    { label: 'Enregistrements', icon: <CirclePlay size={21} />, to: '/enregistrements' },
-    { label: 'Messages', icon: <MessageCircle size={21} />, to: '/messages', badge: messageCount },
-    { label: 'Contacts', icon: <UsersRound size={21} />, to: '/contacts' },
-    { label: 'Tableau blanc', icon: <Sparkles size={21} />, to: '/tableau-blanc' },
-    { label: 'Sondages', icon: <BarChart3 size={21} />, to: '/sondages' },
-    { label: 'Paramètres', icon: <Settings size={21} />, to: '/parametres' },
+    { label: 'Accueil', icon: <Home size={21} />, to: '/app' },
+    { label: 'Réunions', icon: <CalendarDays size={21} />, to: '/app/meetings' },
+    { label: 'Rejoindre', icon: <SquareArrowOutUpRight size={21} />, to: '/join' },
+    { label: 'Calendrier', icon: <CalendarDays size={21} />, to: '/app/calendar' },
+    { label: 'Enregistrements', icon: <CirclePlay size={21} />, to: '/app/recordings' },
+    { label: 'Messages', icon: <MessageCircle size={21} />, to: '/app/messages', badge: messageCount },
+    { label: 'Contacts', icon: <UsersRound size={21} />, to: '/app/contacts' },
+    { label: 'Tableau blanc', icon: <Sparkles size={21} />, to: '/app/whiteboard' },
+    { label: 'Sondages', icon: <BarChart3 size={21} />, to: '/app/polls' },
+    { label: 'Paramètres', icon: <Settings size={21} />, to: '/app/settings' },
   ];
 
+  const isActiveRoute = (path: string) => location.pathname === path
+    || (path !== '/app' && location.pathname.startsWith(`${path}/`));
+
   return (
-    <aside className={`dashboard-sidebar ${open ? 'is-open' : ''}`}>
+    <aside className={`dashboard-sidebar ${open ? 'is-open' : ''}`} id="dashboard-sidebar" aria-label="Menu principal">
       <button className="dashboard-sidebar-close" type="button" aria-label="Fermer le menu" onClick={onClose}><X size={22} /></button>
-      <Link className="dashboard-logo" to="/app">
+      <Link className="dashboard-logo" to="/app" onClick={onClose}>
         <span><UsersRound size={29} /><Video size={14} /></span>
         <strong>MBoté<span>Room</span><small>Réunions sécurisées</small></strong>
       </Link>
       <nav className="dashboard-sidebar-nav" aria-label="Navigation principale">
         {navItems.map((item) => (
-          <Link className={item.active ? 'is-active' : ''} to={item.to} key={item.label}>
+          <Link
+            className={isActiveRoute(item.to) ? 'is-active' : ''}
+            to={item.to}
+            key={item.label}
+            aria-current={isActiveRoute(item.to) ? 'page' : undefined}
+            onClick={() => {
+              if (item.to === '/app/messages') onMessagesOpened();
+              onClose();
+            }}
+          >
             {item.icon}
             <span>{item.label}</span>
-            {Boolean(item.badge) && <b>{item.badge}</b>}
+            {Boolean(item.badge) && <b aria-label={`${item.badge} nouveaux messages`}>{item.badge}</b>}
           </Link>
         ))}
       </nav>
       <section className="dashboard-premium">
         <Crown size={24} aria-hidden="true" />
-        <strong>Passez au Premium</strong>
-        <p>Plus de fonctionnalités, enregistrements cloud et stockage illimité.</p>
-        <Link to="/fonctionnalites">Découvrir</Link>
+        <strong>{isAdmin ? 'Console administrateur' : 'Passez au Premium'}</strong>
+        <p>{isAdmin ? 'Gérez les utilisateurs, réunions et paramètres de la plateforme.' : 'Plus de fonctionnalités, enregistrements cloud et stockage illimité.'}</p>
+        <Link to={isAdmin ? '/admin' : '/fonctionnalites'} onClick={onClose}>{isAdmin ? 'Administrer' : 'Découvrir'}</Link>
       </section>
       <section className="dashboard-sidebar-profile">
-        <Avatar name={user?.name || user?.email} image={user?.avatar} size="medium" />
-        <div>
-          <strong>{user?.name || 'Utilisateur'}</strong>
-          <small>{user?.email || 'Compte MBotéRoom'}</small>
-          <span>En ligne</span>
-        </div>
-        <button type="button" aria-label="Déconnexion" onClick={onLogout}><LogOut size={18} /></button>
+        <Link className="dashboard-sidebar-profile-main" to="/app/profile" onClick={onClose} aria-label="Ouvrir mon profil">
+          <Avatar name={user?.name || user?.email} image={user?.avatar} size="medium" />
+          <div>
+            <strong>{user?.name || 'Utilisateur'}</strong>
+            <small>{user?.email || 'Compte MBotéRoom'}</small>
+            <span className={isOnline ? 'is-online' : 'is-offline'}>{isOnline ? 'En ligne' : 'Hors ligne'}</span>
+          </div>
+        </Link>
+        <button type="button" aria-label="Déconnexion" title="Déconnexion" onClick={onLogout}><LogOut size={18} /></button>
       </section>
     </aside>
   );
 }
-
 function UpcomingMeetingRow({
   meeting,
   menuOpen,

@@ -1,5 +1,5 @@
 import { apiUrl, getAuthHeaders } from '../lib/api';
-import { Meeting } from './meetingService';
+import { DashboardTip, Meeting } from './meetingService';
 
 export type AdminDashboardStat = {
   id: 'users' | 'meetings' | 'live' | 'hours' | 'recordings';
@@ -80,5 +80,41 @@ export const adminDashboardService = {
       headers: getAuthHeaders(),
     });
     return readJson<{ success: boolean; meeting: Meeting }>(response);
+  },
+
+  async getDashboardTips() {
+    const response = await fetch(apiUrl('/api/admin/dashboard-tips'), {
+      headers: getAuthHeaders(),
+    });
+    return readJson<DashboardTip[]>(response);
+  },
+
+  async createDashboardTip(payload: Pick<DashboardTip, 'title' | 'body' | 'actionLabel' | 'actionPath' | 'isActive'>) {
+    const response = await fetch(apiUrl('/api/admin/dashboard-tips'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return readJson<DashboardTip>(response);
+  },
+
+  async updateDashboardTip(tipId: string, payload: Pick<DashboardTip, 'title' | 'body' | 'actionLabel' | 'actionPath' | 'isActive'>) {
+    const response = await fetch(apiUrl(`/api/admin/dashboard-tips/${encodeURIComponent(tipId)}`), {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return readJson<DashboardTip>(response);
+  },
+
+  async deleteDashboardTip(tipId: string) {
+    const response = await fetch(apiUrl(`/api/admin/dashboard-tips/${encodeURIComponent(tipId)}`), {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(typeof data?.error === 'string' ? data.error : 'Suppression impossible.');
+    }
   },
 };

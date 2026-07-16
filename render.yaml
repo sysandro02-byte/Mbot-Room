@@ -16,13 +16,13 @@ services:
       - key: ADMIN_EMAILS
         sync: false
       - key: MBOTE_AUTH_BASE_URL
-        sync: false
+        value: https://mbote-backend.onrender.com
       - key: MBOTE_AUTH_CLIENT_ID
-        sync: false
+        value: mbote-room
       - key: MBOTE_AUTH_CLIENT_SECRET
         sync: false
       - key: MBOTE_AUTH_PROFILE_URL
-        sync: false
+        value: https://mbote-backend.onrender.com/api/users/me
       - key: MBOTE_AUTH_REDIRECT_URI
         sync: false
       - key: GROQ_API_KEY

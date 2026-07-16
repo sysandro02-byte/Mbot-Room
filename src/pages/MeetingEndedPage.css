@@ -261,9 +261,8 @@
 .meeting-stat-card strong {
   display: block;
   margin-top: 5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
   font-size: 18px;
 }
 
@@ -442,13 +441,17 @@
 
 .meeting-tool-card strong,
 .meeting-tool-card small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .meeting-tool-card small {
   color: #63708f;
+}
+
+.meeting-tool-card:disabled {
+  cursor: not-allowed;
+  opacity: .58;
 }
 
 .meeting-rating-card {
@@ -498,6 +501,12 @@
   background: transparent;
   color: #63708f;
   cursor: pointer;
+}
+
+.meeting-stars button:disabled,
+.meeting-rating-submit:disabled {
+  cursor: not-allowed;
+  opacity: .65;
 }
 
 .meeting-stars button[aria-checked="true"],
@@ -552,6 +561,7 @@
 
 .meeting-ended-side-row strong {
   min-width: 0;
+  overflow-wrap: anywhere;
   text-align: right;
 }
 
@@ -654,6 +664,105 @@
   color: #fff;
   font-weight: 750;
   box-shadow: 0 18px 38px rgba(16, 27, 60, .18);
+}
+
+.meeting-ended-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(16, 27, 60, .42);
+}
+
+.meeting-ended-modal {
+  width: min(480px, 100%);
+  border: 1px solid #dce2ef;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(16, 27, 60, .22);
+}
+
+.meeting-ended-modal header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #dce2ef;
+}
+
+.meeting-ended-modal h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.meeting-ended-modal header button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid #dce2ef;
+  border-radius: 10px;
+  background: #fff;
+  color: #101b3c;
+  cursor: pointer;
+}
+
+.meeting-ended-modal form {
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+}
+
+.meeting-ended-modal label {
+  color: #101b3c;
+  font-weight: 800;
+}
+
+.meeting-ended-modal input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid #dce2ef;
+  border-radius: 12px;
+  color: #101b3c;
+  font: inherit;
+}
+
+.meeting-ended-modal input:focus {
+  border-color: #3451f2;
+  outline: 3px solid rgba(52, 81, 242, .16);
+}
+
+.meeting-ended-modal form > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin-top: 6px;
+  border: 0;
+  border-radius: 12px;
+  background: #3451f2;
+  color: #fff;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.meeting-ended-modal form > button:disabled {
+  cursor: wait;
+  opacity: .72;
+}
+
+.meeting-ended-form-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(216, 64, 64, .24);
+  border-radius: 10px;
+  background: #fff4f4;
+  color: #d84040;
+  font-weight: 750;
 }
 
 button:focus-visible,
