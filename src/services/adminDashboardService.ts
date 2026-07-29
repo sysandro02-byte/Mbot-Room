@@ -1,6 +1,8 @@
 import { apiUrl, getAuthHeaders } from '../lib/api';
 import { DashboardTip, Meeting } from './meetingService';
 
+export type GuestAccessSlide = { id: string; title: string; body: string; imageUrl: string; isActive: boolean; createdAt: string; updatedAt: string };
+
 export type AdminDashboardStat = {
   id: 'users' | 'meetings' | 'live' | 'hours' | 'recordings';
   label: string;
@@ -107,6 +109,20 @@ export const adminDashboardService = {
     return readJson<DashboardTip>(response);
   },
 
+  async getGuestAccessSlides() {
+    const response = await fetch(apiUrl('/api/admin/guest-access-slides'), { headers: getAuthHeaders() });
+    return readJson<GuestAccessSlide[]>(response);
+  },
+  async saveGuestAccessSlide(payload: Pick<GuestAccessSlide, 'title' | 'body' | 'imageUrl' | 'isActive'>, id?: string) {
+    const response = await fetch(apiUrl(id ? `/api/admin/guest-access-slides/${encodeURIComponent(id)}` : '/api/admin/guest-access-slides'), {
+      method: id ? 'PUT' : 'POST', headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    return readJson<GuestAccessSlide>(response);
+  },
+  async deleteGuestAccessSlide(id: string) {
+    const response = await fetch(apiUrl(`/api/admin/guest-access-slides/${encodeURIComponent(id)}`), { method: 'DELETE', headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Suppression impossible.');
+  },
   async deleteDashboardTip(tipId: string) {
     const response = await fetch(apiUrl(`/api/admin/dashboard-tips/${encodeURIComponent(tipId)}`), {
       method: 'DELETE',

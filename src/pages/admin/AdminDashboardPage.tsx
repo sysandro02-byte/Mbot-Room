@@ -33,6 +33,7 @@ import {
   AdminActivity,
   AdminDashboardPayload,
   AdminDashboardStat,
+  GuestAccessSlide,
   adminDashboardService,
 } from '../../services/adminDashboardService';
 import { DashboardTip, getMeetingAccessCode, Meeting } from '../../services/meetingService';
@@ -137,6 +138,9 @@ export default function AdminDashboardPage() {
   });
   const [editingTipId, setEditingTipId] = useState<string | null>(null);
   const [isSavingTip, setIsSavingTip] = useState(false);
+  const [guestSlides, setGuestSlides] = useState<GuestAccessSlide[]>([]);
+  const [guestDraft, setGuestDraft] = useState({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true });
+  const [editingGuestSlideId, setEditingGuestSlideId] = useState<string | null>(null);
   const [toast, setToast] = useState('');
   const abortRef = useRef<AbortController | null>(null);
 
@@ -391,6 +395,7 @@ export default function AdminDashboardPage() {
               onToast={setToast}
             />
             <RecentActivityCard activities={dashboard?.recentActivity || []} />
+            <GuestAccessSlidesCard slides={guestSlides} draft={guestDraft} editingId={editingGuestSlideId} onDraftChange={setGuestDraft} onEdit={(slide) => { setEditingGuestSlideId(slide.id); setGuestDraft({ title: slide.title, body: slide.body, imageUrl: slide.imageUrl, isActive: slide.isActive }); }} onCancel={() => { setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); }} onSubmit={async (event) => { event.preventDefault(); try { await adminDashboardService.saveGuestAccessSlide(guestDraft, editingGuestSlideId || undefined); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); setToast('Slide enregistre.'); } catch (saveError) { setToast(saveError instanceof Error ? saveError.message : 'Enregistrement impossible.'); } }} onDelete={async (id) => { try { await adminDashboardService.deleteGuestAccessSlide(id); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setToast('Slide supprime.'); } catch (deleteError) { setToast(deleteError instanceof Error ? deleteError.message : 'Suppression impossible.'); } }} />
             <DashboardTipsCard
               tips={dashboardTips}
               draft={tipDraft}
@@ -552,6 +557,16 @@ function RecentActivityCard({ activities }: { activities: AdminActivity[] }) {
   );
 }
 
+function GuestAccessSlidesCard({ slides, draft, editingId, onDraftChange, onEdit, onCancel, onSubmit, onDelete }: {
+  slides: GuestAccessSlide[]; draft: Pick<GuestAccessSlide, 'title' | 'body' | 'imageUrl' | 'isActive'>; editingId: string | null;
+  onDraftChange: (draft: Pick<GuestAccessSlide, 'title' | 'body' | 'imageUrl' | 'isActive'>) => void;
+  onEdit: (slide: GuestAccessSlide) => void; onCancel: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onDelete: (id: string) => void;
+}) {
+  return <section className="admin-tips-card"><header><div><h2>Slider accès invité</h2><p>Contenu affiché sur la page de participation sans compte.</p></div><span>{slides.filter((slide) => slide.isActive).length} active(s)</span></header>
+    <form className="admin-tip-form" onSubmit={onSubmit}><label><span>Titre</span><input value={draft.title} maxLength={80} required onChange={(event) => onDraftChange({ ...draft, title: event.target.value })} /></label><label><span>Message</span><textarea value={draft.body} maxLength={280} rows={3} required onChange={(event) => onDraftChange({ ...draft, body: event.target.value })} /></label><label><span>URL de l'image</span><input value={draft.imageUrl} maxLength={500} onChange={(event) => onDraftChange({ ...draft, imageUrl: event.target.value })} /></label><label className="admin-tip-toggle"><input type="checkbox" checked={draft.isActive} onChange={(event) => onDraftChange({ ...draft, isActive: event.target.checked })} /><span>Slide active</span></label><div className="admin-tip-actions">{editingId && <button type="button" onClick={onCancel}>Annuler</button>}<button type="submit">{editingId ? 'Mettre à jour' : 'Publier'}</button></div></form>
+    <div className="admin-tip-list">{slides.map((slide) => <article key={slide.id} className={slide.isActive ? 'is-active' : ''}><div><strong>{slide.title}</strong><p>{slide.body}</p><small>{slide.imageUrl}</small></div><div><button type="button" onClick={() => onEdit(slide)}>Modifier</button><button type="button" className="is-danger" onClick={() => onDelete(slide.id)}>Supprimer</button></div></article>)}</div>
+  </section>;
+}
 function DashboardTipsCard({
   tips,
   draft,

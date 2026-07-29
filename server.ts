@@ -1,4 +1,4 @@
-﻿import dotenv from 'dotenv';
+import dotenv from 'dotenv';
 import express from 'express';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -125,6 +125,16 @@ type DashboardTip = {
   updatedAt: string;
 };
 
+type GuestAccessSlide = {
+  id: string;
+  title: string;
+  body: string;
+  imageUrl: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type DatabaseState = {
   users: User[];
   meetings: Meeting[];
@@ -133,6 +143,7 @@ type DatabaseState = {
   sessions: Session[];
   passwordResetRequests?: PasswordResetRequest[];
   dashboardTips?: DashboardTip[];
+  guestAccessSlides?: GuestAccessSlide[];
   nextUserId: number;
   nextMeetingId: number;
 };
@@ -216,6 +227,7 @@ const meetings = new Map<number, Meeting>();
 const lobby = new Map<number, LobbyParticipant[]>();
 const mediaRequests = new Map<number, MediaRequest[]>();
 const dashboardTips = new Map<string, DashboardTip>();
+const guestAccessSlides = new Map<string, GuestAccessSlide>();
 const meetingParticipants = new Map<string, Map<string, {
   socketId: string;
   userId: string;
@@ -285,6 +297,8 @@ type ApiErrorCode =
   | 'EXTERNAL_AUTH_NOT_CONFIGURED'
   | 'EXTERNAL_AUTH_PROFILE_UNAVAILABLE'
   | 'EXTERNAL_AUTH_STATE_INVALID'
+  | 'MBOTE_CREDENTIALS_INVALID'
+  | 'MBOTE_AUTH_NOT_CONFIGURED'
   | 'INVALID_CREDENTIALS'
   | 'INVALID_EMAIL'
   | 'LOBBY_HOST_REQUIRED'
@@ -303,6 +317,8 @@ type ApiErrorCode =
   | 'PASSWORD_RESET_NOT_CONFIGURED'
   | 'TIP_BODY_REQUIRED'
   | 'TIP_NOT_FOUND'
+  | 'SLIDE_CONTENT_REQUIRED'
+  | 'SLIDE_NOT_FOUND'
   | 'VALIDATION_ERROR';
 
 const sendApiError = (
@@ -539,6 +555,7 @@ const saveLocalDatabase = async () => {
     sessions: [...sessions.values()],
     passwordResetRequests: [...passwordResetRequests.values()],
     dashboardTips: [...dashboardTips.values()],
+    guestAccessSlides: [...guestAccessSlides.values()],
     nextUserId,
     nextMeetingId,
   };
@@ -663,6 +680,8 @@ const loadDatabase = async () => {
       sessions.clear();
       passwordResetRequests.clear();
       dashboardTips.clear();
+    guestAccessSlides.clear();
+      guestAccessSlides.clear();
 
       for (const user of userResult.rows) {
         users.set(Number(user.id), {
@@ -742,6 +761,7 @@ const loadDatabase = async () => {
     sessions.clear();
     passwordResetRequests.clear();
     dashboardTips.clear();
+    guestAccessSlides.clear();
     for (const user of state.users || []) users.set(Number(user.id), user);
     for (const meeting of state.meetings || []) meetings.set(Number(meeting.id), meeting);
     for (const [meetingId, rows] of restoreRowsByMeeting(state.lobby || [])) lobby.set(meetingId, rows as LobbyParticipant[]);
@@ -755,6 +775,7 @@ const loadDatabase = async () => {
       }
     }
     for (const tip of state.dashboardTips || []) dashboardTips.set(tip.id, tip);
+    for (const slide of state.guestAccessSlides || []) guestAccessSlides.set(slide.id, slide);
     nextUserId = Math.max(Number(state.nextUserId || 1), ...[...users.keys()].map((id) => id + 1), 1);
     nextMeetingId = Math.max(Number(state.nextMeetingId || 1), ...[...meetings.keys()].map((id) => id + 1), 1);
     ensureDefaultDashboardTips();
@@ -826,10 +847,12 @@ const getMboteAuthConfig = (request: express.Request) => {
   const authorizeUrl = String(process.env.MBOTE_AUTH_AUTHORIZE_URL || (baseUrl ? `${baseUrl}/api/oauth/authorize` : '')).trim();
   const tokenUrl = String(process.env.MBOTE_AUTH_TOKEN_URL || (baseUrl ? `${baseUrl}/api/oauth/token` : '')).trim();
   const profileUrl = String(process.env.MBOTE_AUTH_PROFILE_URL || (baseUrl ? `${baseUrl}/api/auth/me` : '')).trim();
-  return { baseUrl, clientId, clientSecret, redirectUri, authorizeUrl, tokenUrl, profileUrl };
+  const loginUrl = String(process.env.MBOTE_AUTH_LOGIN_URL || (baseUrl ? baseUrl + '/api/auth/login' : '')).trim();
+  return { baseUrl, clientId, clientSecret, redirectUri, authorizeUrl, tokenUrl, profileUrl, loginUrl };
 };
 
 const mboteOAuthStates = new Map<string, { redirectTo: string; clientOrigin: string; createdAt: number }>();
+const mboteCredentialChallenges = new Map<string, { profile: NonNullable<ReturnType<typeof normalizeExternalProfile>>; createdAt: number }>();
 
 const normalizeRedirectPath = (value: unknown) => {
   const redirectTo = String(value || '/app').trim();
@@ -968,6 +991,31 @@ const ensureDefaultDashboardTips = () => {
   });
 };
 
+const ensureDefaultGuestAccessSlides = () => {
+  if (guestAccessSlides.size > 0) return;
+  const now = new Date().toISOString();
+  guestAccessSlides.set('guest-access-default', {
+    id: 'guest-access-default', title: 'Acc\u00e8s invit\u00e9',
+    body: "Vous participez en tant qu'invit\u00e9. Certaines fonctionnalit\u00e9s peuvent \u00eatre limit\u00e9es.",
+    imageUrl: '/meeting-black-team.svg', isActive: true, createdAt: now, updatedAt: now,
+  });
+};
+
+const normalizeGuestAccessSlidePayload = (body: Record<string, unknown>, existing?: GuestAccessSlide): GuestAccessSlide => {
+  const now = new Date().toISOString();
+  return {
+    id: existing?.id || crypto.randomUUID(),
+    title: String(body.title || existing?.title || 'Acc\u00e8s invit\u00e9').trim().slice(0, 80),
+    body: String(body.body || existing?.body || '').trim().slice(0, 280),
+    imageUrl: String(body.imageUrl || existing?.imageUrl || '/meeting-black-team.svg').trim().slice(0, 500),
+    isActive: typeof body.isActive === 'boolean' ? body.isActive : existing?.isActive ?? true,
+    createdAt: existing?.createdAt || now, updatedAt: now,
+  };
+};
+
+const getPublicGuestAccessSlide = (slide: GuestAccessSlide): GuestAccessSlide => ({
+  ...slide, title: repairStoredText(slide.title), body: repairStoredText(slide.body),
+});
 const normalizeDashboardTipPayload = (body: Record<string, unknown>, existing?: DashboardTip): DashboardTip => {
   const now = new Date().toISOString();
   const startsAt = String(body.startsAt || existing?.startsAt || '').trim();
@@ -1414,6 +1462,11 @@ app.get('/api/health', (_request, response) => {
   });
 });
 
+app.get('/api/public/guest-access-slides', (_request, response) => {
+  ensureDefaultGuestAccessSlides();
+  response.json([...guestAccessSlides.values()].filter((slide) => slide.isActive).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map(getPublicGuestAccessSlide));
+});
+
 app.get('/api/public/meetings', (_request, response) => {
   const publicMeetings = [...meetings.values()]
     .filter((meeting) => {
@@ -1483,6 +1536,53 @@ app.post('/api/auth/login', async (request, response) => {
   response.json(await createSession(user, Boolean(request.body?.rememberMe)));
 });
 
+app.post('/api/auth/mbote/credentials', async (request, response) => {
+  const identifier = String(request.body?.identifier || '').trim();
+  const password = String(request.body?.password || '');
+  const config = getMboteAuthConfig(request);
+  if (!config.loginUrl || !config.profileUrl) {
+    sendApiError(response, 503, 'MBOTE_AUTH_NOT_CONFIGURED', 'Authentification MBoté non configurée.');
+    return;
+  }
+  if (!identifier || !password) {
+    sendApiError(response, 400, 'MBOTE_CREDENTIALS_INVALID', 'Identifiant et mot de passe requis.');
+    return;
+  }
+  try {
+    const loginResponse = await fetch(config.loginUrl, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier, email: identifier, username: identifier, password }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const loginPayload = await loginResponse.json().catch(() => ({}));
+    if (!loginResponse.ok) throw new Error('Identifiants MBoté incorrects.');
+    const externalToken = String(loginPayload.access_token || loginPayload.token || loginPayload.accessToken || '').trim();
+    const profileResponse = externalToken
+      ? await fetch(config.profileUrl, { headers: { Authorization: `Bearer ${externalToken}` }, signal: AbortSignal.timeout(15000) })
+      : null;
+    const profilePayload = profileResponse ? await profileResponse.json().catch(() => ({})) : loginPayload;
+    if (profileResponse && !profileResponse.ok) throw new Error('Profil MBoté indisponible.');
+    const profile = normalizeExternalProfile(profilePayload);
+    if (!profile) throw new Error('Profil MBoté incomplet.');
+    const challengeId = createToken();
+    mboteCredentialChallenges.set(challengeId, { profile, createdAt: Date.now() });
+    response.json({ challengeId, profile: { id: profile.id, name: profile.name, email: profile.email, avatar: profile.avatar } });
+  } catch (error) {
+    sendApiError(response, 401, 'MBOTE_CREDENTIALS_INVALID', error instanceof Error ? error.message : 'Identifiants MBoté incorrects.');
+  }
+});
+
+app.post('/api/auth/mbote/authorize', async (request, response) => {
+  const challengeId = String(request.body?.challengeId || '').trim();
+  const challenge = mboteCredentialChallenges.get(challengeId);
+  mboteCredentialChallenges.delete(challengeId);
+  if (!challenge || Date.now() - challenge.createdAt > 10 * 60 * 1000) {
+    sendApiError(response, 401, 'EXTERNAL_AUTH_STATE_INVALID', 'La demande d’autorisation a expiré.');
+    return;
+  }
+  const user = await findOrCreateMboteUser(challenge.profile);
+  response.json(await createSession(user, true));
+});
 app.get('/api/auth/mbote/start', (request, response) => {
   const config = getMboteAuthConfig(request);
   if (!config.authorizeUrl || !config.clientId || !config.tokenUrl || !config.profileUrl) {
@@ -1716,6 +1816,28 @@ app.post('/api/admin/meetings/:meetingId/join', authenticateToken, requireAdmin,
   response.json({ success: true, meeting: getPublicMeeting(meeting) });
 });
 
+app.get('/api/admin/guest-access-slides', authenticateToken, requireAdmin, (_request, response) => {
+  ensureDefaultGuestAccessSlides();
+  response.json([...guestAccessSlides.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(getPublicGuestAccessSlide));
+});
+
+app.post('/api/admin/guest-access-slides', authenticateToken, requireAdmin, async (request, response) => {
+  const slide = normalizeGuestAccessSlidePayload(request.body || {});
+  if (!slide.title || !slide.body) { sendApiError(response, 400, 'SLIDE_CONTENT_REQUIRED', 'Title and body are required.'); return; }
+  guestAccessSlides.set(slide.id, slide); await saveDatabase(); response.status(201).json(getPublicGuestAccessSlide(slide));
+});
+
+app.put('/api/admin/guest-access-slides/:slideId', authenticateToken, requireAdmin, async (request, response) => {
+  const existing = guestAccessSlides.get(request.params.slideId);
+  if (!existing) { sendApiError(response, 404, 'SLIDE_NOT_FOUND', 'Slide not found.'); return; }
+  const slide = normalizeGuestAccessSlidePayload(request.body || {}, existing);
+  if (!slide.title || !slide.body) { sendApiError(response, 400, 'SLIDE_CONTENT_REQUIRED', 'Title and body are required.'); return; }
+  guestAccessSlides.set(slide.id, slide); await saveDatabase(); response.json(getPublicGuestAccessSlide(slide));
+});
+
+app.delete('/api/admin/guest-access-slides/:slideId', authenticateToken, requireAdmin, async (request, response) => {
+  guestAccessSlides.delete(request.params.slideId); ensureDefaultGuestAccessSlides(); await saveDatabase(); response.status(204).end();
+});
 app.get('/api/admin/dashboard-tips', authenticateToken, requireAdmin, (_request, response) => {
   ensureDefaultDashboardTips();
   response.json([...dashboardTips.values()]

@@ -1003,3 +1003,10 @@
     animation-iteration-count: 1 !important;
   }
 }
+
+.guest-access-card { position: relative; overflow: hidden; }
+.guest-access-copy { position: relative; z-index: 1; }
+.guest-access-image { width: 100%; max-width: 320px; max-height: 150px; object-fit: contain; justify-self: center; }
+.guest-access-controls { position: absolute; right: 18px; bottom: 14px; display: flex; align-items: center; gap: 6px; }
+.guest-access-controls button { width: 26px; height: 26px; padding: 0; border: 1px solid #c9d7f4; border-radius: 50%; background: #fff; color: #2452c8; cursor: pointer; }
+.guest-access-controls button.is-active { width: 8px; height: 8px; border: 0; background: #2f5bea; font-size: 0; }

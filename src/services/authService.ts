@@ -121,6 +121,29 @@ export const authService = {
     };
   },
 
+  async verifyMboteCredentials(identifier: string, password: string) {
+    const response = await fetch(apiUrl('/api/auth/mbote/credentials'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier, password }),
+    });
+    const result = await readJson(response);
+    if (!response.ok) throw new Error(result.error || 'Identifiants MBoté incorrects.');
+    return result as { challengeId: string; profile: { id: string; name: string; email: string; avatar?: string } };
+  },
+
+  async authorizeMbote(challengeId: string, redirectTo = '/app') {
+    const response = await fetch(apiUrl('/api/auth/mbote/authorize'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ challengeId }),
+    });
+    const result = await readJson(response);
+    if (!response.ok) throw new Error(result.error || "Autorisation MBoté impossible.");
+    const session = {
+      user: normalizeUser(result.user), token: String(result.token || ''),
+      expiresAt: typeof result.expiresAt === 'string' ? result.expiresAt : undefined,
+    };
+    saveSession(session, true);
+    return { ...session, redirectTo };
+  },
   async startMboteAuth(redirectTo = '/app') {
     const response = await fetch(apiUrl(`/api/auth/mbote/start?redirect=${encodeURIComponent(redirectTo)}`));
     const result = await readJson(response);

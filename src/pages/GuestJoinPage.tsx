@@ -41,6 +41,7 @@ type RecentMeeting = {
 };
 
 type RecentMeetingsState = 'idle' | 'loading' | 'ready' | 'error';
+type GuestAccessSlide = { id: string; title: string; body: string; imageUrl: string; isActive: boolean; };
 
 type PublicMeetingResponse = {
   id?: number | string;
@@ -143,6 +144,27 @@ export default function GuestJoinPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [recentMeetings, setRecentMeetings] = useState<RecentMeeting[]>([]);
   const [recentMeetingsState, setRecentMeetingsState] = useState<RecentMeetingsState>('idle');
+  const [guestSlides, setGuestSlides] = useState<GuestAccessSlide[]>([]);
+  const [activeGuestSlide, setActiveGuestSlide] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const loadGuestSlides = async () => {
+      try {
+        const response = await fetch(apiUrl('/api/public/guest-access-slides'));
+        const payload = await response.json().catch(() => []);
+        if (!response.ok || !Array.isArray(payload)) return;
+        if (!cancelled) setGuestSlides(payload.filter((slide: GuestAccessSlide) => slide.isActive));
+      } catch { /* Keep the default card when the API is unavailable. */ }
+    };
+    void loadGuestSlides();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (guestSlides.length < 2) return undefined;
+    const timer = window.setInterval(() => setActiveGuestSlide((current) => (current + 1) % guestSlides.length), 6000);
+    return () => window.clearInterval(timer);
+  }, [guestSlides.length]);
   useEffect(() => {
     let cancelled = false;
 
@@ -412,7 +434,7 @@ export default function GuestJoinPage() {
         </div>
 
         <aside className="guest-join-right" aria-label="Informations invité">
-          <GuestAccessCard />
+          <GuestAccessCard slides={guestSlides} activeIndex={activeGuestSlide} onSelect={setActiveGuestSlide} />
           <InformationCard
             icon={<Headphones size={39} aria-hidden="true" />}
             iconVariant="soft"
@@ -500,18 +522,22 @@ function JoinField({
   );
 }
 
-function GuestAccessCard() {
+function GuestAccessCard({ slides, activeIndex, onSelect }: { slides: GuestAccessSlide[]; activeIndex: number; onSelect: (index: number) => void }) {
+  const fallback: GuestAccessSlide = { id: 'fallback', title: 'Acc\u00e8s invit\u00e9', body: "Vous participez en tant qu'invit\u00e9. Certaines fonctionnalit\u00e9s peuvent \u00eatre limit\u00e9es.", imageUrl: '/meeting-black-team.svg', isActive: true };
+  const visibleSlides = slides.length ? slides : [fallback];
+  const slide = visibleSlides[activeIndex % visibleSlides.length];
   return (
     <section className="guest-side-card guest-access-card" aria-labelledby="guest-access-title">
-      <div>
-        <h2 id="guest-access-title">Accès invité</h2>
-        <p>Vous participez en tant qu'invité. Certaines fonctionnalités peuvent être limitées (enregistrement, historique des discussions, etc.).</p>
-      </div>
-      <MeetingDevicesIllustration compact />
+      <div className="guest-access-copy"><h2 id="guest-access-title">{slide.title}</h2><p>{slide.body}</p></div>
+      <img className="guest-access-image" src={slide.imageUrl} alt="" />
+      {visibleSlides.length > 1 && <div className="guest-access-controls" aria-label="Slides accès invité">
+        <button type="button" aria-label="Slide précédente" onClick={() => onSelect((activeIndex - 1 + visibleSlides.length) % visibleSlides.length)}>‹</button>
+        {visibleSlides.map((item, index) => <button key={item.id} type="button" className={index === activeIndex % visibleSlides.length ? 'is-active' : ''} aria-label={`Afficher ${item.title}`} onClick={() => onSelect(index)} />)}
+        <button type="button" aria-label="Slide suivante" onClick={() => onSelect((activeIndex + 1) % visibleSlides.length)}>›</button>
+      </div>}
     </section>
   );
 }
-
 function InformationCard({
   icon,
   iconVariant,

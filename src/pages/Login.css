@@ -1157,3 +1157,15 @@
 .auth-modal p { margin: 12px 0 24px; color: #64748b; line-height: 1.6; }
 .auth-modal button { width: 100%; min-height: 46px; border: 0; border-radius: 12px; background: linear-gradient(135deg, #315cf5, #5437f5); color: #fff; font: inherit; font-weight: 750; cursor: pointer; }
 .auth-modal button:focus-visible { outline: 3px solid rgba(49, 92, 245, .3); outline-offset: 3px; }
+
+.mbote-auth-flow { width: min(460px, calc(100vw - 32px)); text-align: left; }
+.mbote-credentials-form { display: grid; gap: 9px; }
+.mbote-credentials-form label { color: #52617f; font-size: 13px; font-weight: 800; }
+.mbote-credentials-form input { min-height: 46px; padding: 0 13px; border: 1px solid #d7dfed; border-radius: 10px; color: #172346; font: inherit; }
+.mbote-credentials-form input:focus { border-color: #2f5bea; outline: 3px solid rgba(47, 91, 234, .14); }
+.auth-modal-secondary-button { width: 100%; min-height: 46px; margin-top: 10px; border: 1px solid #dce2ef; border-radius: 10px; background: #fff; color: #52617f; cursor: pointer; font: inherit; font-weight: 800; }
+.mbote-consent-profile { display: flex; align-items: center; gap: 12px; margin: 18px 0; padding: 12px; border: 1px solid #dfe6f2; border-radius: 12px; }
+.mbote-consent-profile img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; }
+.mbote-consent-profile span { display: grid; gap: 3px; }
+.mbote-consent-profile small { color: #667390; }
+.mbote-consent-list { display: grid; gap: 9px; margin: 0 0 18px; padding: 14px 18px 14px 34px; border: 1px solid #dfe6f2; border-radius: 12px; color: #233253; }

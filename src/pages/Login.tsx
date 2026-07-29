@@ -1,4 +1,4 @@
-﻿import { FocusEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import { FocusEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronDown,
@@ -266,6 +266,11 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [isMboteLoading, setIsMboteLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [externalAuthModalMessage, setExternalAuthModalMessage] = useState('');
+  const [mboteStep, setMboteStep] = useState<'credentials' | 'consent' | null>(null);
+  const [mboteIdentifier, setMboteIdentifier] = useState('');
+  const [mbotePassword, setMbotePassword] = useState('');
+  const [mboteChallengeId, setMboteChallengeId] = useState('');
+  const [mboteProfile, setMboteProfile] = useState<{ name: string; email: string; avatar?: string } | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -389,18 +394,55 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     }
   };
 
-  const startMboteLogin = async () => {
+  const startMboteLogin = () => {
     if (isLoading || isMboteLoading) return;
+    setFormError('');
+    setMboteStep('credentials');
+  };
+
+  const submitMboteCredentials = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!mboteIdentifier.trim() || !mbotePassword || isMboteLoading) {
+      setFormError('Votre identifiant et votre mot de passe MBoté sont obligatoires.');
+      return;
+    }
     setIsMboteLoading(true);
     setFormError('');
     try {
-      await authService.startMboteAuth(redirectTo);
+      const result = await authService.verifyMboteCredentials(mboteIdentifier.trim(), mbotePassword);
+      setMboteChallengeId(result.challengeId);
+      setMboteProfile(result.profile);
+      setMbotePassword('');
+      setMboteStep('consent');
     } catch (error) {
-      setExternalAuthModalMessage(error instanceof Error ? error.message : "Authentification MBoté indisponible.");
+      setFormError(error instanceof Error ? error.message : 'Identifiants MBoté incorrects.');
+    } finally {
       setIsMboteLoading(false);
     }
   };
 
+  const authorizeMbote = async () => {
+    if (!mboteChallengeId || isMboteLoading) return;
+    setIsMboteLoading(true);
+    setFormError('');
+    try {
+      await authService.authorizeMbote(mboteChallengeId, redirectTo);
+      navigate(redirectTo, { replace: true });
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Autorisation MBoté impossible.');
+      setMboteStep('credentials');
+    } finally {
+      setIsMboteLoading(false);
+    }
+  };
+
+  const closeMboteAuth = () => {
+    setMboteStep(null);
+    setMbotePassword('');
+    setMboteChallengeId('');
+    setMboteProfile(null);
+    setFormError('');
+  };
   const submitForgotPassword = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isLoading) return;
@@ -660,6 +702,39 @@ export default function Login({ initialView = 'login' }: LoginProps) {
         })}
       </footer>
 
+      {mboteStep && (
+        <div className="auth-modal-backdrop" role="presentation" onMouseDown={closeMboteAuth}>
+          <section className="auth-modal mbote-auth-flow" role="dialog" aria-modal="true" aria-labelledby="mbote-flow-title" onMouseDown={(event) => event.stopPropagation()}>
+            {mboteStep === 'credentials' ? (
+              <>
+                <span className="auth-modal-icon" aria-hidden="true">M</span>
+                <h2 id="mbote-flow-title">Se connecter avec MBoté</h2>
+                <p>Entrez d’abord vos identifiants MBoté pour continuer.</p>
+                <form className="mbote-credentials-form" onSubmit={submitMboteCredentials}>
+                  <label htmlFor="mbote-identifier">Identifiant MBoté</label>
+                  <input id="mbote-identifier" value={mboteIdentifier} autoComplete="username" onChange={(event) => setMboteIdentifier(event.target.value)} autoFocus />
+                  <label htmlFor="mbote-password">Mot de passe MBoté</label>
+                  <input id="mbote-password" type="password" value={mbotePassword} autoComplete="current-password" onChange={(event) => setMbotePassword(event.target.value)} />
+                  {formError && <p className="auth-error" role="alert">{formError}</p>}
+                  <button className="primary-login-button" type="submit" disabled={isMboteLoading}>{isMboteLoading ? 'Vérification...' : 'Vérifier et continuer'}</button>
+                  <button className="auth-modal-secondary-button" type="button" onClick={closeMboteAuth}>Annuler</button>
+                </form>
+              </>
+            ) : (
+              <>
+                <span className="auth-modal-icon" aria-hidden="true">✓</span>
+                <h2 id="mbote-flow-title">Autoriser l'application ?</h2>
+                <p><strong>MBotéRoom</strong> souhaite accéder à votre compte MBoté.</p>
+                <div className="mbote-consent-profile">{mboteProfile?.avatar && <img src={mboteProfile.avatar} alt="" />}<span><strong>{mboteProfile?.name}</strong><small>{mboteProfile?.email}</small></span></div>
+                <ul className="mbote-consent-list"><li>Voir votre profil public</li><li>Voir votre adresse e-mail</li></ul>
+                {formError && <p className="auth-error" role="alert">{formError}</p>}
+                <button className="primary-login-button" type="button" onClick={() => void authorizeMbote()} disabled={isMboteLoading}>{isMboteLoading ? 'Autorisation...' : 'Autoriser et continuer'}</button>
+                <button className="auth-modal-secondary-button" type="button" onClick={closeMboteAuth}>Annuler</button>
+              </>
+            )}
+          </section>
+        </div>
+      )}
       {externalAuthModalMessage && (
         <ExternalAuthErrorModal
           message={externalAuthModalMessage}
