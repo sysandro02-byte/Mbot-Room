@@ -155,6 +155,15 @@ const getPoll = async (pollId: string) => {
   };
 };
 
+type MeetingPollPayload = NonNullable<Awaited<ReturnType<typeof getPoll>>>;
+
+type ActusMeetingPayload = Meeting & {
+  is_public: boolean;
+  is_invited: boolean;
+  my_lobby_status: null;
+  relevance_reason: 'created_by_me' | 'registered';
+};
+
 const callGroq = async (system: string, prompt: string) => {
   const key = String(process.env.GROQ_API_KEY || '').trim();
   if (!key) return null;
@@ -492,7 +501,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const meetingId=Number(request.params.meetingId);
       if(!(await hasMeetingAccess(meetingId,request.user!))) return sendApiError(response,403,'MEETING_ACCESS_DENIED','Accès refusé.');
       const polls=await query('SELECT id FROM room_polls WHERE meeting_id=$1 ORDER BY created_at DESC',[meetingId]);
-      const values=[]; for(const row of polls.rows){const poll=await getPoll(String(row.id));if(poll) values.push(poll);} response.json(values);
+      const values: MeetingPollPayload[]=[]; for(const row of polls.rows){const poll=await getPoll(String(row.id));if(poll) values.push(poll);} response.json(values);
     }catch(error){next(error);}
   });
 
@@ -583,7 +592,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
   });
 
   app.get('/api/actus/events', ...protectedApi, async (request:AuthedRequest,response,next)=>{
-    try{const result=await query(`SELECT * FROM room_meetings WHERE status<>'cancelled' ORDER BY start_time DESC LIMIT 100`);const values=[];for(const row of result.rows){const meeting=mapMeeting(row);if(await visibleToUser(meeting,request.user!))values.push({...meeting,settings:sanitizeMeetingSettings(meeting.settings),is_public:Boolean(meeting.settings.isPublic||meeting.settings.visibility==='public'),is_invited:(meeting.settings.participants||[]).some((v)=>normalizeEmail(v)===normalizeEmail(request.user!.email)),my_lobby_status:null,relevance_reason:canModerateMeeting(meeting,request.user!)?'created_by_me':'registered'});}response.json(values);}catch(error){next(error);}
+    try{const result=await query(`SELECT * FROM room_meetings WHERE status<>'cancelled' ORDER BY start_time DESC LIMIT 100`);const values: ActusMeetingPayload[]=[];for(const row of result.rows){const meeting=mapMeeting(row);if(await visibleToUser(meeting,request.user!))values.push({...meeting,settings:sanitizeMeetingSettings(meeting.settings),is_public:Boolean(meeting.settings.isPublic||meeting.settings.visibility==='public'),is_invited:(meeting.settings.participants||[]).some((v)=>normalizeEmail(v)===normalizeEmail(request.user!.email)),my_lobby_status:null,relevance_reason:canModerateMeeting(meeting,request.user!)?'created_by_me':'registered'});}response.json(values);}catch(error){next(error);}
   });
 };
 
