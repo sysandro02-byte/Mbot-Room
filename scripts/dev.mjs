@@ -32,7 +32,7 @@ const configuredApiPort = Number(process.env.PORT || 3004);
 const apiPort = await findFreePort(configuredApiPort);
 if (apiPort !== configuredApiPort) console.warn(`Port API ${configuredApiPort} déjà utilisé, utilisation de ${apiPort}.`);
 
-const api = run('api', 'node', ['node_modules/tsx/dist/cli.mjs', 'server.ts'], { PORT: String(apiPort) });
+const api = run('api', 'node', ['node_modules/tsx/dist/cli.mjs', 'server-v2.ts'], { PORT: String(apiPort) });
 const web = run('web', 'node', ['node_modules/vite/bin/vite.js'], { VITE_API_PORT: String(apiPort) });
 
 const stop = () => { api.kill(); web.kill(); };
