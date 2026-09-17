@@ -10,8 +10,7 @@
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && vite build --configLoader bundle && esbuild server-v2.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.js",
     "lint": "node node_modules/typescript/bin/tsc --noEmit",
     "test": "npm run lint && node scripts/test-production-config.mjs",
-    "test:auth-admin": "node scripts/test-auth-admin.mjs",
-    "test:realtime": "node scripts/test-realtime-errors.mjs",
+    "test:integration": "node scripts/test-integration.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
