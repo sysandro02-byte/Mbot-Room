@@ -1,4 +1,4 @@
-import dotenv from 'dotenv';
+import 'dotenv/config';
 import express from 'express';
 import { createServer } from 'node:http';
 import path from 'node:path';
@@ -6,13 +6,12 @@ import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
 import { pool, runMigrations } from './server/core.js';
 import { runExtraMigrations } from './server/extraMigrations.js';
+import { runProductMigrations } from './server/productMigrations.js';
 import { registerAuthRoutes } from './server/authRoutes.js';
 import { registerMeetingRoutes } from './server/meetingRoutes.js';
 import { registerAdminRoutes } from './server/adminRoutes.js';
 import { registerAppRoutes } from './server/appRoutes.js';
 import { registerRealtime } from './server/realtime.js';
-
-dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.basename(__dirname) === 'dist' ? __dirname : path.join(__dirname, 'dist');
@@ -123,6 +122,7 @@ const start = async () => {
   } else {
     await runMigrations();
     await runExtraMigrations();
+    await runProductMigrations();
   }
   httpServer.listen(port, () => {
     console.log(`MBotéRoom API V2 listening on port ${port}`);
