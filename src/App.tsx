@@ -5,7 +5,7 @@ import { authService } from './services/authService';
 
 const RealMeetingList = lazy(() => import('./components/RealMeetingList'));
 const AppShell = lazy(() => import('./components/AppShell'));
-const MeetingJoinPage = lazy(() => import('./pages/MeetingJoinPage'));
+const RealJoinPage = lazy(() => import('./pages/RealJoinPage'));
 const GuestJoinPage = lazy(() => import('./pages/GuestJoinPage'));
 const MeetingRoomV2 = lazy(() => import('./pages/MeetingRoomV2'));
 const GuestWaitingRoomPage = lazy(() => import('./pages/GuestWaitingRoomPage'));
@@ -131,8 +131,8 @@ export default function App() {
         <Route path="/reunions/:meetingId" element={<ProtectedRoute><MeetingRoomV2 /></ProtectedRoute>} />
         <Route path="/" element={<Navigate to="/app" replace />} />
         <Route path="/app" element={<ProtectedRoute showAccountBar={false}><UserDashboardPage /></ProtectedRoute>} />
-        <Route path="/join" element={<ProtectedRoute><AppShell title="Rejoindre"><MeetingJoinPage /></AppShell></ProtectedRoute>} />
-        <Route path="/join/:meetingLink" element={<ProtectedRoute><AppShell title="Rejoindre"><MeetingJoinPage /></AppShell></ProtectedRoute>} />
+        <Route path="/join" element={<ProtectedRoute><AppShell title="Rejoindre"><RealJoinPage /></AppShell></ProtectedRoute>} />
+        <Route path="/join/:meetingLink" element={<ProtectedRoute><AppShell title="Rejoindre"><RealJoinPage /></AppShell></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/app" replace />} />
       </Routes>
     </Suspense>
