@@ -13,6 +13,24 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mbote
+          POSTGRES_PASSWORD: mbote
+          POSTGRES_DB: mbote_room_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U mbote -d mbote_room_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: postgresql://mbote:mbote@127.0.0.1:5432/mbote_room_test
+      PGSSLMODE: disable
+      MBOTE_ROOM_TEST_DATABASE: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,3 +47,5 @@ jobs:
         run: npm run build
       - name: Production smoke checks
         run: node scripts/test-production-config.mjs
+      - name: PostgreSQL and realtime integration
+        run: node scripts/test-integration.mjs
