@@ -9,7 +9,7 @@ const RealJoinPage = lazy(() => import('./pages/RealJoinPage'));
 const GuestJoinPage = lazy(() => import('./pages/GuestJoinPage'));
 const MeetingRoomV2 = lazy(() => import('./pages/MeetingRoomV2'));
 const GuestWaitingRoomPage = lazy(() => import('./pages/GuestWaitingRoomPage'));
-const MeetingEndedPage = lazy(() => import('./pages/MeetingEndedPage'));
+const RealMeetingEndedPage = lazy(() => import('./pages/RealMeetingEndedPage'));
 const RealFeaturePage = lazy(() => import('./pages/RealFeaturePage'));
 const RealDashboardPage = lazy(() => import('./pages/dashboard/RealDashboardPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
@@ -90,10 +90,10 @@ export default function App() {
     <Route path="/app/polls" element={<ProtectedRoute><RealFeaturePage kind="polls" /></ProtectedRoute>} />
     <Route path="/app/settings" element={<ProtectedRoute><RealFeaturePage kind="settings" /></ProtectedRoute>} />
     <Route path="/app/profile" element={<ProtectedRoute><RealFeaturePage kind="profile" /></ProtectedRoute>} />
-    <Route path="/reunions/terminee" element={<MeetingEndedPage />} />
+    <Route path="/reunions/terminee" element={<ProtectedRoute><RealMeetingEndedPage /></ProtectedRoute>} />
     <Route path="/reunions" element={<ProtectedRoute><AppShell title="Réunions"><RealMeetingList /></AppShell></ProtectedRoute>} />
     <Route path="/reunions/:meetingId/salle-attente" element={<GuestWaitingRoomPage />} />
-    <Route path="/reunions/:meetingId/terminee" element={<MeetingEndedPage />} />
+    <Route path="/reunions/:meetingId/terminee" element={<ProtectedRoute><RealMeetingEndedPage /></ProtectedRoute>} />
     <Route path="/reunions/:meetingId/luna" element={<ProtectedRoute><MeetingRoomV2 /></ProtectedRoute>} />
     <Route path="/reunions/:meetingId" element={<ProtectedRoute><MeetingRoomV2 /></ProtectedRoute>} />
     <Route path="/" element={<Navigate to="/app" replace />} />
