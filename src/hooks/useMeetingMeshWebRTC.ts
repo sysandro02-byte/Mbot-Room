@@ -39,6 +39,7 @@ type UseMeetingMeshWebRTCOptions = {
 
 type PeerState = {
   pc: RTCPeerConnection;
+  remoteStream: MediaStream;
   polite: boolean;
   makingOffer: boolean;
   ignoreOffer: boolean;
@@ -112,6 +113,7 @@ export function useMeetingMeshWebRTC({
     if (state?.disconnectTimer) clearTimeout(state.disconnectTimer);
     peersRef.current.delete(socketId);
     pendingCandidatesRef.current.delete(socketId);
+    state?.remoteStream.getTracks().forEach((track) => state.remoteStream.removeTrack(track));
     state?.pc.close();
     setRemoteParticipants((current) => current.filter((item) => item.socketId !== socketId));
   }, []);
@@ -119,6 +121,7 @@ export function useMeetingMeshWebRTC({
   const closeAllPeers = useCallback(() => {
     peersRef.current.forEach((state) => {
       if (state.disconnectTimer) clearTimeout(state.disconnectTimer);
+      state.remoteStream.getTracks().forEach((track) => state.remoteStream.removeTrack(track));
       state.pc.close();
     });
     peersRef.current.clear();
@@ -149,10 +152,12 @@ export function useMeetingMeshWebRTC({
     if (existing) return existing;
 
     const pc = new RTCPeerConnection(getRtcConfiguration());
+    const remoteStream = new MediaStream();
     const audioSender = pc.addTransceiver('audio', { direction: 'sendrecv' }).sender;
     const videoSender = pc.addTransceiver('video', { direction: 'sendrecv' }).sender;
     const state: PeerState = {
       pc,
+      remoteStream,
       polite: String(socket.id || '') > targetSocketId,
       makingOffer: false,
       ignoreOffer: false,
@@ -173,10 +178,20 @@ export function useMeetingMeshWebRTC({
     };
 
     pc.ontrack = (event) => {
-      const stream = event.streams[0] || new MediaStream([event.track]);
+      const duplicateKind = remoteStream.getTracks().find((track) => track.kind === event.track.kind && track.id !== event.track.id);
+      if (duplicateKind) remoteStream.removeTrack(duplicateKind);
+      if (!remoteStream.getTracks().some((track) => track.id === event.track.id)) remoteStream.addTrack(event.track);
+
       setRemoteParticipants((current) => current.map((participant) => (
-        participant.socketId === targetSocketId ? { ...participant, stream } : participant
+        participant.socketId === targetSocketId ? { ...participant, stream: remoteStream } : participant
       )));
+
+      event.track.addEventListener('ended', () => {
+        remoteStream.removeTrack(event.track);
+        setRemoteParticipants((current) => current.map((participant) => (
+          participant.socketId === targetSocketId ? { ...participant, stream: remoteStream } : participant
+        )));
+      }, { once: true });
     };
 
     const clearDisconnectTimer = () => {
