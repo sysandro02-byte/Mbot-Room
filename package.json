@@ -1,14 +1,15 @@
 {
   "name": "mbote-room",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "vite:internal": "vite",
     "start": "node dist/server.js",
-    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && vite build --configLoader bundle && esbuild server.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.js",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && vite build --configLoader bundle && esbuild server-v2.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.js",
     "lint": "node node_modules/typescript/bin/tsc --noEmit",
+    "test": "npm run lint && node scripts/test-production-config.mjs",
     "test:auth-admin": "node scripts/test-auth-admin.mjs",
     "test:realtime": "node scripts/test-realtime-errors.mjs",
     "preview": "vite preview"
