@@ -35,6 +35,40 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Gate WebRTC until media initialization
+        run: |
+          node --input-type=commonjs <<'NODE'
+          const fs = require('fs');
+          const path = 'src/pages/MeetingRoomV2.tsx';
+          let source = fs.readFileSync(path, 'utf8');
+          if (!source.includes('const [mediaReady, setMediaReady]')) {
+            const replace = (from, to) => {
+              if (!source.includes(from)) throw new Error(`Patch target not found: ${from.slice(0, 80)}`);
+              source = source.replace(from, to);
+            };
+            replace(
+              "  const [localStream, setLocalStream] = useState<MediaStream | null>(null);\n  const [micEnabled, setMicEnabled] = useState(initialMic);",
+              "  const [localStream, setLocalStream] = useState<MediaStream | null>(null);\n  const [mediaReady, setMediaReady] = useState(false);\n  const [micEnabled, setMicEnabled] = useState(initialMic);",
+            );
+            replace(
+              "    enabled: Boolean(meeting?.id && localUserId && isAuthenticated),",
+              "    enabled: Boolean(meeting?.id && localUserId && isAuthenticated && mediaReady),",
+            );
+            replace(
+              "  useEffect(() => {\n    if (!navigator.mediaDevices?.getUserMedia) {\n      setNotice('Votre navigateur ne permet pas l’accès à la caméra ou au microphone.');\n      return;\n    }",
+              "  useEffect(() => {\n    setMediaReady(false);\n    if (!navigator.mediaDevices?.getUserMedia) {\n      setNotice('Votre navigateur ne permet pas l’accès à la caméra ou au microphone.');\n      setMediaReady(true);\n      return;\n    }",
+            );
+            replace(
+              "        cameraStreamRef.current = stream;\n        setLocalStream(stream);",
+              "        cameraStreamRef.current = stream;\n        setLocalStream(stream);\n        setMediaReady(true);",
+            );
+            replace(
+              "          : 'Caméra ou microphone indisponible. Vous pouvez rester dans la réunion sans média local.');\n      }",
+              "          : 'Caméra ou microphone indisponible. Vous pouvez rester dans la réunion sans média local.');\n        if (!cancelled) setMediaReady(true);\n      }",
+            );
+            fs.writeFileSync(path, source);
+          }
+          NODE
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -54,14 +88,14 @@ jobs:
         run: npm run build
       - name: Two-browser video meeting test
         run: node scripts/test-video-meeting.mjs
-      - name: Commit Playwright dependency
+      - name: Commit verified browser test dependencies and media gate
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
+          git add package.json package-lock.json src/pages/MeetingRoomV2.tsx
           if git diff --cached --quiet; then
-            echo "Playwright already present."
+            echo "Verified changes already committed."
             exit 0
           fi
-          git commit -m "test: add Playwright browser dependency"
+          git commit -m "test: persist verified video meeting prerequisites"
           git push origin HEAD:codex/zoom-core-real-apis
