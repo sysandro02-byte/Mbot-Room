@@ -95,16 +95,29 @@ export function useMeetingMeshWebRTC({
 
   const updateRemoteParticipant = useCallback((participant: ServerMeetingParticipant, patch?: Partial<RemoteMeetingParticipant>) => {
     setRemoteParticipants((current) => {
-      const normalized = normalizeParticipant(participant);
-      const existing = current.find((item) => item.socketId === normalized.socketId);
+      const socketId = String(participant.socketId);
+      const existing = current.find((item) => item.socketId === socketId);
       if (existing) {
-        return current.map((item) => (
-          item.socketId === normalized.socketId
-            ? { ...item, ...normalized, stream: item.stream, ...patch }
-            : item
-        ));
+        const nextMedia = participant.media
+          ? {
+              audio: participant.media.audio ?? existing.media.audio,
+              video: participant.media.video ?? existing.media.video,
+              screen: participant.media.screen ?? existing.media.screen,
+            }
+          : existing.media;
+        const next: RemoteMeetingParticipant = {
+          ...existing,
+          socketId,
+          userId: participant.userId !== undefined ? String(participant.userId) : existing.userId,
+          name: participant.name ?? existing.name,
+          avatar: participant.avatar ?? existing.avatar,
+          media: nextMedia,
+          stream: existing.stream,
+          ...patch,
+        };
+        return current.map((item) => item.socketId === socketId ? next : item);
       }
-      return [...current, { ...normalized, ...patch }];
+      return [...current, { ...normalizeParticipant(participant), ...patch }];
     });
   }, []);
 
