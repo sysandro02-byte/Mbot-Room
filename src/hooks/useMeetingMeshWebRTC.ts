@@ -423,10 +423,23 @@ export function useMeetingMeshWebRTC({
   }, [media, mediaKey, meetingId]);
 
   useEffect(() => {
-    peersRef.current.forEach((state) => {
-      void syncLocalTracks(state).catch(() => onNotice?.('Mise à jour caméra/micro incomplète pour un participant.'));
+    peersRef.current.forEach((state, targetSocketId) => {
+      const hadAudio = Boolean(state.audioSender.track);
+      const hadVideo = Boolean(state.videoSender.track);
+      void (async () => {
+        try {
+          await syncLocalTracks(state);
+          const gainedAudio = !hadAudio && Boolean(state.audioSender.track);
+          const gainedVideo = !hadVideo && Boolean(state.videoSender.track);
+          if ((gainedAudio || gainedVideo) && joinedRef.current && state.pc.signalingState === 'stable') {
+            await createOffer(targetSocketId);
+          }
+        } catch {
+          onNotice?.('Mise à jour caméra/micro incomplète pour un participant.');
+        }
+      })();
     });
-  }, [localStream, onNotice, syncLocalTracks]);
+  }, [createOffer, localStream, onNotice, syncLocalTracks]);
 
   return { remoteParticipants };
 }
