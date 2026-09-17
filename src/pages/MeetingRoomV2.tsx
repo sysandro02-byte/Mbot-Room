@@ -66,7 +66,7 @@ function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, l
     if (!videoRef.current) return;
     videoRef.current.srcObject = stream;
     if (stream) void videoRef.current.play().catch(() => undefined);
-  }, [stream]);
+  }, [stream, videoEnabled]);
 
   return (
     <article className={`room-v2-tile ${screen ? 'is-screen' : ''}`}>
@@ -118,6 +118,7 @@ export default function MeetingRoomV2() {
   const [notice, setNotice] = useState('');
   const [panel, setPanel] = useState<Panel>('participants');
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [mediaReady, setMediaReady] = useState(false);
   const [micEnabled, setMicEnabled] = useState(initialMic);
   const [cameraEnabled, setCameraEnabled] = useState(initialCamera);
   const [screenSharing, setScreenSharing] = useState(false);
@@ -155,7 +156,7 @@ export default function MeetingRoomV2() {
     localAvatar: currentUser?.avatar || '',
     localStream,
     media: mediaState,
-    enabled: Boolean(meeting?.id && localUserId && isAuthenticated),
+    enabled: Boolean(meeting?.id && localUserId && isAuthenticated && mediaReady),
     onNotice: setNotice,
   });
 
@@ -213,8 +214,10 @@ export default function MeetingRoomV2() {
   }, [meeting?.id]);
 
   useEffect(() => {
+    setMediaReady(false);
     if (!navigator.mediaDevices?.getUserMedia) {
       setNotice('Votre navigateur ne permet pas l’accès à la caméra ou au microphone.');
+      setMediaReady(true);
       return;
     }
     let cancelled = false;
@@ -232,11 +235,13 @@ export default function MeetingRoomV2() {
         stream.getVideoTracks().forEach((track) => { track.enabled = initialCamera; });
         cameraStreamRef.current = stream;
         setLocalStream(stream);
+        setMediaReady(true);
       } catch (cause) {
         const name = cause instanceof DOMException ? cause.name : '';
         setNotice(name === 'NotAllowedError'
           ? 'Autorisez la caméra et le microphone dans votre navigateur pour participer avec audio/vidéo.'
           : 'Caméra ou microphone indisponible. Vous pouvez rester dans la réunion sans média local.');
+        if (!cancelled) setMediaReady(true);
       }
     };
     void openMedia();
