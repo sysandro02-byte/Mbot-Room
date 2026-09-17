@@ -12,7 +12,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:16-alpine
@@ -43,6 +43,8 @@ jobs:
         run: npm ci
       - name: Dependency audit
         run: npm audit
+      - name: Install Chromium for video checks
+        run: npx playwright install --with-deps chromium
       - name: Typecheck
         run: npm run lint
       - name: Build
@@ -51,3 +53,13 @@ jobs:
         run: node scripts/test-production-config.mjs
       - name: PostgreSQL and realtime integration
         run: node scripts/test-integration.mjs
+      - name: Two-browser camera, microphone and reconnect test
+        run: node scripts/test-video-meeting.mjs
+      - name: Upload video diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mboteroom-video-diagnostics
+          path: test-artifacts
+          if-no-files-found: ignore
+          retention-days: 7
