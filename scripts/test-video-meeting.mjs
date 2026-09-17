@@ -85,7 +85,7 @@ const register = async (name, email) => {
   return result.data;
 };
 
-const openAuthenticatedMeeting = async (browser, session, meetingId) => {
+const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
   const context = await browser.newContext({
     permissions: ['camera', 'microphone'],
     locale: 'fr-FR',
@@ -97,28 +97,76 @@ const openAuthenticatedMeeting = async (browser, session, meetingId) => {
   }, { user: session.user, token: session.token });
   const page = await context.newPage();
   const browserErrors = [];
-  page.on('pageerror', (error) => browserErrors.push(error.message));
+  page.on('pageerror', (error) => {
+    browserErrors.push(error.message);
+    console.error(`[${label}:pageerror] ${error.message}`);
+  });
   page.on('console', (message) => {
-    if (message.type() === 'error') browserErrors.push(message.text());
+    if (message.type() === 'error') {
+      browserErrors.push(message.text());
+      console.error(`[${label}:console] ${message.text()}`);
+    }
   });
   await page.goto(`${baseUrl}/reunions/${meetingId}`, { waitUntil: 'domcontentloaded' });
   await page.locator('.room-v2-shell').waitFor({ state: 'visible', timeout: 20_000 });
-  return { context, page, browserErrors };
+  return { context, page, browserErrors, label };
 };
 
-const waitForRemoteMedia = async (page, participantName, timeout = 25_000) => {
-  await page.waitForFunction((name) => {
-    const tiles = Array.from(document.querySelectorAll('.room-v2-tile'));
-    const tile = tiles.find((candidate) => candidate.textContent?.includes(name) && !candidate.textContent?.includes('(vous)'));
-    if (!tile) return false;
+const mediaDiagnostics = async (page) => page.evaluate(() => ({
+  href: location.href,
+  bodyText: document.body.innerText.slice(0, 2500),
+  tiles: Array.from(document.querySelectorAll('.room-v2-tile')).map((tile) => {
     const video = tile.querySelector('video');
     const stream = video?.srcObject;
-    if (!(stream instanceof MediaStream)) return false;
-    const tracks = stream.getTracks();
-    const videoTrack = tracks.find((track) => track.kind === 'video');
-    const audioTrack = tracks.find((track) => track.kind === 'audio');
-    return Boolean(video && !video.paused && videoTrack?.readyState === 'live' && audioTrack?.readyState === 'live' && video.videoWidth > 0 && video.videoHeight > 0);
-  }, participantName, { timeout });
+    return {
+      text: tile.textContent?.replace(/\s+/g, ' ').trim(),
+      hasVideo: Boolean(video),
+      paused: video?.paused ?? null,
+      readyState: video?.readyState ?? null,
+      networkState: video?.networkState ?? null,
+      videoWidth: video?.videoWidth ?? null,
+      videoHeight: video?.videoHeight ?? null,
+      stream: stream instanceof MediaStream ? {
+        active: stream.active,
+        tracks: stream.getTracks().map((track) => ({
+          id: track.id,
+          kind: track.kind,
+          enabled: track.enabled,
+          muted: track.muted,
+          readyState: track.readyState,
+        })),
+      } : null,
+    };
+  }),
+}));
+
+const waitForRemoteMedia = async (page, participantName, timeout = 25_000) => {
+  try {
+    await page.waitForFunction((name) => {
+      const tiles = Array.from(document.querySelectorAll('.room-v2-tile'));
+      const tile = tiles.find((candidate) => candidate.textContent?.includes(name) && !candidate.textContent?.includes('(vous)'));
+      if (!tile) return false;
+      const video = tile.querySelector('video');
+      const stream = video?.srcObject;
+      if (!(stream instanceof MediaStream)) return false;
+      const tracks = stream.getTracks();
+      const videoTrack = tracks.find((track) => track.kind === 'video');
+      const audioTrack = tracks.find((track) => track.kind === 'audio');
+      return Boolean(
+        video
+        && !video.paused
+        && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+        && videoTrack?.readyState === 'live'
+        && audioTrack?.readyState === 'live'
+        && video.videoWidth > 0
+        && video.videoHeight > 0
+      );
+    }, participantName, { timeout });
+  } catch (error) {
+    const snapshot = await mediaDiagnostics(page).catch((cause) => ({ diagnosticsError: String(cause) }));
+    console.error(`MEDIA_DIAGNOSTICS ${participantName}: ${JSON.stringify(snapshot, null, 2)}`);
+    throw error;
+  }
 };
 
 const waitForRemoteCameraState = async (page, participantName, enabled, timeout = 15_000) => {
@@ -148,6 +196,8 @@ const clickControl = async (page, label) => {
 let browser;
 let hostContext;
 let participantContext;
+let hostRoom;
+let participantRoom;
 
 try {
   await waitForServer();
@@ -202,9 +252,9 @@ try {
     ],
   });
 
-  const hostRoom = await openAuthenticatedMeeting(browser, host, meeting.id);
+  hostRoom = await openAuthenticatedMeeting(browser, host, meeting.id, 'host');
   hostContext = hostRoom.context;
-  const participantRoom = await openAuthenticatedMeeting(browser, participant, meeting.id);
+  participantRoom = await openAuthenticatedMeeting(browser, participant, meeting.id, 'participant');
   participantContext = participantRoom.context;
 
   await Promise.all([
@@ -245,6 +295,18 @@ try {
   assert.deepEqual(participantRoom.browserErrors, [], `Participant browser errors: ${participantRoom.browserErrors.join('\n')}`);
 
   console.log('Two-browser camera + microphone + reconnect video meeting checks passed.');
+} catch (error) {
+  await mkdir('test-artifacts', { recursive: true }).catch(() => undefined);
+  if (hostRoom?.page) {
+    console.error(`HOST_DIAGNOSTICS ${JSON.stringify(await mediaDiagnostics(hostRoom.page).catch((cause) => ({ error: String(cause) })), null, 2)}`);
+    await hostRoom.page.screenshot({ path: 'test-artifacts/failure-host.png', fullPage: true }).catch(() => undefined);
+  }
+  if (participantRoom?.page) {
+    console.error(`PARTICIPANT_DIAGNOSTICS ${JSON.stringify(await mediaDiagnostics(participantRoom.page).catch((cause) => ({ error: String(cause) })), null, 2)}`);
+    await participantRoom.page.screenshot({ path: 'test-artifacts/failure-participant.png', fullPage: true }).catch(() => undefined);
+  }
+  console.error(`SERVER_OUTPUT\n${serverOutput}`);
+  throw error;
 } finally {
   await participantContext?.close().catch(() => undefined);
   await hostContext?.close().catch(() => undefined);
