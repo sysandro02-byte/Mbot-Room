@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import type express from 'express';
 import pg from 'pg';
+import type { QueryResultRow } from 'pg';
 
 export type UserRole = 'admin' | 'user' | 'guest';
 
@@ -89,7 +90,7 @@ export const pool = databaseUrl
 
 export const hasDatabase = () => Boolean(pool);
 
-export const query = async <T = any>(text: string, params: unknown[] = []) => {
+export const query = async <T extends QueryResultRow = QueryResultRow>(text: string, params: unknown[] = []) => {
   if (!pool) throw new Error('DATABASE_URL is required');
   return pool.query<T>(text, params);
 };
