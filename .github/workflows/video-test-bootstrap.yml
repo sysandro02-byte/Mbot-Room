@@ -1,0 +1,67 @@
+name: Bootstrap browser video test
+
+on:
+  push:
+    branches: [codex/zoom-core-real-apis]
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mbote
+          POSTGRES_PASSWORD: mbote
+          POSTGRES_DB: mbote_room_video_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U mbote -d mbote_room_video_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: postgresql://mbote:mbote@127.0.0.1:5432/mbote_room_video_test
+      PGSSLMODE: disable
+      MBOTE_ROOM_TEST_DATABASE: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install current dependencies
+        run: npm ci
+      - name: Add Playwright test dependency
+        run: npm install --save-dev @playwright/test
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Typecheck
+        run: npm run lint
+      - name: Build
+        run: npm run build
+      - name: Two-browser video meeting test
+        run: node scripts/test-video-meeting.mjs
+      - name: Commit Playwright dependency
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "Playwright already present."
+            exit 0
+          fi
+          git commit -m "test: add Playwright browser dependency"
+          git push origin HEAD:codex/zoom-core-real-apis
