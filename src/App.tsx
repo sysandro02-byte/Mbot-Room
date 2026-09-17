@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { authService } from './services/authService';
 
-const MeetingList = lazy(() => import('./components/MeetingList'));
+const RealMeetingList = lazy(() => import('./components/RealMeetingList'));
 const AppShell = lazy(() => import('./components/AppShell'));
 const MeetingJoinPage = lazy(() => import('./pages/MeetingJoinPage'));
 const GuestJoinPage = lazy(() => import('./pages/GuestJoinPage'));
@@ -114,7 +114,7 @@ export default function App() {
         <Route path="/aide" element={<SimpleInfoPage title="Centre d'aide" description="Le centre d'aide MBotéRoom sera connecté au support dès que le backend expose cette section." />} />
         <Route path="/securite" element={<SimpleInfoPage title="Sécurité MBotéRoom" description="Les réunions utilisent les protections disponibles dans l'application." />} />
         <Route path="/fonctionnalites" element={<SimpleInfoPage title="Fonctionnalités MBotéRoom" description="Créez un compte pour retrouver l'historique, organiser vos réunions et gérer les invitations." />} />
-        <Route path="/app/meetings" element={<ProtectedRoute><AppShell title="Réunions"><MeetingList /></AppShell></ProtectedRoute>} />
+        <Route path="/app/meetings" element={<ProtectedRoute><AppShell title="Réunions"><RealMeetingList /></AppShell></ProtectedRoute>} />
         <Route path="/app/calendar" element={<ProtectedRoute><RealFeaturePage kind="calendar" /></ProtectedRoute>} />
         <Route path="/app/recordings" element={<ProtectedRoute><RealFeaturePage kind="recordings" /></ProtectedRoute>} />
         <Route path="/app/messages" element={<ProtectedRoute><RealFeaturePage kind="messages" /></ProtectedRoute>} />
@@ -124,7 +124,7 @@ export default function App() {
         <Route path="/app/settings" element={<ProtectedRoute><RealFeaturePage kind="settings" /></ProtectedRoute>} />
         <Route path="/app/profile" element={<ProtectedRoute><RealFeaturePage kind="profile" /></ProtectedRoute>} />
         <Route path="/reunions/terminee" element={<MeetingEndedPage />} />
-        <Route path="/reunions" element={<ProtectedRoute><AppShell title="Réunions"><MeetingList /></AppShell></ProtectedRoute>} />
+        <Route path="/reunions" element={<ProtectedRoute><AppShell title="Réunions"><RealMeetingList /></AppShell></ProtectedRoute>} />
         <Route path="/reunions/:meetingId/salle-attente" element={<GuestWaitingRoomPage />} />
         <Route path="/reunions/:meetingId/terminee" element={<MeetingEndedPage />} />
         <Route path="/reunions/:meetingId/luna" element={<ProtectedRoute><MeetingRoomV2 /></ProtectedRoute>} />
