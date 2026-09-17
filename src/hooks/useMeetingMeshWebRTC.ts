@@ -46,8 +46,8 @@ type PeerState = {
   settingRemoteAnswer: boolean;
   restartAttempts: number;
   disconnectTimer: ReturnType<typeof setTimeout> | null;
-  audioSender: RTCRtpSender;
-  videoSender: RTCRtpSender;
+  audioSender: RTCRtpSender | null;
+  videoSender: RTCRtpSender | null;
 };
 
 const DISCONNECT_GRACE_MS = 8_000;
@@ -142,15 +142,39 @@ export function useMeetingMeshWebRTC({
     setRemoteParticipants([]);
   }, []);
 
-  const syncLocalTracks = useCallback(async (state: PeerState) => {
+  const bindRemoteCreatedSenders = useCallback((state: PeerState) => {
+    for (const transceiver of state.pc.getTransceivers()) {
+      const kind = transceiver.receiver.track.kind;
+      if (kind === 'audio' && !state.audioSender) state.audioSender = transceiver.sender;
+      if (kind === 'video' && !state.videoSender) state.videoSender = transceiver.sender;
+      if ((kind === 'audio' || kind === 'video') && transceiver.direction !== 'sendrecv') {
+        transceiver.direction = 'sendrecv';
+      }
+    }
+  }, []);
+
+  const ensureOffererSenders = useCallback((state: PeerState) => {
+    bindRemoteCreatedSenders(state);
+    if (!state.audioSender) {
+      state.audioSender = state.pc.addTransceiver('audio', { direction: 'sendrecv' }).sender;
+    }
+    if (!state.videoSender) {
+      state.videoSender = state.pc.addTransceiver('video', { direction: 'sendrecv' }).sender;
+    }
+  }, [bindRemoteCreatedSenders]);
+
+  const syncLocalTracks = useCallback(async (state: PeerState, createMissingSenders = false) => {
+    if (createMissingSenders) ensureOffererSenders(state);
+    else bindRemoteCreatedSenders(state);
+
     const stream = localStreamRef.current;
     const audioTrack = stream?.getAudioTracks().find((track) => track.readyState === 'live') || null;
     const videoTrack = stream?.getVideoTracks().find((track) => track.readyState === 'live') || null;
-    await Promise.all([
-      state.audioSender.replaceTrack(audioTrack),
-      state.videoSender.replaceTrack(videoTrack),
-    ]);
-  }, []);
+    const updates: Promise<void>[] = [];
+    if (state.audioSender) updates.push(state.audioSender.replaceTrack(audioTrack));
+    if (state.videoSender) updates.push(state.videoSender.replaceTrack(videoTrack));
+    await Promise.all(updates);
+  }, [bindRemoteCreatedSenders, ensureOffererSenders]);
 
   const flushPendingCandidates = useCallback(async (socketId: string, state: PeerState) => {
     const pending = pendingCandidatesRef.current.get(socketId) || [];
@@ -160,14 +184,15 @@ export function useMeetingMeshWebRTC({
     }
   }, []);
 
-  const createPeer = useCallback((targetSocketId: string) => {
+  const createPeer = useCallback((targetSocketId: string, prepareOfferer = false) => {
     const existing = peersRef.current.get(targetSocketId);
-    if (existing) return existing;
+    if (existing) {
+      if (prepareOfferer) ensureOffererSenders(existing);
+      return existing;
+    }
 
     const pc = new RTCPeerConnection(getRtcConfiguration());
     const remoteStream = new MediaStream();
-    const audioSender = pc.addTransceiver('audio', { direction: 'sendrecv' }).sender;
-    const videoSender = pc.addTransceiver('video', { direction: 'sendrecv' }).sender;
     const state: PeerState = {
       pc,
       remoteStream,
@@ -177,9 +202,11 @@ export function useMeetingMeshWebRTC({
       settingRemoteAnswer: false,
       restartAttempts: 0,
       disconnectTimer: null,
-      audioSender,
-      videoSender,
+      audioSender: null,
+      videoSender: null,
     };
+
+    if (prepareOfferer) ensureOffererSenders(state);
 
     pc.onicecandidate = (event) => {
       if (!event.candidate) return;
@@ -223,7 +250,7 @@ export function useMeetingMeshWebRTC({
         pc.restartIce();
         if (pc.signalingState !== 'stable' || state.makingOffer) return;
         state.makingOffer = true;
-        await syncLocalTracks(state);
+        await syncLocalTracks(state, true);
         await pc.setLocalDescription(await pc.createOffer({ iceRestart: true }));
         socket.emit('meeting:offer', { meetingId, targetSocketId, offer: pc.localDescription });
       } catch {
@@ -255,17 +282,16 @@ export function useMeetingMeshWebRTC({
     };
 
     peersRef.current.set(targetSocketId, state);
-    void syncLocalTracks(state);
     return state;
-  }, [meetingId, onNotice, removeRemoteParticipant, syncLocalTracks]);
+  }, [ensureOffererSenders, meetingId, onNotice, removeRemoteParticipant, syncLocalTracks]);
 
   const createOffer = useCallback(async (targetSocketId: string, iceRestart = false) => {
-    const state = createPeer(targetSocketId);
+    const state = createPeer(targetSocketId, true);
     const { pc } = state;
     if (state.makingOffer || pc.signalingState !== 'stable') return;
     try {
       state.makingOffer = true;
-      await syncLocalTracks(state);
+      await syncLocalTracks(state, true);
       await pc.setLocalDescription(await pc.createOffer({ iceRestart }));
       socket.emit('meeting:offer', { meetingId, targetSocketId, offer: pc.localDescription });
     } finally {
@@ -293,9 +319,9 @@ export function useMeetingMeshWebRTC({
         joinedRef.current = true;
         const participants = Array.isArray(response.participants) ? response.participants : [];
         setRemoteParticipants(participants.map((participant) => normalizeParticipant(participant)));
-        participants.forEach((participant) => {
-          void createOffer(String(participant.socketId)).catch(() => onNotice?.('Connexion vidéo avec un participant impossible.'));
-        });
+        // Les participants déjà présents initient l'offre lorsqu'ils reçoivent
+        // meeting:participant-joined. Le nouvel arrivant attend cette offre afin
+        // d'éviter deux offres simultanées et des transceivers dupliqués.
       });
     };
 
@@ -312,8 +338,11 @@ export function useMeetingMeshWebRTC({
     const handleParticipantJoined = (participant: ServerMeetingParticipant) => {
       if (String(participant.userId) === localUserId) return;
       updateRemoteParticipant(participant);
+      void createOffer(String(participant.socketId)).catch(() => onNotice?.('Connexion vidéo avec un participant impossible.'));
     };
+
     const handleParticipantLeft = ({ socketId }: { socketId: string }) => removeRemoteParticipant(String(socketId));
+
     const handleMediaUpdated = (payload: ServerMeetingParticipant) => {
       updateRemoteParticipant(payload, {
         media: {
@@ -327,7 +356,7 @@ export function useMeetingMeshWebRTC({
     const handleOffer = async ({ fromSocketId, fromUserId, offer }: { fromSocketId: string; fromUserId: string | number; offer: RTCSessionDescriptionInit }) => {
       if (!fromSocketId || String(fromUserId) === localUserId || !offer) return;
       updateRemoteParticipant({ socketId: fromSocketId, userId: fromUserId });
-      const state = createPeer(fromSocketId);
+      const state = createPeer(fromSocketId, false);
       const { pc } = state;
       const readyForOffer = !state.makingOffer && (pc.signalingState === 'stable' || state.settingRemoteAnswer);
       const offerCollision = offer.type === 'offer' && !readyForOffer;
@@ -339,9 +368,10 @@ export function useMeetingMeshWebRTC({
           await pc.setLocalDescription({ type: 'rollback' });
         }
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        bindRemoteCreatedSenders(state);
         await flushPendingCandidates(fromSocketId, state);
         if (offer.type === 'offer') {
-          await syncLocalTracks(state);
+          await syncLocalTracks(state, false);
           await pc.setLocalDescription(await pc.createAnswer());
           socket.emit('meeting:answer', { meetingId, targetSocketId: fromSocketId, answer: pc.localDescription });
         }
@@ -356,6 +386,7 @@ export function useMeetingMeshWebRTC({
       state.settingRemoteAnswer = true;
       try {
         await state.pc.setRemoteDescription(new RTCSessionDescription(answer));
+        bindRemoteCreatedSenders(state);
         await flushPendingCandidates(String(fromSocketId), state);
       } catch {
         onNotice?.('Réponse WebRTC invalide reçue.');
@@ -415,7 +446,7 @@ export function useMeetingMeshWebRTC({
       closeAllPeers();
       joinedRef.current = false;
     };
-  }, [closeAllPeers, createOffer, createPeer, enabled, flushPendingCandidates, localAvatar, localName, localUserId, meetingId, onNotice, removeRemoteParticipant, syncLocalTracks, updateRemoteParticipant]);
+  }, [bindRemoteCreatedSenders, closeAllPeers, createOffer, createPeer, enabled, flushPendingCandidates, localAvatar, localName, localUserId, meetingId, onNotice, removeRemoteParticipant, syncLocalTracks, updateRemoteParticipant]);
 
   useEffect(() => {
     if (!joinedRef.current) return;
@@ -424,22 +455,27 @@ export function useMeetingMeshWebRTC({
 
   useEffect(() => {
     peersRef.current.forEach((state, targetSocketId) => {
-      const hadAudio = Boolean(state.audioSender.track);
-      const hadVideo = Boolean(state.videoSender.track);
+      const hadAudio = Boolean(state.audioSender?.track);
+      const hadVideo = Boolean(state.videoSender?.track);
       void (async () => {
         try {
-          await syncLocalTracks(state);
-          const gainedAudio = !hadAudio && Boolean(state.audioSender.track);
-          const gainedVideo = !hadVideo && Boolean(state.videoSender.track);
-          if ((gainedAudio || gainedVideo) && joinedRef.current && state.pc.signalingState === 'stable') {
+          await syncLocalTracks(state, false);
+          const hasAudio = Boolean(state.audioSender?.track);
+          const hasVideo = Boolean(state.videoSender?.track);
+          const missingNegotiatedSender = !state.audioSender || !state.videoSender;
+          if (missingNegotiatedSender && joinedRef.current && state.pc.signalingState === 'stable') {
             await createOffer(targetSocketId);
+            return;
+          }
+          if ((!hadAudio && hasAudio) || (!hadVideo && hasVideo)) {
+            socket.emit('meeting:media-updated', { meetingId, media: mediaRef.current });
           }
         } catch {
           onNotice?.('Mise à jour caméra/micro incomplète pour un participant.');
         }
       })();
     });
-  }, [createOffer, localStream, onNotice, syncLocalTracks]);
+  }, [createOffer, localStream, meetingId, onNotice, syncLocalTracks]);
 
   return { remoteParticipants };
 }
