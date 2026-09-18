@@ -19,6 +19,10 @@ services:
         value: https://mbote-room-api.onrender.com
       - key: MBOTE_ROOM_ALLOWED_ORIGINS
         value: https://mbote-room-api.onrender.com
+      - key: MBOTE_ROOM_SESSION_COOKIE
+        value: mbote_room_session
+      - key: MBOTE_ROOM_COOKIE_SAMESITE
+        value: lax
       - key: MBOTE_AUTH_BASE_URL
         value: https://mbote-backend.onrender.com
       - key: MBOTE_AUTH_CLIENT_ID
