@@ -188,7 +188,8 @@ export default function AdminDashboardPage() {
   }, [debouncedSearch]);
 
   useEffect(() => {
-    if (!authService.getToken()) return undefined;
+    const legacyToken = authService.getToken();
+    socket.auth = legacyToken ? { token: legacyToken } : {};
     if (!socket.connected) socket.connect();
     const refresh = () => void loadDashboard();
     socket.on('meeting:created', refresh);

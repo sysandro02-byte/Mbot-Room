@@ -13,20 +13,35 @@ const RealMeetingEndedPage = lazy(() => import('./pages/RealMeetingEndedPage'));
 const RealFeaturePage = lazy(() => import('./pages/RealFeaturePage'));
 const RealDashboardPage = lazy(() => import('./pages/dashboard/RealDashboardPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
+const GlobalSearchPage = lazy(() => import('./pages/GlobalSearchPage'));
+const HelpPage = lazy(() => import('./pages/HelpPage'));
 const Login = lazy(() => import('./pages/Login'));
 
 function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: boolean }) {
   const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated());
+  const [checking, setChecking] = useState(true);
+
   useEffect(() => {
+    let active = true;
+    const verify = async () => {
+      const user = await authService.refreshCurrentUser();
+      if (!active) return;
+      setIsAuthenticated(Boolean(user));
+      setChecking(false);
+    };
     const sync = () => setIsAuthenticated(authService.isAuthenticated());
+    void verify();
     window.addEventListener('storage', sync);
     window.addEventListener('mbote-room-auth-changed', sync);
     return () => {
+      active = false;
       window.removeEventListener('storage', sync);
       window.removeEventListener('mbote-room-auth-changed', sync);
     };
   }, []);
+
+  if (checking) return <main className="route-loading" role="status">Vérification de la session…</main>;
   if (!isAuthenticated) {
     const redirect = `${location.pathname}${location.search}`;
     return <Navigate to={`/login?redirect=${encodeURIComponent(redirect)}`} replace />;
@@ -43,12 +58,32 @@ function AdminRoute({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated());
   const [isAdmin, setIsAdmin] = useState(authService.isAdmin());
+  const [checking, setChecking] = useState(true);
+
   useEffect(() => {
-    const sync = () => { setIsAuthenticated(authService.isAuthenticated()); setIsAdmin(authService.isAdmin()); };
+    let active = true;
+    const verify = async () => {
+      const user = await authService.refreshCurrentUser();
+      if (!active) return;
+      setIsAuthenticated(Boolean(user));
+      setIsAdmin(Boolean(user && authService.isAdmin()));
+      setChecking(false);
+    };
+    const sync = () => {
+      setIsAuthenticated(authService.isAuthenticated());
+      setIsAdmin(authService.isAdmin());
+    };
+    void verify();
     window.addEventListener('storage', sync);
     window.addEventListener('mbote-room-auth-changed', sync);
-    return () => { window.removeEventListener('storage', sync); window.removeEventListener('mbote-room-auth-changed', sync); };
+    return () => {
+      active = false;
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('mbote-room-auth-changed', sync);
+    };
   }, []);
+
+  if (checking) return <main className="route-loading" role="status">Vérification de la session…</main>;
   if (!isAuthenticated) {
     const redirect = `${location.pathname}${location.search}`;
     return <Navigate to={`/login?redirect=${encodeURIComponent(redirect)}`} replace />;
@@ -78,10 +113,11 @@ export default function App() {
     <Route path="/dashboard" element={<Navigate to="/app" replace />} />
     <Route path="/admin" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
     <Route path="/reunions/recentes" element={<Navigate to="/app?tab=reunions" replace />} />
-    <Route path="/aide" element={<SimpleInfoPage title="Centre d'aide" description="Le centre d'aide MBotéRoom sera connecté au support dès que le backend expose cette section." />} />
+    <Route path="/aide" element={<HelpPage />} />
     <Route path="/securite" element={<SimpleInfoPage title="Sécurité MBotéRoom" description="Les réunions utilisent les protections disponibles dans l'application." />} />
     <Route path="/fonctionnalites" element={<SimpleInfoPage title="Fonctionnalités MBotéRoom" description="Créez un compte pour retrouver l'historique, organiser vos réunions et gérer les invitations." />} />
     <Route path="/app/meetings" element={<ProtectedRoute><AppShell title="Réunions"><RealMeetingList /></AppShell></ProtectedRoute>} />
+    <Route path="/app/search" element={<ProtectedRoute><GlobalSearchPage /></ProtectedRoute>} />
     <Route path="/app/calendar" element={<ProtectedRoute><RealFeaturePage kind="calendar" /></ProtectedRoute>} />
     <Route path="/app/recordings" element={<ProtectedRoute><RealFeaturePage kind="recordings" /></ProtectedRoute>} />
     <Route path="/app/messages" element={<ProtectedRoute><RealFeaturePage kind="messages" /></ProtectedRoute>} />

@@ -195,10 +195,39 @@ export const requireDatabase: express.RequestHandler = (_request, response, next
   next();
 };
 
-const getBearerToken = (request: express.Request) => {
+export const SESSION_COOKIE_NAME = String(process.env.MBOTE_ROOM_SESSION_COOKIE || 'mbote_room_session').trim() || 'mbote_room_session';
+
+export const getCookieValue = (cookieHeader: unknown, name: string) => {
+  const header = String(cookieHeader || '');
+  if (!header) return '';
+  for (const part of header.split(';')) {
+    const [rawName, ...rawValue] = part.trim().split('=');
+    if (rawName === name) {
+      try {
+        return decodeURIComponent(rawValue.join('='));
+      } catch {
+        return rawValue.join('=');
+      }
+    }
+  }
+  return '';
+};
+
+export const getBearerToken = (request: express.Request) => {
   const [scheme, token] = String(request.headers.authorization || '').split(' ');
   return scheme?.toLowerCase() === 'bearer' ? token : '';
 };
+
+export const getRawSessionToken = (authorization: unknown, cookieHeader: unknown) => {
+  const raw = String(authorization || '').trim();
+  const [scheme, bearer] = raw.split(' ');
+  if (scheme?.toLowerCase() === 'bearer' && bearer) return bearer;
+  if (raw && !raw.includes(' ')) return raw;
+  return getCookieValue(cookieHeader, SESSION_COOKIE_NAME);
+};
+
+export const getRawSessionTokenFromRequest = (request: express.Request) =>
+  getBearerToken(request) || getCookieValue(request.headers.cookie, SESSION_COOKIE_NAME);
 
 export const getUserByRawToken = async (rawToken: string): Promise<PublicUser | null> => {
   if (!pool || !rawToken) return null;
@@ -214,7 +243,7 @@ export const getUserByRawToken = async (rawToken: string): Promise<PublicUser | 
 
 export const authenticateToken: express.RequestHandler = async (request: AuthedRequest, response, next) => {
   try {
-    const user = await getUserByRawToken(getBearerToken(request));
+    const user = await getUserByRawToken(getRawSessionTokenFromRequest(request));
     if (!user) {
       sendApiError(response, 401, 'AUTH_REQUIRED', 'Authentification requise.');
       return;

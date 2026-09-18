@@ -186,12 +186,19 @@ const decodeAndVerifyJwt = (token, secret) => {
 const register = async (name, email) => {
   const result = await jsonRequest('/api/auth/register', {
     method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
     body: JSON.stringify({ name, email, password: 'Password2026!' }),
   });
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
   assert.ok(result.data.token);
   assert.ok(result.data.user?.id);
-  return result.data;
+  const setCookie = result.response.headers.get('set-cookie') || '';
+  assert.match(setCookie, /mbote_room_session=/);
+  assert.match(setCookie, /HttpOnly/i);
+  return {
+    ...result.data,
+    cookie: setCookie.split(';')[0],
+  };
 };
 
 const socketConnect = (token) => new Promise((resolve, reject) => {
@@ -204,6 +211,28 @@ const socketConnect = (token) => new Promise((resolve, reject) => {
   const timer = setTimeout(() => {
     socket.close();
     reject(new Error('Socket.IO connection timeout'));
+  }, 7_000);
+  socket.once('connect', () => {
+    clearTimeout(timer);
+    resolve(socket);
+  });
+  socket.once('connect_error', (error) => {
+    clearTimeout(timer);
+    socket.close();
+    reject(error);
+  });
+});
+
+const socketConnectWithCookie = (cookie) => new Promise((resolve, reject) => {
+  const socket = createSocket(baseUrl, {
+    extraHeaders: { Cookie: cookie, Origin: baseUrl },
+    transports: ['websocket', 'polling'],
+    reconnection: false,
+    timeout: 5_000,
+  });
+  const timer = setTimeout(() => {
+    socket.close();
+    reject(new Error('Cookie-authenticated Socket.IO connection timeout'));
   }, 7_000);
   socket.once('connect', () => {
     clearTimeout(timer);
@@ -266,6 +295,34 @@ try {
   const host = await register('Hôte Integration', 'host.integration@mbote.test');
   assert.equal(host.user.role, 'admin');
 
+  const browserLogin = await jsonRequest('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: 'host.integration@mbote.test',
+      password: 'Password2026!',
+      rememberMe: true,
+    }),
+  });
+  assert.equal(browserLogin.response.status, 200, JSON.stringify(browserLogin.data));
+  assert.equal(browserLogin.data.token, undefined, 'Browser session must not expose a bearer token');
+  const browserSetCookie = browserLogin.response.headers.get('set-cookie') || '';
+  assert.match(browserSetCookie, /mbote_room_session=/);
+  assert.match(browserSetCookie, /HttpOnly/i);
+  assert.match(browserSetCookie, /SameSite=Lax/i);
+  const browserCookie = browserSetCookie.split(';')[0];
+
+  const browserMe = await jsonRequest('/api/auth/me', { headers: { Cookie: browserCookie } });
+  assert.equal(browserMe.response.status, 200, JSON.stringify(browserMe.data));
+  assert.equal(browserMe.data.user.email, 'host.integration@mbote.test');
+
+  const browserLogout = await jsonRequest('/api/auth/logout', {
+    method: 'POST',
+    headers: { Cookie: browserCookie },
+  });
+  assert.equal(browserLogout.response.status, 204);
+  const browserMeAfterLogout = await jsonRequest('/api/auth/me', { headers: { Cookie: browserCookie } });
+  assert.equal(browserMeAfterLogout.response.status, 401);
+
   const participant = await register('Participant Integration', 'participant.integration@mbote.test');
   assert.equal(participant.user.role, 'user');
   const outsider = await register('Participant Bloqué', 'outsider.integration@mbote.test');
@@ -274,6 +331,16 @@ try {
   const hostMe = await jsonRequest('/api/auth/me', { headers: authHeaders(host.token) });
   assert.equal(hostMe.response.status, 200);
   assert.equal(hostMe.data.user.email, 'host.integration@mbote.test');
+
+  const hostMeCookieOnly = await jsonRequest('/api/auth/me', {
+    headers: { Cookie: host.cookie },
+  });
+  assert.equal(hostMeCookieOnly.response.status, 200, JSON.stringify(hostMeCookieOnly.data));
+  assert.equal(hostMeCookieOnly.data.user.email, 'host.integration@mbote.test');
+
+  const cookieSocket = await socketConnectWithCookie(host.cookie);
+  assert.equal(cookieSocket.connected, true);
+  cookieSocket.close();
 
   const rtcConfig = await jsonRequest('/api/rtc/config', { headers: authHeaders(host.token) });
   assert.equal(rtcConfig.response.status, 200, JSON.stringify(rtcConfig.data));

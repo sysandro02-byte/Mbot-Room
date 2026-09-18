@@ -13,6 +13,8 @@ import {
   publicMeeting,
   query,
   requireDatabase,
+  SESSION_COOKIE_NAME,
+  getRawSessionTokenFromRequest,
   sendApiError,
   toPublicUser,
   validateMeetingPassword,
@@ -20,6 +22,51 @@ import {
 
 const challenges = new Map<string, { profile: any; createdAt: number }>();
 const oauthStates = new Map<string, { redirectTo: string; clientOrigin: string; createdAt: number }>();
+
+const sessionCookieOptions = (expiresAt?: string) => {
+  const sameSiteValue = String(process.env.MBOTE_ROOM_COOKIE_SAMESITE || 'lax').trim().toLowerCase();
+  const sameSite: 'lax' | 'strict' | 'none' =
+    sameSiteValue === 'strict' || sameSiteValue === 'none' ? sameSiteValue : 'lax';
+  const secure = process.env.NODE_ENV === 'production' || sameSite === 'none';
+  return {
+    httpOnly: true,
+    secure,
+    sameSite,
+    path: '/',
+    ...(expiresAt ? { expires: new Date(expiresAt) } : {}),
+    ...(process.env.MBOTE_ROOM_COOKIE_DOMAIN ? { domain: process.env.MBOTE_ROOM_COOKIE_DOMAIN } : {}),
+  };
+};
+
+const attachSessionCookie = (response: express.Response, session: { token: string; expiresAt?: string }) => {
+  response.cookie(SESSION_COOKIE_NAME, session.token, sessionCookieOptions(session.expiresAt));
+};
+
+const clearSessionCookie = (response: express.Response) => {
+  response.clearCookie(SESSION_COOKIE_NAME, sessionCookieOptions());
+};
+
+const wantsBearerSession = (request: express.Request) =>
+  String(request.headers['x-mbote-room-session-mode'] || '').trim().toLowerCase() === 'bearer';
+
+const publicSessionPayload = (
+  request: express.Request,
+  session: Awaited<ReturnType<typeof createSession>>,
+) => ({
+  user: session.user,
+  expiresAt: session.expiresAt,
+  ...(wantsBearerSession(request) ? { token: session.token } : {}),
+});
+
+const respondWithSession = (
+  request: express.Request,
+  response: express.Response,
+  session: Awaited<ReturnType<typeof createSession>>,
+  status = 200,
+) => {
+  attachSessionCookie(response, session);
+  response.status(status).json(publicSessionPayload(request, session));
+};
 
 const createAvatar = (name: string) =>
   `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'MBoté')}&background=3156eb&color=fff&bold=true`;
@@ -121,7 +168,8 @@ export const registerAuthRoutes = (app: express.Express) => {
          VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8,$9,$10,$11) RETURNING *`,
         [name, username, email, createAvatar(name), passwordData.hash, passwordData.salt, new Date().toISOString(), normalizeText(request.body?.phoneNumber).slice(0, 40), normalizeText(request.body?.organization).slice(0, 120), normalizeText(request.body?.jobTitle).slice(0, 120), role],
       );
-      response.status(201).json(await createSession(Number(inserted.rows[0].id), true));
+      const session = await createSession(Number(inserted.rows[0].id), true);
+      respondWithSession(request, response, session, 201);
     } catch (error) { next(error); }
   });
 
@@ -134,7 +182,8 @@ export const registerAuthRoutes = (app: express.Express) => {
       const password = String(request.body?.password || '');
       const passwordData = hashPassword(password, user.password_salt);
       if (passwordData.hash !== user.password_hash) return sendApiError(response, 401, 'INVALID_CREDENTIALS', 'Email ou mot de passe incorrect.');
-      response.json(await createSession(Number(user.id), Boolean(request.body?.rememberMe)));
+      const session = await createSession(Number(user.id), Boolean(request.body?.rememberMe));
+      respondWithSession(request, response, session);
     } catch (error) { next(error); }
   });
 
@@ -171,7 +220,12 @@ export const registerAuthRoutes = (app: express.Express) => {
         );
       }
       const session = await createSession(user.id, false);
-      response.status(201).json({ ...session, meeting: { ...publicMeeting(meeting), settings: { ...publicMeeting(meeting).settings } }, lobbyStatus: status });
+      attachSessionCookie(response, session);
+      response.status(201).json({
+        ...publicSessionPayload(request, session),
+        meeting: { ...publicMeeting(meeting), settings: { ...publicMeeting(meeting).settings } },
+        lobbyStatus: status,
+      });
     } catch (error) { next(error); }
   });
 
@@ -181,8 +235,9 @@ export const registerAuthRoutes = (app: express.Express) => {
 
   app.post('/api/auth/logout', requireDatabase, authenticateToken, async (request, response, next) => {
     try {
-      const [scheme, rawToken] = String(request.headers.authorization || '').split(' ');
-      if (scheme?.toLowerCase() === 'bearer' && rawToken) await query('DELETE FROM room_sessions WHERE token_hash=$1', [hashToken(rawToken)]);
+      const rawToken = getRawSessionTokenFromRequest(request);
+      if (rawToken) await query('DELETE FROM room_sessions WHERE token_hash=$1', [hashToken(rawToken)]);
+      clearSessionCookie(response);
       response.status(204).end();
     } catch (error) { next(error); }
   });
@@ -251,7 +306,8 @@ export const registerAuthRoutes = (app: express.Express) => {
       challenges.delete(challengeId);
       if (!challenge || Date.now() - challenge.createdAt > 10 * 60_000) return sendApiError(response, 400, 'EXTERNAL_AUTH_STATE_INVALID', 'Autorisation MBoté expirée.');
       const user = await upsertExternalUser(challenge.profile);
-      response.json(await createSession(Number(user.id), true));
+      const session = await createSession(Number(user.id), true);
+      respondWithSession(request, response, session);
     } catch (error) { next(error); }
   });
 
@@ -297,7 +353,12 @@ export const registerAuthRoutes = (app: express.Express) => {
       const profile = normalizeExternalProfile(await profileResponse.json());
       const user = await upsertExternalUser(profile);
       const session = await createSession(Number(user.id), true);
-      const hash = new URLSearchParams({ mboteToken: session.token, mboteUser: JSON.stringify(session.user), redirect: stored.redirectTo });
+      attachSessionCookie(response, session);
+      const hash = new URLSearchParams({
+        mboteUser: JSON.stringify(session.user),
+        expiresAt: session.expiresAt,
+        redirect: stored.redirectTo,
+      });
       response.redirect(`${stored.clientOrigin}/login#${hash.toString()}`);
     } catch (error) { next(error); }
   });

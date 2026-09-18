@@ -1,5 +1,5 @@
 import { ReactNode, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   CalendarDays,
@@ -39,7 +39,9 @@ const navItems = [
 
 export default function AppShell({ children, title }: AppShellProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const user = authService.getCurrentUser();
   const userName = user?.name || user?.email || 'Utilisateur';
 
@@ -82,9 +84,19 @@ export default function AppShell({ children, title }: AppShellProps) {
           <button className="app-shell-menu-button" type="button" aria-label="Ouvrir le menu" onClick={() => setMenuOpen(true)}>
             <Menu size={24} aria-hidden="true" />
           </button>
-          <form className="app-shell-search" onSubmit={(event) => event.preventDefault()}>
+          <form className="app-shell-search" onSubmit={(event) => {
+            event.preventDefault();
+            const query = searchTerm.trim();
+            if (query) navigate(`/app/search?q=${encodeURIComponent(query)}`);
+          }}>
             <Search size={18} aria-hidden="true" />
-            <input type="search" placeholder="Rechercher une réunion ou un contact..." aria-label="Rechercher" />
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Rechercher une réunion ou un contact..."
+              aria-label="Rechercher"
+            />
           </form>
           <div className="app-shell-header-title">{title}</div>
         </header>

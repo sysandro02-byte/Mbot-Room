@@ -23,6 +23,7 @@ type AuthResponse = {
 
 const USER_KEY = 'user';
 const TOKEN_KEY = 'token';
+const EXPIRY_KEY = 'sessionExpiresAt';
 
 type RawRoomUser = Partial<Record<keyof RoomUser | 'is_guest' | 'created_at' | 'phone_number' | 'job_title' | 'role' | 'permissions', unknown>>;
 
@@ -31,8 +32,10 @@ const getStorage = (persist: boolean) => (persist ? localStorage : sessionStorag
 const clearStoredSession = () => {
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(EXPIRY_KEY);
   sessionStorage.removeItem(USER_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(EXPIRY_KEY);
 };
 
 const normalizeUser = (user: RawRoomUser): RoomUser => ({
@@ -60,11 +63,11 @@ const readJson = async (response: Response) => {
   }
 };
 
-const saveSession = ({ user, token }: AuthResponse, persist: boolean) => {
+const saveSession = ({ user, expiresAt }: AuthResponse, persist: boolean) => {
   clearStoredSession();
   const storage = getStorage(persist);
   storage.setItem(USER_KEY, JSON.stringify(normalizeUser(user)));
-  storage.setItem(TOKEN_KEY, token);
+  if (expiresAt) storage.setItem(EXPIRY_KEY, expiresAt);
   window.dispatchEvent(new CustomEvent('mbote-room-auth-changed'));
 };
 
@@ -73,6 +76,7 @@ const postAuth = async (path: string, body: unknown): Promise<AuthResponse> => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    credentials: 'include',
   });
   const result = await readJson(response);
   if (!response.ok) {
@@ -103,6 +107,7 @@ export const authService = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      credentials: 'include',
     });
     const result = await readJson(response);
     if (!response.ok) {
@@ -125,6 +130,7 @@ export const authService = {
     const response = await fetch(apiUrl('/api/auth/mbote/credentials'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier, password }),
+      credentials: 'include',
     });
     const result = await readJson(response);
     if (!response.ok) throw new Error(result.error || 'Identifiants MBoté incorrects.');
@@ -134,6 +140,7 @@ export const authService = {
   async authorizeMbote(challengeId: string, redirectTo = '/app') {
     const response = await fetch(apiUrl('/api/auth/mbote/authorize'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ challengeId }),
+      credentials: 'include',
     });
     const result = await readJson(response);
     if (!response.ok) throw new Error(result.error || "Autorisation MBoté impossible.");
@@ -145,7 +152,7 @@ export const authService = {
     return { ...session, redirectTo };
   },
   async startMboteAuth(redirectTo = '/app') {
-    const response = await fetch(apiUrl(`/api/auth/mbote/start?redirect=${encodeURIComponent(redirectTo)}`));
+    const response = await fetch(apiUrl(`/api/auth/mbote/start?redirect=${encodeURIComponent(redirectTo)}`), { credentials: 'include' });
     const result = await readJson(response);
     if (!response.ok) {
       throw new Error(result.error || "Authentification MBoté indisponible.");
@@ -156,14 +163,17 @@ export const authService = {
 
   consumeMboteAuthCallback() {
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-    const token = params.get('mboteToken');
     const rawUser = params.get('mboteUser');
-    if (!token || !rawUser) return null;
+    if (!rawUser) return null;
 
     try {
       const user = normalizeUser(JSON.parse(rawUser));
       if (!user.id) throw new Error('Profil MBoté incomplet.');
-      saveSession({ user, token }, true);
+      saveSession({
+        user,
+        token: '',
+        expiresAt: params.get('expiresAt') || undefined,
+      }, true);
       const requestedRedirect = params.get('redirect') || '/app';
       return requestedRedirect.startsWith('/') && !requestedRedirect.startsWith('//') ? requestedRedirect : '/app';
     } finally {
@@ -176,6 +186,7 @@ export const authService = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
+      credentials: 'include',
     });
     const result = await readJson(response);
     if (!response.ok) {
@@ -185,26 +196,31 @@ export const authService = {
   },
 
   async refreshCurrentUser() {
-    const response = await fetch(apiUrl('/api/auth/me'), { headers: getAuthHeaders() });
+    const response = await fetch(apiUrl('/api/auth/me'), {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
     if (!response.ok) {
-      this.logout(false);
+      await this.logout(false);
       return null;
     }
     const result = await readJson(response);
     const user = normalizeUser(result.user);
-    getStorage(Boolean(localStorage.getItem(TOKEN_KEY))).setItem(USER_KEY, JSON.stringify(user));
+    const persist = Boolean(localStorage.getItem(USER_KEY));
+    getStorage(persist).setItem(USER_KEY, JSON.stringify(user));
     return user;
   },
 
   async logout(notifyServer = true) {
-    const token = this.getToken();
-    clearStoredSession();
-    if (notifyServer && token) {
+    const legacyToken = this.getToken();
+    if (notifyServer) {
       await fetch(apiUrl('/api/auth/logout'), {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: legacyToken ? { Authorization: `Bearer ${legacyToken}` } : undefined,
+        credentials: 'include',
       }).catch(() => undefined);
     }
+    clearStoredSession();
     window.dispatchEvent(new CustomEvent('mbote-room-auth-changed'));
   },
 
@@ -223,7 +239,17 @@ export const authService = {
   },
 
   isAuthenticated() {
-    return Boolean(this.getCurrentUser() && this.getToken());
+    const user = this.getCurrentUser();
+    if (!user) return false;
+    const expiry = localStorage.getItem(EXPIRY_KEY) || sessionStorage.getItem(EXPIRY_KEY);
+    if (expiry) {
+      const timestamp = new Date(expiry).getTime();
+      if (!Number.isNaN(timestamp) && timestamp <= Date.now()) {
+        clearStoredSession();
+        return false;
+      }
+    }
+    return true;
   },
 
   isAdmin() {

@@ -84,6 +84,7 @@ const authHeaders = (token) => ({ Authorization: `Bearer ${token}` });
 const register = async (name, email) => {
   const result = await jsonRequest('/api/auth/register', {
     method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
     body: JSON.stringify({ name, email, password: 'Password2026!' }),
   });
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
@@ -404,6 +405,28 @@ try {
       '--no-sandbox',
     ],
   });
+
+  const loginContext = await browser.newContext({ locale: 'fr-FR' });
+  const loginPage = await loginContext.newPage();
+  await loginPage.goto(`${baseUrl}/login`, { waitUntil: 'domcontentloaded' });
+  await loginPage.locator('#login-email').fill('host.video@mbote.test');
+  await loginPage.locator('#login-password').fill('Password2026!');
+  await loginPage.locator('.primary-login-button').click();
+  await loginPage.waitForURL(/\/app(?:\?|$)/, { timeout: 20_000 });
+  const browserStorage = await loginPage.evaluate(() => ({
+    localToken: localStorage.getItem('token'),
+    sessionToken: sessionStorage.getItem('token'),
+    localUser: localStorage.getItem('user'),
+    sessionUser: sessionStorage.getItem('user'),
+  }));
+  assert.equal(browserStorage.localToken, null, 'Web login must not store bearer token in localStorage');
+  assert.equal(browserStorage.sessionToken, null, 'Web login must not store bearer token in sessionStorage');
+  assert.ok(browserStorage.sessionUser || browserStorage.localUser, 'Web login should cache only the public user profile');
+  const sessionCookies = await loginContext.cookies(baseUrl);
+  const secureSessionCookie = sessionCookies.find((cookie) => cookie.name === 'mbote_room_session');
+  assert.ok(secureSessionCookie, 'Web login should set mbote_room_session cookie');
+  assert.equal(secureSessionCookie.httpOnly, true, 'Session cookie should be HttpOnly');
+  await loginContext.close();
 
   hostRoom = await openAuthenticatedMeeting(browser, host, meeting.id, 'host');
   hostContext = hostRoom.context;
