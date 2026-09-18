@@ -90,7 +90,7 @@ const register = async (name, email) => {
   return result.data;
 };
 
-const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
+const openAuthenticatedMeeting = async (browser, session, meetingId, label, liveKitMode = 'fail') => {
   const context = await browser.newContext({
     permissions: ['camera', 'microphone'],
     locale: 'fr-FR',
@@ -100,16 +100,33 @@ const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
     localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('token', token);
   }, { user: session.user, token: session.token });
-  await context.addInitScript(() => {
-    class FailingLiveKitRoom {
+  await context.addInitScript(({ mode }) => {
+    window.__mboteLiveKitPublishedKinds = [];
+    window.__mbotePeerConnectionCount = 0;
+    const NativePeerConnection = window.RTCPeerConnection;
+    window.RTCPeerConnection = class CountingPeerConnection extends NativePeerConnection {
+      constructor(...args) {
+        super(...args);
+        window.__mbotePeerConnectionCount += 1;
+      }
+    };
+
+    class TestLiveKitRoom {
       remoteParticipants = new Map();
       activeSpeakers = [];
+      listeners = new Map();
       localParticipant = {
         trackPublications: new Map(),
-        publishTrack: async () => ({ isMuted: false }),
+        publishTrack: async (track) => {
+          window.__mboteLiveKitPublishedKinds.push(track.kind);
+          return {
+            isMuted: false,
+            mute: async () => undefined,
+            unmute: async () => undefined,
+          };
+        },
         unpublishTrack: async () => undefined,
       };
-      listeners = new Map();
       on(event, listener) {
         const values = this.listeners.get(event) || [];
         values.push(listener);
@@ -122,12 +139,12 @@ const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
         return this;
       }
       async connect() {
-        throw new Error('CI LiveKit intentionally unavailable');
+        if (mode === 'fail') throw new Error('CI LiveKit intentionally unavailable');
       }
       async disconnect() {}
     }
     window.LivekitClient = {
-      Room: FailingLiveKitRoom,
+      Room: TestLiveKitRoom,
       RoomEvent: {
         TrackSubscribed: 'trackSubscribed',
         TrackUnsubscribed: 'trackUnsubscribed',
@@ -151,7 +168,7 @@ const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
         },
       },
     };
-  });
+  }, { mode: liveKitMode });
 
   await context.addInitScript(() => {
     if (!navigator.mediaDevices) return;
@@ -186,8 +203,13 @@ const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
   });
   page.on('console', (message) => {
     if (message.type() === 'error') {
-      browserErrors.push(message.text());
-      console.error(`[${label}:console] ${message.text()}`);
+      const text = message.text();
+      if (text === 'WebSocket is already in CLOSING or CLOSED state.') {
+        console.warn(`[${label}:expected-network-warning] ${text}`);
+        return;
+      }
+      browserErrors.push(text);
+      console.error(`[${label}:console] ${text}`);
     }
   });
   await page.goto(`${baseUrl}/reunions/${meetingId}`, { waitUntil: 'domcontentloaded' });
@@ -280,6 +302,7 @@ let browser;
 let hostContext;
 let participantContext;
 let participantTwoContext;
+let successfulSfuContext;
 let hostRoom;
 let participantRoom;
 let participantTwoRoom;
@@ -476,7 +499,40 @@ try {
   assert.deepEqual(participantRoom.browserErrors, [], `Participant browser errors: ${participantRoom.browserErrors.join('\n')}`);
   assert.deepEqual(participantTwoRoom.browserErrors, [], `Participant two browser errors: ${participantTwoRoom.browserErrors.join('\n')}`);
 
-  console.log('Three-browser camera + microphone + reconnect video meeting checks passed.');
+  await participantTwoContext.close();
+  await participantContext.close();
+  await hostContext.close();
+  participantTwoContext = undefined;
+  participantContext = undefined;
+  hostContext = undefined;
+
+  const successfulSfuRoom = await openAuthenticatedMeeting(browser, host, meeting.id, 'host-sfu-success', 'success');
+  successfulSfuContext = successfulSfuRoom.context;
+  const successfulSfuBadge = successfulSfuRoom.page.locator('[data-testid="media-transport-status"]');
+  await successfulSfuBadge.waitFor({ state: 'visible', timeout: 10_000 });
+  await successfulSfuRoom.page.waitForFunction(() => {
+    const badge = document.querySelector('[data-testid="media-transport-status"]');
+    return badge?.getAttribute('data-transport') === 'livekit' && badge.textContent?.includes('SFU actif');
+  }, undefined, { timeout: 15_000 });
+
+  await successfulSfuRoom.page.waitForFunction(() => {
+    const kinds = window.__mboteLiveKitPublishedKinds || [];
+    return kinds.includes('audio') && kinds.includes('video');
+  }, undefined, { timeout: 15_000 });
+
+  const sfuDiagnostics = await successfulSfuRoom.page.evaluate(() => ({
+    transport: document.querySelector('[data-testid="media-transport-status"]')?.getAttribute('data-transport'),
+    publishedKinds: window.__mboteLiveKitPublishedKinds || [],
+    peerConnectionCount: window.__mbotePeerConnectionCount || 0,
+  }));
+  assert.equal(sfuDiagnostics.transport, 'livekit');
+  assert.ok(sfuDiagnostics.publishedKinds.includes('audio'));
+  assert.ok(sfuDiagnostics.publishedKinds.includes('video'));
+  assert.equal(sfuDiagnostics.peerConnectionCount, 0, 'MBotéRoom must not create mesh RTCPeerConnections while SFU is active');
+  assert.deepEqual(successfulSfuRoom.browserErrors, [], `Successful SFU browser errors: ${successfulSfuRoom.browserErrors.join('\n')}`);
+  await successfulSfuRoom.page.screenshot({ path: 'test-artifacts/video-sfu-active.png', fullPage: true });
+
+  console.log('Three-browser mesh fallback + successful SFU publish checks passed.');
 } catch (error) {
   await mkdir('test-artifacts', { recursive: true }).catch(() => undefined);
   if (hostRoom?.page) {
@@ -494,6 +550,7 @@ try {
   console.error(`SERVER_OUTPUT\n${serverOutput}`);
   throw error;
 } finally {
+  await successfulSfuContext?.close().catch(() => undefined);
   await participantTwoContext?.close().catch(() => undefined);
   await participantContext?.close().catch(() => undefined);
   await hostContext?.close().catch(() => undefined);
