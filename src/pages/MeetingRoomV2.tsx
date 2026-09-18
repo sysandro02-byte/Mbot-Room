@@ -1109,7 +1109,7 @@ export default function MeetingRoomV2() {
             </div>
           ) : null}
         </div>
-        <Control active={recording} label={recording ? 'Stop rec.' : 'Enregistrer local'} onClick={toggleRecording}>{recording ? <Square/> : <Circle/>}</Control>
+        <Control active={recording} label={recording ? 'Stop rec.' : 'Enregistrer'} onClick={() => void toggleRecording()}>{recording ? <Square/> : <Circle/>}</Control>
         <div className="room-v2-leave-actions">
           <button type="button" className="room-v2-leave" onClick={() => void leaveMeeting(false)}><LogOut size={18}/> Quitter</button>
           {isModerator ? <button type="button" className="room-v2-end" onClick={() => void leaveMeeting(true)}><PhoneOff size={18}/> Terminer pour tous</button> : null}
