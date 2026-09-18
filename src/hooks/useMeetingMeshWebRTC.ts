@@ -92,6 +92,7 @@ export function useMeetingMeshWebRTC({
     connectedPeers: 0,
     totalPeers: 0,
   });
+  const [activeSpeakerSocketId, setActiveSpeakerSocketId] = useState<string | null>(null);
   const peersRef = useRef<Map<string, PeerState>>(new Map());
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(localStream);
@@ -500,10 +501,11 @@ export function useMeetingMeshWebRTC({
 
     let cancelled = false;
     const sample = async () => {
-      const peers = [...peersRef.current.values()];
+      const peers = [...peersRef.current.entries()];
       if (peers.length === 0) {
         if (!cancelled) {
           setNetworkQuality({ level: 'excellent', rttMs: null, packetLossPct: null, connectedPeers: 0, totalPeers: 0 });
+          setActiveSpeakerSocketId(null);
         }
         return;
       }
@@ -512,8 +514,10 @@ export function useMeetingMeshWebRTC({
       let maxRttSeconds = 0;
       let totalLost = 0;
       let totalReceived = 0;
+      let loudestSocketId: string | null = null;
+      let loudestAudioLevel = 0;
 
-      await Promise.all(peers.map(async ({ pc }) => {
+      await Promise.all(peers.map(async ([socketId, { pc }]) => {
         if (pc.connectionState === 'connected') connectedPeers += 1;
         try {
           const reports = await pc.getStats();
@@ -531,6 +535,19 @@ export function useMeetingMeshWebRTC({
               const received = typeof stat.packetsReceived === 'number' ? Math.max(0, stat.packetsReceived) : 0;
               totalLost += lost;
               totalReceived += received;
+              const mediaKind = String(stat.kind || stat.mediaType || '');
+              const audioLevel = typeof stat.audioLevel === 'number' ? stat.audioLevel : 0;
+              if (mediaKind === 'audio' && audioLevel > loudestAudioLevel) {
+                loudestAudioLevel = audioLevel;
+                loudestSocketId = socketId;
+              }
+            }
+            if (stat.type === 'track' && String(stat.kind || '') === 'audio') {
+              const audioLevel = typeof stat.audioLevel === 'number' ? stat.audioLevel : 0;
+              if (audioLevel > loudestAudioLevel) {
+                loudestAudioLevel = audioLevel;
+                loudestSocketId = socketId;
+              }
             }
           });
         } catch {
@@ -555,6 +572,7 @@ export function useMeetingMeshWebRTC({
         connectedPeers,
         totalPeers: peers.length,
       });
+      setActiveSpeakerSocketId(loudestAudioLevel >= 0.015 ? loudestSocketId : null);
     };
 
     void sample();
@@ -565,5 +583,5 @@ export function useMeetingMeshWebRTC({
     };
   }, [enabled]);
 
-  return { remoteParticipants, networkQuality };
+  return { remoteParticipants, networkQuality, activeSpeakerSocketId };
 }
