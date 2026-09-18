@@ -585,8 +585,10 @@ export default function MeetingRoomV2() {
         link.download = `mboteroom-${meeting?.id || 'reunion'}-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
+        void recordingSessionRef.current?.stop();
+        recordingSessionRef.current = null;
         setRecording(false);
-        setNotice('Enregistrement local terminé et téléchargé.');
+        setNotice('Enregistrement composite terminé et téléchargé.');
       };
       recorder.start(1000);
       recorderRef.current = recorder;
