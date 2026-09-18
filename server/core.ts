@@ -89,7 +89,7 @@ const databaseUrl = String(process.env.DATABASE_URL || '').trim();
 const databaseMode = String(process.env.DATABASE_MODE || '').trim().toLowerCase();
 const embeddedTestMode = !databaseUrl && databaseMode === 'pglite-test';
 const embeddedDataDir = String(process.env.PGLITE_DATA_DIR || '/tmp/mboteroom-pglite-test').trim();
-const embeddedInitialMemoryMb = Math.max(32, Math.min(256, Number(process.env.PGLITE_INITIAL_MEMORY_MB || 64)));
+const embeddedInitialMemoryMb = Math.max(128, Math.min(256, Number(process.env.PGLITE_INITIAL_MEMORY_MB || 128)));
 
 export const pool = databaseUrl
   ? new pg.Pool({ connectionString: databaseUrl, ssl: process.env.PGSSLMODE === 'disable' ? undefined : { rejectUnauthorized: false } })
