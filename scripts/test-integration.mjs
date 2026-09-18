@@ -151,6 +151,9 @@ try {
   assert.equal(health.database?.connected, true);
   assert.equal(health.database?.type, 'postgres');
 
+  assert.equal(health.media?.topology, 'mesh');
+  assert.equal(health.media?.turnConfigured, false);
+
   await expectRejectedSocket();
 
   const host = await register('Hôte Integration', 'host.integration@mbote.test');
