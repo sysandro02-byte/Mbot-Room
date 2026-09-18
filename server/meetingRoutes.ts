@@ -337,7 +337,10 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       if (meeting.settings.locked === true && !canModerateMeeting(meeting, request.user!) && !alreadyAccepted) {
         return sendApiError(response, 423, 'MEETING_LOCKED', 'La réunion est verrouillée par l’hôte.');
       }
-      const status = canModerateMeeting(meeting, request.user!) || alreadyAccepted || meeting.settings.waitingRoom === false ? 'accepted' : 'requested';
+      const moderator = canModerateMeeting(meeting, request.user!);
+      const hostHasStarted = meeting.is_active || meeting.status === 'live';
+      const blockedUntilHost = !moderator && !alreadyAccepted && !hostHasStarted && meeting.settings.joinBeforeHost === false;
+      const status = moderator || alreadyAccepted || (!blockedUntilHost && meeting.settings.waitingRoom === false) ? 'accepted' : 'requested';
       await query(
         `INSERT INTO room_lobby (meeting_id,user_id,status,name,avatar) VALUES ($1,$2,$3,$4,$5)
          ON CONFLICT (meeting_id,user_id) DO UPDATE SET status=excluded.status,name=excluded.name,avatar=excluded.avatar`,
@@ -419,6 +422,22 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       if (!meeting) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
       if (!canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte peut démarrer la réunion.');
       const updated = await query(`UPDATE room_meetings SET status='live',is_active=true,started_at=COALESCE(started_at,now()),ended_at=NULL,updated_at=now() WHERE id=$1 RETURNING *`, [meeting.id]);
+      if (meeting.settings.waitingRoom === false) {
+        const pending = await query(`SELECT user_id FROM room_lobby WHERE meeting_id=$1 AND status='requested'`, [meeting.id]);
+        if (pending.rows.length) {
+          await query(`UPDATE room_lobby SET status='accepted' WHERE meeting_id=$1 AND status='requested'`, [meeting.id]);
+          for (const row of pending.rows) {
+            const userId = Number(row.user_id);
+            await query(
+              `INSERT INTO room_meeting_members (meeting_id,user_id,role,status,joined_at) VALUES ($1,$2,'participant','accepted',now())
+               ON CONFLICT (meeting_id,user_id) DO UPDATE SET status='accepted',joined_at=COALESCE(room_meeting_members.joined_at,now()),updated_at=now()`,
+              [meeting.id, userId],
+            );
+            io.to(`user:${userId}`).emit('meeting:lobby-status', { meetingId: meeting.id, status: 'accepted' });
+          }
+          io.to(`meeting:${meeting.id}`).emit('meeting:lobby-updated', { meetingId: meeting.id, autoAdmitted: true });
+        }
+      }
       const members = await query(`SELECT COUNT(*)::int AS count FROM room_meeting_members WHERE meeting_id=$1 AND user_id<>$2`, [meeting.id, request.user!.id]);
       const value = publicMeeting(updated.rows[0]);
       io.emit('meeting:started', value);
