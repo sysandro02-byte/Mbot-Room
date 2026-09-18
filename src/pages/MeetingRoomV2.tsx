@@ -38,6 +38,7 @@ import {
   MeetingPoll,
 } from '../services/collaborationService';
 import { getMeetingAccessCode, LobbyParticipant, Meeting, meetingService } from '../services/meetingService';
+import { createCompositeMeetingRecording, type CompositeRecordingSession } from '../lib/meetingRecording';
 import './MeetingRoomV2.css';
 
 type Panel = 'participants' | 'chat' | 'polls' | 'luna' | 'breakouts' | null;
@@ -143,6 +144,7 @@ export default function MeetingRoomV2() {
   const screenStreamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
+  const recordingSessionRef = useRef<CompositeRecordingSession | null>(null);
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [loading, setLoading] = useState(true);
