@@ -268,6 +268,37 @@ try {
   assert.ok(participants.data.some((item) => Number(item.userId) === Number(host.user.id)));
   assert.ok(participants.data.some((item) => Number(item.userId) === Number(participant.user.id)));
 
+  const mediaStatus = await jsonRequest('/api/media/status');
+  assert.equal(mediaStatus.response.status, 200, JSON.stringify(mediaStatus.data));
+  assert.equal(mediaStatus.data.activeMode, 'livekit');
+  assert.equal(mediaStatus.data.livekitReady, true);
+
+  const hostMediaSession = await jsonRequest(`/api/meetings/${meeting.id}/media-session`, {
+    headers: authHeaders(host.token),
+  });
+  assert.equal(hostMediaSession.response.status, 200, JSON.stringify(hostMediaSession.data));
+  assert.equal(hostMediaSession.data.mode, 'livekit');
+  assert.equal(hostMediaSession.data.serverUrl, 'wss://livekit.test.invalid');
+  const hostSfuPayload = decodeAndVerifyJwt(hostMediaSession.data.participantToken, 'test-api-secret');
+  assert.equal(hostSfuPayload.iss, 'test-api-key');
+  assert.equal(hostSfuPayload.sub, `mboteroom-user-${host.user.id}`);
+  assert.equal(hostSfuPayload.video?.room, `mboteroom-${meeting.id}`);
+  assert.equal(hostSfuPayload.video?.roomJoin, true);
+
+  const participantMediaSession = await jsonRequest(`/api/meetings/${meeting.id}/media-session`, {
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(participantMediaSession.response.status, 200, JSON.stringify(participantMediaSession.data));
+  const participantSfuPayload = decodeAndVerifyJwt(participantMediaSession.data.participantToken, 'test-api-secret');
+  assert.equal(participantSfuPayload.sub, `mboteroom-user-${participant.user.id}`);
+  assert.equal(participantSfuPayload.video?.room, `mboteroom-${meeting.id}`);
+
+  const outsiderMediaSession = await jsonRequest(`/api/meetings/${meeting.id}/media-session`, {
+    headers: authHeaders(outsider.token),
+  });
+  assert.equal(outsiderMediaSession.response.status, 403);
+  assert.equal(outsiderMediaSession.data.code, 'MEETING_ACCESS_DENIED');
+
   const muteAll = await jsonRequest(`/api/meetings/${meeting.id}/participants/mute-all`, {
     method: 'POST',
     headers: authHeaders(host.token),
