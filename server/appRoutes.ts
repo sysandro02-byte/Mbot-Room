@@ -4,6 +4,8 @@ import {
   AuthedRequest,
   authenticateToken,
   createId,
+  getDatabaseType,
+  hasDatabase,
   publicMeeting,
   query,
   requireDatabase,
@@ -18,8 +20,9 @@ const parseDate = (value: unknown) => {
 
 export const registerAppRoutes = (app: express.Express, io: Server) => {
   app.get('/api/health', async (_request, response) => {
-    if (!process.env.DATABASE_URL) {
-      response.status(503).json({ ok:false,service:'mbote-room',database:{configured:false,connected:false,type:'postgres'} });
+    const databaseType = getDatabaseType();
+    if (!hasDatabase()) {
+      response.status(503).json({ ok:false,service:'mbote-room',database:{configured:false,connected:false,type:databaseType} });
       return;
     }
     try {
@@ -27,7 +30,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
       response.json({
         ok:true,
         service:'mbote-room',
-        database:{configured:true,connected:true,type:'postgres',users:Number(result.rows[0].users),meetings:Number(result.rows[0].meetings)},
+        database:{configured:true,connected:true,type:databaseType,users:Number(result.rows[0].users),meetings:Number(result.rows[0].meetings)},
         media:{
           topology:'mesh',
           turnConfigured:Boolean(String(process.env.TURN_URLS||'').trim() && String(process.env.TURN_SHARED_SECRET||'').trim()),
@@ -36,7 +39,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
         serverTime:result.rows[0].now,
       });
     } catch (error) {
-      response.status(503).json({ ok:false,service:'mbote-room',database:{configured:true,connected:false,type:'postgres'},error:error instanceof Error?error.message:'Database unavailable' });
+      response.status(503).json({ ok:false,service:'mbote-room',database:{configured:true,connected:false,type:databaseType},error:error instanceof Error?error.message:'Database unavailable' });
     }
   });
 

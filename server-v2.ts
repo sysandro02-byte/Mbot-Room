@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
-import { pool, runMigrations } from './server/core.js';
+import { closeDatabase, getDatabaseType, hasDatabase, runMigrations } from './server/core.js';
 import { runExtraMigrations } from './server/extraMigrations.js';
 import { runProductMigrations } from './server/productMigrations.js';
 import { registerAuthRoutes } from './server/authRoutes.js';
@@ -125,22 +125,22 @@ app.use((error: unknown, _request: express.Request, response: express.Response, 
 const port = Number(process.env.PORT || 3004);
 
 const start = async () => {
-  if (!pool) {
-    console.error('DATABASE_URL est obligatoire. MBotéRoom démarre en mode diagnostic uniquement.');
+  if (!hasDatabase()) {
+    console.error('DATABASE_URL est obligatoire, sauf si DATABASE_MODE=pglite-test est explicitement activé.');
   } else {
     await runMigrations();
     await runExtraMigrations();
     await runProductMigrations();
   }
   httpServer.listen(port, () => {
-    console.log(`MBotéRoom API V2 listening on port ${port}`);
+    console.log(`MBotéRoom API V2 listening on port ${port} · database=${getDatabaseType()}`);
   });
 };
 
 const shutdown = async () => {
   io.close();
   await new Promise<void>((resolve) => httpServer.close(() => resolve()));
-  await pool?.end().catch(() => undefined);
+  await closeDatabase();
   process.exit(0);
 };
 
