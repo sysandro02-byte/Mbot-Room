@@ -98,6 +98,8 @@ export function useMeetingMeshWebRTC({
   const localStreamRef = useRef<MediaStream | null>(localStream);
   const mediaRef = useRef(media);
   const joinedRef = useRef(false);
+  const rtcConfigRef = useRef<RTCConfiguration>({ iceServers: [], iceCandidatePoolSize: 0 });
+  const [rtcConfigReady, setRtcConfigReady] = useState(false);
 
   const mediaKey = useMemo(() => `${Number(media.audio)}:${Number(media.video)}:${Number(media.screen)}`, [media.audio, media.video, media.screen]);
 
@@ -108,6 +110,20 @@ export function useMeetingMeshWebRTC({
   useEffect(() => {
     mediaRef.current = media;
   }, [media]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setRtcConfigReady(false);
+    if (!enabled) return () => { cancelled = true; };
+    void getRtcConfiguration().then((config) => {
+      if (cancelled) return;
+      rtcConfigRef.current = config;
+      setRtcConfigReady(true);
+    }).catch(() => {
+      if (!cancelled) setRtcConfigReady(true);
+    });
+    return () => { cancelled = true; };
+  }, [enabled]);
 
   const updateRemoteParticipant = useCallback((participant: ServerMeetingParticipant, patch?: Partial<RemoteMeetingParticipant>) => {
     setRemoteParticipants((current) => {
@@ -207,7 +223,7 @@ export function useMeetingMeshWebRTC({
       return existing;
     }
 
-    const pc = new RTCPeerConnection(getRtcConfiguration());
+    const pc = new RTCPeerConnection(rtcConfigRef.current);
     const remoteStream = new MediaStream();
     const state: PeerState = {
       pc,
@@ -316,7 +332,7 @@ export function useMeetingMeshWebRTC({
   }, [createPeer, meetingId, syncLocalTracks]);
 
   useEffect(() => {
-    if (!enabled || !meetingId || !localUserId) return undefined;
+    if (!enabled || !rtcConfigReady || !meetingId || !localUserId) return undefined;
 
     socket.auth = { token: authService.getToken() };
 
@@ -462,7 +478,7 @@ export function useMeetingMeshWebRTC({
       closeAllPeers();
       joinedRef.current = false;
     };
-  }, [bindRemoteCreatedSenders, closeAllPeers, createOffer, createPeer, enabled, flushPendingCandidates, localAvatar, localName, localUserId, meetingId, onNotice, removeRemoteParticipant, syncLocalTracks, updateRemoteParticipant]);
+  }, [bindRemoteCreatedSenders, closeAllPeers, createOffer, createPeer, enabled, flushPendingCandidates, localAvatar, localName, localUserId, meetingId, onNotice, removeRemoteParticipant, rtcConfigReady, syncLocalTracks, updateRemoteParticipant]);
 
   useEffect(() => {
     if (!joinedRef.current) return;
