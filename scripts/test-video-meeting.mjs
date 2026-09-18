@@ -95,6 +95,31 @@ const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
     localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('token', token);
   }, { user: session.user, token: session.token });
+  await context.addInitScript(() => {
+    if (!navigator.mediaDevices) return;
+    const fakeDisplayMedia = async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1280;
+      canvas.height = 720;
+      const ctx = canvas.getContext('2d');
+      let frame = 0;
+      const draw = () => {
+        if (!ctx) return;
+        ctx.fillStyle = frame % 2 ? '#1e3a8a' : '#172554';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '48px sans-serif';
+        ctx.fillText('MBotéRoom partage écran CI', 80, 120);
+        frame += 1;
+      };
+      draw();
+      const timer = setInterval(draw, 250);
+      const stream = canvas.captureStream(15);
+      stream.getVideoTracks()[0]?.addEventListener('ended', () => clearInterval(timer), { once: true });
+      return stream;
+    };
+    Object.defineProperty(navigator.mediaDevices, 'getDisplayMedia', { configurable: true, value: fakeDisplayMedia });
+  });
   const page = await context.newPage();
   const browserErrors = [];
   page.on('pageerror', (error) => {
@@ -196,14 +221,17 @@ const clickControl = async (page, label) => {
 let browser;
 let hostContext;
 let participantContext;
+let participantTwoContext;
 let hostRoom;
 let participantRoom;
+let participantTwoRoom;
 
 try {
   await waitForServer();
 
   const host = await register('Hôte Vidéo', 'host.video@mbote.test');
   const participant = await register('Participant Vidéo', 'participant.video@mbote.test');
+  const participantTwo = await register('Participant Deux', 'participant.two@mbote.test');
 
   const created = await jsonRequest('/api/meetings', {
     method: 'POST',
@@ -233,7 +261,15 @@ try {
     body: JSON.stringify({ password: 'VideoRoom2026!' }),
   });
   assert.equal(join.response.status, 200, JSON.stringify(join.data));
-  assert.equal(join.data.status, 'accepted');
+  assert.equal(join.data.status, 'requested');
+
+  const joinTwo = await jsonRequest(`/api/meetings/${meeting.id}/join-request`, {
+    method: 'POST',
+    headers: authHeaders(participantTwo.token),
+    body: JSON.stringify({ password: 'VideoRoom2026!' }),
+  });
+  assert.equal(joinTwo.response.status, 200, JSON.stringify(joinTwo.data));
+  assert.equal(joinTwo.data.status, 'requested');
 
   const start = await jsonRequest(`/api/meetings/${meeting.id}/start-notify`, {
     method: 'POST',
@@ -256,10 +292,16 @@ try {
   hostContext = hostRoom.context;
   participantRoom = await openAuthenticatedMeeting(browser, participant, meeting.id, 'participant');
   participantContext = participantRoom.context;
+  participantTwoRoom = await openAuthenticatedMeeting(browser, participantTwo, meeting.id, 'participant-two');
+  participantTwoContext = participantTwoRoom.context;
 
   await Promise.all([
     waitForRemoteMedia(hostRoom.page, 'Participant Vidéo'),
+    waitForRemoteMedia(hostRoom.page, 'Participant Deux'),
     waitForRemoteMedia(participantRoom.page, 'Hôte Vidéo'),
+    waitForRemoteMedia(participantRoom.page, 'Participant Deux'),
+    waitForRemoteMedia(participantTwoRoom.page, 'Hôte Vidéo'),
+    waitForRemoteMedia(participantTwoRoom.page, 'Participant Vidéo'),
   ]);
 
   await hostRoom.page.waitForFunction(() => {
@@ -267,6 +309,16 @@ try {
     const level = indicator?.getAttribute('data-level');
     return Boolean(indicator && level && level !== 'offline');
   }, undefined, { timeout: 15_000 });
+
+  await hostRoom.page.locator('[data-testid="speaker-view-button"]').click();
+  await hostRoom.page.locator('[data-testid="speaker-layout"]').waitFor({ state: 'visible', timeout: 10_000 });
+  const pinButton = hostRoom.page.locator('[data-testid="pin-participant"]').first();
+  await pinButton.waitFor({ state: 'visible', timeout: 10_000 });
+  await pinButton.click();
+  await hostRoom.page.locator('[data-testid="unpin-participant"]').first().waitFor({ state: 'visible', timeout: 10_000 });
+  await hostRoom.page.locator('[data-testid="gallery-view-button"]').click();
+  await hostRoom.page.locator('[data-testid="gallery-layout"]').waitFor({ state: 'visible', timeout: 10_000 });
+  await waitForRemoteMedia(hostRoom.page, 'Participant Vidéo');
 
   const deviceButton = hostRoom.page.locator('[data-testid="device-settings-button"]');
   await deviceButton.waitFor({ state: 'visible', timeout: 10_000 });
@@ -284,10 +336,42 @@ try {
   await clickControl(participantRoom.page, 'Caméra');
   await waitForRemoteMedia(hostRoom.page, 'Participant Vidéo');
 
+  await clickControl(participantRoom.page, 'Partager');
+  await hostRoom.page.waitForFunction(() => {
+    const tile = Array.from(document.querySelectorAll('.room-v2-tile')).find((candidate) => candidate.textContent?.includes('Participant Vidéo') && !candidate.textContent?.includes('(vous)'));
+    const video = tile?.querySelector('video');
+    return Boolean(tile?.classList.contains('is-screen') && video && video.videoWidth > 0 && video.videoHeight > 0);
+  }, undefined, { timeout: 15_000 });
+  await clickControl(participantRoom.page, 'Partager');
+  await hostRoom.page.waitForFunction(() => {
+    const tile = Array.from(document.querySelectorAll('.room-v2-tile')).find((candidate) => candidate.textContent?.includes('Participant Vidéo') && !candidate.textContent?.includes('(vous)'));
+    return Boolean(tile && !tile.classList.contains('is-screen'));
+  }, undefined, { timeout: 15_000 });
+  await waitForRemoteMedia(hostRoom.page, 'Participant Vidéo');
+
   await clickControl(participantRoom.page, 'Micro');
   await waitForRemoteMicState(hostRoom.page, 'Participant Vidéo', true);
   await clickControl(participantRoom.page, 'Micro');
   await waitForRemoteMicState(hostRoom.page, 'Participant Vidéo', false);
+
+  await clickControl(participantRoom.page, 'Main');
+  await hostRoom.page.waitForFunction(() => {
+    const tile = Array.from(document.querySelectorAll('.room-v2-tile')).find((candidate) => candidate.textContent?.includes('Participant Vidéo') && !candidate.textContent?.includes('(vous)'));
+    return Boolean(tile?.querySelector('[aria-label="Main levée"]'));
+  }, undefined, { timeout: 10_000 });
+  await clickControl(participantRoom.page, 'Baisser la main');
+  await hostRoom.page.waitForFunction(() => {
+    const tile = Array.from(document.querySelectorAll('.room-v2-tile')).find((candidate) => candidate.textContent?.includes('Participant Vidéo') && !candidate.textContent?.includes('(vous)'));
+    return Boolean(tile && !tile.querySelector('[aria-label="Main levée"]'));
+  }, undefined, { timeout: 10_000 });
+
+  await participantRoom.page.locator('[data-testid="reaction-button"]').click();
+  await participantRoom.page.locator('[data-testid="reaction-panel"]').waitFor({ state: 'visible', timeout: 10_000 });
+  await participantRoom.page.locator('[data-testid="reaction-panel"] button').filter({ hasText: '👏' }).click();
+  await hostRoom.page.waitForFunction(() => {
+    const tile = Array.from(document.querySelectorAll('.room-v2-tile')).find((candidate) => candidate.textContent?.includes('Participant Vidéo') && !candidate.textContent?.includes('(vous)'));
+    return Boolean(tile?.querySelector('[aria-label="Réaction 👏"]'));
+  }, undefined, { timeout: 10_000 });
 
   await participantContext.setOffline(true);
   await hostRoom.page.waitForFunction(() => {
@@ -297,7 +381,11 @@ try {
 
   await Promise.all([
     waitForRemoteMedia(hostRoom.page, 'Participant Vidéo', 30_000),
+    waitForRemoteMedia(hostRoom.page, 'Participant Deux', 30_000),
     waitForRemoteMedia(participantRoom.page, 'Hôte Vidéo', 30_000),
+    waitForRemoteMedia(participantRoom.page, 'Participant Deux', 30_000),
+    waitForRemoteMedia(participantTwoRoom.page, 'Hôte Vidéo', 30_000),
+    waitForRemoteMedia(participantTwoRoom.page, 'Participant Vidéo', 30_000),
   ]);
 
   const persisted = await jsonRequest(`/api/meetings/${meeting.id}/participants`, { headers: authHeaders(host.token) });
@@ -307,11 +395,13 @@ try {
   await mkdir('test-artifacts', { recursive: true });
   await hostRoom.page.screenshot({ path: 'test-artifacts/video-host.png', fullPage: true });
   await participantRoom.page.screenshot({ path: 'test-artifacts/video-participant.png', fullPage: true });
+  await participantTwoRoom.page.screenshot({ path: 'test-artifacts/video-participant-two.png', fullPage: true });
 
   assert.deepEqual(hostRoom.browserErrors, [], `Host browser errors: ${hostRoom.browserErrors.join('\n')}`);
   assert.deepEqual(participantRoom.browserErrors, [], `Participant browser errors: ${participantRoom.browserErrors.join('\n')}`);
+  assert.deepEqual(participantTwoRoom.browserErrors, [], `Participant two browser errors: ${participantTwoRoom.browserErrors.join('\n')}`);
 
-  console.log('Two-browser camera + microphone + reconnect video meeting checks passed.');
+  console.log('Three-browser camera + microphone + reconnect video meeting checks passed.');
 } catch (error) {
   await mkdir('test-artifacts', { recursive: true }).catch(() => undefined);
   if (hostRoom?.page) {
@@ -322,9 +412,14 @@ try {
     console.error(`PARTICIPANT_DIAGNOSTICS ${JSON.stringify(await mediaDiagnostics(participantRoom.page).catch((cause) => ({ error: String(cause) })), null, 2)}`);
     await participantRoom.page.screenshot({ path: 'test-artifacts/failure-participant.png', fullPage: true }).catch(() => undefined);
   }
+  if (participantTwoRoom?.page) {
+    console.error(`PARTICIPANT_TWO_DIAGNOSTICS ${JSON.stringify(await mediaDiagnostics(participantTwoRoom.page).catch((cause) => ({ error: String(cause) })), null, 2)}`);
+    await participantTwoRoom.page.screenshot({ path: 'test-artifacts/failure-participant-two.png', fullPage: true }).catch(() => undefined);
+  }
   console.error(`SERVER_OUTPUT\n${serverOutput}`);
   throw error;
 } finally {
+  await participantTwoContext?.close().catch(() => undefined);
   await participantContext?.close().catch(() => undefined);
   await hostContext?.close().catch(() => undefined);
   await browser?.close().catch(() => undefined);

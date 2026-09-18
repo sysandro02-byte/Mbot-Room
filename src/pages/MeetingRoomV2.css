@@ -13,3 +13,52 @@
 .room-v2-device-panel select:disabled{opacity:.55}
 .room-v2-device-panel>small{color:#aeb7c8;font-size:10px;line-height:1.4}
 @media(max-width:600px){.room-v2-device-panel{bottom:80px}.room-v2-device-panel label{grid-template-columns:20px 1fr}.room-v2-device-panel label select{grid-column:1 / -1}.room-v2-network small{display:none}}
+
+.room-v2-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px}
+.room-v2-view-switch{display:inline-flex;padding:3px;border-radius:9px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.08)}
+.room-v2-view-switch button{height:30px;padding:0 10px;border:0;border-radius:7px;background:transparent;color:#dce3ef;font-size:11px;cursor:pointer}
+.room-v2-view-switch button.active{background:#3156eb;color:#fff}
+.room-v2-tile.is-speaking{box-shadow:0 0 0 2px #22c55e,0 12px 30px rgba(0,0,0,.25)}
+.room-v2-tile.is-pinned{box-shadow:0 0 0 2px #60a5fa,0 12px 30px rgba(0,0,0,.25)}
+.room-v2-tile-meta .speaker-badge{background:#16803f}
+.room-v2-pin{position:absolute;top:10px;right:10px;z-index:4;width:32px;height:32px;border:0;border-radius:9px;background:rgba(0,0,0,.58);color:#fff;display:grid;place-items:center;cursor:pointer;backdrop-filter:blur(7px)}
+.room-v2-pin:hover{background:rgba(49,86,235,.9)}
+.room-v2-speaker-layout{height:100%;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) 132px;gap:10px}
+.room-v2-speaker-main{min-height:0}
+.room-v2-speaker-main>.room-v2-tile{width:100%;height:100%;min-height:0}
+.room-v2-speaker-strip{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;min-height:0;padding-bottom:2px}
+.room-v2-speaker-strip>.room-v2-tile{flex:0 0 190px;height:120px}
+@media(max-width:900px){
+  .room-v2-header-actions{gap:6px}
+  .room-v2-view-switch button{padding:0 8px}
+  .room-v2-speaker-layout{grid-template-rows:minmax(0,1fr) 112px}
+  .room-v2-speaker-strip>.room-v2-tile{flex-basis:160px;height:102px}
+}
+@media(max-width:600px){
+  .room-v2-header-actions{position:absolute;right:8px;top:58px;z-index:18}
+  .room-v2-view-switch{background:#202633}
+  .room-v2-start{display:none}
+  .room-v2-stage.speaker-mode{padding-top:40px}
+  .room-v2-speaker-layout{grid-template-rows:minmax(0,1fr) 96px}
+  .room-v2-speaker-strip>.room-v2-tile{flex-basis:138px;height:88px}
+}
+
+.room-v2-tile-meta .hand-badge{display:inline-flex;align-items:center;gap:3px;background:#a16207}
+.room-v2-raised-inline{color:#d97706;font-weight:700}
+
+.room-v2-reaction-wrap{position:relative}
+.room-v2-reaction-panel{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);display:flex;gap:5px;padding:8px;border-radius:12px;background:#252c3a;border:1px solid rgba(255,255,255,.1);box-shadow:0 16px 35px rgba(0,0,0,.3);z-index:120;pointer-events:auto}
+.room-v2-reaction-panel button{width:38px;height:38px;border:0;border-radius:9px;background:transparent;font-size:21px;cursor:pointer}
+.room-v2-reaction-panel button:hover{background:rgba(255,255,255,.08)}
+.room-v2-reaction-bubble{position:absolute;right:12px;bottom:52px;z-index:5;font-size:34px;filter:drop-shadow(0 5px 8px rgba(0,0,0,.35));animation:roomReactionPop .28s ease-out}
+@keyframes roomReactionPop{from{transform:translateY(8px) scale(.7);opacity:0}to{transform:translateY(0) scale(1);opacity:1}}
+
+.room-v2-host-tools{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #e5e9f0}
+.room-v2-host-tools button{border:0;border-radius:8px;padding:8px 10px;background:#eef2ff;color:#3156eb;font-size:11px;font-weight:700;cursor:pointer}
+.room-v2-host-tools button:hover{background:#dfe7ff}
+.room-v2-lobby-section{margin-bottom:14px;padding:10px;border-radius:10px;background:#fff7ed;border:1px solid #fed7aa}
+.room-v2-lobby-section>strong{display:block;margin-bottom:8px;font-size:12px;color:#9a3412}
+.room-v2-lobby-row{grid-template-columns:38px minmax(0,1fr) auto!important}
+.room-v2-lobby-actions{display:flex;gap:5px}
+.room-v2-lobby-actions button{border:0;border-radius:7px;padding:7px 8px;background:#2563eb;color:#fff;font-size:10px;cursor:pointer}
+.room-v2-lobby-actions button.danger{background:#b91c1c}

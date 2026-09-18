@@ -37,6 +37,7 @@ export interface MeetingSettings {
   linkSharing?: boolean;
   externalAccess?: boolean;
   isPublic?: boolean;
+  locked?: boolean;
   visibility?: string;
 }
 
@@ -268,6 +269,17 @@ export const meetingService = {
     return response.json();
   },
 
+  async setMeetingLocked(meetingId: number, locked: boolean): Promise<{ success: boolean; locked: boolean; meeting?: Meeting }> {
+    const response = await fetch(apiUrl(`/api/meetings/${meetingId}/lock`), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ locked }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Impossible de modifier le verrouillage de la réunion');
+    return data;
+  },
+
   async startMeetingAndNotify(meetingId: number): Promise<{ success: boolean; notifiedCount: number; meeting?: Meeting }> {
     const response = await fetch(apiUrl(`/api/meetings/${meetingId}/start-notify`), {
       method: 'POST',
@@ -289,6 +301,16 @@ export const meetingService = {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.error || 'Suppression de réunion impossible');
     }
+  },
+
+  async admitAllLobby(meetingId: number): Promise<{ success: boolean; admitted: number; userIds: number[] }> {
+    const response = await fetch(apiUrl(`/api/meetings/${meetingId}/lobby/admit-all`), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Admission de la salle d’attente impossible');
+    return data;
   },
 
   async respondToLobby(meetingId: number, userId: number, status: 'accepted' | 'rejected'): Promise<void> {

@@ -34,6 +34,9 @@ export const collaborationService = {
   async getParticipants(meetingId:number) {
     return readJson<MeetingParticipant[]>(await fetch(apiUrl(`/api/meetings/${meetingId}/participants`),{headers:getAuthHeaders()}));
   },
+  async muteAllParticipants(meetingId:number) {
+    return readJson<{success:boolean;muted:number;userIds:number[]}>(await fetch(apiUrl(`/api/meetings/${meetingId}/participants/mute-all`),{method:'POST',headers:getAuthHeaders()}));
+  },
   async updateParticipant(meetingId:number,userId:number,patch:{role?:'cohost'|'participant';mutedByHost?:boolean;cameraDisabledByHost?:boolean}) {
     return readJson<any>(await fetch(apiUrl(`/api/meetings/${meetingId}/participants/${userId}`),{method:'PATCH',headers:getAuthHeaders(),body:JSON.stringify(patch)}));
   },

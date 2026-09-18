@@ -53,6 +53,17 @@ const meetingRole = (meeting: Meeting, user: NonNullable<AuthedRequest['user']>)
   return 'participant';
 };
 
+const meetingCapacity = (meeting: Meeting) => {
+  const configured = Number(meeting.settings.participantCapacity || 100);
+  if (!Number.isFinite(configured)) return 100;
+  return Math.max(2, Math.min(1000, Math.floor(configured)));
+};
+
+const acceptedMemberCount = async (meetingId: number) => {
+  const result = await query(`SELECT COUNT(*)::int AS count FROM room_meeting_members WHERE meeting_id=$1 AND status='accepted'`, [meetingId]);
+  return Number(result.rows[0]?.count || 0);
+};
+
 const normalizeInvitationEmails = (value: unknown) => Array.isArray(value)
   ? [...new Set(value.map(normalizeEmail).filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))].slice(0, 200)
   : [];
@@ -99,6 +110,7 @@ const defaultSettings = (): MeetingSettings => ({
   linkSharing: true,
   externalAccess: true,
   joinBeforeHost: false,
+  locked: false,
 });
 
 const buildSettings = (body: any, existing?: Meeting) => {
@@ -328,7 +340,22 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       if (!validateMeetingPassword(meeting, request.body?.password)) return sendApiError(response, 403, 'MEETING_PASSWORD_INVALID', 'Mot de passe de réunion incorrect.');
       const ban = await query('SELECT 1 FROM room_meeting_bans WHERE meeting_id=$1 AND user_id=$2 LIMIT 1', [meeting.id, request.user!.id]);
       if (ban.rows[0]) return sendApiError(response, 403, 'MEETING_BANNED', 'Vous avez été exclu de cette réunion.');
-      const status = canModerateMeeting(meeting, request.user!) || meeting.settings.waitingRoom === false ? 'accepted' : 'requested';
+      const existingMember = await query(
+        `SELECT status FROM room_meeting_members WHERE meeting_id=$1 AND user_id=$2 LIMIT 1`,
+        [meeting.id, request.user!.id],
+      );
+      const alreadyAccepted = existingMember.rows[0]?.status === 'accepted';
+      if (meeting.settings.locked === true && !canModerateMeeting(meeting, request.user!) && !alreadyAccepted) {
+        return sendApiError(response, 423, 'MEETING_LOCKED', 'La réunion est verrouillée par l’hôte.');
+      }
+      const moderator = canModerateMeeting(meeting, request.user!);
+      const hostHasStarted = meeting.is_active || meeting.status === 'live';
+      const blockedUntilHost = !moderator && !alreadyAccepted && !hostHasStarted && meeting.settings.joinBeforeHost === false;
+      const status = moderator || alreadyAccepted || (!blockedUntilHost && meeting.settings.waitingRoom === false) ? 'accepted' : 'requested';
+      if (status === 'accepted' && !alreadyAccepted && !moderator) {
+        const count = await acceptedMemberCount(meeting.id);
+        if (count >= meetingCapacity(meeting)) return sendApiError(response, 409, 'MEETING_CAPACITY_REACHED', 'La capacité maximale de la réunion est atteinte.');
+      }
       await query(
         `INSERT INTO room_lobby (meeting_id,user_id,status,name,avatar) VALUES ($1,$2,$3,$4,$5)
          ON CONFLICT (meeting_id,user_id) DO UPDATE SET status=excluded.status,name=excluded.name,avatar=excluded.avatar`,
@@ -355,6 +382,10 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const updated = await query('UPDATE room_lobby SET status=$3 WHERE meeting_id=$1 AND user_id=$2 RETURNING *', [meeting.id, userId, status]);
       if (!updated.rows[0]) return sendApiError(response, 404, 'PARTICIPANT_NOT_FOUND', 'Participant introuvable dans la salle d’attente.');
       if (status === 'accepted') {
+        const existingAccepted = await query(`SELECT 1 FROM room_meeting_members WHERE meeting_id=$1 AND user_id=$2 AND status='accepted' LIMIT 1`, [meeting.id, userId]);
+        if (!existingAccepted.rows[0] && await acceptedMemberCount(meeting.id) >= meetingCapacity(meeting)) {
+          return sendApiError(response, 409, 'MEETING_CAPACITY_REACHED', 'La capacité maximale de la réunion est atteinte.');
+        }
         await query(
           `INSERT INTO room_meeting_members (meeting_id,user_id,role,status,joined_at) VALUES ($1,$2,'participant','accepted',now())
            ON CONFLICT (meeting_id,user_id) DO UPDATE SET status='accepted',joined_at=COALESCE(room_meeting_members.joined_at,now()),updated_at=now()`, [meeting.id,userId],
@@ -366,12 +397,70 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     } catch (error) { next(error); }
   });
 
+  app.post('/api/meetings/:meetingId/lobby/admit-all', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const meeting = await getMeetingById(Number(request.params.meetingId));
+      if (!meeting || !canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'LOBBY_HOST_REQUIRED', 'Seul l’hôte ou le co-hôte peut gérer la salle d’attente.');
+      const pending = await query(`SELECT user_id FROM room_lobby WHERE meeting_id=$1 AND status='requested' ORDER BY user_id`, [meeting.id]);
+      const currentCount = await acceptedMemberCount(meeting.id);
+      const availableSlots = Math.max(0, meetingCapacity(meeting) - currentCount);
+      const userIds = pending.rows.map((row) => Number(row.user_id)).filter(Boolean).slice(0, availableSlots);
+      if (userIds.length) {
+        await query(`UPDATE room_lobby SET status='accepted' WHERE meeting_id=$1 AND user_id = ANY($2::int[])`, [meeting.id, userIds]);
+        for (const userId of userIds) {
+          await query(
+            `INSERT INTO room_meeting_members (meeting_id,user_id,role,status,joined_at) VALUES ($1,$2,'participant','accepted',now())
+             ON CONFLICT (meeting_id,user_id) DO UPDATE SET status='accepted',joined_at=COALESCE(room_meeting_members.joined_at,now()),updated_at=now()`,
+            [meeting.id, userId],
+          );
+          io.to(`user:${userId}`).emit('meeting:lobby-status', { meetingId: meeting.id, status: 'accepted' });
+        }
+        io.to(`meeting:${meeting.id}`).emit('meeting:lobby-updated', { meetingId: meeting.id, admitAll: true, userIds });
+      }
+      response.json({ success: true, admitted: userIds.length, userIds });
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/meetings/:meetingId/lock', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const meeting = await getMeetingById(Number(request.params.meetingId));
+      if (!meeting || !canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Action réservée à l’hôte ou au co-hôte.');
+      const locked = Boolean(request.body?.locked);
+      const settings = { ...meeting.settings, locked };
+      const updated = await query(
+        `UPDATE room_meetings SET settings=$2::jsonb,updated_at=now() WHERE id=$1 RETURNING *`,
+        [meeting.id, JSON.stringify(settings)],
+      );
+      const value = publicMeeting(updated.rows[0]);
+      io.to(`meeting:${meeting.id}`).emit('meeting:locked', { meetingId: meeting.id, locked });
+      response.json({ success: true, locked, meeting: value });
+    } catch (error) { next(error); }
+  });
+
   app.post('/api/meetings/:meetingId/start-notify', ...protectedApi, async (request: AuthedRequest, response, next) => {
     try {
       const meeting = await getMeetingById(Number(request.params.meetingId));
       if (!meeting) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
       if (!canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte peut démarrer la réunion.');
       const updated = await query(`UPDATE room_meetings SET status='live',is_active=true,started_at=COALESCE(started_at,now()),ended_at=NULL,updated_at=now() WHERE id=$1 RETURNING *`, [meeting.id]);
+      if (meeting.settings.waitingRoom === false) {
+        const pending = await query(`SELECT user_id FROM room_lobby WHERE meeting_id=$1 AND status='requested' ORDER BY user_id`, [meeting.id]);
+        const currentCount = await acceptedMemberCount(meeting.id);
+        const availableSlots = Math.max(0, meetingCapacity(meeting) - currentCount);
+        const autoAdmitIds = pending.rows.map((row) => Number(row.user_id)).filter(Boolean).slice(0, availableSlots);
+        if (autoAdmitIds.length) {
+          await query(`UPDATE room_lobby SET status='accepted' WHERE meeting_id=$1 AND user_id = ANY($2::int[])`, [meeting.id, autoAdmitIds]);
+          for (const userId of autoAdmitIds) {
+            await query(
+              `INSERT INTO room_meeting_members (meeting_id,user_id,role,status,joined_at) VALUES ($1,$2,'participant','accepted',now())
+               ON CONFLICT (meeting_id,user_id) DO UPDATE SET status='accepted',joined_at=COALESCE(room_meeting_members.joined_at,now()),updated_at=now()`,
+              [meeting.id, userId],
+            );
+            io.to(`user:${userId}`).emit('meeting:lobby-status', { meetingId: meeting.id, status: 'accepted' });
+          }
+          io.to(`meeting:${meeting.id}`).emit('meeting:lobby-updated', { meetingId: meeting.id, autoAdmitted: true });
+        }
+      }
       const members = await query(`SELECT COUNT(*)::int AS count FROM room_meeting_members WHERE meeting_id=$1 AND user_id<>$2`, [meeting.id, request.user!.id]);
       const value = publicMeeting(updated.rows[0]);
       io.emit('meeting:started', value);
@@ -400,6 +489,26 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
            FROM room_meeting_members m JOIN room_users u ON u.id=m.user_id WHERE m.meeting_id=$1 ORDER BY m.role,u.name`, [meetingId],
       );
       response.json(result.rows.map((row) => ({ userId:Number(row.user_id),role:row.role,status:row.status,mutedByHost:row.muted_by_host,cameraDisabledByHost:row.camera_disabled_by_host,joinedAt:row.joined_at,leftAt:row.left_at,name:row.name,username:row.username,email:row.email,avatar:row.avatar,isGuest:row.is_guest })));
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/meetings/:meetingId/participants/mute-all', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const meeting = await getMeetingById(Number(request.params.meetingId));
+      if (!meeting || !canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Action réservée à l’hôte ou au co-hôte.');
+      const updated = await query(
+        `UPDATE room_meeting_members
+            SET muted_by_host=true, updated_at=now()
+          WHERE meeting_id=$1 AND user_id<>$2 AND status='accepted'
+          RETURNING user_id`,
+        [meeting.id, meeting.host_id],
+      );
+      const userIds = updated.rows.map((row) => Number(row.user_id));
+      for (const userId of userIds) {
+        io.to(`user:${userId}`).emit('meeting:moderation', { meetingId: meeting.id, mutedByHost: true });
+      }
+      io.to(`meeting:${meeting.id}`).emit('meeting:participants-muted', { meetingId: meeting.id, userIds });
+      response.json({ success: true, muted: userIds.length, userIds });
     } catch (error) { next(error); }
   });
 

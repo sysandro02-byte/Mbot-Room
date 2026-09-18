@@ -13,6 +13,8 @@ import {
   MonitorUp,
   MoreVertical,
   PhoneOff,
+  Pin,
+  PinOff,
   Radio,
   Send,
   Settings2,
@@ -34,7 +36,7 @@ import {
   MeetingParticipant,
   MeetingPoll,
 } from '../services/collaborationService';
-import { getMeetingAccessCode, Meeting, meetingService } from '../services/meetingService';
+import { getMeetingAccessCode, LobbyParticipant, Meeting, meetingService } from '../services/meetingService';
 import './MeetingRoomV2.css';
 
 type Panel = 'participants' | 'chat' | 'polls' | 'luna' | null;
@@ -54,6 +56,11 @@ type VideoTileProps = {
   badge?: string;
   local?: boolean;
   audioOutputId?: string;
+  activeSpeaker?: boolean;
+  pinned?: boolean;
+  handRaised?: boolean;
+  reaction?: string;
+  onPin?: () => void;
 };
 
 const initials = (value: string) => String(value || 'MB')
@@ -64,7 +71,7 @@ const initials = (value: string) => String(value || 'MB')
   .slice(0, 2)
   .toUpperCase();
 
-function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, local, audioOutputId }: VideoTileProps) {
+function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, local, audioOutputId, activeSpeaker, pinned, handRaised, reaction, onPin }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -78,7 +85,7 @@ function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, l
   }, [audioOutputId, local, stream, videoEnabled]);
 
   return (
-    <article className={`room-v2-tile ${screen ? 'is-screen' : ''}`}>
+    <article className={`room-v2-tile ${screen ? 'is-screen' : ''} ${activeSpeaker ? 'is-speaking' : ''} ${pinned ? 'is-pinned' : ''}`} data-speaking={activeSpeaker ? 'true' : 'false'}>
       {stream && videoEnabled !== false ? (
         <video ref={videoRef} autoPlay playsInline muted={Boolean(local)} />
       ) : (
@@ -89,8 +96,23 @@ function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, l
       <div className="room-v2-tile-meta">
         <span>{name}{local ? ' (vous)' : ''}</span>
         {badge ? <small>{badge}</small> : null}
+        {activeSpeaker ? <small className="speaker-badge">Parle</small> : null}
+        {handRaised ? <small className="hand-badge" aria-label="Main levée"><Hand size={13}/> Main</small> : null}
         {muted ? <MicOff size={15} aria-label="Micro coupé" /> : <Mic size={15} aria-label="Micro actif" />}
       </div>
+      {reaction ? <div className="room-v2-reaction-bubble" aria-label={`Réaction ${reaction}`}>{reaction}</div> : null}
+      {!local && onPin ? (
+        <button
+          type="button"
+          className="room-v2-pin"
+          data-testid={pinned ? 'unpin-participant' : 'pin-participant'}
+          onClick={onPin}
+          aria-label={pinned ? `Désépingler ${name}` : `Épingler ${name}`}
+          title={pinned ? 'Désépingler' : 'Épingler'}
+        >
+          {pinned ? <PinOff size={15}/> : <Pin size={15}/>}
+        </button>
+      ) : null}
     </article>
   );
 }
@@ -133,12 +155,19 @@ export default function MeetingRoomV2() {
   const [selectedAudioInputId, setSelectedAudioInputId] = useState('');
   const [selectedVideoInputId, setSelectedVideoInputId] = useState('');
   const [selectedAudioOutputId, setSelectedAudioOutputId] = useState('');
+  const [viewMode, setViewMode] = useState<'gallery' | 'speaker'>('gallery');
+  const [pinnedSocketId, setPinnedSocketId] = useState<string | null>(null);
   const [micEnabled, setMicEnabled] = useState(initialMic);
   const [cameraEnabled, setCameraEnabled] = useState(initialCamera);
   const [screenSharing, setScreenSharing] = useState(false);
   const [recording, setRecording] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
+  const [raisedHands, setRaisedHands] = useState<Set<number>>(new Set());
+  const [reactions, setReactions] = useState<Record<number, string>>({});
+  const reactionTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const [reactionPanelOpen, setReactionPanelOpen] = useState(false);
   const [participants, setParticipants] = useState<MeetingParticipant[]>([]);
+  const [lobbyParticipants, setLobbyParticipants] = useState<LobbyParticipant[]>([]);
   const [messages, setMessages] = useState<MeetingMessage[]>([]);
   const [messageDraft, setMessageDraft] = useState('');
   const [polls, setPolls] = useState<MeetingPoll[]>([]);
@@ -177,7 +206,7 @@ export default function MeetingRoomV2() {
     screen: screenSharing,
   }), [cameraEnabled, localStream, micEnabled, screenSharing]);
 
-  const { remoteParticipants, networkQuality } = useMeetingMeshWebRTC({
+  const { remoteParticipants, networkQuality, activeSpeakerSocketId } = useMeetingMeshWebRTC({
     meetingId: meeting?.id || 0,
     localUserId,
     localName,
@@ -227,19 +256,21 @@ export default function MeetingRoomV2() {
     if (!meeting?.id) return;
     let cancelled = false;
     const load = async () => {
-      const [memberRows, chatRows, pollRows] = await Promise.all([
+      const [memberRows, chatRows, pollRows, lobbyRows] = await Promise.all([
         collaborationService.getParticipants(meeting.id).catch(() => []),
         collaborationService.getMessages(meeting.id).catch(() => []),
         collaborationService.getPolls(meeting.id).catch(() => []),
+        isModerator ? meetingService.getLobby(meeting.id).catch(() => []) : Promise.resolve([]),
       ]);
       if (cancelled) return;
       setParticipants(memberRows);
       setMessages(dedupeMessages(chatRows));
       setPolls(pollRows);
+      setLobbyParticipants(lobbyRows.filter((item) => item.status === 'requested'));
     };
     void load();
     return () => { cancelled = true; };
-  }, [meeting?.id]);
+  }, [isModerator, meeting?.id]);
 
   useEffect(() => {
     setMediaReady(false);
@@ -252,7 +283,12 @@ export default function MeetingRoomV2() {
     const openMedia = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            channelCount: { ideal: 1 },
+          },
           video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } },
         });
         if (cancelled) {
@@ -294,6 +330,12 @@ export default function MeetingRoomV2() {
     setParticipants(await collaborationService.getParticipants(meeting.id).catch(() => []));
   }, [meeting?.id]);
 
+  const refreshLobby = useCallback(async () => {
+    if (!meeting?.id || !isModerator) return;
+    const rows = await meetingService.getLobby(meeting.id).catch(() => []);
+    setLobbyParticipants(rows.filter((item) => item.status === 'requested'));
+  }, [isModerator, meeting?.id]);
+
   useEffect(() => {
     if (!meeting?.id) return;
     const id = meeting.id;
@@ -301,7 +343,37 @@ export default function MeetingRoomV2() {
     const onChatDeleted = ({ messageId }: { messageId: string }) => setMessages((current) => current.filter((message) => message.id !== messageId));
     const onPoll = (poll: MeetingPoll) => setPolls((current) => [poll, ...current.filter((item) => item.id !== poll.id)]);
     const onPresence = () => void refreshParticipants();
-    const onLobby = () => void refreshParticipants();
+    const onLobby = () => { void refreshParticipants(); void refreshLobby(); };
+    const onHandRaised = (payload: { meetingId: number; userId: number; raised: boolean }) => {
+      if (Number(payload.meetingId) !== id) return;
+      setRaisedHands((current) => {
+        const next = new Set(current);
+        if (payload.raised) next.add(Number(payload.userId));
+        else next.delete(Number(payload.userId));
+        return next;
+      });
+    };
+    const onReaction = (payload: { meetingId: number; userId: number; reaction: string }) => {
+      if (Number(payload.meetingId) !== id || !payload.reaction) return;
+      const userId = Number(payload.userId);
+      setReactions((current) => ({ ...current, [userId]: payload.reaction }));
+      const previous = reactionTimersRef.current.get(userId);
+      if (previous) clearTimeout(previous);
+      const timer = setTimeout(() => {
+        setReactions((current) => {
+          const next = { ...current };
+          delete next[userId];
+          return next;
+        });
+        reactionTimersRef.current.delete(userId);
+      }, 4000);
+      reactionTimersRef.current.set(userId, timer);
+    };
+    const onLocked = (payload: { meetingId: number; locked: boolean }) => {
+      if (Number(payload.meetingId) !== id) return;
+      setMeeting((current) => current ? { ...current, settings: { ...(current.settings || {}), locked: Boolean(payload.locked) } } : current);
+      setNotice(payload.locked ? 'La réunion a été verrouillée par l’hôte.' : 'La réunion a été déverrouillée.');
+    };
     const onModeration = (payload: { meetingId:number; mutedByHost?:boolean; cameraDisabledByHost?:boolean; role?:string }) => {
       if (Number(payload.meetingId) !== id) return;
       if (payload.mutedByHost === true) {
@@ -332,6 +404,9 @@ export default function MeetingRoomV2() {
     socket.on('meeting:poll-updated', onPoll);
     socket.on('meeting:presence', onPresence);
     socket.on('meeting:lobby-updated', onLobby);
+    socket.on('meeting:hand-raised', onHandRaised);
+    socket.on('meeting:reaction', onReaction);
+    socket.on('meeting:locked', onLocked);
     socket.on('meeting:moderation', onModeration);
     socket.on('meeting:ended', onEnded);
     socket.on('meeting:removed', onRemoved);
@@ -343,13 +418,18 @@ export default function MeetingRoomV2() {
       socket.off('meeting:poll-updated', onPoll);
       socket.off('meeting:presence', onPresence);
       socket.off('meeting:lobby-updated', onLobby);
+      socket.off('meeting:hand-raised', onHandRaised);
+      socket.off('meeting:reaction', onReaction);
+      socket.off('meeting:locked', onLocked);
       socket.off('meeting:moderation', onModeration);
+      reactionTimersRef.current.forEach((timer) => clearTimeout(timer));
+      reactionTimersRef.current.clear();
       socket.off('meeting:ended', onEnded);
       socket.off('meeting:removed', onRemoved);
       socket.off('meeting:banned', onBanned);
       socket.off('meeting:moved-to-lobby', onMoved);
     };
-  }, [location.state, meeting?.id, navigate, refreshParticipants]);
+  }, [location.state, meeting?.id, navigate, refreshLobby, refreshParticipants]);
 
   const toggleMic = () => {
     const next = !micEnabled;
@@ -368,7 +448,7 @@ export default function MeetingRoomV2() {
     if (!deviceId || !navigator.mediaDevices?.getUserMedia) return;
     try {
       const fresh = await navigator.mediaDevices.getUserMedia(kind === 'audioinput'
-        ? { audio: { deviceId: { exact: deviceId } }, video: false }
+        ? { audio: { deviceId: { exact: deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: { ideal: 1 } }, video: false }
         : { audio: false, video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } } });
       const nextTrack = kind === 'audioinput' ? fresh.getAudioTracks()[0] : fresh.getVideoTracks()[0];
       if (!nextTrack) throw new Error('Périphérique sans piste média.');
@@ -516,6 +596,39 @@ export default function MeetingRoomV2() {
     }
   };
 
+  const respondToLobby = async (userId: number, status: 'accepted' | 'rejected') => {
+    if (!meeting?.id) return;
+    try {
+      await meetingService.respondToLobby(meeting.id, userId, status);
+      await Promise.all([refreshLobby(), refreshParticipants()]);
+      setNotice(status === 'accepted' ? 'Participant admis.' : 'Demande refusée.');
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Action salle d’attente impossible.');
+    }
+  };
+
+  const admitAllLobby = async () => {
+    if (!meeting?.id) return;
+    try {
+      const result = await meetingService.admitAllLobby(meeting.id);
+      await Promise.all([refreshLobby(), refreshParticipants()]);
+      setNotice(`${result.admitted} participant${result.admitted > 1 ? 's' : ''} admis.`);
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Admission globale impossible.');
+    }
+  };
+
+  const muteAllParticipants = async () => {
+    if (!meeting?.id) return;
+    try {
+      const result = await collaborationService.muteAllParticipants(meeting.id);
+      await refreshParticipants();
+      setNotice(`${result.muted} participant${result.muted > 1 ? 's' : ''} mis en sourdine.`);
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Impossible de couper tous les micros.');
+    }
+  };
+
   const moderateParticipant = async (userId: number, action: 'mute' | 'camera' | 'remove' | 'ban' | 'lobby' | 'cohost') => {
     if (!meeting?.id) return;
     setMenuUserId(null);
@@ -529,6 +642,19 @@ export default function MeetingRoomV2() {
       await refreshParticipants();
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : 'Action de modération impossible.');
+    }
+  };
+
+  const toggleMeetingLock = async () => {
+    if (!meeting?.id || !isModerator) return;
+    const next = !Boolean(meeting.settings?.locked);
+    try {
+      const result = await meetingService.setMeetingLocked(meeting.id, next);
+      if (result.meeting) setMeeting(result.meeting);
+      else setMeeting((current) => current ? { ...current, settings: { ...(current.settings || {}), locked: result.locked } } : current);
+      setNotice(result.locked ? 'Réunion verrouillée.' : 'Réunion déverrouillée.');
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Impossible de modifier le verrouillage.');
     }
   };
 
@@ -571,6 +697,9 @@ export default function MeetingRoomV2() {
   const remoteByUser = new Map(remoteParticipants.map((participant) => [Number(participant.userId), participant]));
   const activeMembers = participants.filter((participant) => participant.status === 'accepted');
   const galleryCount = 1 + remoteParticipants.length;
+  const featuredSocketId = pinnedSocketId || activeSpeakerSocketId || remoteParticipants[0]?.socketId || null;
+  const featuredParticipant = featuredSocketId ? remoteParticipants.find((participant) => participant.socketId === featuredSocketId) || null : null;
+  const speakerViewEnabled = viewMode === 'speaker' && Boolean(featuredParticipant);
 
   return (
     <main className="room-v2-shell">
@@ -593,38 +722,102 @@ export default function MeetingRoomV2() {
             {networkQuality.rttMs !== null ? <small>{networkQuality.rttMs} ms</small> : null}
           </span>
         </div>
-        {isModerator && !meeting.is_active ? <button className="room-v2-start" type="button" onClick={startMeeting}>Démarrer</button> : null}
+        <div className="room-v2-header-actions">
+          <div className="room-v2-view-switch" role="group" aria-label="Mode d’affichage">
+            <button type="button" className={viewMode === 'gallery' ? 'active' : ''} onClick={() => setViewMode('gallery')} data-testid="gallery-view-button">Galerie</button>
+            <button type="button" className={viewMode === 'speaker' ? 'active' : ''} onClick={() => setViewMode('speaker')} data-testid="speaker-view-button">Intervenant</button>
+          </div>
+          {isModerator && !meeting.is_active ? <button className="room-v2-start" type="button" onClick={startMeeting}>Démarrer</button> : null}
+        </div>
       </header>
 
       {notice ? <div className="room-v2-notice" role="status"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Fermer"><X size={16}/></button></div> : null}
 
       <section className="room-v2-body">
-        <div className="room-v2-stage">
-          <div className={`room-v2-gallery count-${Math.min(galleryCount, 9)}`}>
-            <VideoTile
-              name={localName}
-              stream={localStream}
-              avatar={currentUser?.avatar}
-              muted={!mediaState.audio}
-              videoEnabled={screenSharing || mediaState.video}
-              screen={screenSharing}
-              badge={isModerator ? 'Hôte' : currentUser?.isGuest ? 'Invité' : undefined}
-              local
-            />
-            {remoteParticipants.map((participant) => (
+        <div className={`room-v2-stage ${speakerViewEnabled ? 'speaker-mode' : ''}`}>
+          {speakerViewEnabled && featuredParticipant ? (
+            <div className="room-v2-speaker-layout" data-testid="speaker-layout">
+              <div className="room-v2-speaker-main">
+                <VideoTile
+                  name={featuredParticipant.name}
+                  stream={featuredParticipant.stream}
+                  avatar={featuredParticipant.avatar}
+                  muted={!featuredParticipant.media.audio}
+                  videoEnabled={featuredParticipant.media.video || featuredParticipant.media.screen}
+                  screen={featuredParticipant.media.screen}
+                  badge={activeMembers.find((member) => member.userId === Number(featuredParticipant.userId))?.role === 'cohost' ? 'Co-hôte' : undefined}
+                  audioOutputId={selectedAudioOutputId}
+                  activeSpeaker={activeSpeakerSocketId === featuredParticipant.socketId}
+                  pinned={pinnedSocketId === featuredParticipant.socketId}
+                  handRaised={raisedHands.has(Number(featuredParticipant.userId))}
+                  reaction={reactions[Number(featuredParticipant.userId)]}
+                  onPin={() => setPinnedSocketId((current) => current === featuredParticipant.socketId ? null : featuredParticipant.socketId)}
+                />
+              </div>
+              <div className="room-v2-speaker-strip">
+                <VideoTile
+                  name={localName}
+                  stream={localStream}
+                  avatar={currentUser?.avatar}
+                  muted={!mediaState.audio}
+                  videoEnabled={screenSharing || mediaState.video}
+                  screen={screenSharing}
+                  badge={isModerator ? 'Hôte' : currentUser?.isGuest ? 'Invité' : undefined}
+                  reaction={reactions[Number(currentUser?.id || 0)]}
+                  local
+                />
+                {remoteParticipants.filter((participant) => participant.socketId !== featuredParticipant.socketId).map((participant) => (
+                  <VideoTile
+                    key={participant.socketId}
+                    name={participant.name}
+                    stream={participant.stream}
+                    avatar={participant.avatar}
+                    muted={!participant.media.audio}
+                    videoEnabled={participant.media.video || participant.media.screen}
+                    screen={participant.media.screen}
+                    badge={activeMembers.find((member) => member.userId === Number(participant.userId))?.role === 'cohost' ? 'Co-hôte' : undefined}
+                    audioOutputId={selectedAudioOutputId}
+                    activeSpeaker={activeSpeakerSocketId === participant.socketId}
+                    pinned={pinnedSocketId === participant.socketId}
+                    handRaised={raisedHands.has(Number(participant.userId))}
+                    reaction={reactions[Number(participant.userId)]}
+                    onPin={() => setPinnedSocketId((current) => current === participant.socketId ? null : participant.socketId)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className={`room-v2-gallery count-${Math.min(galleryCount, 9)}`} data-testid="gallery-layout">
               <VideoTile
-                key={participant.socketId}
-                name={participant.name}
-                stream={participant.stream}
-                avatar={participant.avatar}
-                muted={!participant.media.audio}
-                videoEnabled={participant.media.video || participant.media.screen}
-                screen={participant.media.screen}
-                badge={activeMembers.find((member) => member.userId === Number(participant.userId))?.role === 'cohost' ? 'Co-hôte' : undefined}
-                audioOutputId={selectedAudioOutputId}
+                name={localName}
+                stream={localStream}
+                avatar={currentUser?.avatar}
+                muted={!mediaState.audio}
+                videoEnabled={screenSharing || mediaState.video}
+                screen={screenSharing}
+                badge={isModerator ? 'Hôte' : currentUser?.isGuest ? 'Invité' : undefined}
+                local
               />
-            ))}
-          </div>
+              {remoteParticipants.map((participant) => (
+                <VideoTile
+                  key={participant.socketId}
+                  name={participant.name}
+                  stream={participant.stream}
+                  avatar={participant.avatar}
+                  muted={!participant.media.audio}
+                  videoEnabled={participant.media.video || participant.media.screen}
+                  screen={participant.media.screen}
+                  badge={activeMembers.find((member) => member.userId === Number(participant.userId))?.role === 'cohost' ? 'Co-hôte' : undefined}
+                  audioOutputId={selectedAudioOutputId}
+                  activeSpeaker={activeSpeakerSocketId === participant.socketId}
+                  pinned={pinnedSocketId === participant.socketId}
+                  handRaised={raisedHands.has(Number(participant.userId))}
+                  reaction={reactions[Number(participant.userId)]}
+                  onPin={() => setPinnedSocketId((current) => current === participant.socketId ? null : participant.socketId)}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {panel ? (
@@ -636,13 +829,34 @@ export default function MeetingRoomV2() {
 
             {panel === 'participants' ? (
               <div className="room-v2-participants">
+                {isModerator ? (
+                  <div className="room-v2-host-tools">
+                    <button type="button" onClick={() => void muteAllParticipants()} data-testid="mute-all-button">Couper tous les micros</button>
+                    {lobbyParticipants.length ? <button type="button" onClick={() => void admitAllLobby()} data-testid="admit-all-button">Admettre tous ({lobbyParticipants.length})</button> : null}
+                  </div>
+                ) : null}
+                {isModerator && lobbyParticipants.length ? (
+                  <section className="room-v2-lobby-section">
+                    <strong>Salle d’attente</strong>
+                    {lobbyParticipants.map((item) => (
+                      <article key={item.user_id} className="room-v2-lobby-row">
+                        <div className="room-v2-person-avatar">{item.avatar ? <img src={item.avatar} alt=""/> : initials(item.name)}</div>
+                        <div><strong>{item.name}</strong><small>En attente</small></div>
+                        <div className="room-v2-lobby-actions">
+                          <button type="button" onClick={() => void respondToLobby(item.user_id, 'accepted')}>Admettre</button>
+                          <button type="button" className="danger" onClick={() => void respondToLobby(item.user_id, 'rejected')}>Refuser</button>
+                        </div>
+                      </article>
+                    ))}
+                  </section>
+                ) : null}
                 {activeMembers.map((member) => {
                   const remote = remoteByUser.get(member.userId);
                   const isSelf = member.userId === Number(currentUser?.id || 0);
                   return (
                     <article key={member.userId}>
                       <div className="room-v2-person-avatar">{member.avatar ? <img src={member.avatar} alt=""/> : initials(member.name)}</div>
-                      <div><strong>{member.name}{isSelf ? ' (vous)' : ''}</strong><small>{member.role === 'host' ? 'Hôte' : member.role === 'cohost' ? 'Co-hôte' : member.isGuest ? 'Invité' : 'Participant'}{remote || isSelf ? ' · En ligne' : ''}</small></div>
+                      <div><strong>{member.name}{isSelf ? ' (vous)' : ''}{raisedHands.has(member.userId) || (isSelf && handRaised) ? <span className="room-v2-raised-inline"> · ✋</span> : null}</strong><small>{member.role === 'host' ? 'Hôte' : member.role === 'cohost' ? 'Co-hôte' : member.isGuest ? 'Invité' : 'Participant'}{remote || isSelf ? ' · En ligne' : ''}</small></div>
                       {isModerator && !isSelf && member.role !== 'host' ? (
                         <div className="room-v2-person-menu-wrap">
                           <button type="button" onClick={() => setMenuUserId(menuUserId === member.userId ? null : member.userId)}><MoreVertical size={18}/></button>
@@ -723,11 +937,22 @@ export default function MeetingRoomV2() {
         <Control active={micEnabled} label={micEnabled ? 'Micro' : 'Micro coupé'} onClick={toggleMic}>{micEnabled ? <Mic/> : <MicOff/>}</Control>
         <Control active={cameraEnabled} label={cameraEnabled ? 'Caméra' : 'Caméra coupée'} onClick={toggleCamera}>{cameraEnabled ? <Camera/> : <CameraOff/>}</Control>
         <Control active={screenSharing} label="Partager" onClick={() => void toggleScreenShare()}><MonitorUp/></Control>
-        <Control active={handRaised} label="Main" onClick={() => { const raised = !handRaised; setHandRaised(raised); socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised}); }}><Hand/></Control>
+        <Control active={handRaised} label={handRaised ? 'Baisser la main' : 'Main'} onClick={() => { const raised = !handRaised; setHandRaised(raised); setRaisedHands((current) => { const next = new Set(current); if (raised) next.add(Number(currentUser?.id || 0)); else next.delete(Number(currentUser?.id || 0)); return next; }); socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised}); }}><Hand/></Control>
+        <div className="room-v2-reaction-wrap">
+          <Control active={reactionPanelOpen} label="Réactions" testId="reaction-button" onClick={() => setReactionPanelOpen((current) => !current)}>😊</Control>
+          {reactionPanelOpen ? (
+            <div className="room-v2-reaction-panel" data-testid="reaction-panel">
+              {['👍','👏','❤️','🎉','😂'].map((reaction) => (
+                <button key={reaction} type="button" onClick={() => { setReactionPanelOpen(false); socket.emit('meeting:reaction',{meetingId:meeting.id,reaction}); }}>{reaction}</button>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <Control active={panel === 'participants'} label="Participants" onClick={() => setPanel(panel === 'participants' ? null : 'participants')}><UsersRound/></Control>
         <Control active={panel === 'chat'} label="Discussion" onClick={() => setPanel(panel === 'chat' ? null : 'chat')}><MessageCircle/></Control>
         <Control active={panel === 'polls'} label="Sondages" onClick={() => setPanel(panel === 'polls' ? null : 'polls')}><Vote/></Control>
         <Control active={panel === 'luna'} label="Luna" onClick={() => setPanel(panel === 'luna' ? null : 'luna')}><Bot/></Control>
+        {isModerator ? <Control active={Boolean(meeting.settings?.locked)} label={meeting.settings?.locked ? 'Déverrouiller' : 'Verrouiller'} testId="meeting-lock-button" onClick={() => void toggleMeetingLock()}><ShieldCheck/></Control> : null}
         <div className="room-v2-device-wrap">
           <Control
             active={devicePanelOpen}

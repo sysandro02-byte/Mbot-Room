@@ -92,11 +92,14 @@ export function useMeetingMeshWebRTC({
     connectedPeers: 0,
     totalPeers: 0,
   });
+  const [activeSpeakerSocketId, setActiveSpeakerSocketId] = useState<string | null>(null);
   const peersRef = useRef<Map<string, PeerState>>(new Map());
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(localStream);
   const mediaRef = useRef(media);
   const joinedRef = useRef(false);
+  const rtcConfigRef = useRef<RTCConfiguration>({ iceServers: [], iceCandidatePoolSize: 0 });
+  const [rtcConfigReady, setRtcConfigReady] = useState(false);
 
   const mediaKey = useMemo(() => `${Number(media.audio)}:${Number(media.video)}:${Number(media.screen)}`, [media.audio, media.video, media.screen]);
 
@@ -107,6 +110,20 @@ export function useMeetingMeshWebRTC({
   useEffect(() => {
     mediaRef.current = media;
   }, [media]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setRtcConfigReady(false);
+    if (!enabled) return () => { cancelled = true; };
+    void getRtcConfiguration().then((config) => {
+      if (cancelled) return;
+      rtcConfigRef.current = config;
+      setRtcConfigReady(true);
+    }).catch(() => {
+      if (!cancelled) setRtcConfigReady(true);
+    });
+    return () => { cancelled = true; };
+  }, [enabled]);
 
   const updateRemoteParticipant = useCallback((participant: ServerMeetingParticipant, patch?: Partial<RemoteMeetingParticipant>) => {
     setRemoteParticipants((current) => {
@@ -206,7 +223,7 @@ export function useMeetingMeshWebRTC({
       return existing;
     }
 
-    const pc = new RTCPeerConnection(getRtcConfiguration());
+    const pc = new RTCPeerConnection(rtcConfigRef.current);
     const remoteStream = new MediaStream();
     const state: PeerState = {
       pc,
@@ -315,7 +332,7 @@ export function useMeetingMeshWebRTC({
   }, [createPeer, meetingId, syncLocalTracks]);
 
   useEffect(() => {
-    if (!enabled || !meetingId || !localUserId) return undefined;
+    if (!enabled || !rtcConfigReady || !meetingId || !localUserId) return undefined;
 
     socket.auth = { token: authService.getToken() };
 
@@ -461,7 +478,7 @@ export function useMeetingMeshWebRTC({
       closeAllPeers();
       joinedRef.current = false;
     };
-  }, [bindRemoteCreatedSenders, closeAllPeers, createOffer, createPeer, enabled, flushPendingCandidates, localAvatar, localName, localUserId, meetingId, onNotice, removeRemoteParticipant, syncLocalTracks, updateRemoteParticipant]);
+  }, [bindRemoteCreatedSenders, closeAllPeers, createOffer, createPeer, enabled, flushPendingCandidates, localAvatar, localName, localUserId, meetingId, onNotice, removeRemoteParticipant, rtcConfigReady, syncLocalTracks, updateRemoteParticipant]);
 
   useEffect(() => {
     if (!joinedRef.current) return;
@@ -500,10 +517,11 @@ export function useMeetingMeshWebRTC({
 
     let cancelled = false;
     const sample = async () => {
-      const peers = [...peersRef.current.values()];
+      const peers = [...peersRef.current.entries()];
       if (peers.length === 0) {
         if (!cancelled) {
           setNetworkQuality({ level: 'excellent', rttMs: null, packetLossPct: null, connectedPeers: 0, totalPeers: 0 });
+          setActiveSpeakerSocketId(null);
         }
         return;
       }
@@ -512,8 +530,10 @@ export function useMeetingMeshWebRTC({
       let maxRttSeconds = 0;
       let totalLost = 0;
       let totalReceived = 0;
+      let loudestSocketId: string | null = null;
+      let loudestAudioLevel = 0;
 
-      await Promise.all(peers.map(async ({ pc }) => {
+      await Promise.all(peers.map(async ([socketId, { pc }]) => {
         if (pc.connectionState === 'connected') connectedPeers += 1;
         try {
           const reports = await pc.getStats();
@@ -531,6 +551,19 @@ export function useMeetingMeshWebRTC({
               const received = typeof stat.packetsReceived === 'number' ? Math.max(0, stat.packetsReceived) : 0;
               totalLost += lost;
               totalReceived += received;
+              const mediaKind = String(stat.kind || stat.mediaType || '');
+              const audioLevel = typeof stat.audioLevel === 'number' ? stat.audioLevel : 0;
+              if (mediaKind === 'audio' && audioLevel > loudestAudioLevel) {
+                loudestAudioLevel = audioLevel;
+                loudestSocketId = socketId;
+              }
+            }
+            if (stat.type === 'track' && String(stat.kind || '') === 'audio') {
+              const audioLevel = typeof stat.audioLevel === 'number' ? stat.audioLevel : 0;
+              if (audioLevel > loudestAudioLevel) {
+                loudestAudioLevel = audioLevel;
+                loudestSocketId = socketId;
+              }
             }
           });
         } catch {
@@ -555,6 +588,7 @@ export function useMeetingMeshWebRTC({
         connectedPeers,
         totalPeers: peers.length,
       });
+      setActiveSpeakerSocketId(loudestAudioLevel >= 0.015 ? loudestSocketId : null);
     };
 
     void sample();
@@ -565,5 +599,5 @@ export function useMeetingMeshWebRTC({
     };
   }, [enabled]);
 
-  return { remoteParticipants, networkQuality };
+  return { remoteParticipants, networkQuality, activeSpeakerSocketId };
 }

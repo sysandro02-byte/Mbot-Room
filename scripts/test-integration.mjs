@@ -151,6 +151,9 @@ try {
   assert.equal(health.database?.connected, true);
   assert.equal(health.database?.type, 'postgres');
 
+  assert.equal(health.media?.topology, 'mesh');
+  assert.equal(health.media?.turnConfigured, false);
+
   await expectRejectedSocket();
 
   const host = await register('Hôte Integration', 'host.integration@mbote.test');
@@ -158,10 +161,18 @@ try {
 
   const participant = await register('Participant Integration', 'participant.integration@mbote.test');
   assert.equal(participant.user.role, 'user');
+  const outsider = await register('Participant Bloqué', 'outsider.integration@mbote.test');
+  assert.equal(outsider.user.role, 'user');
 
   const hostMe = await jsonRequest('/api/auth/me', { headers: authHeaders(host.token) });
   assert.equal(hostMe.response.status, 200);
   assert.equal(hostMe.data.user.email, 'host.integration@mbote.test');
+
+  const rtcConfig = await jsonRequest('/api/rtc/config', { headers: authHeaders(host.token) });
+  assert.equal(rtcConfig.response.status, 200, JSON.stringify(rtcConfig.data));
+  assert.ok(Array.isArray(rtcConfig.data.iceServers));
+  assert.ok(rtcConfig.data.iceServers.length >= 1);
+  assert.equal(rtcConfig.data.turnConfigured, false);
 
   const deniedAdmin = await jsonRequest('/api/admin/dashboard', { headers: authHeaders(participant.token) });
   assert.equal(deniedAdmin.response.status, 403);
@@ -181,6 +192,7 @@ try {
       settings: {
         password: 'RoomPass2026!',
         waitingRoom: true,
+        participantCapacity: 2,
         chat: true,
         reactions: true,
         joinBeforeHost: false,
@@ -222,12 +234,13 @@ try {
   assert.equal(lobby.response.status, 200);
   assert.ok(lobby.data.some((item) => Number(item.user_id) === Number(participant.user.id) && item.status === 'requested'));
 
-  const admit = await jsonRequest(`/api/meetings/${meeting.id}/lobby/respond`, {
+  const admitAll = await jsonRequest(`/api/meetings/${meeting.id}/lobby/admit-all`, {
     method: 'POST',
     headers: authHeaders(host.token),
-    body: JSON.stringify({ userId: Number(participant.user.id), status: 'accepted' }),
   });
-  assert.equal(admit.response.status, 200, JSON.stringify(admit.data));
+  assert.equal(admitAll.response.status, 200, JSON.stringify(admitAll.data));
+  assert.equal(admitAll.data.admitted, 1);
+  assert.ok(admitAll.data.userIds.includes(Number(participant.user.id)));
 
   const start = await jsonRequest(`/api/meetings/${meeting.id}/start-notify`, {
     method: 'POST',
@@ -240,6 +253,64 @@ try {
   assert.equal(participants.response.status, 200);
   assert.ok(participants.data.some((item) => Number(item.userId) === Number(host.user.id)));
   assert.ok(participants.data.some((item) => Number(item.userId) === Number(participant.user.id)));
+
+  const muteAll = await jsonRequest(`/api/meetings/${meeting.id}/participants/mute-all`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+  });
+  assert.equal(muteAll.response.status, 200, JSON.stringify(muteAll.data));
+  assert.equal(muteAll.data.muted, 1);
+  assert.ok(muteAll.data.userIds.includes(Number(participant.user.id)));
+
+  const mutedParticipants = await jsonRequest(`/api/meetings/${meeting.id}/participants`, { headers: authHeaders(host.token) });
+  assert.equal(mutedParticipants.response.status, 200);
+  assert.equal(
+    mutedParticipants.data.find((item) => Number(item.userId) === Number(participant.user.id))?.mutedByHost,
+    true,
+  );
+
+  const lockMeeting = await jsonRequest(`/api/meetings/${meeting.id}/lock`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ locked: true }),
+  });
+  assert.equal(lockMeeting.response.status, 200, JSON.stringify(lockMeeting.data));
+  assert.equal(lockMeeting.data.locked, true);
+
+  const lockedJoin = await jsonRequest(`/api/meetings/${meeting.id}/join-request`, {
+    method: 'POST',
+    headers: authHeaders(outsider.token),
+    body: JSON.stringify({ password: 'RoomPass2026!' }),
+  });
+  assert.equal(lockedJoin.response.status, 423, JSON.stringify(lockedJoin.data));
+  assert.equal(lockedJoin.data.code, 'MEETING_LOCKED');
+
+  const unlockMeeting = await jsonRequest(`/api/meetings/${meeting.id}/lock`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ locked: false }),
+  });
+  assert.equal(unlockMeeting.response.status, 200, JSON.stringify(unlockMeeting.data));
+  assert.equal(unlockMeeting.data.locked, false);
+
+  const unlockedJoin = await jsonRequest(`/api/meetings/${meeting.id}/join-request`, {
+    method: 'POST',
+    headers: authHeaders(outsider.token),
+    body: JSON.stringify({ password: 'RoomPass2026!' }),
+  });
+  assert.equal(unlockedJoin.response.status, 200, JSON.stringify(unlockedJoin.data));
+  assert.equal(unlockedJoin.data.status, 'requested');
+
+  const capacityAdmitAll = await jsonRequest(`/api/meetings/${meeting.id}/lobby/admit-all`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+  });
+  assert.equal(capacityAdmitAll.response.status, 200, JSON.stringify(capacityAdmitAll.data));
+  assert.equal(capacityAdmitAll.data.admitted, 0);
+
+  const lobbyAtCapacity = await jsonRequest(`/api/meetings/${meeting.id}/lobby`, { headers: authHeaders(host.token) });
+  assert.equal(lobbyAtCapacity.response.status, 200);
+  assert.ok(lobbyAtCapacity.data.some((item) => Number(item.user_id) === Number(outsider.user.id) && item.status === 'requested'));
 
   const message = await jsonRequest(`/api/meetings/${meeting.id}/messages`, {
     method: 'POST',
