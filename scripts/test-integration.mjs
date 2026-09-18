@@ -80,6 +80,26 @@ const mockEgressServer = createServer(async (request, response) => {
 });
 await new Promise((resolve) => mockEgressServer.listen(egressPort, '127.0.0.1', resolve));
 
+const transcriptionPort = port + 2;
+const transcriptionRequests = [];
+const mockTranscriptionServer = createServer(async (request, response) => {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(Buffer.from(chunk));
+  const body = Buffer.concat(chunks);
+  transcriptionRequests.push({
+    method: request.method,
+    authorization: request.headers.authorization || '',
+    contentType: request.headers['content-type'] || '',
+    bodyText: body.toString('utf8'),
+  });
+  response.setHeader('Content-Type', 'application/json');
+  response.end(JSON.stringify({
+    text: 'Décision CI issue du micro réel',
+    language: 'fr',
+  }));
+});
+await new Promise((resolve) => mockTranscriptionServer.listen(transcriptionPort, '127.0.0.1', resolve));
+
 const pool = new pg.Pool({ connectionString: databaseUrl, ssl: false });
 
 await pool.query('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
@@ -97,6 +117,10 @@ const server = spawn(process.execPath, ['dist/server.js'], {
     ADMIN_EMAILS: '',
     RESEND_API_KEY: '',
     GROQ_API_KEY: '',
+    GROQ_TRANSCRIPTION_API_KEY: 'transcription-test-key',
+    GROQ_TRANSCRIPTION_URL: `http://127.0.0.1:${transcriptionPort}/transcriptions`,
+    GROQ_TRANSCRIPTION_MODEL: 'whisper-large-v3-turbo',
+    CAPTION_CHUNK_SECONDS: '10',
     MEDIA_TRANSPORT: 'livekit',
     LIVEKIT_URL: `ws://127.0.0.1:${egressPort}`,
     LIVEKIT_API_KEY: 'test-api-key',
@@ -336,6 +360,48 @@ try {
   assert.equal(participants.response.status, 200);
   assert.ok(participants.data.some((item) => Number(item.userId) === Number(host.user.id)));
   assert.ok(participants.data.some((item) => Number(item.userId) === Number(participant.user.id)));
+
+  const transcriptionStatus = await jsonRequest('/api/transcription/status');
+  assert.equal(transcriptionStatus.response.status, 200, JSON.stringify(transcriptionStatus.data));
+  assert.equal(transcriptionStatus.data.configured, true);
+  assert.equal(transcriptionStatus.data.model, 'whisper-large-v3-turbo');
+  assert.equal(transcriptionStatus.data.chunkSeconds, 10);
+
+  const audioResponse = await fetch(`${baseUrl}/api/meetings/${meeting.id}/transcription/chunk?language=fr`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${participant.token}`,
+      Origin: baseUrl,
+      'Content-Type': 'audio/webm',
+    },
+    body: Buffer.alloc(2048, 7),
+  });
+  const audioCaption = await audioResponse.json();
+  assert.equal(audioResponse.status, 201, JSON.stringify(audioCaption));
+  assert.equal(audioCaption.text, 'Décision CI issue du micro réel');
+  assert.equal(audioCaption.provider, 'groq-whisper');
+  assert.equal(audioCaption.language, 'fr');
+
+  assert.equal(transcriptionRequests.length, 1);
+  assert.equal(transcriptionRequests[0].authorization, 'Bearer transcription-test-key');
+  assert.match(transcriptionRequests[0].contentType, /^multipart\/form-data; boundary=/);
+  assert.match(transcriptionRequests[0].bodyText, /whisper-large-v3-turbo/);
+  assert.match(transcriptionRequests[0].bodyText, /mboteroom-caption\.webm/);
+
+  const browserCaption = await jsonRequest(`/api/meetings/${meeting.id}/captions/text`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ text: 'Sous-titre navigateur CI', language: 'fr-FR' }),
+  });
+  assert.equal(browserCaption.response.status, 201, JSON.stringify(browserCaption.data));
+  assert.equal(browserCaption.data.provider, 'browser-speech');
+
+  const persistedCaptions = await jsonRequest(`/api/meetings/${meeting.id}/captions`, {
+    headers: authHeaders(host.token),
+  });
+  assert.equal(persistedCaptions.response.status, 200, JSON.stringify(persistedCaptions.data));
+  assert.ok(persistedCaptions.data.some((item) => item.text === 'Décision CI issue du micro réel' && item.provider === 'groq-whisper'));
+  assert.ok(persistedCaptions.data.some((item) => item.text === 'Sous-titre navigateur CI' && item.provider === 'browser-speech'));
 
   const mediaStatus = await jsonRequest('/api/media/status');
   assert.equal(mediaStatus.response.status, 200, JSON.stringify(mediaStatus.data));
@@ -588,4 +654,5 @@ try {
     sleep(5_000),
   ]);
   await new Promise((resolve) => mockEgressServer.close(() => resolve()));
+  await new Promise((resolve) => mockTranscriptionServer.close(() => resolve()));
 }

@@ -44,5 +44,21 @@ export const runProductMigrations = async () => {
     ALTER TABLE room_recordings ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
     CREATE INDEX IF NOT EXISTS room_recordings_provider_id_idx ON room_recordings(provider_recording_id);
     CREATE INDEX IF NOT EXISTS room_recordings_meeting_status_idx ON room_recordings(meeting_id,status,created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS room_captions (
+      id uuid PRIMARY KEY,
+      meeting_id integer NOT NULL REFERENCES room_meetings(id) ON DELETE CASCADE,
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      speaker text NOT NULL,
+      text text NOT NULL,
+      breakout_room_id uuid REFERENCES room_breakout_rooms(id) ON DELETE SET NULL,
+      provider text NOT NULL DEFAULT 'browser',
+      language text NOT NULL DEFAULT '',
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    ALTER TABLE room_captions ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'browser';
+    ALTER TABLE room_captions ADD COLUMN IF NOT EXISTS language text NOT NULL DEFAULT '';
+    CREATE INDEX IF NOT EXISTS room_captions_meeting_created_idx ON room_captions(meeting_id, created_at);
+    CREATE INDEX IF NOT EXISTS room_captions_user_idx ON room_captions(user_id);
   `);
 };
