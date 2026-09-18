@@ -297,6 +297,7 @@ let browser;
 let hostContext;
 let participantContext;
 let participantTwoContext;
+let successfulSfuContext;
 let hostRoom;
 let participantRoom;
 let participantTwoRoom;
@@ -493,7 +494,40 @@ try {
   assert.deepEqual(participantRoom.browserErrors, [], `Participant browser errors: ${participantRoom.browserErrors.join('\n')}`);
   assert.deepEqual(participantTwoRoom.browserErrors, [], `Participant two browser errors: ${participantTwoRoom.browserErrors.join('\n')}`);
 
-  console.log('Three-browser camera + microphone + reconnect video meeting checks passed.');
+  await participantTwoContext.close();
+  await participantContext.close();
+  await hostContext.close();
+  participantTwoContext = undefined;
+  participantContext = undefined;
+  hostContext = undefined;
+
+  const successfulSfuRoom = await openAuthenticatedMeeting(browser, host, meeting.id, 'host-sfu-success', 'success');
+  successfulSfuContext = successfulSfuRoom.context;
+  const successfulSfuBadge = successfulSfuRoom.page.locator('[data-testid="media-transport-status"]');
+  await successfulSfuBadge.waitFor({ state: 'visible', timeout: 10_000 });
+  await successfulSfuRoom.page.waitForFunction(() => {
+    const badge = document.querySelector('[data-testid="media-transport-status"]');
+    return badge?.getAttribute('data-transport') === 'livekit' && badge.textContent?.includes('SFU actif');
+  }, undefined, { timeout: 15_000 });
+
+  await successfulSfuRoom.page.waitForFunction(() => {
+    const kinds = window.__mboteLiveKitPublishedKinds || [];
+    return kinds.includes('audio') && kinds.includes('video');
+  }, undefined, { timeout: 15_000 });
+
+  const sfuDiagnostics = await successfulSfuRoom.page.evaluate(() => ({
+    transport: document.querySelector('[data-testid="media-transport-status"]')?.getAttribute('data-transport'),
+    publishedKinds: window.__mboteLiveKitPublishedKinds || [],
+    peerConnectionCount: window.__mbotePeerConnectionCount || 0,
+  }));
+  assert.equal(sfuDiagnostics.transport, 'livekit');
+  assert.ok(sfuDiagnostics.publishedKinds.includes('audio'));
+  assert.ok(sfuDiagnostics.publishedKinds.includes('video'));
+  assert.equal(sfuDiagnostics.peerConnectionCount, 0, 'MBotéRoom must not create mesh RTCPeerConnections while SFU is active');
+  assert.deepEqual(successfulSfuRoom.browserErrors, [], `Successful SFU browser errors: ${successfulSfuRoom.browserErrors.join('\n')}`);
+  await successfulSfuRoom.page.screenshot({ path: 'test-artifacts/video-sfu-active.png', fullPage: true });
+
+  console.log('Three-browser mesh fallback + successful SFU publish checks passed.');
 } catch (error) {
   await mkdir('test-artifacts', { recursive: true }).catch(() => undefined);
   if (hostRoom?.page) {
@@ -511,6 +545,7 @@ try {
   console.error(`SERVER_OUTPUT\n${serverOutput}`);
   throw error;
 } finally {
+  await successfulSfuContext?.close().catch(() => undefined);
   await participantTwoContext?.close().catch(() => undefined);
   await participantContext?.close().catch(() => undefined);
   await hostContext?.close().catch(() => undefined);
