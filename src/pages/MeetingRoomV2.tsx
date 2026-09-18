@@ -197,6 +197,8 @@ export default function MeetingRoomV2() {
     || Number(meeting.co_host_id || 0) === Number(currentUser.id)
     || currentUser.role === 'admin'
   ));
+  const participantMicAllowed = isModerator || meeting?.settings?.participantAudio !== false;
+  const participantCameraAllowed = isModerator || meeting?.settings?.participantVideo !== false;
 
   const refreshMediaDevices = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -338,6 +340,20 @@ export default function MeetingRoomV2() {
     void load();
     return () => { cancelled = true; };
   }, [isModerator, meeting?.id]);
+
+  useEffect(() => {
+    if (!meeting || isModerator) return;
+    if (meeting.settings?.participantAudio === false) {
+      cameraStreamRef.current?.getAudioTracks().forEach((track) => { track.enabled = false; });
+      localStream?.getAudioTracks().forEach((track) => { track.enabled = false; });
+      setMicEnabled(false);
+    }
+    if (meeting.settings?.participantVideo === false) {
+      cameraStreamRef.current?.getVideoTracks().forEach((track) => { track.enabled = false; });
+      if (!screenSharing) localStream?.getVideoTracks().forEach((track) => { track.enabled = false; });
+      setCameraEnabled(false);
+    }
+  }, [isModerator, localStream, meeting, screenSharing]);
 
   useEffect(() => {
     setMediaReady(false);
@@ -525,6 +541,10 @@ export default function MeetingRoomV2() {
   }, [location.state, meeting?.id, navigate, refreshBreakouts, refreshLobby, refreshParticipants]);
 
   const toggleMic = () => {
+    if (!participantMicAllowed && !micEnabled) {
+      setNotice('L’hôte a désactivé le microphone des participants.');
+      return;
+    }
     const next = !micEnabled;
     cameraStreamRef.current?.getAudioTracks().forEach((track) => { track.enabled = next; });
     if (screenSharing) localStream?.getAudioTracks().forEach((track) => { track.enabled = next; });
@@ -532,6 +552,10 @@ export default function MeetingRoomV2() {
   };
 
   const toggleCamera = () => {
+    if (!participantCameraAllowed && !cameraEnabled) {
+      setNotice('L’hôte a désactivé la caméra des participants.');
+      return;
+    }
     const next = !cameraEnabled;
     cameraStreamRef.current?.getVideoTracks().forEach((track) => { track.enabled = next; });
     setCameraEnabled(next);
@@ -539,6 +563,14 @@ export default function MeetingRoomV2() {
 
   const switchInputDevice = useCallback(async (kind: 'audioinput' | 'videoinput', deviceId: string) => {
     if (!deviceId || !navigator.mediaDevices?.getUserMedia) return;
+    if (kind === 'audioinput' && !participantMicAllowed) {
+      setNotice('Le changement de microphone est bloqué par les paramètres de la réunion.');
+      return;
+    }
+    if (kind === 'videoinput' && !participantCameraAllowed) {
+      setNotice('Le changement de caméra est bloqué par les paramètres de la réunion.');
+      return;
+    }
     try {
       const fresh = await navigator.mediaDevices.getUserMedia(kind === 'audioinput'
         ? { audio: { deviceId: { exact: deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: { ideal: 1 } }, video: false }
@@ -572,7 +604,7 @@ export default function MeetingRoomV2() {
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : 'Impossible de changer de périphérique.');
     }
-  }, [cameraEnabled, micEnabled, refreshMediaDevices, screenSharing]);
+  }, [cameraEnabled, micEnabled, participantCameraAllowed, participantMicAllowed, refreshMediaDevices, screenSharing]);
 
   const stopScreenShare = useCallback(() => {
     screenStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -1128,8 +1160,18 @@ export default function MeetingRoomV2() {
       </section>
 
       <footer className="room-v2-controls">
-        <Control active={micEnabled} label={micEnabled ? 'Micro' : 'Micro coupé'} onClick={toggleMic}>{micEnabled ? <Mic/> : <MicOff/>}</Control>
-        <Control active={cameraEnabled} label={cameraEnabled ? 'Caméra' : 'Caméra coupée'} onClick={toggleCamera}>{cameraEnabled ? <Camera/> : <CameraOff/>}</Control>
+        <Control
+          active={micEnabled}
+          disabled={!participantMicAllowed && !micEnabled}
+          label={!participantMicAllowed ? 'Micro bloqué' : micEnabled ? 'Micro' : 'Micro coupé'}
+          onClick={toggleMic}
+        >{micEnabled ? <Mic/> : <MicOff/>}</Control>
+        <Control
+          active={cameraEnabled}
+          disabled={!participantCameraAllowed && !cameraEnabled}
+          label={!participantCameraAllowed ? 'Caméra bloquée' : cameraEnabled ? 'Caméra' : 'Caméra coupée'}
+          onClick={toggleCamera}
+        >{cameraEnabled ? <Camera/> : <CameraOff/>}</Control>
         <Control active={screenSharing} label="Partager" onClick={() => void toggleScreenShare()}><MonitorUp/></Control>
         <Control active={handRaised} label={handRaised ? 'Baisser la main' : 'Main'} onClick={() => { const raised = !handRaised; setHandRaised(raised); setRaisedHands((current) => { const next = new Set(current); if (raised) next.add(Number(currentUser?.id || 0)); else next.delete(Number(currentUser?.id || 0)); return next; }); socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised}); }}><Hand/></Control>
         <div className="room-v2-reaction-wrap">
@@ -1160,13 +1202,13 @@ export default function MeetingRoomV2() {
               <div className="room-v2-device-title"><strong>Audio et vidéo</strong><button type="button" onClick={() => setDevicePanelOpen(false)} aria-label="Fermer"><X size={16}/></button></div>
               <label>
                 <Mic size={16}/> Microphone
-                <select value={selectedAudioInputId} onChange={(event) => void switchInputDevice('audioinput', event.target.value)}>
+                <select value={selectedAudioInputId} disabled={!participantMicAllowed} onChange={(event) => void switchInputDevice('audioinput', event.target.value)}>
                   {mediaDevices.filter((device) => device.kind === 'audioinput').map((device, index) => <option key={device.deviceId || `audio-${index}`} value={device.deviceId}>{device.label || `Microphone ${index + 1}`}</option>)}
                 </select>
               </label>
               <label>
                 <Camera size={16}/> Caméra
-                <select value={selectedVideoInputId} onChange={(event) => void switchInputDevice('videoinput', event.target.value)}>
+                <select value={selectedVideoInputId} disabled={!participantCameraAllowed} onChange={(event) => void switchInputDevice('videoinput', event.target.value)}>
                   {mediaDevices.filter((device) => device.kind === 'videoinput').map((device, index) => <option key={device.deviceId || `video-${index}`} value={device.deviceId}>{device.label || `Caméra ${index + 1}`}</option>)}
                 </select>
               </label>
@@ -1195,6 +1237,6 @@ export default function MeetingRoomV2() {
   );
 }
 
-function Control({ children, label, active, onClick, testId }: { children: ReactNode; label: string; active?: boolean; onClick: () => void; testId?: string }) {
-  return <button type="button" data-testid={testId} className={`room-v2-control ${active ? 'active' : ''}`} onClick={onClick}><span>{children}</span><small>{label}</small></button>;
+function Control({ children, label, active, onClick, testId, disabled }: { children: ReactNode; label: string; active?: boolean; onClick: () => void; testId?: string; disabled?: boolean }) {
+  return <button type="button" data-testid={testId} disabled={disabled} className={`room-v2-control ${active ? 'active' : ''}`} onClick={onClick}><span>{children}</span><small>{label}</small></button>;
 }
