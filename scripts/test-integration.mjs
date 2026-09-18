@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 import pg from 'pg';
 import { io as createSocket } from 'socket.io-client';
 
@@ -13,6 +14,72 @@ if (!databaseUrl) throw new Error('DATABASE_URL is required for integration test
 
 const port = Number(process.env.MBOTE_ROOM_TEST_PORT || 4307);
 const baseUrl = `http://127.0.0.1:${port}`;
+const egressPort = port + 1;
+const egressBaseUrl = `http://127.0.0.1:${egressPort}`;
+const egressRequests = [];
+let mockEgressStatus = 'EGRESS_ACTIVE';
+
+const mockEgressServer = createServer(async (request, response) => {
+  let rawBody = '';
+  for await (const chunk of request) rawBody += chunk.toString();
+  const body = rawBody ? JSON.parse(rawBody) : {};
+  egressRequests.push({ path: request.url, authorization: request.headers.authorization || '', body });
+
+  const nowNs = String(BigInt(Date.now()) * 1_000_000n);
+  response.setHeader('Content-Type', 'application/json');
+
+  if (request.url?.endsWith('/StartEgress')) {
+    mockEgressStatus = 'EGRESS_ACTIVE';
+    response.end(JSON.stringify({
+      egress_id: 'EG_TEST_RECORDING_1',
+      room_name: body.room_name,
+      status: 'EGRESS_ACTIVE',
+      started_at: nowNs,
+      file_results: [],
+    }));
+    return;
+  }
+
+  if (request.url?.endsWith('/ListEgress')) {
+    response.end(JSON.stringify({
+      items: [{
+        egress_id: 'EG_TEST_RECORDING_1',
+        room_name: body.room_name || '',
+        status: mockEgressStatus,
+        started_at: nowNs,
+        file_results: mockEgressStatus === 'EGRESS_COMPLETE' ? [{
+          filename: 'mboteroom-test.mp4',
+          duration: '5000000000',
+          size: '245760',
+          location: 'https://storage.test/mboteroom-test.mp4',
+        }] : [],
+      }],
+    }));
+    return;
+  }
+
+  if (request.url?.endsWith('/StopEgress')) {
+    mockEgressStatus = 'EGRESS_COMPLETE';
+    response.end(JSON.stringify({
+      egress_id: body.egress_id,
+      status: 'EGRESS_COMPLETE',
+      started_at: nowNs,
+      ended_at: nowNs,
+      file_results: [{
+        filename: 'mboteroom-test.mp4',
+        duration: '5000000000',
+        size: '245760',
+        location: 'https://storage.test/mboteroom-test.mp4',
+      }],
+    }));
+    return;
+  }
+
+  response.statusCode = 404;
+  response.end(JSON.stringify({ error: 'Unknown mock Egress method' }));
+});
+await new Promise((resolve) => mockEgressServer.listen(egressPort, '127.0.0.1', resolve));
+
 const pool = new pg.Pool({ connectionString: databaseUrl, ssl: false });
 
 await pool.query('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
@@ -31,10 +98,12 @@ const server = spawn(process.execPath, ['dist/server.js'], {
     RESEND_API_KEY: '',
     GROQ_API_KEY: '',
     MEDIA_TRANSPORT: 'livekit',
-    LIVEKIT_URL: 'wss://livekit.test.invalid',
+    LIVEKIT_URL: `ws://127.0.0.1:${egressPort}`,
     LIVEKIT_API_KEY: 'test-api-key',
     LIVEKIT_API_SECRET: 'test-api-secret',
     LIVEKIT_TOKEN_TTL_SECONDS: '900',
+    LIVEKIT_EGRESS_ENABLED: 'true',
+    LIVEKIT_EGRESS_USE_SERVER_DEFAULT_STORAGE: 'true',
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
