@@ -20,6 +20,11 @@ export type RecordingMetadata = {
   id:string; meeting_id:number; storage_url:string; mime_type:string; size_bytes:number; duration_seconds:number; created_at:string;
 };
 
+export type BreakoutRoom = {
+  id:string; meetingId:number; name:string; isOpen:boolean; createdAt?:string; updatedAt?:string;
+  members:Array<{userId:number;name:string;avatar:string}>;
+};
+
 export const collaborationService = {
   async getMessages(meetingId:number) {
     return readJson<MeetingMessage[]>(await fetch(apiUrl(`/api/meetings/${meetingId}/messages?limit=150`), { headers:getAuthHeaders() }));
@@ -49,6 +54,21 @@ export const collaborationService = {
   },
   async moveToLobby(meetingId:number,userId:number) {
     return readJson<{success:boolean}>(await fetch(apiUrl(`/api/meetings/${meetingId}/participants/${userId}/move-to-lobby`),{method:'POST',headers:getAuthHeaders()}));
+  },
+  async getBreakoutRooms(meetingId:number) {
+    return readJson<BreakoutRoom[]>(await fetch(apiUrl(`/api/meetings/${meetingId}/breakouts`),{headers:getAuthHeaders()}));
+  },
+  async createBreakoutRooms(meetingId:number,names:string[]) {
+    return readJson<BreakoutRoom[]>(await fetch(apiUrl(`/api/meetings/${meetingId}/breakouts`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({names})}));
+  },
+  async assignBreakoutParticipant(meetingId:number,breakoutId:string,userId:number) {
+    return readJson<{success:boolean}>(await fetch(apiUrl(`/api/meetings/${meetingId}/breakouts/${encodeURIComponent(breakoutId)}/assign`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({userId})}));
+  },
+  async openBreakoutRooms(meetingId:number) {
+    return readJson<{success:boolean;assignments:number}>(await fetch(apiUrl(`/api/meetings/${meetingId}/breakouts/open`),{method:'POST',headers:getAuthHeaders()}));
+  },
+  async closeBreakoutRooms(meetingId:number) {
+    return readJson<{success:boolean}>(await fetch(apiUrl(`/api/meetings/${meetingId}/breakouts/close`),{method:'POST',headers:getAuthHeaders()}));
   },
   async getPolls(meetingId:number) {
     return readJson<MeetingPoll[]>(await fetch(apiUrl(`/api/meetings/${meetingId}/polls`),{headers:getAuthHeaders()}));
