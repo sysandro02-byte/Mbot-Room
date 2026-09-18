@@ -13,6 +13,8 @@ import {
   MonitorUp,
   MoreVertical,
   PhoneOff,
+  Pin,
+  PinOff,
   Radio,
   Send,
   Settings2,
@@ -54,6 +56,9 @@ type VideoTileProps = {
   badge?: string;
   local?: boolean;
   audioOutputId?: string;
+  activeSpeaker?: boolean;
+  pinned?: boolean;
+  onPin?: () => void;
 };
 
 const initials = (value: string) => String(value || 'MB')
@@ -64,7 +69,7 @@ const initials = (value: string) => String(value || 'MB')
   .slice(0, 2)
   .toUpperCase();
 
-function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, local, audioOutputId }: VideoTileProps) {
+function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, local, audioOutputId, activeSpeaker, pinned, onPin }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -78,7 +83,7 @@ function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, l
   }, [audioOutputId, local, stream, videoEnabled]);
 
   return (
-    <article className={`room-v2-tile ${screen ? 'is-screen' : ''}`}>
+    <article className={`room-v2-tile ${screen ? 'is-screen' : ''} ${activeSpeaker ? 'is-speaking' : ''} ${pinned ? 'is-pinned' : ''}`} data-speaking={activeSpeaker ? 'true' : 'false'}>
       {stream && videoEnabled !== false ? (
         <video ref={videoRef} autoPlay playsInline muted={Boolean(local)} />
       ) : (
@@ -89,8 +94,21 @@ function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, l
       <div className="room-v2-tile-meta">
         <span>{name}{local ? ' (vous)' : ''}</span>
         {badge ? <small>{badge}</small> : null}
+        {activeSpeaker ? <small className="speaker-badge">Parle</small> : null}
         {muted ? <MicOff size={15} aria-label="Micro coupé" /> : <Mic size={15} aria-label="Micro actif" />}
       </div>
+      {!local && onPin ? (
+        <button
+          type="button"
+          className="room-v2-pin"
+          data-testid={pinned ? 'unpin-participant' : 'pin-participant'}
+          onClick={onPin}
+          aria-label={pinned ? `Désépingler ${name}` : `Épingler ${name}`}
+          title={pinned ? 'Désépingler' : 'Épingler'}
+        >
+          {pinned ? <PinOff size={15}/> : <Pin size={15}/>}
+        </button>
+      ) : null}
     </article>
   );
 }
@@ -133,6 +151,8 @@ export default function MeetingRoomV2() {
   const [selectedAudioInputId, setSelectedAudioInputId] = useState('');
   const [selectedVideoInputId, setSelectedVideoInputId] = useState('');
   const [selectedAudioOutputId, setSelectedAudioOutputId] = useState('');
+  const [viewMode, setViewMode] = useState<'gallery' | 'speaker'>('gallery');
+  const [pinnedSocketId, setPinnedSocketId] = useState<string | null>(null);
   const [micEnabled, setMicEnabled] = useState(initialMic);
   const [cameraEnabled, setCameraEnabled] = useState(initialCamera);
   const [screenSharing, setScreenSharing] = useState(false);
@@ -177,7 +197,7 @@ export default function MeetingRoomV2() {
     screen: screenSharing,
   }), [cameraEnabled, localStream, micEnabled, screenSharing]);
 
-  const { remoteParticipants, networkQuality } = useMeetingMeshWebRTC({
+  const { remoteParticipants, networkQuality, activeSpeakerSocketId } = useMeetingMeshWebRTC({
     meetingId: meeting?.id || 0,
     localUserId,
     localName,
@@ -571,6 +591,9 @@ export default function MeetingRoomV2() {
   const remoteByUser = new Map(remoteParticipants.map((participant) => [Number(participant.userId), participant]));
   const activeMembers = participants.filter((participant) => participant.status === 'accepted');
   const galleryCount = 1 + remoteParticipants.length;
+  const featuredSocketId = pinnedSocketId || activeSpeakerSocketId || remoteParticipants[0]?.socketId || null;
+  const featuredParticipant = featuredSocketId ? remoteParticipants.find((participant) => participant.socketId === featuredSocketId) || null : null;
+  const speakerViewEnabled = viewMode === 'speaker' && Boolean(featuredParticipant);
 
   return (
     <main className="room-v2-shell">
@@ -593,38 +616,95 @@ export default function MeetingRoomV2() {
             {networkQuality.rttMs !== null ? <small>{networkQuality.rttMs} ms</small> : null}
           </span>
         </div>
-        {isModerator && !meeting.is_active ? <button className="room-v2-start" type="button" onClick={startMeeting}>Démarrer</button> : null}
+        <div className="room-v2-header-actions">
+          <div className="room-v2-view-switch" role="group" aria-label="Mode d’affichage">
+            <button type="button" className={viewMode === 'gallery' ? 'active' : ''} onClick={() => setViewMode('gallery')} data-testid="gallery-view-button">Galerie</button>
+            <button type="button" className={viewMode === 'speaker' ? 'active' : ''} onClick={() => setViewMode('speaker')} data-testid="speaker-view-button">Intervenant</button>
+          </div>
+          {isModerator && !meeting.is_active ? <button className="room-v2-start" type="button" onClick={startMeeting}>Démarrer</button> : null}
+        </div>
       </header>
 
       {notice ? <div className="room-v2-notice" role="status"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Fermer"><X size={16}/></button></div> : null}
 
       <section className="room-v2-body">
-        <div className="room-v2-stage">
-          <div className={`room-v2-gallery count-${Math.min(galleryCount, 9)}`}>
-            <VideoTile
-              name={localName}
-              stream={localStream}
-              avatar={currentUser?.avatar}
-              muted={!mediaState.audio}
-              videoEnabled={screenSharing || mediaState.video}
-              screen={screenSharing}
-              badge={isModerator ? 'Hôte' : currentUser?.isGuest ? 'Invité' : undefined}
-              local
-            />
-            {remoteParticipants.map((participant) => (
+        <div className={`room-v2-stage ${speakerViewEnabled ? 'speaker-mode' : ''}`}>
+          {speakerViewEnabled && featuredParticipant ? (
+            <div className="room-v2-speaker-layout" data-testid="speaker-layout">
+              <div className="room-v2-speaker-main">
+                <VideoTile
+                  name={featuredParticipant.name}
+                  stream={featuredParticipant.stream}
+                  avatar={featuredParticipant.avatar}
+                  muted={!featuredParticipant.media.audio}
+                  videoEnabled={featuredParticipant.media.video || featuredParticipant.media.screen}
+                  screen={featuredParticipant.media.screen}
+                  badge={activeMembers.find((member) => member.userId === Number(featuredParticipant.userId))?.role === 'cohost' ? 'Co-hôte' : undefined}
+                  audioOutputId={selectedAudioOutputId}
+                  activeSpeaker={activeSpeakerSocketId === featuredParticipant.socketId}
+                  pinned={pinnedSocketId === featuredParticipant.socketId}
+                  onPin={() => setPinnedSocketId((current) => current === featuredParticipant.socketId ? null : featuredParticipant.socketId)}
+                />
+              </div>
+              <div className="room-v2-speaker-strip">
+                <VideoTile
+                  name={localName}
+                  stream={localStream}
+                  avatar={currentUser?.avatar}
+                  muted={!mediaState.audio}
+                  videoEnabled={screenSharing || mediaState.video}
+                  screen={screenSharing}
+                  badge={isModerator ? 'Hôte' : currentUser?.isGuest ? 'Invité' : undefined}
+                  local
+                />
+                {remoteParticipants.filter((participant) => participant.socketId !== featuredParticipant.socketId).map((participant) => (
+                  <VideoTile
+                    key={participant.socketId}
+                    name={participant.name}
+                    stream={participant.stream}
+                    avatar={participant.avatar}
+                    muted={!participant.media.audio}
+                    videoEnabled={participant.media.video || participant.media.screen}
+                    screen={participant.media.screen}
+                    badge={activeMembers.find((member) => member.userId === Number(participant.userId))?.role === 'cohost' ? 'Co-hôte' : undefined}
+                    audioOutputId={selectedAudioOutputId}
+                    activeSpeaker={activeSpeakerSocketId === participant.socketId}
+                    pinned={pinnedSocketId === participant.socketId}
+                    onPin={() => setPinnedSocketId((current) => current === participant.socketId ? null : participant.socketId)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className={`room-v2-gallery count-${Math.min(galleryCount, 9)}`} data-testid="gallery-layout">
               <VideoTile
-                key={participant.socketId}
-                name={participant.name}
-                stream={participant.stream}
-                avatar={participant.avatar}
-                muted={!participant.media.audio}
-                videoEnabled={participant.media.video || participant.media.screen}
-                screen={participant.media.screen}
-                badge={activeMembers.find((member) => member.userId === Number(participant.userId))?.role === 'cohost' ? 'Co-hôte' : undefined}
-                audioOutputId={selectedAudioOutputId}
+                name={localName}
+                stream={localStream}
+                avatar={currentUser?.avatar}
+                muted={!mediaState.audio}
+                videoEnabled={screenSharing || mediaState.video}
+                screen={screenSharing}
+                badge={isModerator ? 'Hôte' : currentUser?.isGuest ? 'Invité' : undefined}
+                local
               />
-            ))}
-          </div>
+              {remoteParticipants.map((participant) => (
+                <VideoTile
+                  key={participant.socketId}
+                  name={participant.name}
+                  stream={participant.stream}
+                  avatar={participant.avatar}
+                  muted={!participant.media.audio}
+                  videoEnabled={participant.media.video || participant.media.screen}
+                  screen={participant.media.screen}
+                  badge={activeMembers.find((member) => member.userId === Number(participant.userId))?.role === 'cohost' ? 'Co-hôte' : undefined}
+                  audioOutputId={selectedAudioOutputId}
+                  activeSpeaker={activeSpeakerSocketId === participant.socketId}
+                  pinned={pinnedSocketId === participant.socketId}
+                  onPin={() => setPinnedSocketId((current) => current === participant.socketId ? null : participant.socketId)}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {panel ? (
