@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, stat } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import pg from 'pg';
 import { chromium } from '@playwright/test';
@@ -364,6 +364,18 @@ try {
     const tile = Array.from(document.querySelectorAll('.room-v2-tile')).find((candidate) => candidate.textContent?.includes('Participant Vidéo') && !candidate.textContent?.includes('(vous)'));
     return Boolean(tile && !tile.querySelector('[aria-label="Main levée"]'));
   }, undefined, { timeout: 10_000 });
+
+  const recordingDownload = hostRoom.page.waitForEvent('download', { timeout: 20_000 });
+  await clickControl(hostRoom.page, 'Enregistrer');
+  await hostRoom.page.waitForFunction(() => document.body.innerText.includes('Enregistrement composite démarré pour 3 flux.'), undefined, { timeout: 10_000 });
+  await sleep(2_500);
+  await clickControl(hostRoom.page, 'Stop rec.');
+  const download = await recordingDownload;
+  await mkdir('test-artifacts', { recursive: true });
+  const recordingPath = 'test-artifacts/meeting-composite.webm';
+  await download.saveAs(recordingPath);
+  const recordingInfo = await stat(recordingPath);
+  assert.ok(recordingInfo.size > 15_000, `Composite recording should contain media data, got ${recordingInfo.size} bytes`);
 
   await participantRoom.page.locator('[data-testid="reaction-button"]').click();
   await participantRoom.page.locator('[data-testid="reaction-panel"]').waitFor({ state: 'visible', timeout: 10_000 });
