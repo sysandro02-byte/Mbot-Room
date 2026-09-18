@@ -17,6 +17,8 @@ const signLiveKitToken = ({
   identity,
   room,
   userId,
+  displayName,
+  avatar,
   ttlSeconds,
 }: {
   apiKey: string;
@@ -24,6 +26,8 @@ const signLiveKitToken = ({
   identity: string;
   room: string;
   userId: number;
+  displayName: string;
+  avatar: string;
   ttlSeconds: number;
 }) => {
   const now = Math.floor(Date.now() / 1000);
@@ -33,7 +37,8 @@ const signLiveKitToken = ({
     sub: identity,
     nbf: now - 5,
     exp: now + ttlSeconds,
-    metadata: JSON.stringify({ mboteRoomUserId: userId, displayName: identity }),
+    name: displayName,
+    metadata: JSON.stringify({ mboteRoomUserId: userId, displayName, avatar }),
     video: {
       room,
       roomJoin: true,
@@ -144,6 +149,8 @@ export const registerSfuRoutes = (app: express.Express) => {
         identity,
         room: roomName,
         userId: user.id,
+        displayName: user.name || user.username || 'Participant',
+        avatar: user.avatar || '',
         ttlSeconds,
       });
 
