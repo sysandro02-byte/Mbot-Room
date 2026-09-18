@@ -268,6 +268,16 @@ try {
     return Boolean(indicator && level && level !== 'offline');
   }, undefined, { timeout: 15_000 });
 
+  await hostRoom.page.locator('[data-testid="speaker-view-button"]').click();
+  await hostRoom.page.locator('[data-testid="speaker-layout"]').waitFor({ state: 'visible', timeout: 10_000 });
+  const pinButton = hostRoom.page.locator('[data-testid="pin-participant"]').first();
+  await pinButton.waitFor({ state: 'visible', timeout: 10_000 });
+  await pinButton.click();
+  await hostRoom.page.locator('[data-testid="unpin-participant"]').first().waitFor({ state: 'visible', timeout: 10_000 });
+  await hostRoom.page.locator('[data-testid="gallery-view-button"]').click();
+  await hostRoom.page.locator('[data-testid="gallery-layout"]').waitFor({ state: 'visible', timeout: 10_000 });
+  await waitForRemoteMedia(hostRoom.page, 'Participant Vidéo');
+
   const deviceButton = hostRoom.page.locator('[data-testid="device-settings-button"]');
   await deviceButton.waitFor({ state: 'visible', timeout: 10_000 });
   await deviceButton.click();
