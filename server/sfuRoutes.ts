@@ -33,7 +33,7 @@ const signLiveKitToken = ({
     sub: identity,
     nbf: now - 5,
     exp: now + ttlSeconds,
-    metadata: JSON.stringify({ mboteRoomUserId: userId }),
+    metadata: JSON.stringify({ mboteRoomUserId: userId, displayName: identity }),
     video: {
       room,
       roomJoin: true,
