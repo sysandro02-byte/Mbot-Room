@@ -404,6 +404,31 @@ try {
   });
   assert.equal(participantJoin.ok, true, JSON.stringify(participantJoin));
 
+  const captionReceived = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Live caption relay timeout')), 7_000);
+    hostSocket.once('meeting:caption', (caption) => {
+      clearTimeout(timer);
+      resolve(caption);
+    });
+  });
+
+  const captionAck = await socketAck(participantSocket, 'meeting:caption', {
+    meetingId: meeting.id,
+    text: 'Décision validée pendant la réunion.',
+  });
+  assert.equal(captionAck.ok, true, JSON.stringify(captionAck));
+  const relayedCaption = await captionReceived;
+  assert.equal(relayedCaption.text, 'Décision validée pendant la réunion.');
+  assert.equal(Number(relayedCaption.userId), Number(participant.user.id));
+
+  const captionPool = new pg.Pool({ connectionString: databaseUrl, ssl: false });
+  const persistedCaptions = await captionPool.query(
+    'SELECT speaker,text FROM room_captions WHERE meeting_id=$1 ORDER BY created_at DESC LIMIT 1',
+    [meeting.id],
+  );
+  await captionPool.end();
+  assert.equal(persistedCaptions.rows[0]?.text, 'Décision validée pendant la réunion.');
+
   const realtimeMessage = await socketAck(participantSocket, 'meeting:chat-message', {
     meetingId: meeting.id,
     text: 'Message Socket.IO persistant',

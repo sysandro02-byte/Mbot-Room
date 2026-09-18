@@ -35,5 +35,17 @@ export const runProductMigrations = async () => {
     );
     CREATE INDEX IF NOT EXISTS room_breakout_members_user_idx ON room_breakout_members(user_id);
     CREATE INDEX IF NOT EXISTS room_breakout_members_assigned_by_idx ON room_breakout_members(assigned_by);
+
+    CREATE TABLE IF NOT EXISTS room_captions (
+      id uuid PRIMARY KEY,
+      meeting_id integer NOT NULL REFERENCES room_meetings(id) ON DELETE CASCADE,
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      speaker text NOT NULL,
+      text text NOT NULL,
+      breakout_room_id uuid REFERENCES room_breakout_rooms(id) ON DELETE SET NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS room_captions_meeting_created_idx ON room_captions(meeting_id, created_at);
+    CREATE INDEX IF NOT EXISTS room_captions_user_idx ON room_captions(user_id);
   `);
 };

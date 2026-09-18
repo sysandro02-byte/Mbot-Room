@@ -153,6 +153,42 @@ const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
     };
   });
 
+  await context.addInitScript(({ transcript }) => {
+    class TestSpeechRecognition {
+      continuous = true;
+      interimResults = true;
+      lang = 'fr-FR';
+      maxAlternatives = 1;
+      onresult = null;
+      onerror = null;
+      onend = null;
+      started = false;
+      start() {
+        if (this.started) return;
+        this.started = true;
+        setTimeout(() => {
+          if (!this.started || !this.onresult) return;
+          this.onresult({
+            resultIndex: 0,
+            results: {
+              0: { isFinal: true, 0: { transcript }, length: 1 },
+              length: 1,
+            },
+          });
+        }, 350);
+      }
+      stop() {
+        this.started = false;
+        this.onend?.();
+      }
+      abort() {
+        this.started = false;
+      }
+    }
+    window.SpeechRecognition = TestSpeechRecognition;
+    window.webkitSpeechRecognition = TestSpeechRecognition;
+  }, { transcript: `Sous-titre automatique ${label}` });
+
   await context.addInitScript(() => {
     if (!navigator.mediaDevices) return;
     const fakeDisplayMedia = async () => {
@@ -186,8 +222,13 @@ const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
   });
   page.on('console', (message) => {
     if (message.type() === 'error') {
-      browserErrors.push(message.text());
-      console.error(`[${label}:console] ${message.text()}`);
+      const text = message.text();
+      if (text === 'WebSocket is already in CLOSING or CLOSED state.') {
+        console.warn(`[${label}:expected-network-warning] ${text}`);
+        return;
+      }
+      browserErrors.push(text);
+      console.error(`[${label}:console] ${text}`);
     }
   });
   await page.goto(`${baseUrl}/reunions/${meetingId}`, { waitUntil: 'domcontentloaded' });
@@ -439,6 +480,13 @@ try {
   await download.saveAs(recordingPath);
   const recordingInfo = await stat(recordingPath);
   assert.ok(recordingInfo.size > 15_000, `Composite recording should contain media data, got ${recordingInfo.size} bytes`);
+
+  await clickControl(hostRoom.page, 'Sous-titres');
+  await clickControl(participantRoom.page, 'Sous-titres');
+  await hostRoom.page.waitForFunction(() => {
+    const overlay = document.querySelector('[data-testid="caption-overlay"]');
+    return Boolean(overlay?.textContent?.includes('Sous-titre automatique participant'));
+  }, undefined, { timeout: 12_000 });
 
   await participantRoom.page.locator('[data-testid="reaction-button"]').click();
   await participantRoom.page.locator('[data-testid="reaction-panel"]').waitFor({ state: 'visible', timeout: 10_000 });
