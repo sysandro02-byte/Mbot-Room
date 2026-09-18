@@ -42,3 +42,6 @@
   .room-v2-speaker-layout{grid-template-rows:minmax(0,1fr) 96px}
   .room-v2-speaker-strip>.room-v2-tile{flex-basis:138px;height:88px}
 }
+
+.room-v2-tile-meta .hand-badge{display:inline-flex;align-items:center;gap:3px;background:#a16207}
+.room-v2-raised-inline{color:#d97706;font-weight:700}
