@@ -27,7 +27,8 @@ import {
   WifiOff,
   X,
 } from 'lucide-react';
-import { useMeetingMeshWebRTC, RemoteMeetingParticipant } from '../hooks/useMeetingMeshWebRTC';
+import { useMeetingMeshWebRTC } from '../hooks/useMeetingMeshWebRTC';
+import { useMeetingLiveKit } from '../hooks/useMeetingLiveKit';
 import { socket } from '../lib/socket';
 import { authService } from '../services/authService';
 import {
@@ -186,6 +187,8 @@ export default function MeetingRoomV2() {
   const [lunaLoading, setLunaLoading] = useState(false);
   const [menuUserId, setMenuUserId] = useState<number | null>(null);
   const [mediaTransportStatus, setMediaTransportStatus] = useState<MediaTransportStatus | null>(null);
+  const [mediaTransportChecked, setMediaTransportChecked] = useState(false);
+  const [liveKitFailed, setLiveKitFailed] = useState(false);
 
   const localUserId = String(currentUser?.id || '');
   const localName = state?.guestName?.trim() || currentUser?.name || currentUser?.username || currentUser?.email || 'Participant';
@@ -215,7 +218,30 @@ export default function MeetingRoomV2() {
     screen: screenSharing,
   }), [cameraEnabled, localStream, micEnabled, screenSharing]);
 
-  const { remoteParticipants, networkQuality, activeSpeakerSocketId } = useMeetingMeshWebRTC({
+  const mediaEnabled = Boolean(meeting?.id && localUserId && isAuthenticated && mediaReady);
+  const liveKitDesired = Boolean(
+    mediaTransportChecked
+    && mediaTransportStatus?.livekitReady
+    && mediaTransportStatus.preferredMode === 'livekit'
+    && !liveKitFailed
+  );
+
+  const handleLiveKitFailure = useCallback((message: string) => {
+    setLiveKitFailed(true);
+    setNotice(message);
+  }, []);
+
+  const liveKitMedia = useMeetingLiveKit({
+    meetingId: meeting?.id || 0,
+    breakoutRoomId,
+    localStream,
+    media: mediaState,
+    enabled: mediaEnabled && liveKitDesired,
+    onNotice: setNotice,
+    onFailure: handleLiveKitFailure,
+  });
+
+  const meshMedia = useMeetingMeshWebRTC({
     meetingId: meeting?.id || 0,
     localUserId,
     localName,
@@ -223,9 +249,15 @@ export default function MeetingRoomV2() {
     localStream,
     media: mediaState,
     breakoutRoomId,
-    enabled: Boolean(meeting?.id && localUserId && isAuthenticated && mediaReady),
+    enabled: mediaEnabled,
+    peerConnectionsEnabled: mediaTransportChecked && !liveKitDesired,
     onNotice: setNotice,
   });
+
+  const usingLiveKit = liveKitDesired && !liveKitMedia.failed;
+  const remoteParticipants = usingLiveKit ? liveKitMedia.remoteParticipants : meshMedia.remoteParticipants;
+  const networkQuality = usingLiveKit ? liveKitMedia.networkQuality : meshMedia.networkQuality;
+  const activeSpeakerSocketId = usingLiveKit ? liveKitMedia.activeSpeakerSocketId : meshMedia.activeSpeakerSocketId;
 
   const loadMeeting = useCallback(async () => {
     if (!isAuthenticated) {
@@ -264,15 +296,25 @@ export default function MeetingRoomV2() {
 
   useEffect(() => {
     let cancelled = false;
+    setMediaTransportChecked(false);
     void mediaTransportService.getStatus()
       .then((status) => {
-        if (!cancelled) setMediaTransportStatus(status);
+        if (cancelled) return;
+        setMediaTransportStatus(status);
+        setLiveKitFailed(false);
       })
       .catch(() => {
         if (!cancelled) setMediaTransportStatus(null);
+      })
+      .finally(() => {
+        if (!cancelled) setMediaTransportChecked(true);
       });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    setLiveKitFailed(false);
+  }, [meeting?.id]);
 
 
   useEffect(() => {
@@ -811,16 +853,28 @@ export default function MeetingRoomV2() {
           {meeting.is_active ? <><Radio size={16} /> En direct</> : <span>Programmée</span>}
           <span>{galleryCount} connecté{galleryCount > 1 ? 's' : ''}</span>
           {breakoutRoomName ? <span className="room-v2-breakout-status">Sous-salle : {breakoutRoomName}</span> : null}
-          <span className="room-v2-media-transport" data-testid="media-transport-status" title={mediaTransportStatus?.livekitReady ? 'Le backend SFU LiveKit est prêt. Le client navigateur utilise encore le mesh WebRTC.' : 'Transport navigateur actuel : mesh WebRTC.'}>
-            Mesh actif
-            {mediaTransportStatus?.livekitReady ? <small> · SFU prêt</small> : null}
+          <span
+            className={`room-v2-media-transport ${liveKitMedia.connected ? 'sfu-active' : liveKitDesired ? 'sfu-connecting' : 'mesh-active'}`}
+            data-testid="media-transport-status"
+            data-transport={liveKitMedia.connected ? 'livekit' : 'mesh'}
+            title={liveKitMedia.connected
+              ? 'Transport média SFU LiveKit actif.'
+              : liveKitDesired
+                ? 'Connexion au SFU LiveKit en cours.'
+                : liveKitFailed
+                  ? 'Le SFU est indisponible. Le mesh WebRTC a repris automatiquement.'
+                  : 'Transport média mesh WebRTC actif.'}
+          >
+            {liveKitMedia.connected ? 'SFU actif' : liveKitDesired ? 'Connexion SFU…' : 'Mesh actif'}
+            {!liveKitMedia.connected && mediaTransportStatus?.livekitReady && !liveKitFailed ? <small> · SFU prêt</small> : null}
+            {liveKitFailed ? <small> · secours</small> : null}
             {mediaTransportStatus?.serverRecordingReady ? <small> · Rec. serveur prêt</small> : null}
           </span>
           <span
             className={`room-v2-network ${networkQuality.level}`}
             data-testid="network-quality"
             data-level={networkQuality.level}
-            title={`Pairs ${networkQuality.connectedPeers}/${networkQuality.totalPeers} · Latence ${networkQuality.rttMs ?? '—'} ms · Pertes ${networkQuality.packetLossPct ?? '—'} %`}
+            title={`${liveKitMedia.connected ? 'SFU' : 'Pairs'} ${networkQuality.connectedPeers}/${networkQuality.totalPeers} · Latence ${networkQuality.rttMs ?? '—'} ms · Pertes ${networkQuality.packetLossPct ?? '—'} %`}
           >
             {networkQuality.level === 'offline' ? <WifiOff size={15} /> : <Wifi size={15} />}
             {networkQuality.level === 'excellent' ? 'Réseau excellent' : networkQuality.level === 'good' ? 'Réseau correct' : networkQuality.level === 'poor' ? 'Réseau faible' : 'Hors ligne'}

@@ -66,6 +66,9 @@
 .room-v2-breakout-status{padding:4px 7px;border-radius:8px;background:rgba(99,102,241,.18);color:#c7d2fe!important}
 .room-v2-media-transport{display:inline-flex;align-items:center;gap:3px;padding:4px 7px;border-radius:8px;background:rgba(34,197,94,.12);color:#bbf7d0!important;font-size:10px!important;white-space:nowrap}
 .room-v2-media-transport small{font-size:10px;color:#93c5fd}
+.room-v2-media-transport.sfu-active{background:rgba(34,197,94,.18);color:#bbf7d0!important}
+.room-v2-media-transport.sfu-connecting{background:rgba(59,130,246,.18);color:#bfdbfe!important}
+.room-v2-media-transport.mesh-active{background:rgba(148,163,184,.14);color:#dbeafe!important}
 .room-v2-breakouts{padding:14px;overflow:auto}
 .room-v2-breakout-create{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid #dfe5ed;border-radius:12px;background:white}
 .room-v2-breakout-create p{margin:0;color:#64748b;font-size:12px;line-height:1.45}
