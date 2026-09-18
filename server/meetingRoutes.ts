@@ -53,6 +53,17 @@ const meetingRole = (meeting: Meeting, user: NonNullable<AuthedRequest['user']>)
   return 'participant';
 };
 
+const meetingCapacity = (meeting: Meeting) => {
+  const configured = Number(meeting.settings.participantCapacity || 100);
+  if (!Number.isFinite(configured)) return 100;
+  return Math.max(2, Math.min(1000, Math.floor(configured)));
+};
+
+const acceptedMemberCount = async (meetingId: number) => {
+  const result = await query(`SELECT COUNT(*)::int AS count FROM room_meeting_members WHERE meeting_id=$1 AND status='accepted'`, [meetingId]);
+  return Number(result.rows[0]?.count || 0);
+};
+
 const normalizeInvitationEmails = (value: unknown) => Array.isArray(value)
   ? [...new Set(value.map(normalizeEmail).filter((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)))].slice(0, 200)
   : [];
@@ -341,6 +352,10 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const hostHasStarted = meeting.is_active || meeting.status === 'live';
       const blockedUntilHost = !moderator && !alreadyAccepted && !hostHasStarted && meeting.settings.joinBeforeHost === false;
       const status = moderator || alreadyAccepted || (!blockedUntilHost && meeting.settings.waitingRoom === false) ? 'accepted' : 'requested';
+      if (status === 'accepted' && !alreadyAccepted && !moderator) {
+        const count = await acceptedMemberCount(meeting.id);
+        if (count >= meetingCapacity(meeting)) return sendApiError(response, 409, 'MEETING_CAPACITY_REACHED', 'La capacité maximale de la réunion est atteinte.');
+      }
       await query(
         `INSERT INTO room_lobby (meeting_id,user_id,status,name,avatar) VALUES ($1,$2,$3,$4,$5)
          ON CONFLICT (meeting_id,user_id) DO UPDATE SET status=excluded.status,name=excluded.name,avatar=excluded.avatar`,
@@ -367,6 +382,10 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const updated = await query('UPDATE room_lobby SET status=$3 WHERE meeting_id=$1 AND user_id=$2 RETURNING *', [meeting.id, userId, status]);
       if (!updated.rows[0]) return sendApiError(response, 404, 'PARTICIPANT_NOT_FOUND', 'Participant introuvable dans la salle d’attente.');
       if (status === 'accepted') {
+        const existingAccepted = await query(`SELECT 1 FROM room_meeting_members WHERE meeting_id=$1 AND user_id=$2 AND status='accepted' LIMIT 1`, [meeting.id, userId]);
+        if (!existingAccepted.rows[0] && await acceptedMemberCount(meeting.id) >= meetingCapacity(meeting)) {
+          return sendApiError(response, 409, 'MEETING_CAPACITY_REACHED', 'La capacité maximale de la réunion est atteinte.');
+        }
         await query(
           `INSERT INTO room_meeting_members (meeting_id,user_id,role,status,joined_at) VALUES ($1,$2,'participant','accepted',now())
            ON CONFLICT (meeting_id,user_id) DO UPDATE SET status='accepted',joined_at=COALESCE(room_meeting_members.joined_at,now()),updated_at=now()`, [meeting.id,userId],
@@ -382,10 +401,12 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     try {
       const meeting = await getMeetingById(Number(request.params.meetingId));
       if (!meeting || !canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'LOBBY_HOST_REQUIRED', 'Seul l’hôte ou le co-hôte peut gérer la salle d’attente.');
-      const pending = await query(`SELECT user_id FROM room_lobby WHERE meeting_id=$1 AND status='requested'`, [meeting.id]);
-      const userIds = pending.rows.map((row) => Number(row.user_id)).filter(Boolean);
+      const pending = await query(`SELECT user_id FROM room_lobby WHERE meeting_id=$1 AND status='requested' ORDER BY user_id`, [meeting.id]);
+      const currentCount = await acceptedMemberCount(meeting.id);
+      const availableSlots = Math.max(0, meetingCapacity(meeting) - currentCount);
+      const userIds = pending.rows.map((row) => Number(row.user_id)).filter(Boolean).slice(0, availableSlots);
       if (userIds.length) {
-        await query(`UPDATE room_lobby SET status='accepted' WHERE meeting_id=$1 AND status='requested'`, [meeting.id]);
+        await query(`UPDATE room_lobby SET status='accepted' WHERE meeting_id=$1 AND user_id = ANY($2::int[])`, [meeting.id, userIds]);
         for (const userId of userIds) {
           await query(
             `INSERT INTO room_meeting_members (meeting_id,user_id,role,status,joined_at) VALUES ($1,$2,'participant','accepted',now())
@@ -423,11 +444,13 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       if (!canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte peut démarrer la réunion.');
       const updated = await query(`UPDATE room_meetings SET status='live',is_active=true,started_at=COALESCE(started_at,now()),ended_at=NULL,updated_at=now() WHERE id=$1 RETURNING *`, [meeting.id]);
       if (meeting.settings.waitingRoom === false) {
-        const pending = await query(`SELECT user_id FROM room_lobby WHERE meeting_id=$1 AND status='requested'`, [meeting.id]);
-        if (pending.rows.length) {
-          await query(`UPDATE room_lobby SET status='accepted' WHERE meeting_id=$1 AND status='requested'`, [meeting.id]);
-          for (const row of pending.rows) {
-            const userId = Number(row.user_id);
+        const pending = await query(`SELECT user_id FROM room_lobby WHERE meeting_id=$1 AND status='requested' ORDER BY user_id`, [meeting.id]);
+        const currentCount = await acceptedMemberCount(meeting.id);
+        const availableSlots = Math.max(0, meetingCapacity(meeting) - currentCount);
+        const autoAdmitIds = pending.rows.map((row) => Number(row.user_id)).filter(Boolean).slice(0, availableSlots);
+        if (autoAdmitIds.length) {
+          await query(`UPDATE room_lobby SET status='accepted' WHERE meeting_id=$1 AND user_id = ANY($2::int[])`, [meeting.id, autoAdmitIds]);
+          for (const userId of autoAdmitIds) {
             await query(
               `INSERT INTO room_meeting_members (meeting_id,user_id,role,status,joined_at) VALUES ($1,$2,'participant','accepted',now())
                ON CONFLICT (meeting_id,user_id) DO UPDATE SET status='accepted',joined_at=COALESCE(room_meeting_members.joined_at,now()),updated_at=now()`,
