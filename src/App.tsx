@@ -13,6 +13,8 @@ const RealMeetingEndedPage = lazy(() => import('./pages/RealMeetingEndedPage'));
 const RealFeaturePage = lazy(() => import('./pages/RealFeaturePage'));
 const RealDashboardPage = lazy(() => import('./pages/dashboard/RealDashboardPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
+const GlobalSearchPage = lazy(() => import('./pages/GlobalSearchPage'));
+const HelpPage = lazy(() => import('./pages/HelpPage'));
 const Login = lazy(() => import('./pages/Login'));
 
 function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: boolean }) {
@@ -111,10 +113,11 @@ export default function App() {
     <Route path="/dashboard" element={<Navigate to="/app" replace />} />
     <Route path="/admin" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
     <Route path="/reunions/recentes" element={<Navigate to="/app?tab=reunions" replace />} />
-    <Route path="/aide" element={<SimpleInfoPage title="Centre d'aide" description="Le centre d'aide MBotéRoom sera connecté au support dès que le backend expose cette section." />} />
+    <Route path="/aide" element={<HelpPage />} />
     <Route path="/securite" element={<SimpleInfoPage title="Sécurité MBotéRoom" description="Les réunions utilisent les protections disponibles dans l'application." />} />
     <Route path="/fonctionnalites" element={<SimpleInfoPage title="Fonctionnalités MBotéRoom" description="Créez un compte pour retrouver l'historique, organiser vos réunions et gérer les invitations." />} />
     <Route path="/app/meetings" element={<ProtectedRoute><AppShell title="Réunions"><RealMeetingList /></AppShell></ProtectedRoute>} />
+    <Route path="/app/search" element={<ProtectedRoute><GlobalSearchPage /></ProtectedRoute>} />
     <Route path="/app/calendar" element={<ProtectedRoute><RealFeaturePage kind="calendar" /></ProtectedRoute>} />
     <Route path="/app/recordings" element={<ProtectedRoute><RealFeaturePage kind="recordings" /></ProtectedRoute>} />
     <Route path="/app/messages" element={<ProtectedRoute><RealFeaturePage kind="messages" /></ProtectedRoute>} />
