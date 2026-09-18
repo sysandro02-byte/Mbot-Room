@@ -283,7 +283,12 @@ export default function MeetingRoomV2() {
     const openMedia = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            channelCount: { ideal: 1 },
+          },
           video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } },
         });
         if (cancelled) {
@@ -443,7 +448,7 @@ export default function MeetingRoomV2() {
     if (!deviceId || !navigator.mediaDevices?.getUserMedia) return;
     try {
       const fresh = await navigator.mediaDevices.getUserMedia(kind === 'audioinput'
-        ? { audio: { deviceId: { exact: deviceId } }, video: false }
+        ? { audio: { deviceId: { exact: deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: { ideal: 1 } }, video: false }
         : { audio: false, video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } } });
       const nextTrack = kind === 'audioinput' ? fresh.getAudioTracks()[0] : fresh.getVideoTracks()[0];
       if (!nextTrack) throw new Error('Périphérique sans piste média.');
