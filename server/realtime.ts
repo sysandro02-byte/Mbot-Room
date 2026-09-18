@@ -2,8 +2,10 @@ import type { Server, Socket } from 'socket.io';
 import {
   PublicUser,
   canModerateMeeting,
+  createId,
   getUserByRawToken,
   hasMeetingAccess,
+  normalizeText,
   query,
 } from './core.js';
 import { getMeetingById, insertChatMessage } from './meetingRoutes.js';
@@ -173,6 +175,34 @@ export const registerRealtime = (io: Server) => {
       if (!reaction) return callback?.(fail('VALIDATION_ERROR', 'Réaction invalide.'));
       io.to(`meeting:${meetingId}`).emit('meeting:reaction', { meetingId, userId: user.id, name: user.name, reaction, at: new Date().toISOString() });
       callback?.({ ok: true });
+    });
+
+    socket.on('meeting:caption', async (payload: any, callback?: Ack) => {
+      const meetingId = Number(socket.data.meetingId || 0);
+      const participant = participantForSocket(meetingId, socket.id);
+      if (!meetingId || !participant) return callback?.(fail('REALTIME_NOT_JOINED', 'Vous devez rejoindre la réunion.'));
+      const text = normalizeText(payload?.text).slice(0, 500);
+      if (!text) return callback?.(fail('VALIDATION_ERROR', 'Sous-titre vide.'));
+      const caption = {
+        id: createId(),
+        meetingId,
+        userId: user.id,
+        speaker: user.name || user.email,
+        text,
+        breakoutRoomId: participant.breakoutRoomId,
+        createdAt: new Date().toISOString(),
+      };
+      try {
+        await query(
+          `INSERT INTO room_captions (id,meeting_id,user_id,speaker,text,breakout_room_id,created_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [caption.id, meetingId, user.id, caption.speaker, caption.text, caption.breakoutRoomId, caption.createdAt],
+        );
+        io.to(mediaRoomName(meetingId, participant.breakoutRoomId)).emit('meeting:caption', caption);
+        callback?.({ ok: true, caption });
+      } catch {
+        callback?.(fail('REALTIME_CAPTION_FAILED', 'Sous-titre impossible à enregistrer.'));
+      }
     });
 
     for (const eventName of ['meeting:offer', 'meeting:answer', 'meeting:ice-candidate'] as const) {
