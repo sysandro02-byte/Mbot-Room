@@ -342,7 +342,8 @@ export function useMeetingMeshWebRTC({
   useEffect(() => {
     if (!enabled || !rtcConfigReady || !meetingId || !localUserId) return undefined;
 
-    socket.auth = { token: authService.getToken() };
+    const legacyToken = authService.getToken();
+    socket.auth = legacyToken ? { token: legacyToken } : {};
 
     const joinRealtime = () => {
       socket.emit('meeting:join', {
