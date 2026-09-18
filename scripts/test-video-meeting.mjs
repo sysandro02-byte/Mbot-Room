@@ -196,14 +196,17 @@ const clickControl = async (page, label) => {
 let browser;
 let hostContext;
 let participantContext;
+let participantTwoContext;
 let hostRoom;
 let participantRoom;
+let participantTwoRoom;
 
 try {
   await waitForServer();
 
   const host = await register('Hôte Vidéo', 'host.video@mbote.test');
   const participant = await register('Participant Vidéo', 'participant.video@mbote.test');
+  const participantTwo = await register('Participant Deux', 'participant.two@mbote.test');
 
   const created = await jsonRequest('/api/meetings', {
     method: 'POST',
@@ -235,6 +238,14 @@ try {
   assert.equal(join.response.status, 200, JSON.stringify(join.data));
   assert.equal(join.data.status, 'accepted');
 
+  const joinTwo = await jsonRequest(`/api/meetings/${meeting.id}/join-request`, {
+    method: 'POST',
+    headers: authHeaders(participantTwo.token),
+    body: JSON.stringify({ password: 'VideoRoom2026!' }),
+  });
+  assert.equal(joinTwo.response.status, 200, JSON.stringify(joinTwo.data));
+  assert.equal(joinTwo.data.status, 'accepted');
+
   const start = await jsonRequest(`/api/meetings/${meeting.id}/start-notify`, {
     method: 'POST',
     headers: authHeaders(host.token),
@@ -256,10 +267,16 @@ try {
   hostContext = hostRoom.context;
   participantRoom = await openAuthenticatedMeeting(browser, participant, meeting.id, 'participant');
   participantContext = participantRoom.context;
+  participantTwoRoom = await openAuthenticatedMeeting(browser, participantTwo, meeting.id, 'participant-two');
+  participantTwoContext = participantTwoRoom.context;
 
   await Promise.all([
     waitForRemoteMedia(hostRoom.page, 'Participant Vidéo'),
+    waitForRemoteMedia(hostRoom.page, 'Participant Deux'),
     waitForRemoteMedia(participantRoom.page, 'Hôte Vidéo'),
+    waitForRemoteMedia(participantRoom.page, 'Participant Deux'),
+    waitForRemoteMedia(participantTwoRoom.page, 'Hôte Vidéo'),
+    waitForRemoteMedia(participantTwoRoom.page, 'Participant Vidéo'),
   ]);
 
   await hostRoom.page.waitForFunction(() => {
@@ -307,7 +324,11 @@ try {
 
   await Promise.all([
     waitForRemoteMedia(hostRoom.page, 'Participant Vidéo', 30_000),
+    waitForRemoteMedia(hostRoom.page, 'Participant Deux', 30_000),
     waitForRemoteMedia(participantRoom.page, 'Hôte Vidéo', 30_000),
+    waitForRemoteMedia(participantRoom.page, 'Participant Deux', 30_000),
+    waitForRemoteMedia(participantTwoRoom.page, 'Hôte Vidéo', 30_000),
+    waitForRemoteMedia(participantTwoRoom.page, 'Participant Vidéo', 30_000),
   ]);
 
   const persisted = await jsonRequest(`/api/meetings/${meeting.id}/participants`, { headers: authHeaders(host.token) });
@@ -317,11 +338,13 @@ try {
   await mkdir('test-artifacts', { recursive: true });
   await hostRoom.page.screenshot({ path: 'test-artifacts/video-host.png', fullPage: true });
   await participantRoom.page.screenshot({ path: 'test-artifacts/video-participant.png', fullPage: true });
+  await participantTwoRoom.page.screenshot({ path: 'test-artifacts/video-participant-two.png', fullPage: true });
 
   assert.deepEqual(hostRoom.browserErrors, [], `Host browser errors: ${hostRoom.browserErrors.join('\n')}`);
   assert.deepEqual(participantRoom.browserErrors, [], `Participant browser errors: ${participantRoom.browserErrors.join('\n')}`);
+  assert.deepEqual(participantTwoRoom.browserErrors, [], `Participant two browser errors: ${participantTwoRoom.browserErrors.join('\n')}`);
 
-  console.log('Two-browser camera + microphone + reconnect video meeting checks passed.');
+  console.log('Three-browser camera + microphone + reconnect video meeting checks passed.');
 } catch (error) {
   await mkdir('test-artifacts', { recursive: true }).catch(() => undefined);
   if (hostRoom?.page) {
@@ -332,9 +355,14 @@ try {
     console.error(`PARTICIPANT_DIAGNOSTICS ${JSON.stringify(await mediaDiagnostics(participantRoom.page).catch((cause) => ({ error: String(cause) })), null, 2)}`);
     await participantRoom.page.screenshot({ path: 'test-artifacts/failure-participant.png', fullPage: true }).catch(() => undefined);
   }
+  if (participantTwoRoom?.page) {
+    console.error(`PARTICIPANT_TWO_DIAGNOSTICS ${JSON.stringify(await mediaDiagnostics(participantTwoRoom.page).catch((cause) => ({ error: String(cause) })), null, 2)}`);
+    await participantTwoRoom.page.screenshot({ path: 'test-artifacts/failure-participant-two.png', fullPage: true }).catch(() => undefined);
+  }
   console.error(`SERVER_OUTPUT\n${serverOutput}`);
   throw error;
 } finally {
+  await participantTwoContext?.close().catch(() => undefined);
   await participantContext?.close().catch(() => undefined);
   await hostContext?.close().catch(() => undefined);
   await browser?.close().catch(() => undefined);
