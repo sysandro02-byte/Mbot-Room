@@ -183,6 +183,7 @@ try {
       settings: {
         password: 'RoomPass2026!',
         waitingRoom: true,
+        participantCapacity: 2,
         chat: true,
         reactions: true,
         joinBeforeHost: false,
@@ -290,6 +291,17 @@ try {
   });
   assert.equal(unlockedJoin.response.status, 200, JSON.stringify(unlockedJoin.data));
   assert.equal(unlockedJoin.data.status, 'requested');
+
+  const capacityAdmitAll = await jsonRequest(`/api/meetings/${meeting.id}/lobby/admit-all`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+  });
+  assert.equal(capacityAdmitAll.response.status, 200, JSON.stringify(capacityAdmitAll.data));
+  assert.equal(capacityAdmitAll.data.admitted, 0);
+
+  const lobbyAtCapacity = await jsonRequest(`/api/meetings/${meeting.id}/lobby`, { headers: authHeaders(host.token) });
+  assert.equal(lobbyAtCapacity.response.status, 200);
+  assert.ok(lobbyAtCapacity.data.some((item) => Number(item.user_id) === Number(outsider.user.id) && item.status === 'requested'));
 
   const message = await jsonRequest(`/api/meetings/${meeting.id}/messages`, {
     method: 'POST',
