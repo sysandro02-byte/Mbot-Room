@@ -166,6 +166,8 @@ export default function MeetingRoomV2() {
   const [cameraEnabled, setCameraEnabled] = useState(initialCamera);
   const [screenSharing, setScreenSharing] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [recordingMode, setRecordingMode] = useState<'local' | 'server' | null>(null);
+  const [serverRecordingId, setServerRecordingId] = useState<string | null>(null);
   const [handRaised, setHandRaised] = useState(false);
   const [raisedHands, setRaisedHands] = useState<Set<number>>(new Set());
   const [reactions, setReactions] = useState<Record<number, string>>({});
