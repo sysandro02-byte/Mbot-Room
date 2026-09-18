@@ -304,6 +304,10 @@ try {
     waitForRemoteMedia(participantTwoRoom.page, 'Participant Vidéo'),
   ]);
 
+  const transportBadge = hostRoom.page.locator('[data-testid="media-transport-status"]');
+  await transportBadge.waitFor({ state: 'visible', timeout: 10_000 });
+  assert.match(await transportBadge.innerText(), /Mesh actif/);
+
   await hostRoom.page.waitForFunction(() => {
     const indicator = document.querySelector('[data-testid="network-quality"]');
     const level = indicator?.getAttribute('data-level');
