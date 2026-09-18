@@ -36,7 +36,7 @@ import {
   MeetingParticipant,
   MeetingPoll,
 } from '../services/collaborationService';
-import { getMeetingAccessCode, Meeting, meetingService } from '../services/meetingService';
+import { getMeetingAccessCode, LobbyParticipant, Meeting, meetingService } from '../services/meetingService';
 import './MeetingRoomV2.css';
 
 type Panel = 'participants' | 'chat' | 'polls' | 'luna' | null;
@@ -167,6 +167,7 @@ export default function MeetingRoomV2() {
   const reactionTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const [reactionPanelOpen, setReactionPanelOpen] = useState(false);
   const [participants, setParticipants] = useState<MeetingParticipant[]>([]);
+  const [lobbyParticipants, setLobbyParticipants] = useState<LobbyParticipant[]>([]);
   const [messages, setMessages] = useState<MeetingMessage[]>([]);
   const [messageDraft, setMessageDraft] = useState('');
   const [polls, setPolls] = useState<MeetingPoll[]>([]);
@@ -255,19 +256,21 @@ export default function MeetingRoomV2() {
     if (!meeting?.id) return;
     let cancelled = false;
     const load = async () => {
-      const [memberRows, chatRows, pollRows] = await Promise.all([
+      const [memberRows, chatRows, pollRows, lobbyRows] = await Promise.all([
         collaborationService.getParticipants(meeting.id).catch(() => []),
         collaborationService.getMessages(meeting.id).catch(() => []),
         collaborationService.getPolls(meeting.id).catch(() => []),
+        isModerator ? meetingService.getLobby(meeting.id).catch(() => []) : Promise.resolve([]),
       ]);
       if (cancelled) return;
       setParticipants(memberRows);
       setMessages(dedupeMessages(chatRows));
       setPolls(pollRows);
+      setLobbyParticipants(lobbyRows.filter((item) => item.status === 'requested'));
     };
     void load();
     return () => { cancelled = true; };
-  }, [meeting?.id]);
+  }, [isModerator, meeting?.id]);
 
   useEffect(() => {
     setMediaReady(false);
@@ -322,6 +325,12 @@ export default function MeetingRoomV2() {
     setParticipants(await collaborationService.getParticipants(meeting.id).catch(() => []));
   }, [meeting?.id]);
 
+  const refreshLobby = useCallback(async () => {
+    if (!meeting?.id || !isModerator) return;
+    const rows = await meetingService.getLobby(meeting.id).catch(() => []);
+    setLobbyParticipants(rows.filter((item) => item.status === 'requested'));
+  }, [isModerator, meeting?.id]);
+
   useEffect(() => {
     if (!meeting?.id) return;
     const id = meeting.id;
@@ -329,7 +338,7 @@ export default function MeetingRoomV2() {
     const onChatDeleted = ({ messageId }: { messageId: string }) => setMessages((current) => current.filter((message) => message.id !== messageId));
     const onPoll = (poll: MeetingPoll) => setPolls((current) => [poll, ...current.filter((item) => item.id !== poll.id)]);
     const onPresence = () => void refreshParticipants();
-    const onLobby = () => void refreshParticipants();
+    const onLobby = () => { void refreshParticipants(); void refreshLobby(); };
     const onHandRaised = (payload: { meetingId: number; userId: number; raised: boolean }) => {
       if (Number(payload.meetingId) !== id) return;
       setRaisedHands((current) => {
@@ -408,7 +417,7 @@ export default function MeetingRoomV2() {
       socket.off('meeting:banned', onBanned);
       socket.off('meeting:moved-to-lobby', onMoved);
     };
-  }, [location.state, meeting?.id, navigate, refreshParticipants]);
+  }, [location.state, meeting?.id, navigate, refreshLobby, refreshParticipants]);
 
   const toggleMic = () => {
     const next = !micEnabled;
@@ -572,6 +581,39 @@ export default function MeetingRoomV2() {
       setLunaAnswer(cause instanceof Error ? cause.message : 'Luna IA est indisponible.');
     } finally {
       setLunaLoading(false);
+    }
+  };
+
+  const respondToLobby = async (userId: number, status: 'accepted' | 'rejected') => {
+    if (!meeting?.id) return;
+    try {
+      await meetingService.respondToLobby(meeting.id, userId, status);
+      await Promise.all([refreshLobby(), refreshParticipants()]);
+      setNotice(status === 'accepted' ? 'Participant admis.' : 'Demande refusée.');
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Action salle d’attente impossible.');
+    }
+  };
+
+  const admitAllLobby = async () => {
+    if (!meeting?.id) return;
+    try {
+      const result = await meetingService.admitAllLobby(meeting.id);
+      await Promise.all([refreshLobby(), refreshParticipants()]);
+      setNotice(`${result.admitted} participant${result.admitted > 1 ? 's' : ''} admis.`);
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Admission globale impossible.');
+    }
+  };
+
+  const muteAllParticipants = async () => {
+    if (!meeting?.id) return;
+    try {
+      const result = await collaborationService.muteAllParticipants(meeting.id);
+      await refreshParticipants();
+      setNotice(`${result.muted} participant${result.muted > 1 ? 's' : ''} mis en sourdine.`);
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Impossible de couper tous les micros.');
     }
   };
 
@@ -762,6 +804,27 @@ export default function MeetingRoomV2() {
 
             {panel === 'participants' ? (
               <div className="room-v2-participants">
+                {isModerator ? (
+                  <div className="room-v2-host-tools">
+                    <button type="button" onClick={() => void muteAllParticipants()} data-testid="mute-all-button">Couper tous les micros</button>
+                    {lobbyParticipants.length ? <button type="button" onClick={() => void admitAllLobby()} data-testid="admit-all-button">Admettre tous ({lobbyParticipants.length})</button> : null}
+                  </div>
+                ) : null}
+                {isModerator && lobbyParticipants.length ? (
+                  <section className="room-v2-lobby-section">
+                    <strong>Salle d’attente</strong>
+                    {lobbyParticipants.map((item) => (
+                      <article key={item.user_id} className="room-v2-lobby-row">
+                        <div className="room-v2-person-avatar">{item.avatar ? <img src={item.avatar} alt=""/> : initials(item.name)}</div>
+                        <div><strong>{item.name}</strong><small>En attente</small></div>
+                        <div className="room-v2-lobby-actions">
+                          <button type="button" onClick={() => void respondToLobby(item.user_id, 'accepted')}>Admettre</button>
+                          <button type="button" className="danger" onClick={() => void respondToLobby(item.user_id, 'rejected')}>Refuser</button>
+                        </div>
+                      </article>
+                    ))}
+                  </section>
+                ) : null}
                 {activeMembers.map((member) => {
                   const remote = remoteByUser.get(member.userId);
                   const isSelf = member.userId === Number(currentUser?.id || 0);
