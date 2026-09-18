@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import pg from 'pg';
 import { io as createSocket } from 'socket.io-client';
@@ -29,6 +30,11 @@ const server = spawn(process.execPath, ['dist/server.js'], {
     ADMIN_EMAILS: '',
     RESEND_API_KEY: '',
     GROQ_API_KEY: '',
+    MEDIA_TRANSPORT: 'livekit',
+    LIVEKIT_URL: 'wss://livekit.test.invalid',
+    LIVEKIT_API_KEY: 'test-api-key',
+    LIVEKIT_API_SECRET: 'test-api-secret',
+    LIVEKIT_TOKEN_TTL_SECONDS: '900',
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -75,6 +81,14 @@ const jsonRequest = async (path, options = {}) => {
 };
 
 const authHeaders = (token) => ({ Authorization: `Bearer ${token}` });
+
+const decodeAndVerifyJwt = (token, secret) => {
+  const [header, payload, signature] = String(token || '').split('.');
+  assert.ok(header && payload && signature, 'JWT must have three parts');
+  const expected = crypto.createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64url');
+  assert.equal(signature, expected, 'JWT signature must match');
+  return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+};
 
 const register = async (name, email) => {
   const result = await jsonRequest('/api/auth/register', {
@@ -253,6 +267,38 @@ try {
   assert.equal(participants.response.status, 200);
   assert.ok(participants.data.some((item) => Number(item.userId) === Number(host.user.id)));
   assert.ok(participants.data.some((item) => Number(item.userId) === Number(participant.user.id)));
+
+  const mediaStatus = await jsonRequest('/api/media/status');
+  assert.equal(mediaStatus.response.status, 200, JSON.stringify(mediaStatus.data));
+  assert.equal(mediaStatus.data.preferredMode, 'livekit');
+  assert.equal(mediaStatus.data.browserTransport, 'mesh');
+  assert.equal(mediaStatus.data.livekitReady, true);
+
+  const hostMediaSession = await jsonRequest(`/api/meetings/${meeting.id}/media-session`, {
+    headers: authHeaders(host.token),
+  });
+  assert.equal(hostMediaSession.response.status, 200, JSON.stringify(hostMediaSession.data));
+  assert.equal(hostMediaSession.data.mode, 'livekit');
+  assert.equal(hostMediaSession.data.serverUrl, 'wss://livekit.test.invalid');
+  const hostSfuPayload = decodeAndVerifyJwt(hostMediaSession.data.participantToken, 'test-api-secret');
+  assert.equal(hostSfuPayload.iss, 'test-api-key');
+  assert.equal(hostSfuPayload.sub, `mboteroom-user-${host.user.id}`);
+  assert.equal(hostSfuPayload.video?.room, `mboteroom-${meeting.id}`);
+  assert.equal(hostSfuPayload.video?.roomJoin, true);
+
+  const participantMediaSession = await jsonRequest(`/api/meetings/${meeting.id}/media-session`, {
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(participantMediaSession.response.status, 200, JSON.stringify(participantMediaSession.data));
+  const participantSfuPayload = decodeAndVerifyJwt(participantMediaSession.data.participantToken, 'test-api-secret');
+  assert.equal(participantSfuPayload.sub, `mboteroom-user-${participant.user.id}`);
+  assert.equal(participantSfuPayload.video?.room, `mboteroom-${meeting.id}`);
+
+  const outsiderMediaSession = await jsonRequest(`/api/meetings/${meeting.id}/media-session`, {
+    headers: authHeaders(outsider.token),
+  });
+  assert.equal(outsiderMediaSession.response.status, 403);
+  assert.equal(outsiderMediaSession.data.code, 'MEETING_ACCESS_DENIED');
 
   const muteAll = await jsonRequest(`/api/meetings/${meeting.id}/participants/mute-all`, {
     method: 'POST',

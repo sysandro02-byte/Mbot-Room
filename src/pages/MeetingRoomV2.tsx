@@ -38,6 +38,7 @@ import {
   MeetingPoll,
 } from '../services/collaborationService';
 import { getMeetingAccessCode, LobbyParticipant, Meeting, meetingService } from '../services/meetingService';
+import { mediaTransportService, type MediaTransportStatus } from '../services/mediaTransportService';
 import { createCompositeMeetingRecording, type CompositeRecordingSession } from '../lib/meetingRecording';
 import './MeetingRoomV2.css';
 
@@ -184,6 +185,7 @@ export default function MeetingRoomV2() {
   const [lunaAnswer, setLunaAnswer] = useState('');
   const [lunaLoading, setLunaLoading] = useState(false);
   const [menuUserId, setMenuUserId] = useState<number | null>(null);
+  const [mediaTransportStatus, setMediaTransportStatus] = useState<MediaTransportStatus | null>(null);
 
   const localUserId = String(currentUser?.id || '');
   const localName = state?.guestName?.trim() || currentUser?.name || currentUser?.username || currentUser?.email || 'Participant';
@@ -259,6 +261,19 @@ export default function MeetingRoomV2() {
   }, [currentUser?.id, currentUser?.isGuest, isAuthenticated, location.state, meetingId, navigate, state?.meeting]);
 
   useEffect(() => { void loadMeeting(); }, [loadMeeting]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void mediaTransportService.getStatus()
+      .then((status) => {
+        if (!cancelled) setMediaTransportStatus(status);
+      })
+      .catch(() => {
+        if (!cancelled) setMediaTransportStatus(null);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
 
   useEffect(() => {
     if (!meeting?.id) return;
@@ -796,6 +811,11 @@ export default function MeetingRoomV2() {
           {meeting.is_active ? <><Radio size={16} /> En direct</> : <span>Programmée</span>}
           <span>{galleryCount} connecté{galleryCount > 1 ? 's' : ''}</span>
           {breakoutRoomName ? <span className="room-v2-breakout-status">Sous-salle : {breakoutRoomName}</span> : null}
+          <span className="room-v2-media-transport" data-testid="media-transport-status" title={mediaTransportStatus?.livekitReady ? 'Le backend SFU LiveKit est prêt. Le client navigateur utilise encore le mesh WebRTC.' : 'Transport navigateur actuel : mesh WebRTC.'}>
+            Mesh actif
+            {mediaTransportStatus?.livekitReady ? <small> · SFU prêt</small> : null}
+            {mediaTransportStatus?.serverRecordingReady ? <small> · Rec. serveur prêt</small> : null}
+          </span>
           <span
             className={`room-v2-network ${networkQuality.level}`}
             data-testid="network-quality"
