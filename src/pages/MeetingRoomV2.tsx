@@ -591,7 +591,7 @@ export default function MeetingRoomV2() {
       recorder.start(1000);
       recorderRef.current = recorder;
       setRecording(true);
-      setNotice('Enregistrement local démarré. Il contient votre flux local, pas les vidéos distantes.');
+      setNotice(`Enregistrement composite démarré pour ${sources.filter((source) => source.stream).length} flux.`);
     } catch {
       setNotice('Impossible de démarrer l’enregistrement local.');
     }
