@@ -222,12 +222,13 @@ try {
   assert.equal(lobby.response.status, 200);
   assert.ok(lobby.data.some((item) => Number(item.user_id) === Number(participant.user.id) && item.status === 'requested'));
 
-  const admit = await jsonRequest(`/api/meetings/${meeting.id}/lobby/respond`, {
+  const admitAll = await jsonRequest(`/api/meetings/${meeting.id}/lobby/admit-all`, {
     method: 'POST',
     headers: authHeaders(host.token),
-    body: JSON.stringify({ userId: Number(participant.user.id), status: 'accepted' }),
   });
-  assert.equal(admit.response.status, 200, JSON.stringify(admit.data));
+  assert.equal(admitAll.response.status, 200, JSON.stringify(admitAll.data));
+  assert.equal(admitAll.data.admitted, 1);
+  assert.ok(admitAll.data.userIds.includes(Number(participant.user.id)));
 
   const start = await jsonRequest(`/api/meetings/${meeting.id}/start-notify`, {
     method: 'POST',
@@ -240,6 +241,21 @@ try {
   assert.equal(participants.response.status, 200);
   assert.ok(participants.data.some((item) => Number(item.userId) === Number(host.user.id)));
   assert.ok(participants.data.some((item) => Number(item.userId) === Number(participant.user.id)));
+
+  const muteAll = await jsonRequest(`/api/meetings/${meeting.id}/participants/mute-all`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+  });
+  assert.equal(muteAll.response.status, 200, JSON.stringify(muteAll.data));
+  assert.equal(muteAll.data.muted, 1);
+  assert.ok(muteAll.data.userIds.includes(Number(participant.user.id)));
+
+  const mutedParticipants = await jsonRequest(`/api/meetings/${meeting.id}/participants`, { headers: authHeaders(host.token) });
+  assert.equal(mutedParticipants.response.status, 200);
+  assert.equal(
+    mutedParticipants.data.find((item) => Number(item.userId) === Number(participant.user.id))?.mutedByHost,
+    true,
+  );
 
   const message = await jsonRequest(`/api/meetings/${meeting.id}/messages`, {
     method: 'POST',
