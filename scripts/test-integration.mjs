@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import pg from 'pg';
 import { io as createSocket } from 'socket.io-client';
@@ -29,6 +30,11 @@ const server = spawn(process.execPath, ['dist/server.js'], {
     ADMIN_EMAILS: '',
     RESEND_API_KEY: '',
     GROQ_API_KEY: '',
+    MEDIA_TRANSPORT: 'livekit',
+    LIVEKIT_URL: 'wss://livekit.test.invalid',
+    LIVEKIT_API_KEY: 'test-api-key',
+    LIVEKIT_API_SECRET: 'test-api-secret',
+    LIVEKIT_TOKEN_TTL_SECONDS: '900',
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
