@@ -86,7 +86,11 @@ export const adminPermissions = [
 
 const databaseUrl = String(process.env.DATABASE_URL || '').trim();
 export const pool = databaseUrl
-  ? new pg.Pool({ connectionString: databaseUrl, ssl: process.env.PGSSLMODE === 'disable' ? undefined : { rejectUnauthorized: false } })
+  ? new pg.Pool({
+      connectionString: databaseUrl,
+      ssl: process.env.PGSSLMODE === 'disable' ? undefined : { rejectUnauthorized: false },
+      connectionTimeoutMillis: Math.max(1000, Number(process.env.DB_CONNECT_TIMEOUT_MS || 8000)),
+    })
   : null;
 
 let databaseReady = false;
