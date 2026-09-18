@@ -3,6 +3,7 @@ import { getSocketUrl } from './api';
 
 export const socket = io(getSocketUrl(), {
   autoConnect: false,
+  withCredentials: true,
   transports: ['websocket', 'polling'],
   withCredentials: true,
 }) as Socket & {
