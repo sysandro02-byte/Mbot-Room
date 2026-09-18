@@ -280,6 +280,7 @@ let browser;
 let hostContext;
 let participantContext;
 let participantTwoContext;
+let restrictedParticipantContext;
 let hostRoom;
 let participantRoom;
 let participantTwoRoom;
@@ -476,7 +477,53 @@ try {
   assert.deepEqual(participantRoom.browserErrors, [], `Participant browser errors: ${participantRoom.browserErrors.join('\n')}`);
   assert.deepEqual(participantTwoRoom.browserErrors, [], `Participant two browser errors: ${participantTwoRoom.browserErrors.join('\n')}`);
 
-  console.log('Three-browser camera + microphone + reconnect video meeting checks passed.');
+  const restrictedCreated = await jsonRequest('/api/meetings', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: 'Réunion média restreint',
+      description: 'Validation permissions hôte',
+      startTime: new Date(Date.now() - 60_000).toISOString(),
+      duration: 30,
+      settings: {
+        waitingRoom: false,
+        participantAudio: false,
+        participantVideo: false,
+        screenShare: true,
+        chat: true,
+        reactions: true,
+        joinBeforeHost: true,
+      },
+    }),
+  });
+  assert.equal(restrictedCreated.response.status, 201, JSON.stringify(restrictedCreated.data));
+  const restrictedMeeting = restrictedCreated.data;
+
+  const restrictedJoin = await jsonRequest(`/api/meetings/${restrictedMeeting.id}/join-request`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({}),
+  });
+  assert.equal(restrictedJoin.response.status, 200, JSON.stringify(restrictedJoin.data));
+
+  const restrictedStart = await jsonRequest(`/api/meetings/${restrictedMeeting.id}/start-notify`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+  });
+  assert.equal(restrictedStart.response.status, 200, JSON.stringify(restrictedStart.data));
+
+  const restrictedRoom = await openAuthenticatedMeeting(browser, participant, restrictedMeeting.id, 'participant-restricted');
+  restrictedParticipantContext = restrictedRoom.context;
+  const blockedMic = restrictedRoom.page.locator('.room-v2-control').filter({ hasText: 'Micro bloqué' }).first();
+  const blockedCamera = restrictedRoom.page.locator('.room-v2-control').filter({ hasText: 'Caméra bloquée' }).first();
+  await blockedMic.waitFor({ state: 'visible', timeout: 15_000 });
+  await blockedCamera.waitFor({ state: 'visible', timeout: 15_000 });
+  assert.equal(await blockedMic.isDisabled(), true);
+  assert.equal(await blockedCamera.isDisabled(), true);
+  assert.deepEqual(restrictedRoom.browserErrors, [], `Restricted participant browser errors: ${restrictedRoom.browserErrors.join('\n')}`);
+  await restrictedRoom.page.screenshot({ path: 'test-artifacts/video-restricted-participant.png', fullPage: true });
+
+  console.log('Three-browser meeting + host media permission checks passed.');
 } catch (error) {
   await mkdir('test-artifacts', { recursive: true }).catch(() => undefined);
   if (hostRoom?.page) {
@@ -494,6 +541,7 @@ try {
   console.error(`SERVER_OUTPUT\n${serverOutput}`);
   throw error;
 } finally {
+  await restrictedParticipantContext?.close().catch(() => undefined);
   await participantTwoContext?.close().catch(() => undefined);
   await participantContext?.close().catch(() => undefined);
   await hostContext?.close().catch(() => undefined);
