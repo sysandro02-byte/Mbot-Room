@@ -4,6 +4,7 @@ import {
   Bot,
   Camera,
   CameraOff,
+  Captions,
   Circle,
   Hand,
   LogOut,
@@ -29,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useMeetingMeshWebRTC } from '../hooks/useMeetingMeshWebRTC';
 import { useMeetingLiveKit } from '../hooks/useMeetingLiveKit';
+import { useMeetingCaptions } from '../hooks/useMeetingCaptions';
 import { socket } from '../lib/socket';
 import { authService } from '../services/authService';
 import {
@@ -189,6 +191,7 @@ export default function MeetingRoomV2() {
   const [mediaTransportStatus, setMediaTransportStatus] = useState<MediaTransportStatus | null>(null);
   const [mediaTransportChecked, setMediaTransportChecked] = useState(false);
   const [liveKitFailed, setLiveKitFailed] = useState(false);
+  const [captionsEnabled, setCaptionsEnabled] = useState(false);
 
   const localUserId = String(currentUser?.id || '');
   const localName = state?.guestName?.trim() || currentUser?.name || currentUser?.username || currentUser?.email || 'Participant';
@@ -258,6 +261,13 @@ export default function MeetingRoomV2() {
   const remoteParticipants = usingLiveKit ? liveKitMedia.remoteParticipants : meshMedia.remoteParticipants;
   const networkQuality = usingLiveKit ? liveKitMedia.networkQuality : meshMedia.networkQuality;
   const activeSpeakerSocketId = usingLiveKit ? liveKitMedia.activeSpeakerSocketId : meshMedia.activeSpeakerSocketId;
+
+  const liveCaptions = useMeetingCaptions({
+    meetingId: meeting?.id || 0,
+    enabled: Boolean(meeting?.id && captionsEnabled),
+    language: typeof navigator !== 'undefined' ? navigator.language : 'fr-FR',
+    onNotice: setNotice,
+  });
 
   const loadMeeting = useCallback(async () => {
     if (!isAuthenticated) {
@@ -892,6 +902,14 @@ export default function MeetingRoomV2() {
 
       {notice ? <div className="room-v2-notice" role="status"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Fermer"><X size={16}/></button></div> : null}
 
+      {captionsEnabled && liveCaptions.captions.length ? (
+        <div className="room-v2-caption-overlay" data-testid="caption-overlay" aria-live="polite">
+          {liveCaptions.captions.slice(-2).map((caption) => (
+            <p key={caption.id}><strong>{caption.speaker}</strong><span>{caption.text}</span></p>
+          ))}
+        </div>
+      ) : null}
+
       <section className="room-v2-body">
         <div className={`room-v2-stage ${speakerViewEnabled ? 'speaker-mode' : ''}`}>
           {speakerViewEnabled && featuredParticipant ? (
@@ -1131,6 +1149,12 @@ export default function MeetingRoomV2() {
         <Control active={micEnabled} label={micEnabled ? 'Micro' : 'Micro coupé'} onClick={toggleMic}>{micEnabled ? <Mic/> : <MicOff/>}</Control>
         <Control active={cameraEnabled} label={cameraEnabled ? 'Caméra' : 'Caméra coupée'} onClick={toggleCamera}>{cameraEnabled ? <Camera/> : <CameraOff/>}</Control>
         <Control active={screenSharing} label="Partager" onClick={() => void toggleScreenShare()}><MonitorUp/></Control>
+        <Control
+          active={captionsEnabled}
+          label={captionsEnabled ? (liveCaptions.active ? 'Sous-titres' : 'Sous-titres affichés') : 'Sous-titres'}
+          testId="captions-button"
+          onClick={() => setCaptionsEnabled((current) => !current)}
+        ><Captions/></Control>
         <Control active={handRaised} label={handRaised ? 'Baisser la main' : 'Main'} onClick={() => { const raised = !handRaised; setHandRaised(raised); setRaisedHands((current) => { const next = new Set(current); if (raised) next.add(Number(currentUser?.id || 0)); else next.delete(Number(currentUser?.id || 0)); return next; }); socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised}); }}><Hand/></Control>
         <div className="room-v2-reaction-wrap">
           <Control active={reactionPanelOpen} label="Réactions" testId="reaction-button" onClick={() => setReactionPanelOpen((current) => !current)}>😊</Control>
