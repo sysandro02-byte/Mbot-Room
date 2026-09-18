@@ -63,7 +63,7 @@ const transcribeWithGroq = async ({
   mimeType: string;
   language: string;
 }) => {
-  const apiKey = String(process.env.GROQ_API_KEY || '').trim();
+  const apiKey = String(process.env.GROQ_TRANSCRIPTION_API_KEY || process.env.GROQ_API_KEY || '').trim();
   if (!apiKey) return { configured: false as const, text: '', language: '' };
 
   const form = new FormData();
@@ -103,7 +103,7 @@ export const registerTranscriptionRoutes = (app: express.Express, io: Server) =>
   app.get('/api/transcription/status', (_request, response) => {
     response.setHeader('Cache-Control', 'no-store');
     response.json({
-      configured: Boolean(String(process.env.GROQ_API_KEY || '').trim()),
+      configured: Boolean(String(process.env.GROQ_TRANSCRIPTION_API_KEY || process.env.GROQ_API_KEY || '').trim()),
       model: transcriptionModel(),
       chunkSeconds: Math.max(5, Math.min(30, Number(process.env.CAPTION_CHUNK_SECONDS || 10))),
     });
