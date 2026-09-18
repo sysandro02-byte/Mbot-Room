@@ -59,6 +59,20 @@ services:
         value: "900"
       - key: LIVEKIT_EGRESS_ENABLED
         value: "false"
+      - key: LIVEKIT_EGRESS_USE_SERVER_DEFAULT_STORAGE
+        value: "false"
+      - key: LIVEKIT_EGRESS_S3_BUCKET
+        sync: false
+      - key: LIVEKIT_EGRESS_S3_REGION
+        sync: false
+      - key: LIVEKIT_EGRESS_S3_ENDPOINT
+        sync: false
+      - key: LIVEKIT_EGRESS_S3_ACCESS_KEY
+        sync: false
+      - key: LIVEKIT_EGRESS_S3_SECRET_KEY
+        sync: false
+      - key: LIVEKIT_EGRESS_S3_FORCE_PATH_STYLE
+        value: "true"
       - key: VITE_TURN_URLS
         sync: false
       - key: VITE_TURN_USERNAME

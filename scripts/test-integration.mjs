@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 import pg from 'pg';
 import { io as createSocket } from 'socket.io-client';
 
@@ -13,6 +14,72 @@ if (!databaseUrl) throw new Error('DATABASE_URL is required for integration test
 
 const port = Number(process.env.MBOTE_ROOM_TEST_PORT || 4307);
 const baseUrl = `http://127.0.0.1:${port}`;
+const egressPort = port + 1;
+const egressBaseUrl = `http://127.0.0.1:${egressPort}`;
+const egressRequests = [];
+let mockEgressStatus = 'EGRESS_ACTIVE';
+
+const mockEgressServer = createServer(async (request, response) => {
+  let rawBody = '';
+  for await (const chunk of request) rawBody += chunk.toString();
+  const body = rawBody ? JSON.parse(rawBody) : {};
+  egressRequests.push({ path: request.url, authorization: request.headers.authorization || '', body });
+
+  const nowNs = String(BigInt(Date.now()) * 1_000_000n);
+  response.setHeader('Content-Type', 'application/json');
+
+  if (request.url?.endsWith('/StartEgress')) {
+    mockEgressStatus = 'EGRESS_ACTIVE';
+    response.end(JSON.stringify({
+      egress_id: 'EG_TEST_RECORDING_1',
+      room_name: body.room_name,
+      status: 'EGRESS_ACTIVE',
+      started_at: nowNs,
+      file_results: [],
+    }));
+    return;
+  }
+
+  if (request.url?.endsWith('/ListEgress')) {
+    response.end(JSON.stringify({
+      items: [{
+        egress_id: 'EG_TEST_RECORDING_1',
+        room_name: body.room_name || '',
+        status: mockEgressStatus,
+        started_at: nowNs,
+        file_results: mockEgressStatus === 'EGRESS_COMPLETE' ? [{
+          filename: 'mboteroom-test.mp4',
+          duration: '5000000000',
+          size: '245760',
+          location: 'https://storage.test/mboteroom-test.mp4',
+        }] : [],
+      }],
+    }));
+    return;
+  }
+
+  if (request.url?.endsWith('/StopEgress')) {
+    mockEgressStatus = 'EGRESS_COMPLETE';
+    response.end(JSON.stringify({
+      egress_id: body.egress_id,
+      status: 'EGRESS_COMPLETE',
+      started_at: nowNs,
+      ended_at: nowNs,
+      file_results: [{
+        filename: 'mboteroom-test.mp4',
+        duration: '5000000000',
+        size: '245760',
+        location: 'https://storage.test/mboteroom-test.mp4',
+      }],
+    }));
+    return;
+  }
+
+  response.statusCode = 404;
+  response.end(JSON.stringify({ error: 'Unknown mock Egress method' }));
+});
+await new Promise((resolve) => mockEgressServer.listen(egressPort, '127.0.0.1', resolve));
+
 const pool = new pg.Pool({ connectionString: databaseUrl, ssl: false });
 
 await pool.query('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
@@ -31,10 +98,12 @@ const server = spawn(process.execPath, ['dist/server.js'], {
     RESEND_API_KEY: '',
     GROQ_API_KEY: '',
     MEDIA_TRANSPORT: 'livekit',
-    LIVEKIT_URL: 'wss://livekit.test.invalid',
+    LIVEKIT_URL: `ws://127.0.0.1:${egressPort}`,
     LIVEKIT_API_KEY: 'test-api-key',
     LIVEKIT_API_SECRET: 'test-api-secret',
     LIVEKIT_TOKEN_TTL_SECONDS: '900',
+    LIVEKIT_EGRESS_ENABLED: 'true',
+    LIVEKIT_EGRESS_USE_SERVER_DEFAULT_STORAGE: 'true',
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -273,13 +342,14 @@ try {
   assert.equal(mediaStatus.data.preferredMode, 'livekit');
   assert.equal(mediaStatus.data.browserTransport, 'mesh');
   assert.equal(mediaStatus.data.livekitReady, true);
+  assert.equal(mediaStatus.data.serverRecordingReady, true);
 
   const hostMediaSession = await jsonRequest(`/api/meetings/${meeting.id}/media-session`, {
     headers: authHeaders(host.token),
   });
   assert.equal(hostMediaSession.response.status, 200, JSON.stringify(hostMediaSession.data));
   assert.equal(hostMediaSession.data.mode, 'livekit');
-  assert.equal(hostMediaSession.data.serverUrl, 'wss://livekit.test.invalid');
+  assert.equal(hostMediaSession.data.serverUrl, egressBaseUrl.replace(/^http:/, 'ws:'));
   const hostSfuPayload = decodeAndVerifyJwt(hostMediaSession.data.participantToken, 'test-api-secret');
   assert.equal(hostSfuPayload.iss, 'test-api-key');
   assert.equal(hostSfuPayload.sub, `mboteroom-user-${host.user.id}`);
@@ -303,6 +373,70 @@ try {
   });
   assert.equal(outsiderMediaSession.response.status, 403);
   assert.equal(outsiderMediaSession.data.code, 'MEETING_ACCESS_DENIED');
+
+  const recordingCapability = await jsonRequest('/api/recording/status');
+  assert.equal(recordingCapability.response.status, 200, JSON.stringify(recordingCapability.data));
+  assert.equal(recordingCapability.data.ready, true);
+  assert.equal(recordingCapability.data.livekitReady, true);
+  assert.equal(recordingCapability.data.egressEnabled, true);
+  assert.equal(recordingCapability.data.storageReady, true);
+
+  const startRecording = await jsonRequest(`/api/meetings/${meeting.id}/recordings/start`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ layout: 'grid' }),
+  });
+  assert.equal(startRecording.response.status, 201, JSON.stringify(startRecording.data));
+  assert.equal(startRecording.data.provider, 'livekit');
+  assert.equal(startRecording.data.provider_recording_id, 'EG_TEST_RECORDING_1');
+  assert.ok(['active', 'starting'].includes(startRecording.data.status));
+  const recordingId = startRecording.data.id;
+
+  const startEgressRequest = egressRequests.find((item) => item.path?.endsWith('/StartEgress'));
+  assert.ok(startEgressRequest, 'StartEgress request should reach the mock LiveKit service');
+  assert.equal(startEgressRequest.body.room_name, `mboteroom-${meeting.id}`);
+  assert.equal(startEgressRequest.body.template?.layout, 'grid');
+  assert.equal(startEgressRequest.body.outputs?.[0]?.file?.file_type, 'MP4');
+  const roomRecordToken = String(startEgressRequest.authorization).replace(/^Bearer\s+/i, '');
+  const roomRecordPayload = decodeAndVerifyJwt(roomRecordToken, 'test-api-secret');
+  assert.equal(roomRecordPayload.iss, 'test-api-key');
+  assert.equal(roomRecordPayload.video?.roomRecord, true);
+
+  const duplicateRecording = await jsonRequest(`/api/meetings/${meeting.id}/recordings/start`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ layout: 'speaker' }),
+  });
+  assert.equal(duplicateRecording.response.status, 409, JSON.stringify(duplicateRecording.data));
+  assert.equal(duplicateRecording.data.code, 'RECORDING_ALREADY_ACTIVE');
+
+  const recordingStatus = await jsonRequest(`/api/meetings/${meeting.id}/recordings/${recordingId}/status`, {
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(recordingStatus.response.status, 200, JSON.stringify(recordingStatus.data));
+  assert.equal(recordingStatus.data.provider_recording_id, 'EG_TEST_RECORDING_1');
+  assert.equal(recordingStatus.data.status, 'active');
+
+  const stopRecording = await jsonRequest(`/api/meetings/${meeting.id}/recordings/${recordingId}/stop`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+  });
+  assert.equal(stopRecording.response.status, 200, JSON.stringify(stopRecording.data));
+  assert.equal(stopRecording.data.status, 'complete');
+  assert.equal(stopRecording.data.storage_url, 'https://storage.test/mboteroom-test.mp4');
+  assert.equal(Number(stopRecording.data.size_bytes), 245760);
+  assert.equal(Number(stopRecording.data.duration_seconds), 5);
+
+  const persistedRecordings = await jsonRequest(`/api/meetings/${meeting.id}/recordings`, {
+    headers: authHeaders(host.token),
+  });
+  assert.equal(persistedRecordings.response.status, 200, JSON.stringify(persistedRecordings.data));
+  assert.ok(persistedRecordings.data.some((item) =>
+    item.id === recordingId
+    && item.provider === 'livekit'
+    && item.status === 'complete'
+    && item.storage_url === 'https://storage.test/mboteroom-test.mp4'
+  ));
 
   const muteAll = await jsonRequest(`/api/meetings/${meeting.id}/participants/mute-all`, {
     method: 'POST',
@@ -453,4 +587,5 @@ try {
     new Promise((resolve) => server.once('exit', resolve)),
     sleep(5_000),
   ]);
+  await new Promise((resolve) => mockEgressServer.close(() => resolve()));
 }

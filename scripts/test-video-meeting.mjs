@@ -453,7 +453,7 @@ try {
 
   const recordingDownload = hostRoom.page.waitForEvent('download', { timeout: 20_000 });
   await clickControl(hostRoom.page, 'Enregistrer');
-  await hostRoom.page.waitForFunction(() => document.body.innerText.includes('Enregistrement composite démarré pour 3 flux.'), undefined, { timeout: 10_000 });
+  await hostRoom.page.waitForFunction(() => document.body.innerText.includes('Enregistrement composite local démarré pour 3 flux.'), undefined, { timeout: 10_000 });
   await sleep(2_500);
   await clickControl(hostRoom.page, 'Stop rec.');
   const download = await recordingDownload;
