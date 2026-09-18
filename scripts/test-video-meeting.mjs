@@ -262,6 +262,23 @@ try {
     waitForRemoteMedia(participantRoom.page, 'Hôte Vidéo'),
   ]);
 
+  await hostRoom.page.waitForFunction(() => {
+    const indicator = document.querySelector('[data-testid="network-quality"]');
+    const level = indicator?.getAttribute('data-level');
+    return Boolean(indicator && level && level !== 'offline');
+  }, undefined, { timeout: 15_000 });
+
+  const deviceButton = hostRoom.page.locator('[data-testid="device-settings-button"]');
+  await deviceButton.waitFor({ state: 'visible', timeout: 10_000 });
+  await deviceButton.click();
+  const devicePanel = hostRoom.page.locator('[data-testid="device-settings-panel"]');
+  await devicePanel.waitFor({ state: 'visible', timeout: 10_000 });
+  assert.ok(await devicePanel.locator('select').count() >= 3, 'Device panel should expose microphone, camera and speaker selectors');
+  assert.ok(await devicePanel.locator('select').nth(0).locator('option').count() >= 1, 'At least one microphone should be available in the fake media environment');
+  assert.ok(await devicePanel.locator('select').nth(1).locator('option').count() >= 1, 'At least one camera should be available in the fake media environment');
+  await deviceButton.click();
+  await devicePanel.waitFor({ state: 'hidden', timeout: 10_000 });
+
   await clickControl(participantRoom.page, 'Caméra');
   await waitForRemoteCameraState(hostRoom.page, 'Participant Vidéo', false);
   await clickControl(participantRoom.page, 'Caméra');

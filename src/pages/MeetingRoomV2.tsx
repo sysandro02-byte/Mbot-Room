@@ -15,10 +15,14 @@ import {
   PhoneOff,
   Radio,
   Send,
+  Settings2,
   ShieldCheck,
   Square,
   UsersRound,
+  Volume2,
   Vote,
+  Wifi,
+  WifiOff,
   X,
 } from 'lucide-react';
 import { useMeetingMeshWebRTC, RemoteMeetingParticipant } from '../hooks/useMeetingMeshWebRTC';
@@ -49,6 +53,7 @@ type VideoTileProps = {
   screen?: boolean;
   badge?: string;
   local?: boolean;
+  audioOutputId?: string;
 };
 
 const initials = (value: string) => String(value || 'MB')
@@ -59,14 +64,18 @@ const initials = (value: string) => String(value || 'MB')
   .slice(0, 2)
   .toUpperCase();
 
-function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, local }: VideoTileProps) {
+function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, local, audioOutputId }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     if (!videoRef.current) return;
     videoRef.current.srcObject = stream;
+    const mediaElement = videoRef.current as HTMLVideoElement & { setSinkId?: (deviceId: string) => Promise<void> };
+    if (!local && audioOutputId && typeof mediaElement.setSinkId === 'function') {
+      void mediaElement.setSinkId(audioOutputId).catch(() => undefined);
+    }
     if (stream) void videoRef.current.play().catch(() => undefined);
-  }, [stream, videoEnabled]);
+  }, [audioOutputId, local, stream, videoEnabled]);
 
   return (
     <article className={`room-v2-tile ${screen ? 'is-screen' : ''}`}>
@@ -119,6 +128,11 @@ export default function MeetingRoomV2() {
   const [panel, setPanel] = useState<Panel>('participants');
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [mediaReady, setMediaReady] = useState(false);
+  const [mediaDevices, setMediaDevices] = useState<MediaDeviceInfo[]>([]);
+  const [devicePanelOpen, setDevicePanelOpen] = useState(false);
+  const [selectedAudioInputId, setSelectedAudioInputId] = useState('');
+  const [selectedVideoInputId, setSelectedVideoInputId] = useState('');
+  const [selectedAudioOutputId, setSelectedAudioOutputId] = useState('');
   const [micEnabled, setMicEnabled] = useState(initialMic);
   const [cameraEnabled, setCameraEnabled] = useState(initialCamera);
   const [screenSharing, setScreenSharing] = useState(false);
@@ -143,13 +157,27 @@ export default function MeetingRoomV2() {
     || currentUser.role === 'admin'
   ));
 
+  const refreshMediaDevices = useCallback(async () => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setMediaDevices(devices);
+      const currentAudioId = cameraStreamRef.current?.getAudioTracks()[0]?.getSettings().deviceId;
+      const currentVideoId = cameraStreamRef.current?.getVideoTracks()[0]?.getSettings().deviceId;
+      if (currentAudioId) setSelectedAudioInputId(currentAudioId);
+      if (currentVideoId) setSelectedVideoInputId(currentVideoId);
+    } catch {
+      // Device labels may be unavailable until permission is granted.
+    }
+  }, []);
+
   const mediaState = useMemo(() => ({
     audio: micEnabled && Boolean(localStream?.getAudioTracks().some((track) => track.readyState === 'live')),
     video: !screenSharing && cameraEnabled && Boolean(localStream?.getVideoTracks().some((track) => track.readyState === 'live')),
     screen: screenSharing,
   }), [cameraEnabled, localStream, micEnabled, screenSharing]);
 
-  const { remoteParticipants } = useMeetingMeshWebRTC({
+  const { remoteParticipants, networkQuality } = useMeetingMeshWebRTC({
     meetingId: meeting?.id || 0,
     localUserId,
     localName,
@@ -236,6 +264,7 @@ export default function MeetingRoomV2() {
         cameraStreamRef.current = stream;
         setLocalStream(stream);
         setMediaReady(true);
+        void refreshMediaDevices();
       } catch (cause) {
         const name = cause instanceof DOMException ? cause.name : '';
         setNotice(name === 'NotAllowedError'
@@ -251,7 +280,14 @@ export default function MeetingRoomV2() {
       screenStreamRef.current?.getTracks().forEach((track) => track.stop());
       recorderRef.current?.state !== 'inactive' && recorderRef.current?.stop();
     };
-  }, [initialCamera, initialMic]);
+  }, [initialCamera, initialMic, refreshMediaDevices]);
+
+  useEffect(() => {
+    if (!navigator.mediaDevices?.addEventListener) return undefined;
+    const handleDeviceChange = () => { void refreshMediaDevices(); };
+    navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
+    return () => navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+  }, [refreshMediaDevices]);
 
   const refreshParticipants = useCallback(async () => {
     if (!meeting?.id) return;
@@ -327,6 +363,43 @@ export default function MeetingRoomV2() {
     cameraStreamRef.current?.getVideoTracks().forEach((track) => { track.enabled = next; });
     setCameraEnabled(next);
   };
+
+  const switchInputDevice = useCallback(async (kind: 'audioinput' | 'videoinput', deviceId: string) => {
+    if (!deviceId || !navigator.mediaDevices?.getUserMedia) return;
+    try {
+      const fresh = await navigator.mediaDevices.getUserMedia(kind === 'audioinput'
+        ? { audio: { deviceId: { exact: deviceId } }, video: false }
+        : { audio: false, video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } } });
+      const nextTrack = kind === 'audioinput' ? fresh.getAudioTracks()[0] : fresh.getVideoTracks()[0];
+      if (!nextTrack) throw new Error('Périphérique sans piste média.');
+
+      const current = cameraStreamRef.current || new MediaStream();
+      const replacingKind = kind === 'audioinput' ? 'audio' : 'video';
+      const preserved = current.getTracks().filter((track) => track.kind !== replacingKind && track.readyState === 'live');
+      current.getTracks().filter((track) => track.kind === replacingKind).forEach((track) => track.stop());
+      nextTrack.enabled = kind === 'audioinput' ? micEnabled : cameraEnabled;
+      const nextCameraStream = new MediaStream([...preserved, nextTrack]);
+      cameraStreamRef.current = nextCameraStream;
+
+      if (!screenSharing) {
+        setLocalStream(nextCameraStream);
+      } else if (kind === 'audioinput' && screenStreamRef.current) {
+        const display = screenStreamRef.current;
+        const combined = new MediaStream();
+        display.getVideoTracks().filter((track) => track.readyState === 'live').forEach((track) => combined.addTrack(track));
+        const displayAudio = display.getAudioTracks().filter((track) => track.readyState === 'live');
+        (displayAudio.length ? displayAudio : [nextTrack]).forEach((track) => combined.addTrack(track));
+        setLocalStream(combined);
+      }
+
+      if (kind === 'audioinput') setSelectedAudioInputId(deviceId);
+      else setSelectedVideoInputId(deviceId);
+      await refreshMediaDevices();
+      setNotice(kind === 'audioinput' ? 'Microphone changé.' : 'Caméra changée.');
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Impossible de changer de périphérique.');
+    }
+  }, [cameraEnabled, micEnabled, refreshMediaDevices, screenSharing]);
 
   const stopScreenShare = useCallback(() => {
     screenStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -509,6 +582,16 @@ export default function MeetingRoomV2() {
         <div className="room-v2-live-state">
           {meeting.is_active ? <><Radio size={16} /> En direct</> : <span>Programmée</span>}
           <span>{galleryCount} connecté{galleryCount > 1 ? 's' : ''}</span>
+          <span
+            className={`room-v2-network ${networkQuality.level}`}
+            data-testid="network-quality"
+            data-level={networkQuality.level}
+            title={`Pairs ${networkQuality.connectedPeers}/${networkQuality.totalPeers} · Latence ${networkQuality.rttMs ?? '—'} ms · Pertes ${networkQuality.packetLossPct ?? '—'} %`}
+          >
+            {networkQuality.level === 'offline' ? <WifiOff size={15} /> : <Wifi size={15} />}
+            {networkQuality.level === 'excellent' ? 'Réseau excellent' : networkQuality.level === 'good' ? 'Réseau correct' : networkQuality.level === 'poor' ? 'Réseau faible' : 'Hors ligne'}
+            {networkQuality.rttMs !== null ? <small>{networkQuality.rttMs} ms</small> : null}
+          </span>
         </div>
         {isModerator && !meeting.is_active ? <button className="room-v2-start" type="button" onClick={startMeeting}>Démarrer</button> : null}
       </header>
@@ -538,6 +621,7 @@ export default function MeetingRoomV2() {
                 videoEnabled={participant.media.video || participant.media.screen}
                 screen={participant.media.screen}
                 badge={activeMembers.find((member) => member.userId === Number(participant.userId))?.role === 'cohost' ? 'Co-hôte' : undefined}
+                audioOutputId={selectedAudioOutputId}
               />
             ))}
           </div>
@@ -644,6 +728,43 @@ export default function MeetingRoomV2() {
         <Control active={panel === 'chat'} label="Discussion" onClick={() => setPanel(panel === 'chat' ? null : 'chat')}><MessageCircle/></Control>
         <Control active={panel === 'polls'} label="Sondages" onClick={() => setPanel(panel === 'polls' ? null : 'polls')}><Vote/></Control>
         <Control active={panel === 'luna'} label="Luna" onClick={() => setPanel(panel === 'luna' ? null : 'luna')}><Bot/></Control>
+        <div className="room-v2-device-wrap">
+          <Control
+            active={devicePanelOpen}
+            label="Périphériques"
+            testId="device-settings-button"
+            onClick={() => { setDevicePanelOpen((current) => !current); if (!devicePanelOpen) void refreshMediaDevices(); }}
+          ><Settings2/></Control>
+          {devicePanelOpen ? (
+            <div className="room-v2-device-panel" data-testid="device-settings-panel">
+              <div className="room-v2-device-title"><strong>Audio et vidéo</strong><button type="button" onClick={() => setDevicePanelOpen(false)} aria-label="Fermer"><X size={16}/></button></div>
+              <label>
+                <Mic size={16}/> Microphone
+                <select value={selectedAudioInputId} onChange={(event) => void switchInputDevice('audioinput', event.target.value)}>
+                  {mediaDevices.filter((device) => device.kind === 'audioinput').map((device, index) => <option key={device.deviceId || `audio-${index}`} value={device.deviceId}>{device.label || `Microphone ${index + 1}`}</option>)}
+                </select>
+              </label>
+              <label>
+                <Camera size={16}/> Caméra
+                <select value={selectedVideoInputId} onChange={(event) => void switchInputDevice('videoinput', event.target.value)}>
+                  {mediaDevices.filter((device) => device.kind === 'videoinput').map((device, index) => <option key={device.deviceId || `video-${index}`} value={device.deviceId}>{device.label || `Caméra ${index + 1}`}</option>)}
+                </select>
+              </label>
+              <label>
+                <Volume2 size={16}/> Haut-parleur
+                <select
+                  value={selectedAudioOutputId}
+                  onChange={(event) => setSelectedAudioOutputId(event.target.value)}
+                  disabled={typeof HTMLMediaElement === 'undefined' || !('setSinkId' in HTMLMediaElement.prototype)}
+                >
+                  <option value="">Sortie système</option>
+                  {mediaDevices.filter((device) => device.kind === 'audiooutput').map((device, index) => <option key={device.deviceId || `output-${index}`} value={device.deviceId}>{device.label || `Haut-parleur ${index + 1}`}</option>)}
+                </select>
+              </label>
+              <small>Le choix du haut-parleur dépend du navigateur. Chrome/Edge le prennent généralement en charge.</small>
+            </div>
+          ) : null}
+        </div>
         <Control active={recording} label={recording ? 'Stop rec.' : 'Enregistrer local'} onClick={toggleRecording}>{recording ? <Square/> : <Circle/>}</Control>
         <div className="room-v2-leave-actions">
           <button type="button" className="room-v2-leave" onClick={() => void leaveMeeting(false)}><LogOut size={18}/> Quitter</button>
@@ -654,6 +775,6 @@ export default function MeetingRoomV2() {
   );
 }
 
-function Control({ children, label, active, onClick }: { children: ReactNode; label: string; active?: boolean; onClick: () => void }) {
-  return <button type="button" className={`room-v2-control ${active ? 'active' : ''}`} onClick={onClick}><span>{children}</span><small>{label}</small></button>;
+function Control({ children, label, active, onClick, testId }: { children: ReactNode; label: string; active?: boolean; onClick: () => void; testId?: string }) {
+  return <button type="button" data-testid={testId} className={`room-v2-control ${active ? 'active' : ''}`} onClick={onClick}><span>{children}</span><small>{label}</small></button>;
 }

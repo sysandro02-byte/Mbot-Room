@@ -18,6 +18,14 @@ export type RemoteMeetingParticipant = {
   media: MeetingMediaState;
 };
 
+export type MeetingNetworkQuality = {
+  level: 'excellent' | 'good' | 'poor' | 'offline';
+  rttMs: number | null;
+  packetLossPct: number | null;
+  connectedPeers: number;
+  totalPeers: number;
+};
+
 type ServerMeetingParticipant = {
   socketId: string;
   userId: number | string;
@@ -77,6 +85,13 @@ export function useMeetingMeshWebRTC({
   onNotice,
 }: UseMeetingMeshWebRTCOptions) {
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteMeetingParticipant[]>([]);
+  const [networkQuality, setNetworkQuality] = useState<MeetingNetworkQuality>({
+    level: 'offline',
+    rttMs: null,
+    packetLossPct: null,
+    connectedPeers: 0,
+    totalPeers: 0,
+  });
   const peersRef = useRef<Map<string, PeerState>>(new Map());
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(localStream);
@@ -477,5 +492,78 @@ export function useMeetingMeshWebRTC({
     });
   }, [createOffer, localStream, meetingId, onNotice, syncLocalTracks]);
 
-  return { remoteParticipants };
+  useEffect(() => {
+    if (!enabled) {
+      setNetworkQuality({ level: 'offline', rttMs: null, packetLossPct: null, connectedPeers: 0, totalPeers: 0 });
+      return undefined;
+    }
+
+    let cancelled = false;
+    const sample = async () => {
+      const peers = [...peersRef.current.values()];
+      if (peers.length === 0) {
+        if (!cancelled) {
+          setNetworkQuality({ level: 'excellent', rttMs: null, packetLossPct: null, connectedPeers: 0, totalPeers: 0 });
+        }
+        return;
+      }
+
+      let connectedPeers = 0;
+      let maxRttSeconds = 0;
+      let totalLost = 0;
+      let totalReceived = 0;
+
+      await Promise.all(peers.map(async ({ pc }) => {
+        if (pc.connectionState === 'connected') connectedPeers += 1;
+        try {
+          const reports = await pc.getStats();
+          reports.forEach((report) => {
+            const stat = report as unknown as Record<string, unknown>;
+            if (
+              stat.type === 'candidate-pair'
+              && (stat.state === 'succeeded' || stat.nominated === true)
+              && typeof stat.currentRoundTripTime === 'number'
+            ) {
+              maxRttSeconds = Math.max(maxRttSeconds, stat.currentRoundTripTime);
+            }
+            if (stat.type === 'inbound-rtp' && stat.isRemote !== true) {
+              const lost = typeof stat.packetsLost === 'number' ? Math.max(0, stat.packetsLost) : 0;
+              const received = typeof stat.packetsReceived === 'number' ? Math.max(0, stat.packetsReceived) : 0;
+              totalLost += lost;
+              totalReceived += received;
+            }
+          });
+        } catch {
+          // A peer can disappear while stats are being sampled.
+        }
+      }));
+
+      if (cancelled) return;
+      const total = totalLost + totalReceived;
+      const packetLossPct = total > 0 ? (totalLost / total) * 100 : 0;
+      const rttMs = maxRttSeconds > 0 ? Math.round(maxRttSeconds * 1000) : null;
+
+      let level: MeetingNetworkQuality['level'] = 'excellent';
+      if (connectedPeers === 0) level = 'offline';
+      else if (connectedPeers < peers.length || (rttMs !== null && rttMs > 350) || packetLossPct > 5) level = 'poor';
+      else if ((rttMs !== null && rttMs > 150) || packetLossPct > 2) level = 'good';
+
+      setNetworkQuality({
+        level,
+        rttMs,
+        packetLossPct: Number(packetLossPct.toFixed(1)),
+        connectedPeers,
+        totalPeers: peers.length,
+      });
+    };
+
+    void sample();
+    const timer = window.setInterval(() => { void sample(); }, 3000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [enabled]);
+
+  return { remoteParticipants, networkQuality };
 }
