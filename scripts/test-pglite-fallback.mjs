@@ -19,7 +19,7 @@ const server = spawn(process.execPath, ['dist/server.js'], {
     DATABASE_URL: '',
     DATABASE_MODE: 'pglite-test',
     PGLITE_DATA_DIR: dataDir,
-    PGLITE_INITIAL_MEMORY_MB: '64',
+    PGLITE_INITIAL_MEMORY_MB: '128',
     MBOTE_ROOM_ALLOWED_ORIGINS: baseUrl,
     MBOTE_ROOM_APP_URL: baseUrl,
     ADMIN_EMAILS: '',
