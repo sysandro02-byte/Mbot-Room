@@ -24,7 +24,17 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
     }
     try {
       const result = await query(`SELECT now() AS now,(SELECT COUNT(*)::int FROM room_users) AS users,(SELECT COUNT(*)::int FROM room_meetings) AS meetings`);
-      response.json({ ok:true,service:'mbote-room',database:{configured:true,connected:true,type:'postgres',users:Number(result.rows[0].users),meetings:Number(result.rows[0].meetings)},serverTime:result.rows[0].now });
+      response.json({
+        ok:true,
+        service:'mbote-room',
+        database:{configured:true,connected:true,type:'postgres',users:Number(result.rows[0].users),meetings:Number(result.rows[0].meetings)},
+        media:{
+          topology:'mesh',
+          turnConfigured:Boolean(String(process.env.TURN_URLS||'').trim() && String(process.env.TURN_SHARED_SECRET||'').trim()),
+          turnCredentialTtlSeconds:Number(process.env.TURN_CREDENTIAL_TTL_SECONDS||3600),
+        },
+        serverTime:result.rows[0].now,
+      });
     } catch (error) {
       response.status(503).json({ ok:false,service:'mbote-room',database:{configured:true,connected:false,type:'postgres'},error:error instanceof Error?error.message:'Database unavailable' });
     }
