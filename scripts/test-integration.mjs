@@ -270,7 +270,8 @@ try {
 
   const mediaStatus = await jsonRequest('/api/media/status');
   assert.equal(mediaStatus.response.status, 200, JSON.stringify(mediaStatus.data));
-  assert.equal(mediaStatus.data.activeMode, 'livekit');
+  assert.equal(mediaStatus.data.preferredMode, 'livekit');
+  assert.equal(mediaStatus.data.browserTransport, 'mesh');
   assert.equal(mediaStatus.data.livekitReady, true);
 
   const hostMediaSession = await jsonRequest(`/api/meetings/${meeting.id}/media-session`, {
