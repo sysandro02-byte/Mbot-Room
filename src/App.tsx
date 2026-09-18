@@ -18,15 +18,28 @@ const Login = lazy(() => import('./pages/Login'));
 function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: boolean }) {
   const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated());
+  const [checking, setChecking] = useState(true);
+
   useEffect(() => {
+    let active = true;
+    const verify = async () => {
+      const user = await authService.refreshCurrentUser();
+      if (!active) return;
+      setIsAuthenticated(Boolean(user));
+      setChecking(false);
+    };
     const sync = () => setIsAuthenticated(authService.isAuthenticated());
+    void verify();
     window.addEventListener('storage', sync);
     window.addEventListener('mbote-room-auth-changed', sync);
     return () => {
+      active = false;
       window.removeEventListener('storage', sync);
       window.removeEventListener('mbote-room-auth-changed', sync);
     };
   }, []);
+
+  if (checking) return <main className="route-loading" role="status">Vérification de la session…</main>;
   if (!isAuthenticated) {
     const redirect = `${location.pathname}${location.search}`;
     return <Navigate to={`/login?redirect=${encodeURIComponent(redirect)}`} replace />;
@@ -43,12 +56,32 @@ function AdminRoute({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated());
   const [isAdmin, setIsAdmin] = useState(authService.isAdmin());
+  const [checking, setChecking] = useState(true);
+
   useEffect(() => {
-    const sync = () => { setIsAuthenticated(authService.isAuthenticated()); setIsAdmin(authService.isAdmin()); };
+    let active = true;
+    const verify = async () => {
+      const user = await authService.refreshCurrentUser();
+      if (!active) return;
+      setIsAuthenticated(Boolean(user));
+      setIsAdmin(Boolean(user && authService.isAdmin()));
+      setChecking(false);
+    };
+    const sync = () => {
+      setIsAuthenticated(authService.isAuthenticated());
+      setIsAdmin(authService.isAdmin());
+    };
+    void verify();
     window.addEventListener('storage', sync);
     window.addEventListener('mbote-room-auth-changed', sync);
-    return () => { window.removeEventListener('storage', sync); window.removeEventListener('mbote-room-auth-changed', sync); };
+    return () => {
+      active = false;
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('mbote-room-auth-changed', sync);
+    };
   }, []);
+
+  if (checking) return <main className="route-loading" role="status">Vérification de la session…</main>;
   if (!isAuthenticated) {
     const redirect = `${location.pathname}${location.search}`;
     return <Navigate to={`/login?redirect=${encodeURIComponent(redirect)}`} replace />;
