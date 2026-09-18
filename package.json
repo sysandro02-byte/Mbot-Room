@@ -33,7 +33,8 @@
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
-    "@electric-sql/pglite": "0.5.8"
+    "@electric-sql/pglite": "0.5.8",
+    "@electric-sql/pglite-prepopulatedfs": "0.5.8"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
