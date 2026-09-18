@@ -37,6 +37,7 @@ import {
   MeetingPoll,
 } from '../services/collaborationService';
 import { getMeetingAccessCode, LobbyParticipant, Meeting, meetingService } from '../services/meetingService';
+import { createCompositeMeetingRecording, type CompositeRecordingSession } from '../lib/meetingRecording';
 import './MeetingRoomV2.css';
 
 type Panel = 'participants' | 'chat' | 'polls' | 'luna' | null;
@@ -142,6 +143,7 @@ export default function MeetingRoomV2() {
   const screenStreamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
+  const recordingSessionRef = useRef<CompositeRecordingSession | null>(null);
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [loading, setLoading] = useState(true);
@@ -518,22 +520,27 @@ export default function MeetingRoomV2() {
     if (recorder && recorder.state !== 'inactive') recorder.stop();
   }, []);
 
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     if (recording) {
       stopRecording();
       return;
     }
-    const stream = localStream;
-    if (!stream || typeof MediaRecorder === 'undefined') {
-      setNotice('L’enregistrement local n’est pas disponible dans ce navigateur.');
+    if (!localStream || typeof MediaRecorder === 'undefined') {
+      setNotice('L’enregistrement n’est pas disponible dans ce navigateur.');
       return;
     }
     const preferred = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
       ? 'video/webm;codecs=vp9,opus'
       : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' : 'video/webm';
     try {
+      const sources = [
+        { stream: localStream, label: `${localName} (vous)` },
+        ...remoteParticipants.map((participant) => ({ stream: participant.stream, label: participant.name })),
+      ];
+      const session = await createCompositeMeetingRecording(sources);
+      recordingSessionRef.current = session;
       recordingChunksRef.current = [];
-      const recorder = new MediaRecorder(stream, { mimeType: preferred });
+      const recorder = new MediaRecorder(session.stream, { mimeType: preferred });
       recorder.ondataavailable = (event) => { if (event.data.size > 0) recordingChunksRef.current.push(event.data); };
       recorder.onstop = () => {
         const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'video/webm' });
@@ -543,15 +550,27 @@ export default function MeetingRoomV2() {
         link.download = `mboteroom-${meeting?.id || 'reunion'}-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
+        const activeSession = recordingSessionRef.current;
+        recordingSessionRef.current = null;
+        void activeSession?.stop();
+        recorderRef.current = null;
         setRecording(false);
-        setNotice('Enregistrement local terminé et téléchargé.');
+        setNotice('Enregistrement composite terminé : galerie vidéo et audios de la réunion.');
+      };
+      recorder.onerror = () => {
+        const activeSession = recordingSessionRef.current;
+        recordingSessionRef.current = null;
+        void activeSession?.stop();
+        recorderRef.current = null;
+        setRecording(false);
+        setNotice('Une erreur a interrompu l’enregistrement.');
       };
       recorder.start(1000);
       recorderRef.current = recorder;
       setRecording(true);
-      setNotice('Enregistrement local démarré. Il contient votre flux local, pas les vidéos distantes.');
-    } catch {
-      setNotice('Impossible de démarrer l’enregistrement local.');
+      setNotice(`Enregistrement composite démarré pour ${sources.filter((source) => source.stream).length} flux.`);
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Impossible de démarrer l’enregistrement composite.');
     }
   };
 
@@ -990,7 +1009,7 @@ export default function MeetingRoomV2() {
             </div>
           ) : null}
         </div>
-        <Control active={recording} label={recording ? 'Stop rec.' : 'Enregistrer local'} onClick={toggleRecording}>{recording ? <Square/> : <Circle/>}</Control>
+        <Control active={recording} label={recording ? 'Stop rec.' : 'Enregistrer'} onClick={() => void toggleRecording()}>{recording ? <Square/> : <Circle/>}</Control>
         <div className="room-v2-leave-actions">
           <button type="button" className="room-v2-leave" onClick={() => void leaveMeeting(false)}><LogOut size={18}/> Quitter</button>
           {isModerator ? <button type="button" className="room-v2-end" onClick={() => void leaveMeeting(true)}><PhoneOff size={18}/> Terminer pour tous</button> : null}
