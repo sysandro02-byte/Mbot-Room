@@ -82,3 +82,10 @@
 .room-v2-breakout-card strong{font-size:13px}.room-v2-breakout-card small{font-size:10px;color:#64748b}
 .room-v2-breakout-members{display:flex;flex-wrap:wrap;gap:5px;margin:9px 0}
 .room-v2-breakout-members span{padding:4px 7px;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:10px}
+
+.room-v2-caption-overlay{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:55;width:min(760px,calc(100vw - 32px));display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.room-v2-caption-overlay p{margin:0;padding:8px 12px;border-radius:10px;background:rgba(3,7,18,.88);backdrop-filter:blur(8px);box-shadow:0 8px 24px rgba(0,0,0,.3);font-size:14px;line-height:1.45;text-align:center}
+.room-v2-caption-overlay strong{margin-right:8px;color:#93c5fd}
+.room-v2-caption-overlay span{color:#f8fafc}
+.room-v2-caption-overlay small{margin-left:8px;padding:2px 5px;border-radius:999px;background:rgba(59,130,246,.22);color:#bfdbfe;font-size:9px;font-weight:700}
+@media(max-width:600px){.room-v2-caption-overlay{bottom:82px;width:calc(100vw - 18px)}.room-v2-caption-overlay p{font-size:12px;padding:7px 9px}}
