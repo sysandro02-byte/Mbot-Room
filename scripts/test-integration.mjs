@@ -283,6 +283,10 @@ try {
   const hostSfuPayload = decodeAndVerifyJwt(hostMediaSession.data.participantToken, 'test-api-secret');
   assert.equal(hostSfuPayload.iss, 'test-api-key');
   assert.equal(hostSfuPayload.sub, `mboteroom-user-${host.user.id}`);
+  assert.equal(hostSfuPayload.name, 'Hôte Integration');
+  const hostSfuMetadata = JSON.parse(hostSfuPayload.metadata);
+  assert.equal(Number(hostSfuMetadata.mboteRoomUserId), Number(host.user.id));
+  assert.equal(hostSfuMetadata.displayName, 'Hôte Integration');
   assert.equal(hostSfuPayload.video?.room, `mboteroom-${meeting.id}`);
   assert.equal(hostSfuPayload.video?.roomJoin, true);
 
