@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
-import { pool, runMigrations } from './server/core.js';
+import { pool, query, runMigrations, setDatabaseReady } from './server/core.js';
 import { runExtraMigrations } from './server/extraMigrations.js';
 import { runProductMigrations } from './server/productMigrations.js';
 import { registerAuthRoutes } from './server/authRoutes.js';
@@ -120,17 +120,35 @@ app.use((error: unknown, _request: express.Request, response: express.Response, 
 
 const port = Number(process.env.PORT || 3004);
 
-const start = async () => {
+const initializeDatabase = async () => {
   if (!pool) {
-    console.error('DATABASE_URL est obligatoire. MBotéRoom démarre en mode diagnostic uniquement.');
-  } else {
-    await runMigrations();
-    await runExtraMigrations();
-    await runProductMigrations();
+    setDatabaseReady(false, 'DATABASE_URL is not configured');
+    console.error('DATABASE_URL est obligatoire pour les fonctions persistantes. Le serveur HTTP reste disponible en mode dégradé.');
+    return;
   }
-  httpServer.listen(port, () => {
+
+  try {
+    if (String(process.env.RUN_MIGRATIONS_ON_START || 'true').toLowerCase() !== 'false') {
+      await runMigrations();
+      await runExtraMigrations();
+      await runProductMigrations();
+    } else {
+      await query('SELECT 1');
+    }
+    setDatabaseReady(true);
+    console.log('PostgreSQL ready.');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Database unavailable';
+    setDatabaseReady(false, message);
+    console.error('PostgreSQL indisponible au démarrage. MBotéRoom reste en ligne sans fallback simulé.', error);
+  }
+};
+
+const start = async () => {
+  httpServer.listen(port, '0.0.0.0', () => {
     console.log(`MBotéRoom API V2 listening on port ${port}`);
   });
+  await initializeDatabase();
 };
 
 const shutdown = async () => {
