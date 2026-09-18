@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import type express from 'express';
+import { isServerRecordingReady } from './recordingRoutes.js';
 import {
   AuthedRequest,
   authenticateToken,
@@ -77,7 +78,7 @@ export const registerSfuRoutes = (app: express.Express) => {
       browserTransport: 'mesh',
       livekitReady,
       turnConfigured: Boolean(String(process.env.TURN_URLS || '').trim() && String(process.env.TURN_SHARED_SECRET || '').trim()),
-      serverRecordingReady: livekitReady && Boolean(String(process.env.LIVEKIT_EGRESS_ENABLED || '').trim() === 'true'),
+      serverRecordingReady: isServerRecordingReady(),
     });
   });
 
