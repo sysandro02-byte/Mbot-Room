@@ -17,7 +17,19 @@ export type MeetingPoll = {
   options:Array<{id:string;label:string;votes:number}>;
 };
 export type RecordingMetadata = {
-  id:string; meeting_id:number; storage_url:string; mime_type:string; size_bytes:number; duration_seconds:number; created_at:string;
+  id:string;
+  meeting_id:number;
+  storage_url:string;
+  mime_type:string;
+  size_bytes:number;
+  duration_seconds:number;
+  created_at:string;
+  provider?:'manual'|'livekit';
+  provider_recording_id?:string;
+  status?:'starting'|'active'|'ending'|'complete'|'failed'|'aborted'|'limit_reached'|'ready'|'unknown';
+  started_at?:string|null;
+  ended_at?:string|null;
+  metadata?:Record<string,unknown>;
 };
 
 export type BreakoutRoom = {
@@ -90,5 +102,27 @@ export const collaborationService = {
   },
   async getRecordings(meetingId:number) {
     return readJson<RecordingMetadata[]>(await fetch(apiUrl(`/api/meetings/${meetingId}/recordings`),{headers:getAuthHeaders()}));
+  },
+  async startServerRecording(meetingId:number, options?:{breakoutRoomId?:string|null;layout?:'grid'|'speaker'|'single-speaker'}) {
+    return readJson<RecordingMetadata>(await fetch(apiUrl(`/api/meetings/${meetingId}/recordings/start`),{
+      method:'POST',
+      headers:getAuthHeaders(),
+      body:JSON.stringify({
+        breakoutRoomId:options?.breakoutRoomId||undefined,
+        layout:options?.layout||'grid',
+      }),
+    }));
+  },
+  async getServerRecordingStatus(meetingId:number, recordingId:string) {
+    return readJson<RecordingMetadata>(await fetch(apiUrl(`/api/meetings/${meetingId}/recordings/${encodeURIComponent(recordingId)}/status`),{
+      headers:getAuthHeaders(),
+      cache:'no-store',
+    }));
+  },
+  async stopServerRecording(meetingId:number, recordingId:string) {
+    return readJson<RecordingMetadata>(await fetch(apiUrl(`/api/meetings/${meetingId}/recordings/${encodeURIComponent(recordingId)}/stop`),{
+      method:'POST',
+      headers:getAuthHeaders(),
+    }));
   },
 };
