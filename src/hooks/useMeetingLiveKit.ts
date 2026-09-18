@@ -118,11 +118,11 @@ export function useMeetingLiveKit({
     setRemoteParticipants(participants);
     setNetworkQuality((current) => ({
       ...current,
-      level: status === 'connected' ? 'good' : current.level,
+      level: 'good',
       connectedPeers: participants.length,
       totalPeers: participants.length,
     }));
-  }, [status]);
+  }, []);
 
   useEffect(() => {
     if (!enabled || !meetingId) {
