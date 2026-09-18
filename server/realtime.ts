@@ -2,6 +2,7 @@ import type { Server, Socket } from 'socket.io';
 import {
   PublicUser,
   canModerateMeeting,
+  getRawSessionToken,
   getUserByRawToken,
   hasMeetingAccess,
   query,
@@ -52,7 +53,11 @@ const removeSocketFromMeeting = async (io: Server, socket: Socket) => {
 export const registerRealtime = (io: Server) => {
   io.use(async (socket, next) => {
     try {
-      const user = await getUserByRawToken(String(socket.handshake.auth?.token || ''));
+      const rawToken = getRawSessionToken(
+        socket.handshake.auth?.token,
+        socket.request.headers.cookie,
+      );
+      const user = await getUserByRawToken(rawToken);
       if (!user) {
         const error = new Error('Session invalide.') as Error & { data?: unknown };
         error.data = { code: 'REALTIME_AUTH_REQUIRED', error: 'Session invalide.' };
