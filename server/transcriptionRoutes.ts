@@ -139,6 +139,61 @@ export const registerTranscriptionRoutes = (app: express.Express, io: Server) =>
     }
   });
 
+  app.post('/api/meetings/:meetingId/captions/text', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const meetingId = Number(request.params.meetingId);
+      if (!meetingId || !(await hasMeetingAccess(meetingId, request.user!))) {
+        return sendApiError(response, 403, 'MEETING_ACCESS_DENIED', 'Accès refusé.');
+      }
+      const text = normalizeText(request.body?.text).slice(0, 1200);
+      if (!text) return sendApiError(response, 400, 'CAPTION_EMPTY', 'Sous-titre vide.');
+
+      const breakoutRoomId = await resolveBreakout(
+        meetingId,
+        request.user!.id,
+        request.user!.role,
+        String(request.body?.breakoutRoomId || '').trim(),
+      );
+      const caption = {
+        id: createId(),
+        meetingId,
+        userId: request.user!.id,
+        speaker: request.user!.name || request.user!.email,
+        text,
+        breakoutRoomId,
+        provider: 'browser-speech',
+        language: String(request.body?.language || '').trim().toLowerCase().slice(0, 16),
+        createdAt: new Date().toISOString(),
+      };
+      await query(
+        `INSERT INTO room_captions
+          (id,meeting_id,user_id,speaker,text,breakout_room_id,provider,language,created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [
+          caption.id,
+          caption.meetingId,
+          caption.userId,
+          caption.speaker,
+          caption.text,
+          caption.breakoutRoomId,
+          caption.provider,
+          caption.language,
+          caption.createdAt,
+        ],
+      );
+      io.to(mediaRoomName(meetingId, breakoutRoomId)).emit('meeting:caption', caption);
+      response.status(201).json(caption);
+    } catch (error) {
+      if (error instanceof Error && error.message === 'BREAKOUT_NOT_FOUND') {
+        return sendApiError(response, 404, 'BREAKOUT_NOT_FOUND', 'Sous-salle introuvable.');
+      }
+      if (error instanceof Error && error.message === 'BREAKOUT_ACCESS_DENIED') {
+        return sendApiError(response, 403, 'BREAKOUT_ACCESS_DENIED', 'Accès à la sous-salle refusé.');
+      }
+      next(error);
+    }
+  });
+
   app.post(
     '/api/meetings/:meetingId/transcription/chunk',
     ...protectedApi,
