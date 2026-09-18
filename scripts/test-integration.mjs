@@ -339,6 +339,33 @@ try {
   assert.equal(vote.response.status, 200, JSON.stringify(vote.data));
   assert.equal(vote.data.options[0].votes, 1);
 
+  const createBreakouts = await jsonRequest(`/api/meetings/${meeting.id}/breakouts`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ names: ['Atelier A', 'Atelier B'] }),
+  });
+  assert.equal(createBreakouts.response.status, 201, JSON.stringify(createBreakouts.data));
+  assert.equal(createBreakouts.data.length, 2);
+  const breakoutA = createBreakouts.data[0];
+
+  const assignBreakout = await jsonRequest(`/api/meetings/${meeting.id}/breakouts/${breakoutA.id}/assign`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ userId: participant.user.id }),
+  });
+  assert.equal(assignBreakout.response.status, 200, JSON.stringify(assignBreakout.data));
+
+  const openBreakouts = await jsonRequest(`/api/meetings/${meeting.id}/breakouts/open`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+  });
+  assert.equal(openBreakouts.response.status, 200, JSON.stringify(openBreakouts.data));
+  assert.equal(openBreakouts.data.assignments, 1);
+
+  const breakoutList = await jsonRequest(`/api/meetings/${meeting.id}/breakouts`, { headers: authHeaders(host.token) });
+  assert.equal(breakoutList.response.status, 200, JSON.stringify(breakoutList.data));
+  assert.ok(breakoutList.data.find((room) => room.id === breakoutA.id)?.members.some((member) => Number(member.userId) === Number(participant.user.id)));
+
   hostSocket = await socketConnect(host.token);
   participantSocket = await socketConnect(participant.token);
 
@@ -347,12 +374,23 @@ try {
     media: { audio: true, video: true, screen: false },
   });
   assert.equal(hostJoin.ok, true, JSON.stringify(hostJoin));
+  assert.equal(hostJoin.participants.length, 0);
 
   const participantJoin = await socketAck(participantSocket, 'meeting:join', {
     meetingId: meeting.id,
+    breakoutRoomId: breakoutA.id,
     media: { audio: true, video: false, screen: false },
   });
   assert.equal(participantJoin.ok, true, JSON.stringify(participantJoin));
+  assert.equal(participantJoin.participants.length, 0);
+
+  const crossRoomSignal = await socketAck(participantSocket, 'meeting:offer', {
+    meetingId: meeting.id,
+    targetSocketId: hostSocket.id,
+    offer: { type: 'offer', sdp: 'cross-room-test' },
+  });
+  assert.equal(crossRoomSignal.ok, false);
+  assert.equal(crossRoomSignal.code, 'REALTIME_TARGET_INVALID');
 
   const realtimeMessage = await socketAck(participantSocket, 'meeting:chat-message', {
     meetingId: meeting.id,
@@ -376,6 +414,12 @@ try {
 
   const persistedRealtimeMessages = await jsonRequest(`/api/meetings/${meeting.id}/messages`, { headers: authHeaders(host.token) });
   assert.ok(persistedRealtimeMessages.data.some((item) => item.text === 'Message Socket.IO persistant'));
+
+  const closeBreakouts = await jsonRequest(`/api/meetings/${meeting.id}/breakouts/close`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+  });
+  assert.equal(closeBreakouts.response.status, 200, JSON.stringify(closeBreakouts.data));
 
   const end = await jsonRequest(`/api/meetings/${meeting.id}/end`, {
     method: 'POST',
