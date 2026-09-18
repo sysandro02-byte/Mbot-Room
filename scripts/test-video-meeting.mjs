@@ -316,6 +316,17 @@ try {
   await clickControl(participantRoom.page, 'Micro');
   await waitForRemoteMicState(hostRoom.page, 'Participant Vidéo', false);
 
+  await clickControl(participantRoom.page, 'Main');
+  await hostRoom.page.waitForFunction(() => {
+    const tile = Array.from(document.querySelectorAll('.room-v2-tile')).find((candidate) => candidate.textContent?.includes('Participant Vidéo') && !candidate.textContent?.includes('(vous)'));
+    return Boolean(tile?.querySelector('[aria-label="Main levée"]'));
+  }, undefined, { timeout: 10_000 });
+  await clickControl(participantRoom.page, 'Baisser la main');
+  await hostRoom.page.waitForFunction(() => {
+    const tile = Array.from(document.querySelectorAll('.room-v2-tile')).find((candidate) => candidate.textContent?.includes('Participant Vidéo') && !candidate.textContent?.includes('(vous)'));
+    return Boolean(tile && !tile.querySelector('[aria-label="Main levée"]'));
+  }, undefined, { timeout: 10_000 });
+
   await participantContext.setOffline(true);
   await hostRoom.page.waitForFunction(() => {
     return !Array.from(document.querySelectorAll('.room-v2-tile')).some((tile) => tile.textContent?.includes('Participant Vidéo'));
