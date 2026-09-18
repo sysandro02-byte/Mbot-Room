@@ -291,6 +291,16 @@ export const meetingService = {
     }
   },
 
+  async admitAllLobby(meetingId: number): Promise<{ success: boolean; admitted: number; userIds: number[] }> {
+    const response = await fetch(apiUrl(`/api/meetings/${meetingId}/lobby/admit-all`), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Admission de la salle d’attente impossible');
+    return data;
+  },
+
   async respondToLobby(meetingId: number, userId: number, status: 'accepted' | 'rejected'): Promise<void> {
     const response = await fetch(apiUrl(`/api/meetings/${meetingId}/lobby/respond`), {
       method: 'POST',
