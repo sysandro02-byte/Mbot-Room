@@ -587,4 +587,5 @@ try {
     new Promise((resolve) => server.once('exit', resolve)),
     sleep(5_000),
   ]);
+  await new Promise((resolve) => mockEgressServer.close(() => resolve()));
 }
