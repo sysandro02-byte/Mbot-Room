@@ -53,7 +53,7 @@ jobs:
         run: node scripts/test-production-config.mjs
       - name: PostgreSQL and realtime integration
         run: node scripts/test-integration.mjs
-      - name: Two-browser camera, microphone and reconnect test
+      - name: Three-browser camera, microphone and reconnect test
         run: node scripts/test-video-meeting.mjs
       - name: Upload video diagnostics on failure
         if: failure()
