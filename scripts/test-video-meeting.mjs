@@ -261,7 +261,7 @@ try {
     body: JSON.stringify({ password: 'VideoRoom2026!' }),
   });
   assert.equal(join.response.status, 200, JSON.stringify(join.data));
-  assert.equal(join.data.status, 'accepted');
+  assert.equal(join.data.status, 'requested');
 
   const joinTwo = await jsonRequest(`/api/meetings/${meeting.id}/join-request`, {
     method: 'POST',
@@ -269,7 +269,7 @@ try {
     body: JSON.stringify({ password: 'VideoRoom2026!' }),
   });
   assert.equal(joinTwo.response.status, 200, JSON.stringify(joinTwo.data));
-  assert.equal(joinTwo.data.status, 'accepted');
+  assert.equal(joinTwo.data.status, 'requested');
 
   const start = await jsonRequest(`/api/meetings/${meeting.id}/start-notify`, {
     method: 'POST',
