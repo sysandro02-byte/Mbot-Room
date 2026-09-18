@@ -29,6 +29,11 @@ const server = spawn(process.execPath, ['dist/server.js'], {
     ADMIN_EMAILS: '',
     RESEND_API_KEY: '',
     GROQ_API_KEY: '',
+    MEDIA_TRANSPORT: 'livekit',
+    LIVEKIT_URL: 'wss://livekit.video.test.invalid',
+    LIVEKIT_API_KEY: 'video-test-key',
+    LIVEKIT_API_SECRET: 'video-test-secret',
+    LIVEKIT_TOKEN_TTL_SECONDS: '900',
   },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -95,6 +100,59 @@ const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
     localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('token', token);
   }, { user: session.user, token: session.token });
+  await context.addInitScript(() => {
+    class FailingLiveKitRoom {
+      remoteParticipants = new Map();
+      activeSpeakers = [];
+      localParticipant = {
+        trackPublications: new Map(),
+        publishTrack: async () => ({ isMuted: false }),
+        unpublishTrack: async () => undefined,
+      };
+      listeners = new Map();
+      on(event, listener) {
+        const values = this.listeners.get(event) || [];
+        values.push(listener);
+        this.listeners.set(event, values);
+        return this;
+      }
+      off(event, listener) {
+        const values = this.listeners.get(event) || [];
+        this.listeners.set(event, values.filter((value) => value !== listener));
+        return this;
+      }
+      async connect() {
+        throw new Error('CI LiveKit intentionally unavailable');
+      }
+      async disconnect() {}
+    }
+    window.LivekitClient = {
+      Room: FailingLiveKitRoom,
+      RoomEvent: {
+        TrackSubscribed: 'trackSubscribed',
+        TrackUnsubscribed: 'trackUnsubscribed',
+        TrackMuted: 'trackMuted',
+        TrackUnmuted: 'trackUnmuted',
+        ParticipantConnected: 'participantConnected',
+        ParticipantDisconnected: 'participantDisconnected',
+        ParticipantMetadataChanged: 'participantMetadataChanged',
+        ActiveSpeakersChanged: 'activeSpeakersChanged',
+        Disconnected: 'disconnected',
+        Reconnecting: 'reconnecting',
+        Reconnected: 'reconnected',
+      },
+      Track: {
+        Kind: { Audio: 'audio', Video: 'video' },
+        Source: {
+          Camera: 'camera',
+          Microphone: 'microphone',
+          ScreenShare: 'screen_share',
+          ScreenShareAudio: 'screen_share_audio',
+        },
+      },
+    };
+  });
+
   await context.addInitScript(() => {
     if (!navigator.mediaDevices) return;
     const fakeDisplayMedia = async () => {
@@ -307,6 +365,7 @@ try {
   const transportBadge = hostRoom.page.locator('[data-testid="media-transport-status"]');
   await transportBadge.waitFor({ state: 'visible', timeout: 10_000 });
   assert.match(await transportBadge.innerText(), /Mesh actif/);
+  assert.match(await transportBadge.innerText(), /secours/);
 
   await hostRoom.page.waitForFunction(() => {
     const indicator = document.querySelector('[data-testid="network-quality"]');
