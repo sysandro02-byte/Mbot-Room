@@ -16,6 +16,7 @@ type LiveParticipant = {
   avatar: string;
   role: string;
   media: MediaState;
+  breakoutRoomId: string | null;
 };
 
 type Ack = (payload: unknown) => void;
@@ -25,6 +26,8 @@ const cleanMedia = (value: any): MediaState => ({ audio: Boolean(value?.audio), 
 const fail = (code: string, error: string) => ({ ok: false, code, error });
 
 const participantForSocket = (meetingId: number, socketId: string) => meetings.get(meetingId)?.get(socketId) || null;
+const mediaRoomName = (meetingId: number, breakoutRoomId: string | null) =>
+  breakoutRoomId ? `meeting:${meetingId}:breakout:${breakoutRoomId}` : `meeting:${meetingId}:main`;
 
 const removeSocketFromMeeting = async (io: Server, socket: Socket) => {
   const meetingId = Number(socket.data.meetingId || 0);
@@ -33,7 +36,7 @@ const removeSocketFromMeeting = async (io: Server, socket: Socket) => {
   const participant = participants?.get(socket.id);
   participants?.delete(socket.id);
   if (participant) {
-    io.to(`meeting:${meetingId}`).emit('meeting:participant-left', { socketId: socket.id, userId: participant.userId });
+    io.to(mediaRoomName(meetingId, participant.breakoutRoomId)).emit('meeting:participant-left', { socketId: socket.id, userId: participant.userId });
     const otherDeviceOnline = [...(participants?.values() || [])].some((item) => item.userId === participant.userId);
     if (!otherDeviceOnline) {
       await query(`UPDATE room_meeting_members SET left_at=now(),updated_at=now() WHERE meeting_id=$1 AND user_id=$2`, [meetingId, participant.userId]).catch(() => undefined);
@@ -41,6 +44,7 @@ const removeSocketFromMeeting = async (io: Server, socket: Socket) => {
   }
   if (participants && participants.size === 0) meetings.delete(meetingId);
   socket.leave(`meeting:${meetingId}`);
+  if (participant) socket.leave(mediaRoomName(meetingId, participant.breakoutRoomId));
   socket.leave(`meeting:${meetingId}:moderators`);
   socket.data.meetingId = null;
 };
@@ -83,6 +87,20 @@ export const registerRealtime = (io: Server) => {
 
         const roleResult = await query(`SELECT role FROM room_meeting_members WHERE meeting_id=$1 AND user_id=$2 LIMIT 1`, [meetingId, user.id]);
         const role = moderator ? (meeting.host_id === user.id ? 'host' : 'cohost') : String(roleResult.rows[0]?.role || 'participant');
+        const requestedBreakoutId = payload?.breakoutRoomId ? String(payload.breakoutRoomId) : null;
+        let breakoutRoomId: string | null = null;
+        if (requestedBreakoutId) {
+          const assignment = await query(
+            `SELECT br.id FROM room_breakout_rooms br
+              LEFT JOIN room_breakout_members bm ON bm.breakout_room_id=br.id AND bm.user_id=$3
+             WHERE br.id=$1 AND br.meeting_id=$2 AND br.is_open=true
+               AND ($4::boolean=true OR bm.user_id IS NOT NULL)
+             LIMIT 1`,
+            [requestedBreakoutId, meetingId, user.id, moderator],
+          );
+          if (!assignment.rows[0]) return callback?.(fail('REALTIME_BREAKOUT_ACCESS_DENIED', 'Accès non autorisé à cette sous-salle.'));
+          breakoutRoomId = requestedBreakoutId;
+        }
         const participant: LiveParticipant = {
           socketId: socket.id,
           userId: user.id,
@@ -90,11 +108,13 @@ export const registerRealtime = (io: Server) => {
           avatar: user.avatar,
           role,
           media: cleanMedia(payload?.media),
+          breakoutRoomId,
         };
         const roomParticipants = meetings.get(meetingId) || new Map<string, LiveParticipant>();
-        const existing = [...roomParticipants.values()];
+        const existing = [...roomParticipants.values()].filter((item) => item.breakoutRoomId === breakoutRoomId);
         socket.data.meetingId = meetingId;
         socket.join(`meeting:${meetingId}`);
+        socket.join(mediaRoomName(meetingId, breakoutRoomId));
         if (moderator) socket.join(`meeting:${meetingId}:moderators`);
         roomParticipants.set(socket.id, participant);
         meetings.set(meetingId, roomParticipants);
@@ -102,7 +122,7 @@ export const registerRealtime = (io: Server) => {
         const count = new Set([...roomParticipants.values()].map((item) => item.userId)).size;
         await query('UPDATE room_meetings SET participant_count=GREATEST(participant_count,$2),updated_at=now() WHERE id=$1', [meetingId, count]).catch(() => undefined);
         callback?.({ ok: true, participants: existing });
-        socket.to(`meeting:${meetingId}`).emit('meeting:participant-joined', participant);
+        socket.to(mediaRoomName(meetingId, breakoutRoomId)).emit('meeting:participant-joined', participant);
         io.to(`meeting:${meetingId}`).emit('meeting:presence', { meetingId, count, participants: [...roomParticipants.values()] });
       } catch {
         callback?.(fail('REALTIME_JOIN_FAILED', 'Impossible de rejoindre la réunion en temps réel.'));
@@ -119,7 +139,7 @@ export const registerRealtime = (io: Server) => {
       const participant = participantForSocket(meetingId, socket.id);
       if (!participant) return callback?.(fail('REALTIME_NOT_JOINED', 'Participant introuvable.'));
       participant.media = cleanMedia(payload?.media);
-      socket.to(`meeting:${meetingId}`).emit('meeting:participant-media-updated', participant);
+      socket.to(mediaRoomName(meetingId, participant.breakoutRoomId)).emit('meeting:participant-media-updated', participant);
       callback?.({ ok: true });
     });
 
@@ -160,8 +180,10 @@ export const registerRealtime = (io: Server) => {
         const meetingId = Number(socket.data.meetingId || 0);
         const targetSocketId = String(payload?.targetSocketId || '');
         const participants = meetings.get(meetingId);
-        if (!meetingId || Number(payload?.meetingId || meetingId) !== meetingId || !participants?.has(socket.id) || !participants.has(targetSocketId)) {
-          return callback?.(fail('REALTIME_TARGET_INVALID', 'Participant cible introuvable dans cette réunion.'));
+        const source = participants?.get(socket.id);
+        const target = participants?.get(targetSocketId);
+        if (!meetingId || Number(payload?.meetingId || meetingId) !== meetingId || !source || !target || source.breakoutRoomId !== target.breakoutRoomId) {
+          return callback?.(fail('REALTIME_TARGET_INVALID', 'Participant cible introuvable dans cette salle média.'));
         }
         io.to(targetSocketId).emit(eventName, {
           ...payload,
@@ -176,7 +198,9 @@ export const registerRealtime = (io: Server) => {
     socket.on('meeting:request-ice-restart', (payload: any, callback?: Ack) => {
       const meetingId = Number(socket.data.meetingId || 0);
       const targetSocketId = String(payload?.targetSocketId || '');
-      if (!meetingId || !meetings.get(meetingId)?.has(targetSocketId)) return callback?.(fail('REALTIME_TARGET_INVALID', 'Participant cible introuvable.'));
+      const source = meetings.get(meetingId)?.get(socket.id);
+      const target = meetings.get(meetingId)?.get(targetSocketId);
+      if (!meetingId || !source || !target || source.breakoutRoomId !== target.breakoutRoomId) return callback?.(fail('REALTIME_TARGET_INVALID', 'Participant cible introuvable dans cette salle média.'));
       io.to(targetSocketId).emit('meeting:ice-restart-requested', { meetingId, fromSocketId: socket.id, fromUserId: user.id });
       callback?.({ ok: true });
     });

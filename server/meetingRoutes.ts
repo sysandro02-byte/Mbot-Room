@@ -1,4 +1,5 @@
 import type express from 'express';
+import type { QueryResultRow } from 'pg';
 import type { Server } from 'socket.io';
 import {
   AuthedRequest,
@@ -687,6 +688,113 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
 
   app.post('/api/meetings/:meetingId/summary/generate', ...protectedApi, async (request:AuthedRequest,response,next)=>{
     try{const meeting=await getMeetingById(Number(request.params.meetingId));if(!meeting||!canModerateMeeting(meeting,request.user!))return sendApiError(response,403,'MEETING_HOST_REQUIRED','Action réservée à l’hôte.');const summary=await generateSummary(meeting);if(!summary)return response.status(422).json({error:'Aucun transcript textuel exploitable ou Luna IA non configurée.',code:'SUMMARY_UNAVAILABLE'});response.json(summary);}catch(error){next(error);}
+  });
+
+  app.get('/api/meetings/:meetingId/breakouts', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const meetingId = Number(request.params.meetingId);
+      if (!(await hasMeetingAccess(meetingId, request.user!))) return sendApiError(response, 403, 'MEETING_ACCESS_DENIED', 'Accès refusé.');
+      const rooms = await query(
+        `SELECT r.id,r.meeting_id,r.name,r.is_open,r.created_at,r.updated_at,
+                COALESCE(json_agg(json_build_object('userId',m.user_id,'name',u.name,'avatar',u.avatar))
+                  FILTER (WHERE m.user_id IS NOT NULL),'[]'::json) AS members
+           FROM room_breakout_rooms r
+           LEFT JOIN room_breakout_members m ON m.breakout_room_id=r.id
+           LEFT JOIN room_users u ON u.id=m.user_id
+          WHERE r.meeting_id=$1
+          GROUP BY r.id
+          ORDER BY r.created_at,r.name`, [meetingId],
+      );
+      response.json(rooms.rows.map((row) => ({
+        id: row.id, meetingId: Number(row.meeting_id), name: row.name, isOpen: Boolean(row.is_open),
+        createdAt: row.created_at, updatedAt: row.updated_at, members: row.members || [],
+      })));
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/meetings/:meetingId/breakouts', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const meeting = await getMeetingById(Number(request.params.meetingId));
+      if (!meeting || !canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Action réservée à l’hôte ou au co-hôte.');
+      const names = Array.isArray(request.body?.names)
+        ? request.body.names.map((value: unknown) => normalizeText(value).slice(0, 80)).filter(Boolean).slice(0, 20)
+        : [];
+      if (!names.length) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Ajoutez au moins une salle de sous-groupe.');
+      const created: QueryResultRow[] = [];
+      for (const name of names) {
+        const id = createId();
+        const result = await query(
+          `INSERT INTO room_breakout_rooms (id,meeting_id,name,created_by) VALUES ($1,$2,$3,$4) RETURNING *`,
+          [id, meeting.id, name, request.user!.id],
+        );
+        created.push(result.rows[0]);
+      }
+      io.to(`meeting:${meeting.id}`).emit('meeting:breakouts-updated', { meetingId: meeting.id });
+      response.status(201).json(created.map((row) => ({ id: row.id, meetingId: Number(row.meeting_id), name: row.name, isOpen: row.is_open })));
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/meetings/:meetingId/breakouts/:breakoutId/assign', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const meeting = await getMeetingById(Number(request.params.meetingId));
+      if (!meeting || !canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Action réservée à l’hôte ou au co-hôte.');
+      const userId = Number(request.body?.userId);
+      if (!userId || userId === meeting.host_id) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Participant invalide pour une sous-salle.');
+      const room = await query('SELECT * FROM room_breakout_rooms WHERE id=$1 AND meeting_id=$2 LIMIT 1', [request.params.breakoutId, meeting.id]);
+      if (!room.rows[0]) return sendApiError(response, 404, 'BREAKOUT_NOT_FOUND', 'Sous-salle introuvable.');
+      const member = await query(`SELECT 1 FROM room_meeting_members WHERE meeting_id=$1 AND user_id=$2 AND status='accepted' LIMIT 1`, [meeting.id,userId]);
+      if (!member.rows[0]) return sendApiError(response, 404, 'PARTICIPANT_NOT_FOUND', 'Participant introuvable.');
+      await query(
+        `DELETE FROM room_breakout_members bm USING room_breakout_rooms br
+          WHERE bm.breakout_room_id=br.id AND br.meeting_id=$1 AND bm.user_id=$2`, [meeting.id,userId],
+      );
+      await query(
+        `INSERT INTO room_breakout_members (breakout_room_id,user_id,assigned_by) VALUES ($1,$2,$3)
+         ON CONFLICT (breakout_room_id,user_id) DO UPDATE SET assigned_by=excluded.assigned_by,assigned_at=now(),left_at=NULL`,
+        [request.params.breakoutId,userId,request.user!.id],
+      );
+      io.to(`user:${userId}`).emit('meeting:breakout-assigned', {
+        meetingId: meeting.id, breakoutRoomId: request.params.breakoutId, breakoutRoomName: room.rows[0].name, isOpen: Boolean(room.rows[0].is_open),
+      });
+      io.to(`meeting:${meeting.id}`).emit('meeting:breakouts-updated', { meetingId: meeting.id });
+      response.json({ success: true });
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/meetings/:meetingId/breakouts/open', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const meeting = await getMeetingById(Number(request.params.meetingId));
+      if (!meeting || !canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Action réservée à l’hôte ou au co-hôte.');
+      await query(`UPDATE room_breakout_rooms SET is_open=true,updated_at=now() WHERE meeting_id=$1`, [meeting.id]);
+      const assignments = await query(
+        `SELECT bm.user_id,br.id,br.name FROM room_breakout_members bm JOIN room_breakout_rooms br ON br.id=bm.breakout_room_id WHERE br.meeting_id=$1`, [meeting.id],
+      );
+      for (const row of assignments.rows) {
+        io.to(`user:${Number(row.user_id)}`).emit('meeting:breakout-assigned', {
+          meetingId: meeting.id, breakoutRoomId: row.id, breakoutRoomName: row.name, isOpen: true,
+        });
+      }
+      io.to(`meeting:${meeting.id}`).emit('meeting:breakouts-opened', { meetingId: meeting.id });
+      response.json({ success: true, assignments: assignments.rows.length });
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/meetings/:meetingId/breakouts/close', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const meeting = await getMeetingById(Number(request.params.meetingId));
+      if (!meeting || !canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Action réservée à l’hôte ou au co-hôte.');
+      const members = await query(
+        `SELECT DISTINCT bm.user_id FROM room_breakout_members bm JOIN room_breakout_rooms br ON br.id=bm.breakout_room_id WHERE br.meeting_id=$1`, [meeting.id],
+      );
+      await query(`UPDATE room_breakout_rooms SET is_open=false,updated_at=now() WHERE meeting_id=$1`, [meeting.id]);
+      for (const row of members.rows) {
+        io.to(`user:${Number(row.user_id)}`).emit('meeting:breakout-assigned', {
+          meetingId: meeting.id, breakoutRoomId: null, breakoutRoomName: '', isOpen: false,
+        });
+      }
+      io.to(`meeting:${meeting.id}`).emit('meeting:breakouts-closed', { meetingId: meeting.id });
+      response.json({ success: true });
+    } catch (error) { next(error); }
   });
 
   app.get('/api/meetings/:meetingId/ended', ...protectedApi, async (request:AuthedRequest,response,next)=>{
