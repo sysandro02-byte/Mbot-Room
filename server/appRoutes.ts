@@ -7,6 +7,7 @@ import {
   publicMeeting,
   query,
   requireDatabase,
+  setDatabaseReady,
   sendApiError,
   toPublicUser,
 } from './core.js';
@@ -18,25 +19,50 @@ const parseDate = (value: unknown) => {
 
 export const registerAppRoutes = (app: express.Express, io: Server) => {
   app.get('/api/health', async (_request, response) => {
-    if (!process.env.DATABASE_URL) {
-      response.status(503).json({ ok:false,service:'mbote-room',database:{configured:false,connected:false,type:'postgres'} });
+    const configured = Boolean(String(process.env.DATABASE_URL || '').trim());
+    if (!configured) {
+      setDatabaseReady(false, 'DATABASE_URL is not configured');
+      response.json({
+        ok:false,
+        status:'degraded',
+        service:'mbote-room',
+        database:{configured:false,connected:false,type:'postgres'},
+        media:{
+          topology:String(process.env.MEDIA_TRANSPORT || 'auto'),
+          turnConfigured:Boolean(String(process.env.TURN_URLS||'').trim() && String(process.env.TURN_SHARED_SECRET||'').trim()),
+        },
+      });
       return;
     }
     try {
       const result = await query(`SELECT now() AS now,(SELECT COUNT(*)::int FROM room_users) AS users,(SELECT COUNT(*)::int FROM room_meetings) AS meetings`);
+      setDatabaseReady(true);
       response.json({
         ok:true,
+        status:'ready',
         service:'mbote-room',
         database:{configured:true,connected:true,type:'postgres',users:Number(result.rows[0].users),meetings:Number(result.rows[0].meetings)},
         media:{
-          topology:'mesh',
+          topology:String(process.env.MEDIA_TRANSPORT || 'auto'),
           turnConfigured:Boolean(String(process.env.TURN_URLS||'').trim() && String(process.env.TURN_SHARED_SECRET||'').trim()),
           turnCredentialTtlSeconds:Number(process.env.TURN_CREDENTIAL_TTL_SECONDS||3600),
         },
         serverTime:result.rows[0].now,
       });
     } catch (error) {
-      response.status(503).json({ ok:false,service:'mbote-room',database:{configured:true,connected:false,type:'postgres'},error:error instanceof Error?error.message:'Database unavailable' });
+      const message = error instanceof Error ? error.message : 'Database unavailable';
+      setDatabaseReady(false, message);
+      response.json({
+        ok:false,
+        status:'degraded',
+        service:'mbote-room',
+        database:{configured:true,connected:false,type:'postgres'},
+        media:{
+          topology:String(process.env.MEDIA_TRANSPORT || 'auto'),
+          turnConfigured:Boolean(String(process.env.TURN_URLS||'').trim() && String(process.env.TURN_SHARED_SECRET||'').trim()),
+        },
+        error:message,
+      });
     }
   });
 
