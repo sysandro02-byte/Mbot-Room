@@ -269,6 +269,17 @@ export const meetingService = {
     return response.json();
   },
 
+  async setMeetingLocked(meetingId: number, locked: boolean): Promise<{ success: boolean; locked: boolean; meeting?: Meeting }> {
+    const response = await fetch(apiUrl(`/api/meetings/${meetingId}/lock`), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ locked }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Impossible de modifier le verrouillage de la réunion');
+    return data;
+  },
+
   async startMeetingAndNotify(meetingId: number): Promise<{ success: boolean; notifiedCount: number; meeting?: Meeting }> {
     const response = await fetch(apiUrl(`/api/meetings/${meetingId}/start-notify`), {
       method: 'POST',
