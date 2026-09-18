@@ -80,6 +80,26 @@ const mockEgressServer = createServer(async (request, response) => {
 });
 await new Promise((resolve) => mockEgressServer.listen(egressPort, '127.0.0.1', resolve));
 
+const transcriptionPort = port + 2;
+const transcriptionRequests = [];
+const mockTranscriptionServer = createServer(async (request, response) => {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(Buffer.from(chunk));
+  const body = Buffer.concat(chunks);
+  transcriptionRequests.push({
+    method: request.method,
+    authorization: request.headers.authorization || '',
+    contentType: request.headers['content-type'] || '',
+    bodyText: body.toString('utf8'),
+  });
+  response.setHeader('Content-Type', 'application/json');
+  response.end(JSON.stringify({
+    text: 'Décision CI issue du micro réel',
+    language: 'fr',
+  }));
+});
+await new Promise((resolve) => mockTranscriptionServer.listen(transcriptionPort, '127.0.0.1', resolve));
+
 const pool = new pg.Pool({ connectionString: databaseUrl, ssl: false });
 
 await pool.query('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
@@ -97,6 +117,10 @@ const server = spawn(process.execPath, ['dist/server.js'], {
     ADMIN_EMAILS: '',
     RESEND_API_KEY: '',
     GROQ_API_KEY: '',
+    GROQ_TRANSCRIPTION_API_KEY: 'transcription-test-key',
+    GROQ_TRANSCRIPTION_URL: `http://127.0.0.1:${transcriptionPort}/transcriptions`,
+    GROQ_TRANSCRIPTION_MODEL: 'whisper-large-v3-turbo',
+    CAPTION_CHUNK_SECONDS: '10',
     MEDIA_TRANSPORT: 'livekit',
     LIVEKIT_URL: `ws://127.0.0.1:${egressPort}`,
     LIVEKIT_API_KEY: 'test-api-key',
@@ -588,4 +612,5 @@ try {
     sleep(5_000),
   ]);
   await new Promise((resolve) => mockEgressServer.close(() => resolve()));
+  await new Promise((resolve) => mockTranscriptionServer.close(() => resolve()));
 }
