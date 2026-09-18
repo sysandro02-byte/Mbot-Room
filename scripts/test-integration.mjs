@@ -191,7 +191,13 @@ const register = async (name, email) => {
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
   assert.ok(result.data.token);
   assert.ok(result.data.user?.id);
-  return result.data;
+  const setCookie = result.response.headers.get('set-cookie') || '';
+  assert.match(setCookie, /mbote_room_session=/);
+  assert.match(setCookie, /HttpOnly/i);
+  return {
+    ...result.data,
+    cookie: setCookie.split(';')[0],
+  };
 };
 
 const socketConnect = (token) => new Promise((resolve, reject) => {
@@ -204,6 +210,28 @@ const socketConnect = (token) => new Promise((resolve, reject) => {
   const timer = setTimeout(() => {
     socket.close();
     reject(new Error('Socket.IO connection timeout'));
+  }, 7_000);
+  socket.once('connect', () => {
+    clearTimeout(timer);
+    resolve(socket);
+  });
+  socket.once('connect_error', (error) => {
+    clearTimeout(timer);
+    socket.close();
+    reject(error);
+  });
+});
+
+const socketConnectWithCookie = (cookie) => new Promise((resolve, reject) => {
+  const socket = createSocket(baseUrl, {
+    extraHeaders: { Cookie: cookie, Origin: baseUrl },
+    transports: ['websocket', 'polling'],
+    reconnection: false,
+    timeout: 5_000,
+  });
+  const timer = setTimeout(() => {
+    socket.close();
+    reject(new Error('Cookie-authenticated Socket.IO connection timeout'));
   }, 7_000);
   socket.once('connect', () => {
     clearTimeout(timer);
@@ -274,6 +302,16 @@ try {
   const hostMe = await jsonRequest('/api/auth/me', { headers: authHeaders(host.token) });
   assert.equal(hostMe.response.status, 200);
   assert.equal(hostMe.data.user.email, 'host.integration@mbote.test');
+
+  const hostMeCookieOnly = await jsonRequest('/api/auth/me', {
+    headers: { Cookie: host.cookie },
+  });
+  assert.equal(hostMeCookieOnly.response.status, 200, JSON.stringify(hostMeCookieOnly.data));
+  assert.equal(hostMeCookieOnly.data.user.email, 'host.integration@mbote.test');
+
+  const cookieSocket = await socketConnectWithCookie(host.cookie);
+  assert.equal(cookieSocket.connected, true);
+  cookieSocket.close();
 
   const rtcConfig = await jsonRequest('/api/rtc/config', { headers: authHeaders(host.token) });
   assert.equal(rtcConfig.response.status, 200, JSON.stringify(rtcConfig.data));
