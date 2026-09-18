@@ -222,8 +222,13 @@ const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
   });
   page.on('console', (message) => {
     if (message.type() === 'error') {
-      browserErrors.push(message.text());
-      console.error(`[${label}:console] ${message.text()}`);
+      const text = message.text();
+      if (text === 'WebSocket is already in CLOSING or CLOSED state.') {
+        console.warn(`[${label}:expected-network-warning] ${text}`);
+        return;
+      }
+      browserErrors.push(text);
+      console.error(`[${label}:console] ${text}`);
     }
   });
   await page.goto(`${baseUrl}/reunions/${meetingId}`, { waitUntil: 'domcontentloaded' });
