@@ -31,6 +31,7 @@ import { useMeetingMeshWebRTC, RemoteMeetingParticipant } from '../hooks/useMeet
 import { socket } from '../lib/socket';
 import { authService } from '../services/authService';
 import {
+  BreakoutRoom,
   collaborationService,
   MeetingMessage,
   MeetingParticipant,
@@ -39,7 +40,7 @@ import {
 import { getMeetingAccessCode, LobbyParticipant, Meeting, meetingService } from '../services/meetingService';
 import './MeetingRoomV2.css';
 
-type Panel = 'participants' | 'chat' | 'polls' | 'luna' | null;
+type Panel = 'participants' | 'chat' | 'polls' | 'luna' | 'breakouts' | null;
 type MeetingLocationState = {
   guestName?: string;
   joinOptions?: { mic?: boolean; camera?: boolean; backgroundUrl?: string };
@@ -168,6 +169,10 @@ export default function MeetingRoomV2() {
   const [reactionPanelOpen, setReactionPanelOpen] = useState(false);
   const [participants, setParticipants] = useState<MeetingParticipant[]>([]);
   const [lobbyParticipants, setLobbyParticipants] = useState<LobbyParticipant[]>([]);
+  const [breakoutRooms, setBreakoutRooms] = useState<BreakoutRoom[]>([]);
+  const [breakoutRoomId, setBreakoutRoomId] = useState<string | null>(null);
+  const [breakoutRoomName, setBreakoutRoomName] = useState('');
+  const [breakoutCount, setBreakoutCount] = useState(2);
   const [messages, setMessages] = useState<MeetingMessage[]>([]);
   const [messageDraft, setMessageDraft] = useState('');
   const [polls, setPolls] = useState<MeetingPoll[]>([]);
@@ -213,6 +218,7 @@ export default function MeetingRoomV2() {
     localAvatar: currentUser?.avatar || '',
     localStream,
     media: mediaState,
+    breakoutRoomId,
     enabled: Boolean(meeting?.id && localUserId && isAuthenticated && mediaReady),
     onNotice: setNotice,
   });
@@ -256,17 +262,19 @@ export default function MeetingRoomV2() {
     if (!meeting?.id) return;
     let cancelled = false;
     const load = async () => {
-      const [memberRows, chatRows, pollRows, lobbyRows] = await Promise.all([
+      const [memberRows, chatRows, pollRows, lobbyRows, breakoutRows] = await Promise.all([
         collaborationService.getParticipants(meeting.id).catch(() => []),
         collaborationService.getMessages(meeting.id).catch(() => []),
         collaborationService.getPolls(meeting.id).catch(() => []),
         isModerator ? meetingService.getLobby(meeting.id).catch(() => []) : Promise.resolve([]),
+        collaborationService.getBreakoutRooms(meeting.id).catch(() => []),
       ]);
       if (cancelled) return;
       setParticipants(memberRows);
       setMessages(dedupeMessages(chatRows));
       setPolls(pollRows);
       setLobbyParticipants(lobbyRows.filter((item) => item.status === 'requested'));
+      setBreakoutRooms(breakoutRows);
     };
     void load();
     return () => { cancelled = true; };
@@ -336,6 +344,11 @@ export default function MeetingRoomV2() {
     setLobbyParticipants(rows.filter((item) => item.status === 'requested'));
   }, [isModerator, meeting?.id]);
 
+  const refreshBreakouts = useCallback(async () => {
+    if (!meeting?.id) return;
+    setBreakoutRooms(await collaborationService.getBreakoutRooms(meeting.id).catch(() => []));
+  }, [meeting?.id]);
+
   useEffect(() => {
     if (!meeting?.id) return;
     const id = meeting.id;
@@ -369,6 +382,19 @@ export default function MeetingRoomV2() {
       }, 4000);
       reactionTimersRef.current.set(userId, timer);
     };
+    const onBreakoutAssigned = (payload: { meetingId: number; breakoutRoomId: string | null; breakoutRoomName?: string; isOpen?: boolean }) => {
+      if (Number(payload.meetingId) !== id) return;
+      if (payload.isOpen === false || !payload.breakoutRoomId) {
+        setBreakoutRoomId(null);
+        setBreakoutRoomName('');
+        setNotice('Retour dans la réunion principale.');
+        return;
+      }
+      setBreakoutRoomId(String(payload.breakoutRoomId));
+      setBreakoutRoomName(String(payload.breakoutRoomName || 'Sous-salle'));
+      setNotice(`Vous rejoignez la sous-salle « ${payload.breakoutRoomName || 'Sous-salle'} ».`);
+    };
+    const onBreakoutsUpdated = () => void refreshBreakouts();
     const onLocked = (payload: { meetingId: number; locked: boolean }) => {
       if (Number(payload.meetingId) !== id) return;
       setMeeting((current) => current ? { ...current, settings: { ...(current.settings || {}), locked: Boolean(payload.locked) } } : current);
@@ -406,6 +432,10 @@ export default function MeetingRoomV2() {
     socket.on('meeting:lobby-updated', onLobby);
     socket.on('meeting:hand-raised', onHandRaised);
     socket.on('meeting:reaction', onReaction);
+    socket.on('meeting:breakout-assigned', onBreakoutAssigned);
+    socket.on('meeting:breakouts-updated', onBreakoutsUpdated);
+    socket.on('meeting:breakouts-opened', onBreakoutsUpdated);
+    socket.on('meeting:breakouts-closed', onBreakoutsUpdated);
     socket.on('meeting:locked', onLocked);
     socket.on('meeting:moderation', onModeration);
     socket.on('meeting:ended', onEnded);
@@ -420,6 +450,10 @@ export default function MeetingRoomV2() {
       socket.off('meeting:lobby-updated', onLobby);
       socket.off('meeting:hand-raised', onHandRaised);
       socket.off('meeting:reaction', onReaction);
+      socket.off('meeting:breakout-assigned', onBreakoutAssigned);
+      socket.off('meeting:breakouts-updated', onBreakoutsUpdated);
+      socket.off('meeting:breakouts-opened', onBreakoutsUpdated);
+      socket.off('meeting:breakouts-closed', onBreakoutsUpdated);
       socket.off('meeting:locked', onLocked);
       socket.off('meeting:moderation', onModeration);
       reactionTimersRef.current.forEach((timer) => clearTimeout(timer));
@@ -429,7 +463,7 @@ export default function MeetingRoomV2() {
       socket.off('meeting:banned', onBanned);
       socket.off('meeting:moved-to-lobby', onMoved);
     };
-  }, [location.state, meeting?.id, navigate, refreshLobby, refreshParticipants]);
+  }, [location.state, meeting?.id, navigate, refreshBreakouts, refreshLobby, refreshParticipants]);
 
   const toggleMic = () => {
     const next = !micEnabled;
@@ -658,6 +692,46 @@ export default function MeetingRoomV2() {
     }
   };
 
+  const createBreakouts = async () => {
+    if (!meeting?.id || !isModerator) return;
+    try {
+      const count = Math.max(2, Math.min(10, Math.floor(breakoutCount || 2)));
+      const names = Array.from({ length: count }, (_, index) => `Sous-salle ${index + 1}`);
+      await collaborationService.createBreakoutRooms(meeting.id, names);
+      await refreshBreakouts();
+      setPanel('breakouts');
+      setNotice(`${count} sous-salles créées.`);
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Impossible de créer les sous-salles.');
+    }
+  };
+
+  const assignBreakout = async (roomId: string, userId: number) => {
+    if (!meeting?.id || !isModerator) return;
+    try {
+      await collaborationService.assignBreakoutParticipant(meeting.id, roomId, userId);
+      await refreshBreakouts();
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Affectation impossible.');
+    }
+  };
+
+  const setBreakoutsOpen = async (open: boolean) => {
+    if (!meeting?.id || !isModerator) return;
+    try {
+      if (open) await collaborationService.openBreakoutRooms(meeting.id);
+      else await collaborationService.closeBreakoutRooms(meeting.id);
+      if (!open) {
+        setBreakoutRoomId(null);
+        setBreakoutRoomName('');
+      }
+      await refreshBreakouts();
+      setNotice(open ? 'Sous-salles ouvertes.' : 'Sous-salles fermées.');
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Action sous-salles impossible.');
+    }
+  };
+
   const startMeeting = async () => {
     if (!meeting?.id) return;
     try {
@@ -711,6 +785,7 @@ export default function MeetingRoomV2() {
         <div className="room-v2-live-state">
           {meeting.is_active ? <><Radio size={16} /> En direct</> : <span>Programmée</span>}
           <span>{galleryCount} connecté{galleryCount > 1 ? 's' : ''}</span>
+          {breakoutRoomName ? <span className="room-v2-breakout-status">Sous-salle : {breakoutRoomName}</span> : null}
           <span
             className={`room-v2-network ${networkQuality.level}`}
             data-testid="network-quality"
@@ -823,7 +898,7 @@ export default function MeetingRoomV2() {
         {panel ? (
           <aside className="room-v2-panel">
             <div className="room-v2-panel-title">
-              <h2>{panel === 'participants' ? 'Participants' : panel === 'chat' ? 'Discussion' : panel === 'polls' ? 'Sondages' : 'Luna IA'}</h2>
+              <h2>{panel === 'participants' ? 'Participants' : panel === 'chat' ? 'Discussion' : panel === 'polls' ? 'Sondages' : panel === 'breakouts' ? 'Sous-salles' : 'Luna IA'}</h2>
               <button type="button" onClick={() => setPanel(null)} aria-label="Fermer"><X size={20}/></button>
             </div>
 
@@ -895,6 +970,41 @@ export default function MeetingRoomV2() {
               </div>
             ) : null}
 
+            {panel === 'breakouts' ? (
+              <div className="room-v2-breakouts">
+                {!breakoutRooms.length ? (
+                  <div className="room-v2-breakout-create">
+                    <p>Créez des groupes séparés pour les ateliers ou discussions parallèles.</p>
+                    <label>Nombre de sous-salles
+                      <input type="number" min={2} max={10} value={breakoutCount} onChange={(event) => setBreakoutCount(Number(event.target.value))}/>
+                    </label>
+                    <button type="button" onClick={() => void createBreakouts()} disabled={!isModerator}>Créer les sous-salles</button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="room-v2-breakout-actions">
+                      <button type="button" onClick={() => void setBreakoutsOpen(true)}>Ouvrir les sous-salles</button>
+                      <button type="button" className="secondary" onClick={() => void setBreakoutsOpen(false)}>Fermer les sous-salles</button>
+                    </div>
+                    {breakoutRooms.map((room) => (
+                      <article className="room-v2-breakout-card" key={room.id}>
+                        <div><strong>{room.name}</strong><small>{room.isOpen ? 'Ouverte' : 'Fermée'} · {room.members.length} participant(s)</small></div>
+                        <div className="room-v2-breakout-members">
+                          {room.members.map((member) => <span key={member.userId}>{member.name}</span>)}
+                        </div>
+                        <label>Affecter un participant
+                          <select defaultValue="" onChange={(event) => { const userId = Number(event.target.value); if (userId) void assignBreakout(room.id, userId); event.currentTarget.value=''; }}>
+                            <option value="">Choisir…</option>
+                            {activeMembers.filter((member) => member.role !== 'host').map((member) => <option key={member.userId} value={member.userId}>{member.name}</option>)}
+                          </select>
+                        </label>
+                      </article>
+                    ))}
+                  </>
+                )}
+              </div>
+            ) : null}
+
             {panel === 'polls' ? (
               <div className="room-v2-polls">
                 <form onSubmit={createPoll} className="room-v2-poll-create">
@@ -951,6 +1061,7 @@ export default function MeetingRoomV2() {
         <Control active={panel === 'participants'} label="Participants" onClick={() => setPanel(panel === 'participants' ? null : 'participants')}><UsersRound/></Control>
         <Control active={panel === 'chat'} label="Discussion" onClick={() => setPanel(panel === 'chat' ? null : 'chat')}><MessageCircle/></Control>
         <Control active={panel === 'polls'} label="Sondages" onClick={() => setPanel(panel === 'polls' ? null : 'polls')}><Vote/></Control>
+        {isModerator ? <Control active={panel === 'breakouts'} label="Sous-salles" testId="breakout-button" onClick={() => { setPanel(panel === 'breakouts' ? null : 'breakouts'); void refreshBreakouts(); }}><UsersRound/></Control> : null}
         <Control active={panel === 'luna'} label="Luna" onClick={() => setPanel(panel === 'luna' ? null : 'luna')}><Bot/></Control>
         {isModerator ? <Control active={Boolean(meeting.settings?.locked)} label={meeting.settings?.locked ? 'Déverrouiller' : 'Verrouiller'} testId="meeting-lock-button" onClick={() => void toggleMeetingLock()}><ShieldCheck/></Control> : null}
         <div className="room-v2-device-wrap">
