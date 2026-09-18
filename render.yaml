@@ -15,6 +15,10 @@ services:
           property: connectionString
       - key: ADMIN_EMAILS
         sync: false
+      - key: MBOTE_ROOM_APP_URL
+        value: https://mbote-room-api.onrender.com
+      - key: MBOTE_ROOM_ALLOWED_ORIGINS
+        value: https://mbote-room-api.onrender.com
       - key: MBOTE_AUTH_BASE_URL
         value: https://mbote-backend.onrender.com
       - key: MBOTE_AUTH_CLIENT_ID
@@ -31,6 +35,16 @@ services:
         value: llama-3.1-8b-instant
       - key: GROQ_TIMEOUT_MS
         value: "30000"
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MEETING_INVITE_FROM
+        sync: false
+      - key: VITE_TURN_URLS
+        sync: false
+      - key: VITE_TURN_USERNAME
+        sync: false
+      - key: VITE_TURN_CREDENTIAL
+        sync: false
 
 databases:
   - name: mbote-room-db

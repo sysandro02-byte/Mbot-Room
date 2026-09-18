@@ -1,0 +1,65 @@
+name: MBoteRoom CI
+
+on:
+  push:
+    branches: [main, codex/zoom-core-real-apis]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mbote
+          POSTGRES_PASSWORD: mbote
+          POSTGRES_DB: mbote_room_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U mbote -d mbote_room_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DATABASE_URL: postgresql://mbote:mbote@127.0.0.1:5432/mbote_room_test
+      PGSSLMODE: disable
+      MBOTE_ROOM_TEST_DATABASE: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Dependency audit
+        run: npm audit
+      - name: Install Chromium for video checks
+        run: npx playwright install --with-deps chromium
+      - name: Typecheck
+        run: npm run lint
+      - name: Build
+        run: npm run build
+      - name: Production smoke checks
+        run: node scripts/test-production-config.mjs
+      - name: PostgreSQL and realtime integration
+        run: node scripts/test-integration.mjs
+      - name: Two-browser camera, microphone and reconnect test
+        run: node scripts/test-video-meeting.mjs
+      - name: Upload video diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mboteroom-video-diagnostics
+          path: test-artifacts
+          if-no-files-found: ignore
+          retention-days: 7
