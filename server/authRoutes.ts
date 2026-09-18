@@ -46,13 +46,26 @@ const clearSessionCookie = (response: express.Response) => {
   response.clearCookie(SESSION_COOKIE_NAME, sessionCookieOptions());
 };
 
+const wantsBearerSession = (request: express.Request) =>
+  String(request.headers['x-mbote-room-session-mode'] || '').trim().toLowerCase() === 'bearer';
+
+const publicSessionPayload = (
+  request: express.Request,
+  session: Awaited<ReturnType<typeof createSession>>,
+) => ({
+  user: session.user,
+  expiresAt: session.expiresAt,
+  ...(wantsBearerSession(request) ? { token: session.token } : {}),
+});
+
 const respondWithSession = (
+  request: express.Request,
   response: express.Response,
   session: Awaited<ReturnType<typeof createSession>>,
   status = 200,
 ) => {
   attachSessionCookie(response, session);
-  response.status(status).json(session);
+  response.status(status).json(publicSessionPayload(request, session));
 };
 
 const createAvatar = (name: string) =>
@@ -156,7 +169,7 @@ export const registerAuthRoutes = (app: express.Express) => {
         [name, username, email, createAvatar(name), passwordData.hash, passwordData.salt, new Date().toISOString(), normalizeText(request.body?.phoneNumber).slice(0, 40), normalizeText(request.body?.organization).slice(0, 120), normalizeText(request.body?.jobTitle).slice(0, 120), role],
       );
       const session = await createSession(Number(inserted.rows[0].id), true);
-      respondWithSession(response, session, 201);
+      respondWithSession(request, response, session, 201);
     } catch (error) { next(error); }
   });
 
@@ -170,7 +183,7 @@ export const registerAuthRoutes = (app: express.Express) => {
       const passwordData = hashPassword(password, user.password_salt);
       if (passwordData.hash !== user.password_hash) return sendApiError(response, 401, 'INVALID_CREDENTIALS', 'Email ou mot de passe incorrect.');
       const session = await createSession(Number(user.id), Boolean(request.body?.rememberMe));
-      respondWithSession(response, session);
+      respondWithSession(request, response, session);
     } catch (error) { next(error); }
   });
 
@@ -208,7 +221,11 @@ export const registerAuthRoutes = (app: express.Express) => {
       }
       const session = await createSession(user.id, false);
       attachSessionCookie(response, session);
-      response.status(201).json({ ...session, meeting: { ...publicMeeting(meeting), settings: { ...publicMeeting(meeting).settings } }, lobbyStatus: status });
+      response.status(201).json({
+        ...publicSessionPayload(request, session),
+        meeting: { ...publicMeeting(meeting), settings: { ...publicMeeting(meeting).settings } },
+        lobbyStatus: status,
+      });
     } catch (error) { next(error); }
   });
 
@@ -290,7 +307,7 @@ export const registerAuthRoutes = (app: express.Express) => {
       if (!challenge || Date.now() - challenge.createdAt > 10 * 60_000) return sendApiError(response, 400, 'EXTERNAL_AUTH_STATE_INVALID', 'Autorisation MBoté expirée.');
       const user = await upsertExternalUser(challenge.profile);
       const session = await createSession(Number(user.id), true);
-      respondWithSession(response, session);
+      respondWithSession(request, response, session);
     } catch (error) { next(error); }
   });
 
