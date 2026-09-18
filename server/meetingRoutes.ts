@@ -99,6 +99,7 @@ const defaultSettings = (): MeetingSettings => ({
   linkSharing: true,
   externalAccess: true,
   joinBeforeHost: false,
+  locked: false,
 });
 
 const buildSettings = (body: any, existing?: Meeting) => {
@@ -328,7 +329,15 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       if (!validateMeetingPassword(meeting, request.body?.password)) return sendApiError(response, 403, 'MEETING_PASSWORD_INVALID', 'Mot de passe de réunion incorrect.');
       const ban = await query('SELECT 1 FROM room_meeting_bans WHERE meeting_id=$1 AND user_id=$2 LIMIT 1', [meeting.id, request.user!.id]);
       if (ban.rows[0]) return sendApiError(response, 403, 'MEETING_BANNED', 'Vous avez été exclu de cette réunion.');
-      const status = canModerateMeeting(meeting, request.user!) || meeting.settings.waitingRoom === false ? 'accepted' : 'requested';
+      const existingMember = await query(
+        `SELECT status FROM room_meeting_members WHERE meeting_id=$1 AND user_id=$2 LIMIT 1`,
+        [meeting.id, request.user!.id],
+      );
+      const alreadyAccepted = existingMember.rows[0]?.status === 'accepted';
+      if (meeting.settings.locked === true && !canModerateMeeting(meeting, request.user!) && !alreadyAccepted) {
+        return sendApiError(response, 423, 'MEETING_LOCKED', 'La réunion est verrouillée par l’hôte.');
+      }
+      const status = canModerateMeeting(meeting, request.user!) || alreadyAccepted || meeting.settings.waitingRoom === false ? 'accepted' : 'requested';
       await query(
         `INSERT INTO room_lobby (meeting_id,user_id,status,name,avatar) VALUES ($1,$2,$3,$4,$5)
          ON CONFLICT (meeting_id,user_id) DO UPDATE SET status=excluded.status,name=excluded.name,avatar=excluded.avatar`,
@@ -385,6 +394,22 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
         io.to(`meeting:${meeting.id}`).emit('meeting:lobby-updated', { meetingId: meeting.id, admitAll: true, userIds });
       }
       response.json({ success: true, admitted: userIds.length, userIds });
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/meetings/:meetingId/lock', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const meeting = await getMeetingById(Number(request.params.meetingId));
+      if (!meeting || !canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Action réservée à l’hôte ou au co-hôte.');
+      const locked = Boolean(request.body?.locked);
+      const settings = { ...meeting.settings, locked };
+      const updated = await query(
+        `UPDATE room_meetings SET settings=$2::jsonb,updated_at=now() WHERE id=$1 RETURNING *`,
+        [meeting.id, JSON.stringify(settings)],
+      );
+      const value = publicMeeting(updated.rows[0]);
+      io.to(`meeting:${meeting.id}`).emit('meeting:locked', { meetingId: meeting.id, locked });
+      response.json({ success: true, locked, meeting: value });
     } catch (error) { next(error); }
   });
 
