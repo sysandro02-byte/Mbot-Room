@@ -35,5 +35,14 @@ export const runProductMigrations = async () => {
     );
     CREATE INDEX IF NOT EXISTS room_breakout_members_user_idx ON room_breakout_members(user_id);
     CREATE INDEX IF NOT EXISTS room_breakout_members_assigned_by_idx ON room_breakout_members(assigned_by);
+
+    ALTER TABLE room_recordings ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'manual';
+    ALTER TABLE room_recordings ADD COLUMN IF NOT EXISTS provider_recording_id text NOT NULL DEFAULT '';
+    ALTER TABLE room_recordings ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'ready';
+    ALTER TABLE room_recordings ADD COLUMN IF NOT EXISTS started_at timestamptz;
+    ALTER TABLE room_recordings ADD COLUMN IF NOT EXISTS ended_at timestamptz;
+    ALTER TABLE room_recordings ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
+    CREATE INDEX IF NOT EXISTS room_recordings_provider_id_idx ON room_recordings(provider_recording_id);
+    CREATE INDEX IF NOT EXISTS room_recordings_meeting_status_idx ON room_recordings(meeting_id,status,created_at DESC);
   `);
 };
