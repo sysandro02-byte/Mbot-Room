@@ -4,6 +4,7 @@ import {
   Bot,
   Camera,
   CameraOff,
+  Captions,
   Circle,
   Hand,
   LogOut,
@@ -29,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useMeetingMeshWebRTC } from '../hooks/useMeetingMeshWebRTC';
 import { useMeetingLiveKit } from '../hooks/useMeetingLiveKit';
+import { useMeetingCaptions } from '../hooks/useMeetingCaptions';
 import { socket } from '../lib/socket';
 import { authService } from '../services/authService';
 import {
@@ -191,6 +193,7 @@ export default function MeetingRoomV2() {
   const [mediaTransportStatus, setMediaTransportStatus] = useState<MediaTransportStatus | null>(null);
   const [mediaTransportChecked, setMediaTransportChecked] = useState(false);
   const [liveKitFailed, setLiveKitFailed] = useState(false);
+  const [captionsEnabled, setCaptionsEnabled] = useState(false);
 
   const localUserId = String(currentUser?.id || '');
   const localName = state?.guestName?.trim() || currentUser?.name || currentUser?.username || currentUser?.email || 'Participant';
@@ -260,6 +263,15 @@ export default function MeetingRoomV2() {
   const remoteParticipants = usingLiveKit ? liveKitMedia.remoteParticipants : meshMedia.remoteParticipants;
   const networkQuality = usingLiveKit ? liveKitMedia.networkQuality : meshMedia.networkQuality;
   const activeSpeakerSocketId = usingLiveKit ? liveKitMedia.activeSpeakerSocketId : meshMedia.activeSpeakerSocketId;
+
+  const liveCaptions = useMeetingCaptions({
+    meetingId: meeting?.id || 0,
+    enabled: captionsEnabled && Boolean(meeting?.id),
+    audioStream: cameraStreamRef.current || localStream,
+    breakoutRoomId,
+    language: 'fr-FR',
+    onNotice: setNotice,
+  });
 
   const loadMeeting = useCallback(async () => {
     if (!isAuthenticated) {
@@ -1167,7 +1179,7 @@ export default function MeetingRoomV2() {
 
             {panel === 'luna' ? (
               <div className="room-v2-luna">
-                <p>Luna répond uniquement avec les informations que vous lui fournissez. Elle ne prétend pas écouter la réunion sans transcription.</p>
+                <p>Luna peut utiliser le chat et les transcriptions audio persistées de la réunion pour produire ses résumés. Elle n’invente pas le contenu qui n’a pas été transcrit.</p>
                 <form onSubmit={askLuna}>
                   <textarea value={lunaPrompt} onChange={(event) => setLunaPrompt(event.target.value)} placeholder="Ex. Résume les décisions décrites dans ce texte…" maxLength={5000}/>
                   <button type="submit" disabled={lunaLoading || !lunaPrompt.trim()}>{lunaLoading ? 'Analyse…' : 'Demander à Luna'}</button>
@@ -1179,10 +1191,38 @@ export default function MeetingRoomV2() {
         ) : null}
       </section>
 
+      {captionsEnabled && liveCaptions.captions.length ? (
+        <div
+          className="room-v2-caption-overlay"
+          data-testid="caption-overlay"
+          data-mode={liveCaptions.mode}
+          aria-live="polite"
+          aria-label="Sous-titres de la réunion"
+        >
+          {liveCaptions.captions.slice(-3).map((caption) => (
+            <p key={caption.id}>
+              <strong>{caption.speaker}</strong>
+              <span>{caption.text}</span>
+              {caption.provider === 'groq-whisper' ? <small>IA</small> : null}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
       <footer className="room-v2-controls">
         <Control active={micEnabled} label={micEnabled ? 'Micro' : 'Micro coupé'} onClick={toggleMic}>{micEnabled ? <Mic/> : <MicOff/>}</Control>
         <Control active={cameraEnabled} label={cameraEnabled ? 'Caméra' : 'Caméra coupée'} onClick={toggleCamera}>{cameraEnabled ? <Camera/> : <CameraOff/>}</Control>
         <Control active={screenSharing} label="Partager" onClick={() => void toggleScreenShare()}><MonitorUp/></Control>
+        <Control
+          active={captionsEnabled}
+          label={captionsEnabled ? (liveCaptions.mode === 'server' ? 'Sous-titres IA' : 'Sous-titres') : 'Sous-titres'}
+          testId="captions-button"
+          onClick={() => {
+            const next = !captionsEnabled;
+            setCaptionsEnabled(next);
+            if (!next) liveCaptions.clearCaptions();
+          }}
+        ><Captions/></Control>
         <Control active={handRaised} label={handRaised ? 'Baisser la main' : 'Main'} onClick={() => { const raised = !handRaised; setHandRaised(raised); setRaisedHands((current) => { const next = new Set(current); if (raised) next.add(Number(currentUser?.id || 0)); else next.delete(Number(currentUser?.id || 0)); return next; }); socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised}); }}><Hand/></Control>
         <div className="room-v2-reaction-wrap">
           <Control active={reactionPanelOpen} label="Réactions" testId="reaction-button" onClick={() => setReactionPanelOpen((current) => !current)}>😊</Control>
