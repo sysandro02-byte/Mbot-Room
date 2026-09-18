@@ -342,13 +342,14 @@ try {
   assert.equal(mediaStatus.data.preferredMode, 'livekit');
   assert.equal(mediaStatus.data.browserTransport, 'mesh');
   assert.equal(mediaStatus.data.livekitReady, true);
+  assert.equal(mediaStatus.data.serverRecordingReady, true);
 
   const hostMediaSession = await jsonRequest(`/api/meetings/${meeting.id}/media-session`, {
     headers: authHeaders(host.token),
   });
   assert.equal(hostMediaSession.response.status, 200, JSON.stringify(hostMediaSession.data));
   assert.equal(hostMediaSession.data.mode, 'livekit');
-  assert.equal(hostMediaSession.data.serverUrl, 'wss://livekit.test.invalid');
+  assert.equal(hostMediaSession.data.serverUrl, egressBaseUrl.replace(/^http:/, 'ws:'));
   const hostSfuPayload = decodeAndVerifyJwt(hostMediaSession.data.participantToken, 'test-api-secret');
   assert.equal(hostSfuPayload.iss, 'test-api-key');
   assert.equal(hostSfuPayload.sub, `mboteroom-user-${host.user.id}`);
@@ -372,6 +373,70 @@ try {
   });
   assert.equal(outsiderMediaSession.response.status, 403);
   assert.equal(outsiderMediaSession.data.code, 'MEETING_ACCESS_DENIED');
+
+  const recordingCapability = await jsonRequest('/api/recording/status');
+  assert.equal(recordingCapability.response.status, 200, JSON.stringify(recordingCapability.data));
+  assert.equal(recordingCapability.data.ready, true);
+  assert.equal(recordingCapability.data.livekitReady, true);
+  assert.equal(recordingCapability.data.egressEnabled, true);
+  assert.equal(recordingCapability.data.storageReady, true);
+
+  const startRecording = await jsonRequest(`/api/meetings/${meeting.id}/recordings/start`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ layout: 'grid' }),
+  });
+  assert.equal(startRecording.response.status, 201, JSON.stringify(startRecording.data));
+  assert.equal(startRecording.data.provider, 'livekit');
+  assert.equal(startRecording.data.provider_recording_id, 'EG_TEST_RECORDING_1');
+  assert.ok(['active', 'starting'].includes(startRecording.data.status));
+  const recordingId = startRecording.data.id;
+
+  const startEgressRequest = egressRequests.find((item) => item.path?.endsWith('/StartEgress'));
+  assert.ok(startEgressRequest, 'StartEgress request should reach the mock LiveKit service');
+  assert.equal(startEgressRequest.body.room_name, `mboteroom-${meeting.id}`);
+  assert.equal(startEgressRequest.body.template?.layout, 'grid');
+  assert.equal(startEgressRequest.body.outputs?.[0]?.file?.file_type, 'MP4');
+  const roomRecordToken = String(startEgressRequest.authorization).replace(/^Bearer\s+/i, '');
+  const roomRecordPayload = decodeAndVerifyJwt(roomRecordToken, 'test-api-secret');
+  assert.equal(roomRecordPayload.iss, 'test-api-key');
+  assert.equal(roomRecordPayload.video?.roomRecord, true);
+
+  const duplicateRecording = await jsonRequest(`/api/meetings/${meeting.id}/recordings/start`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ layout: 'speaker' }),
+  });
+  assert.equal(duplicateRecording.response.status, 409, JSON.stringify(duplicateRecording.data));
+  assert.equal(duplicateRecording.data.code, 'RECORDING_ALREADY_ACTIVE');
+
+  const recordingStatus = await jsonRequest(`/api/meetings/${meeting.id}/recordings/${recordingId}/status`, {
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(recordingStatus.response.status, 200, JSON.stringify(recordingStatus.data));
+  assert.equal(recordingStatus.data.provider_recording_id, 'EG_TEST_RECORDING_1');
+  assert.equal(recordingStatus.data.status, 'active');
+
+  const stopRecording = await jsonRequest(`/api/meetings/${meeting.id}/recordings/${recordingId}/stop`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+  });
+  assert.equal(stopRecording.response.status, 200, JSON.stringify(stopRecording.data));
+  assert.equal(stopRecording.data.status, 'complete');
+  assert.equal(stopRecording.data.storage_url, 'https://storage.test/mboteroom-test.mp4');
+  assert.equal(Number(stopRecording.data.size_bytes), 245760);
+  assert.equal(Number(stopRecording.data.duration_seconds), 5);
+
+  const persistedRecordings = await jsonRequest(`/api/meetings/${meeting.id}/recordings`, {
+    headers: authHeaders(host.token),
+  });
+  assert.equal(persistedRecordings.response.status, 200, JSON.stringify(persistedRecordings.data));
+  assert.ok(persistedRecordings.data.some((item) =>
+    item.id === recordingId
+    && item.provider === 'livekit'
+    && item.status === 'complete'
+    && item.storage_url === 'https://storage.test/mboteroom-test.mp4'
+  ));
 
   const muteAll = await jsonRequest(`/api/meetings/${meeting.id}/participants/mute-all`, {
     method: 'POST',
