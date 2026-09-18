@@ -554,16 +554,22 @@ export default function MeetingRoomV2() {
     if (recorder && recorder.state !== 'inactive') recorder.stop();
   }, []);
 
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     if (recording) {
       stopRecording();
       return;
     }
-    const stream = localStream;
-    if (!stream || typeof MediaRecorder === 'undefined') {
-      setNotice('L’enregistrement local n’est pas disponible dans ce navigateur.');
+    if (!localStream || typeof MediaRecorder === 'undefined') {
+      setNotice('L’enregistrement n’est pas disponible dans ce navigateur.');
       return;
     }
+    const sources = [
+      { stream: localStream, label: `${localName} (vous)` },
+      ...remoteParticipants.map((participant) => ({ stream: participant.stream, label: participant.name })),
+    ];
+    const session = await createCompositeMeetingRecording(sources);
+    recordingSessionRef.current = session;
+    const stream = session.stream;
     const preferred = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
       ? 'video/webm;codecs=vp9,opus'
       : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' : 'video/webm';
