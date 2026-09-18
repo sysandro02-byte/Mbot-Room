@@ -361,6 +361,48 @@ try {
   assert.ok(participants.data.some((item) => Number(item.userId) === Number(host.user.id)));
   assert.ok(participants.data.some((item) => Number(item.userId) === Number(participant.user.id)));
 
+  const transcriptionStatus = await jsonRequest('/api/transcription/status');
+  assert.equal(transcriptionStatus.response.status, 200, JSON.stringify(transcriptionStatus.data));
+  assert.equal(transcriptionStatus.data.configured, true);
+  assert.equal(transcriptionStatus.data.model, 'whisper-large-v3-turbo');
+  assert.equal(transcriptionStatus.data.chunkSeconds, 10);
+
+  const audioResponse = await fetch(`${baseUrl}/api/meetings/${meeting.id}/transcription/chunk?language=fr`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${participant.token}`,
+      Origin: baseUrl,
+      'Content-Type': 'audio/webm',
+    },
+    body: Buffer.alloc(2048, 7),
+  });
+  const audioCaption = await audioResponse.json();
+  assert.equal(audioResponse.status, 201, JSON.stringify(audioCaption));
+  assert.equal(audioCaption.text, 'Décision CI issue du micro réel');
+  assert.equal(audioCaption.provider, 'groq-whisper');
+  assert.equal(audioCaption.language, 'fr');
+
+  assert.equal(transcriptionRequests.length, 1);
+  assert.equal(transcriptionRequests[0].authorization, 'Bearer transcription-test-key');
+  assert.match(transcriptionRequests[0].contentType, /^multipart\/form-data; boundary=/);
+  assert.match(transcriptionRequests[0].bodyText, /whisper-large-v3-turbo/);
+  assert.match(transcriptionRequests[0].bodyText, /mboteroom-caption\.webm/);
+
+  const browserCaption = await jsonRequest(`/api/meetings/${meeting.id}/captions/text`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ text: 'Sous-titre navigateur CI', language: 'fr-FR' }),
+  });
+  assert.equal(browserCaption.response.status, 201, JSON.stringify(browserCaption.data));
+  assert.equal(browserCaption.data.provider, 'browser-speech');
+
+  const persistedCaptions = await jsonRequest(`/api/meetings/${meeting.id}/captions`, {
+    headers: authHeaders(host.token),
+  });
+  assert.equal(persistedCaptions.response.status, 200, JSON.stringify(persistedCaptions.data));
+  assert.ok(persistedCaptions.data.some((item) => item.text === 'Décision CI issue du micro réel' && item.provider === 'groq-whisper'));
+  assert.ok(persistedCaptions.data.some((item) => item.text === 'Sous-titre navigateur CI' && item.provider === 'browser-speech'));
+
   const mediaStatus = await jsonRequest('/api/media/status');
   assert.equal(mediaStatus.response.status, 200, JSON.stringify(mediaStatus.data));
   assert.equal(mediaStatus.data.preferredMode, 'livekit');
