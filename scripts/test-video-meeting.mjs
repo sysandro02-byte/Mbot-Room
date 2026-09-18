@@ -95,6 +95,31 @@ const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
     localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('token', token);
   }, { user: session.user, token: session.token });
+  await context.addInitScript(() => {
+    if (!navigator.mediaDevices) return;
+    const fakeDisplayMedia = async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1280;
+      canvas.height = 720;
+      const ctx = canvas.getContext('2d');
+      let frame = 0;
+      const draw = () => {
+        if (!ctx) return;
+        ctx.fillStyle = frame % 2 ? '#1e3a8a' : '#172554';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '48px sans-serif';
+        ctx.fillText('MBotéRoom partage écran CI', 80, 120);
+        frame += 1;
+      };
+      draw();
+      const timer = setInterval(draw, 250);
+      const stream = canvas.captureStream(15);
+      stream.getVideoTracks()[0]?.addEventListener('ended', () => clearInterval(timer), { once: true });
+      return stream;
+    };
+    Object.defineProperty(navigator.mediaDevices, 'getDisplayMedia', { configurable: true, value: fakeDisplayMedia });
+  });
   const page = await context.newPage();
   const browserErrors = [];
   page.on('pageerror', (error) => {
@@ -309,6 +334,19 @@ try {
   await clickControl(participantRoom.page, 'Caméra');
   await waitForRemoteCameraState(hostRoom.page, 'Participant Vidéo', false);
   await clickControl(participantRoom.page, 'Caméra');
+  await waitForRemoteMedia(hostRoom.page, 'Participant Vidéo');
+
+  await clickControl(participantRoom.page, 'Partager');
+  await hostRoom.page.waitForFunction(() => {
+    const tile = Array.from(document.querySelectorAll('.room-v2-tile')).find((candidate) => candidate.textContent?.includes('Participant Vidéo') && !candidate.textContent?.includes('(vous)'));
+    const video = tile?.querySelector('video');
+    return Boolean(tile?.classList.contains('is-screen') && video && video.videoWidth > 0 && video.videoHeight > 0);
+  }, undefined, { timeout: 15_000 });
+  await clickControl(participantRoom.page, 'Partager');
+  await hostRoom.page.waitForFunction(() => {
+    const tile = Array.from(document.querySelectorAll('.room-v2-tile')).find((candidate) => candidate.textContent?.includes('Participant Vidéo') && !candidate.textContent?.includes('(vous)'));
+    return Boolean(tile && !tile.classList.contains('is-screen'));
+  }, undefined, { timeout: 15_000 });
   await waitForRemoteMedia(hostRoom.page, 'Participant Vidéo');
 
   await clickControl(participantRoom.page, 'Micro');
