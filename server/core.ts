@@ -219,8 +219,10 @@ export const getBearerToken = (request: express.Request) => {
 };
 
 export const getRawSessionToken = (authorization: unknown, cookieHeader: unknown) => {
-  const [scheme, bearer] = String(authorization || '').split(' ');
+  const raw = String(authorization || '').trim();
+  const [scheme, bearer] = raw.split(' ');
   if (scheme?.toLowerCase() === 'bearer' && bearer) return bearer;
+  if (raw && !raw.includes(' ')) return raw;
   return getCookieValue(cookieHeader, SESSION_COOKIE_NAME);
 };
 
