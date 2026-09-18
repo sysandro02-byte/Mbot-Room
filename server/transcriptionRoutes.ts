@@ -1,4 +1,4 @@
-import type express from 'express';
+import express from 'express';
 import type { Server } from 'socket.io';
 import {
   AuthedRequest,
