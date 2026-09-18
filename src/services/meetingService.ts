@@ -37,6 +37,7 @@ export interface MeetingSettings {
   linkSharing?: boolean;
   externalAccess?: boolean;
   isPublic?: boolean;
+  locked?: boolean;
   visibility?: string;
 }
 
