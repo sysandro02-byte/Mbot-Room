@@ -89,7 +89,16 @@ export const pool = databaseUrl
   ? new pg.Pool({ connectionString: databaseUrl, ssl: process.env.PGSSLMODE === 'disable' ? undefined : { rejectUnauthorized: false } })
   : null;
 
+let databaseReady = false;
+let databaseStartupError = '';
+
 export const hasDatabase = () => Boolean(pool);
+export const isDatabaseReady = () => Boolean(pool && databaseReady);
+export const getDatabaseStartupError = () => databaseStartupError;
+export const setDatabaseReady = (ready: boolean, error = '') => {
+  databaseReady = ready;
+  databaseStartupError = ready ? '' : String(error || 'Database unavailable');
+};
 
 export const query = async <T extends QueryResultRow = QueryResultRow>(text: string, params: unknown[] = []) => {
   if (!pool) throw new Error('DATABASE_URL is required');
@@ -190,6 +199,10 @@ export const sendApiError = (response: express.Response, status: number, code: s
 export const requireDatabase: express.RequestHandler = (_request, response, next) => {
   if (!pool) {
     sendApiError(response, 503, 'DATABASE_REQUIRED', 'La base PostgreSQL n’est pas configurée.');
+    return;
+  }
+  if (!databaseReady) {
+    sendApiError(response, 503, 'DATABASE_UNAVAILABLE', 'La base PostgreSQL est configurée mais temporairement indisponible.');
     return;
   }
   next();
