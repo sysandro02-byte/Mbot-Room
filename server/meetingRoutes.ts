@@ -366,6 +366,28 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     } catch (error) { next(error); }
   });
 
+  app.post('/api/meetings/:meetingId/lobby/admit-all', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const meeting = await getMeetingById(Number(request.params.meetingId));
+      if (!meeting || !canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'LOBBY_HOST_REQUIRED', 'Seul l’hôte ou le co-hôte peut gérer la salle d’attente.');
+      const pending = await query(`SELECT user_id FROM room_lobby WHERE meeting_id=$1 AND status='requested'`, [meeting.id]);
+      const userIds = pending.rows.map((row) => Number(row.user_id)).filter(Boolean);
+      if (userIds.length) {
+        await query(`UPDATE room_lobby SET status='accepted' WHERE meeting_id=$1 AND status='requested'`, [meeting.id]);
+        for (const userId of userIds) {
+          await query(
+            `INSERT INTO room_meeting_members (meeting_id,user_id,role,status,joined_at) VALUES ($1,$2,'participant','accepted',now())
+             ON CONFLICT (meeting_id,user_id) DO UPDATE SET status='accepted',joined_at=COALESCE(room_meeting_members.joined_at,now()),updated_at=now()`,
+            [meeting.id, userId],
+          );
+          io.to(`user:${userId}`).emit('meeting:lobby-status', { meetingId: meeting.id, status: 'accepted' });
+        }
+        io.to(`meeting:${meeting.id}`).emit('meeting:lobby-updated', { meetingId: meeting.id, admitAll: true, userIds });
+      }
+      response.json({ success: true, admitted: userIds.length, userIds });
+    } catch (error) { next(error); }
+  });
+
   app.post('/api/meetings/:meetingId/start-notify', ...protectedApi, async (request: AuthedRequest, response, next) => {
     try {
       const meeting = await getMeetingById(Number(request.params.meetingId));
@@ -400,6 +422,26 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
            FROM room_meeting_members m JOIN room_users u ON u.id=m.user_id WHERE m.meeting_id=$1 ORDER BY m.role,u.name`, [meetingId],
       );
       response.json(result.rows.map((row) => ({ userId:Number(row.user_id),role:row.role,status:row.status,mutedByHost:row.muted_by_host,cameraDisabledByHost:row.camera_disabled_by_host,joinedAt:row.joined_at,leftAt:row.left_at,name:row.name,username:row.username,email:row.email,avatar:row.avatar,isGuest:row.is_guest })));
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/meetings/:meetingId/participants/mute-all', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const meeting = await getMeetingById(Number(request.params.meetingId));
+      if (!meeting || !canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Action réservée à l’hôte ou au co-hôte.');
+      const updated = await query(
+        `UPDATE room_meeting_members
+            SET muted_by_host=true, updated_at=now()
+          WHERE meeting_id=$1 AND user_id<>$2 AND status='accepted'
+          RETURNING user_id`,
+        [meeting.id, meeting.host_id],
+      );
+      const userIds = updated.rows.map((row) => Number(row.user_id));
+      for (const userId of userIds) {
+        io.to(`user:${userId}`).emit('meeting:moderation', { meetingId: meeting.id, mutedByHost: true });
+      }
+      io.to(`meeting:${meeting.id}`).emit('meeting:participants-muted', { meetingId: meeting.id, userIds });
+      response.json({ success: true, muted: userIds.length, userIds });
     } catch (error) { next(error); }
   });
 
