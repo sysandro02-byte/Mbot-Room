@@ -9,6 +9,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: "22.22.0"
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=192"
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_MODE
@@ -16,7 +20,7 @@ services:
       - key: PGLITE_DATA_DIR
         value: /tmp/mboteroom-pglite-test
       - key: PGLITE_INITIAL_MEMORY_MB
-        value: "128"
+        value: "64"
       - key: ADMIN_EMAILS
         sync: false
       - key: MBOTE_ROOM_APP_URL
