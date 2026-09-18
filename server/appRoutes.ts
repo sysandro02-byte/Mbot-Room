@@ -4,8 +4,10 @@ import {
   AuthedRequest,
   authenticateToken,
   createId,
+  didDatabaseInitializationFail,
   getDatabaseType,
   hasDatabase,
+  isDatabaseReady,
   publicMeeting,
   query,
   requireDatabase,
@@ -23,6 +25,20 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
     const databaseType = getDatabaseType();
     if (!hasDatabase()) {
       response.status(503).json({ ok:false,service:'mbote-room',database:{configured:false,connected:false,type:databaseType} });
+      return;
+    }
+    if (!isDatabaseReady()) {
+      response.status(503).json({
+        ok:false,
+        service:'mbote-room',
+        database:{
+          configured:true,
+          connected:false,
+          initializing:!didDatabaseInitializationFail(),
+          initializationFailed:didDatabaseInitializationFail(),
+          type:databaseType,
+        },
+      });
       return;
     }
     try {
