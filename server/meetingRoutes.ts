@@ -197,12 +197,19 @@ const callGroq = async (system: string, prompt: string) => {
 };
 
 const generateSummary = async (meeting: Meeting) => {
-  const messages = await query(`SELECT sender,text,created_at FROM room_messages WHERE meeting_id=$1 AND deleted_at IS NULL ORDER BY created_at ASC LIMIT 500`, [meeting.id]);
-  if (!messages.rows.length || !process.env.GROQ_API_KEY) return null;
-  const transcript = messages.rows.map((row) => `[${row.sender}] ${row.text}`).join('\n').slice(0, 30000);
+  const [messages, captions] = await Promise.all([
+    query(`SELECT sender,text,created_at FROM room_messages WHERE meeting_id=$1 AND deleted_at IS NULL ORDER BY created_at ASC LIMIT 500`, [meeting.id]),
+    query(`SELECT speaker,text,created_at FROM room_captions WHERE meeting_id=$1 ORDER BY created_at ASC LIMIT 1500`, [meeting.id]),
+  ]);
+  if ((!messages.rows.length && !captions.rows.length) || !process.env.GROQ_API_KEY) return null;
+  const transcriptRows = [
+    ...messages.rows.map((row) => ({ at: new Date(row.created_at).getTime(), line: `[Chat · ${row.sender}] ${row.text}` })),
+    ...captions.rows.map((row) => ({ at: new Date(row.created_at).getTime(), line: `[Audio · ${row.speaker}] ${row.text}` })),
+  ].sort((left, right) => left.at - right.at);
+  const transcript = transcriptRows.map((row) => row.line).join('\n').slice(0, 50000);
   const answer = await callGroq(
     'Tu es Luna IA. Retourne UNIQUEMENT un JSON valide avec les clés bullets (string[]), decisions (string[]), actions (string[]), nextMeeting (string). N’invente rien qui ne figure pas dans le transcript.',
-    `Réunion: ${meeting.title}\nTranscript textuel:\n${transcript}`,
+    `Réunion: ${meeting.title}\nTranscript de réunion (chat + transcription audio):\n${transcript}`,
   );
   if (!answer) return null;
   try {
