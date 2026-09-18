@@ -47,7 +47,7 @@
 .room-v2-raised-inline{color:#d97706;font-weight:700}
 
 .room-v2-reaction-wrap{position:relative}
-.room-v2-reaction-panel{position:absolute;left:50%;bottom:68px;transform:translateX(-50%);display:flex;gap:5px;padding:8px;border-radius:12px;background:#252c3a;border:1px solid rgba(255,255,255,.1);box-shadow:0 16px 35px rgba(0,0,0,.3);z-index:50}
+.room-v2-reaction-panel{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);display:flex;gap:5px;padding:8px;border-radius:12px;background:#252c3a;border:1px solid rgba(255,255,255,.1);box-shadow:0 16px 35px rgba(0,0,0,.3);z-index:120;pointer-events:auto}
 .room-v2-reaction-panel button{width:38px;height:38px;border:0;border-radius:9px;background:transparent;font-size:21px;cursor:pointer}
 .room-v2-reaction-panel button:hover{background:rgba(255,255,255,.08)}
 .room-v2-reaction-bubble{position:absolute;right:12px;bottom:52px;z-index:5;font-size:34px;filter:drop-shadow(0 5px 8px rgba(0,0,0,.35));animation:roomReactionPop .28s ease-out}
