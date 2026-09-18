@@ -233,7 +233,7 @@ export const registerAuthRoutes = (app: express.Express) => {
     response.json({ user: request.user });
   });
 
-  app.post('/api/auth/logout', requireDatabase, authenticateToken, async (request, response, next) => {
+  app.post('/api/auth/logout', requireDatabase, async (request, response, next) => {
     try {
       const rawToken = getRawSessionTokenFromRequest(request);
       if (rawToken) await query('DELETE FROM room_sessions WHERE token_hash=$1', [hashToken(rawToken)]);
