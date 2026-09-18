@@ -12,5 +12,28 @@ export const runProductMigrations = async () => {
       updated_at timestamptz NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS room_whiteboards_owner_updated_idx ON room_whiteboards(owner_id, updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS room_breakout_rooms (
+      id uuid PRIMARY KEY,
+      meeting_id integer NOT NULL REFERENCES room_meetings(id) ON DELETE CASCADE,
+      name text NOT NULL,
+      created_by integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      is_open boolean NOT NULL DEFAULT false,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS room_breakout_rooms_meeting_idx ON room_breakout_rooms(meeting_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS room_breakout_members (
+      breakout_room_id uuid NOT NULL REFERENCES room_breakout_rooms(id) ON DELETE CASCADE,
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      assigned_by integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      assigned_at timestamptz NOT NULL DEFAULT now(),
+      joined_at timestamptz,
+      left_at timestamptz,
+      PRIMARY KEY (breakout_room_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS room_breakout_members_user_idx ON room_breakout_members(user_id);
+    CREATE INDEX IF NOT EXISTS room_breakout_members_assigned_by_idx ON room_breakout_members(assigned_by);
   `);
 };
