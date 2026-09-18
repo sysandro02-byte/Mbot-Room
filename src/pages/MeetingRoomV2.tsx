@@ -58,6 +58,7 @@ type VideoTileProps = {
   audioOutputId?: string;
   activeSpeaker?: boolean;
   pinned?: boolean;
+  handRaised?: boolean;
   onPin?: () => void;
 };
 
@@ -69,7 +70,7 @@ const initials = (value: string) => String(value || 'MB')
   .slice(0, 2)
   .toUpperCase();
 
-function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, local, audioOutputId, activeSpeaker, pinned, onPin }: VideoTileProps) {
+function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, local, audioOutputId, activeSpeaker, pinned, handRaised, onPin }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -95,6 +96,7 @@ function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, l
         <span>{name}{local ? ' (vous)' : ''}</span>
         {badge ? <small>{badge}</small> : null}
         {activeSpeaker ? <small className="speaker-badge">Parle</small> : null}
+        {handRaised ? <small className="hand-badge" aria-label="Main levée"><Hand size={13}/> Main</small> : null}
         {muted ? <MicOff size={15} aria-label="Micro coupé" /> : <Mic size={15} aria-label="Micro actif" />}
       </div>
       {!local && onPin ? (
@@ -158,6 +160,7 @@ export default function MeetingRoomV2() {
   const [screenSharing, setScreenSharing] = useState(false);
   const [recording, setRecording] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
+  const [raisedHands, setRaisedHands] = useState<Set<number>>(new Set());
   const [participants, setParticipants] = useState<MeetingParticipant[]>([]);
   const [messages, setMessages] = useState<MeetingMessage[]>([]);
   const [messageDraft, setMessageDraft] = useState('');
@@ -322,6 +325,15 @@ export default function MeetingRoomV2() {
     const onPoll = (poll: MeetingPoll) => setPolls((current) => [poll, ...current.filter((item) => item.id !== poll.id)]);
     const onPresence = () => void refreshParticipants();
     const onLobby = () => void refreshParticipants();
+    const onHandRaised = (payload: { meetingId: number; userId: number; raised: boolean }) => {
+      if (Number(payload.meetingId) !== id) return;
+      setRaisedHands((current) => {
+        const next = new Set(current);
+        if (payload.raised) next.add(Number(payload.userId));
+        else next.delete(Number(payload.userId));
+        return next;
+      });
+    };
     const onModeration = (payload: { meetingId:number; mutedByHost?:boolean; cameraDisabledByHost?:boolean; role?:string }) => {
       if (Number(payload.meetingId) !== id) return;
       if (payload.mutedByHost === true) {
@@ -352,6 +364,7 @@ export default function MeetingRoomV2() {
     socket.on('meeting:poll-updated', onPoll);
     socket.on('meeting:presence', onPresence);
     socket.on('meeting:lobby-updated', onLobby);
+    socket.on('meeting:hand-raised', onHandRaised);
     socket.on('meeting:moderation', onModeration);
     socket.on('meeting:ended', onEnded);
     socket.on('meeting:removed', onRemoved);
@@ -363,6 +376,7 @@ export default function MeetingRoomV2() {
       socket.off('meeting:poll-updated', onPoll);
       socket.off('meeting:presence', onPresence);
       socket.off('meeting:lobby-updated', onLobby);
+      socket.off('meeting:hand-raised', onHandRaised);
       socket.off('meeting:moderation', onModeration);
       socket.off('meeting:ended', onEnded);
       socket.off('meeting:removed', onRemoved);
@@ -643,6 +657,7 @@ export default function MeetingRoomV2() {
                   audioOutputId={selectedAudioOutputId}
                   activeSpeaker={activeSpeakerSocketId === featuredParticipant.socketId}
                   pinned={pinnedSocketId === featuredParticipant.socketId}
+                  handRaised={raisedHands.has(Number(featuredParticipant.userId))}
                   onPin={() => setPinnedSocketId((current) => current === featuredParticipant.socketId ? null : featuredParticipant.socketId)}
                 />
               </div>
@@ -670,6 +685,7 @@ export default function MeetingRoomV2() {
                     audioOutputId={selectedAudioOutputId}
                     activeSpeaker={activeSpeakerSocketId === participant.socketId}
                     pinned={pinnedSocketId === participant.socketId}
+                    handRaised={raisedHands.has(Number(participant.userId))}
                     onPin={() => setPinnedSocketId((current) => current === participant.socketId ? null : participant.socketId)}
                   />
                 ))}
@@ -700,6 +716,7 @@ export default function MeetingRoomV2() {
                   audioOutputId={selectedAudioOutputId}
                   activeSpeaker={activeSpeakerSocketId === participant.socketId}
                   pinned={pinnedSocketId === participant.socketId}
+                  handRaised={raisedHands.has(Number(participant.userId))}
                   onPin={() => setPinnedSocketId((current) => current === participant.socketId ? null : participant.socketId)}
                 />
               ))}
@@ -722,7 +739,7 @@ export default function MeetingRoomV2() {
                   return (
                     <article key={member.userId}>
                       <div className="room-v2-person-avatar">{member.avatar ? <img src={member.avatar} alt=""/> : initials(member.name)}</div>
-                      <div><strong>{member.name}{isSelf ? ' (vous)' : ''}</strong><small>{member.role === 'host' ? 'Hôte' : member.role === 'cohost' ? 'Co-hôte' : member.isGuest ? 'Invité' : 'Participant'}{remote || isSelf ? ' · En ligne' : ''}</small></div>
+                      <div><strong>{member.name}{isSelf ? ' (vous)' : ''}{raisedHands.has(member.userId) || (isSelf && handRaised) ? <span className="room-v2-raised-inline"> · ✋</span> : null}</strong><small>{member.role === 'host' ? 'Hôte' : member.role === 'cohost' ? 'Co-hôte' : member.isGuest ? 'Invité' : 'Participant'}{remote || isSelf ? ' · En ligne' : ''}</small></div>
                       {isModerator && !isSelf && member.role !== 'host' ? (
                         <div className="room-v2-person-menu-wrap">
                           <button type="button" onClick={() => setMenuUserId(menuUserId === member.userId ? null : member.userId)}><MoreVertical size={18}/></button>
@@ -803,7 +820,7 @@ export default function MeetingRoomV2() {
         <Control active={micEnabled} label={micEnabled ? 'Micro' : 'Micro coupé'} onClick={toggleMic}>{micEnabled ? <Mic/> : <MicOff/>}</Control>
         <Control active={cameraEnabled} label={cameraEnabled ? 'Caméra' : 'Caméra coupée'} onClick={toggleCamera}>{cameraEnabled ? <Camera/> : <CameraOff/>}</Control>
         <Control active={screenSharing} label="Partager" onClick={() => void toggleScreenShare()}><MonitorUp/></Control>
-        <Control active={handRaised} label="Main" onClick={() => { const raised = !handRaised; setHandRaised(raised); socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised}); }}><Hand/></Control>
+        <Control active={handRaised} label={handRaised ? 'Baisser la main' : 'Main'} onClick={() => { const raised = !handRaised; setHandRaised(raised); setRaisedHands((current) => { const next = new Set(current); if (raised) next.add(Number(currentUser?.id || 0)); else next.delete(Number(currentUser?.id || 0)); return next; }); socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised}); }}><Hand/></Control>
         <Control active={panel === 'participants'} label="Participants" onClick={() => setPanel(panel === 'participants' ? null : 'participants')}><UsersRound/></Control>
         <Control active={panel === 'chat'} label="Discussion" onClick={() => setPanel(panel === 'chat' ? null : 'chat')}><MessageCircle/></Control>
         <Control active={panel === 'polls'} label="Sondages" onClick={() => setPanel(panel === 'polls' ? null : 'polls')}><Vote/></Control>
