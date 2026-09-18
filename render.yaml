@@ -47,6 +47,18 @@ services:
         sync: false
       - key: TURN_CREDENTIAL_TTL_SECONDS
         value: "3600"
+      - key: MEDIA_TRANSPORT
+        value: auto
+      - key: LIVEKIT_URL
+        sync: false
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: LIVEKIT_TOKEN_TTL_SECONDS
+        value: "900"
+      - key: LIVEKIT_EGRESS_ENABLED
+        value: "false"
       - key: VITE_TURN_URLS
         sync: false
       - key: VITE_TURN_USERNAME
