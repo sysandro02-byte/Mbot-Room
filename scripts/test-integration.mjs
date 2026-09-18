@@ -158,6 +158,8 @@ try {
 
   const participant = await register('Participant Integration', 'participant.integration@mbote.test');
   assert.equal(participant.user.role, 'user');
+  const outsider = await register('Participant Bloqué', 'outsider.integration@mbote.test');
+  assert.equal(outsider.user.role, 'user');
 
   const hostMe = await jsonRequest('/api/auth/me', { headers: authHeaders(host.token) });
   assert.equal(hostMe.response.status, 200);
@@ -256,6 +258,38 @@ try {
     mutedParticipants.data.find((item) => Number(item.userId) === Number(participant.user.id))?.mutedByHost,
     true,
   );
+
+  const lockMeeting = await jsonRequest(`/api/meetings/${meeting.id}/lock`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ locked: true }),
+  });
+  assert.equal(lockMeeting.response.status, 200, JSON.stringify(lockMeeting.data));
+  assert.equal(lockMeeting.data.locked, true);
+
+  const lockedJoin = await jsonRequest(`/api/meetings/${meeting.id}/join-request`, {
+    method: 'POST',
+    headers: authHeaders(outsider.token),
+    body: JSON.stringify({ password: 'RoomPass2026!' }),
+  });
+  assert.equal(lockedJoin.response.status, 423, JSON.stringify(lockedJoin.data));
+  assert.equal(lockedJoin.data.code, 'MEETING_LOCKED');
+
+  const unlockMeeting = await jsonRequest(`/api/meetings/${meeting.id}/lock`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ locked: false }),
+  });
+  assert.equal(unlockMeeting.response.status, 200, JSON.stringify(unlockMeeting.data));
+  assert.equal(unlockMeeting.data.locked, false);
+
+  const unlockedJoin = await jsonRequest(`/api/meetings/${meeting.id}/join-request`, {
+    method: 'POST',
+    headers: authHeaders(outsider.token),
+    body: JSON.stringify({ password: 'RoomPass2026!' }),
+  });
+  assert.equal(unlockedJoin.response.status, 200, JSON.stringify(unlockedJoin.data));
+  assert.equal(unlockedJoin.data.status, 'requested');
 
   const message = await jsonRequest(`/api/meetings/${meeting.id}/messages`, {
     method: 'POST',
