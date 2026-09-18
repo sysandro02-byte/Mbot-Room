@@ -1,4 +1,5 @@
 import type express from 'express';
+import type { QueryResultRow } from 'pg';
 import type { Server } from 'socket.io';
 import {
   AuthedRequest,
@@ -719,7 +720,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
         ? request.body.names.map((value: unknown) => normalizeText(value).slice(0, 80)).filter(Boolean).slice(0, 20)
         : [];
       if (!names.length) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Ajoutez au moins une salle de sous-groupe.');
-      const created = [];
+      const created: QueryResultRow[] = [];
       for (const name of names) {
         const id = createId();
         const result = await query(
