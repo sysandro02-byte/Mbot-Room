@@ -608,16 +608,31 @@ export default function MeetingRoomV2() {
     }
   };
 
-  const stopRecording = useCallback(() => {
+  const stopLocalRecording = useCallback(() => {
     const recorder = recorderRef.current;
     if (recorder && recorder.state !== 'inactive') recorder.stop();
   }, []);
 
-  const toggleRecording = async () => {
-    if (recording) {
-      stopRecording();
+  const stopActiveRecording = useCallback(async () => {
+    if (!recording) return;
+    if (recordingMode === 'server' && meeting?.id && serverRecordingId) {
+      try {
+        const stopped = await collaborationService.stopServerRecording(meeting.id, serverRecordingId);
+        setRecording(false);
+        setRecordingMode(null);
+        setServerRecordingId(null);
+        setNotice(stopped.storage_url
+          ? 'Enregistrement serveur terminé et disponible dans vos enregistrements.'
+          : 'Arrêt de l’enregistrement serveur demandé. Le fichier est en finalisation.');
+      } catch (cause) {
+        setNotice(cause instanceof Error ? cause.message : 'Impossible d’arrêter l’enregistrement serveur.');
+      }
       return;
     }
+    stopLocalRecording();
+  }, [meeting?.id, recording, recordingMode, serverRecordingId, stopLocalRecording]);
+
+  const startLocalRecording = useCallback(async () => {
     if (!localStream || typeof MediaRecorder === 'undefined') {
       setNotice('L’enregistrement n’est pas disponible dans ce navigateur.');
       return;
@@ -646,16 +661,51 @@ export default function MeetingRoomV2() {
         setTimeout(() => URL.revokeObjectURL(url), 1000);
         void recordingSessionRef.current?.stop();
         recordingSessionRef.current = null;
+        recorderRef.current = null;
         setRecording(false);
+        setRecordingMode(null);
         setNotice('Enregistrement composite terminé et téléchargé.');
       };
       recorder.start(1000);
       recorderRef.current = recorder;
+      setRecordingMode('local');
       setRecording(true);
-      setNotice(`Enregistrement composite démarré pour ${sources.filter((source) => source.stream).length} flux.`);
+      setNotice(`Enregistrement composite local démarré pour ${sources.filter((source) => source.stream).length} flux.`);
     } catch {
+      void recordingSessionRef.current?.stop();
+      recordingSessionRef.current = null;
       setNotice('Impossible de démarrer l’enregistrement local.');
     }
+  }, [localName, localStream, meeting?.id, remoteParticipants]);
+
+  const toggleRecording = async () => {
+    if (recording) {
+      await stopActiveRecording();
+      return;
+    }
+
+    if (
+      isModerator
+      && meeting?.id
+      && liveKitMedia.connected
+      && mediaTransportStatus?.serverRecordingReady
+    ) {
+      try {
+        const serverRecording = await collaborationService.startServerRecording(meeting.id, {
+          breakoutRoomId,
+          layout: viewMode === 'speaker' ? 'speaker' : 'grid',
+        });
+        setServerRecordingId(serverRecording.id);
+        setRecordingMode('server');
+        setRecording(true);
+        setNotice('Enregistrement serveur MP4 démarré.');
+        return;
+      } catch (cause) {
+        setNotice(`${cause instanceof Error ? cause.message : 'Enregistrement serveur indisponible.'} Bascule vers l’enregistrement local.`);
+      }
+    }
+
+    await startLocalRecording();
   };
 
   const sendMessage = async (event: FormEvent) => {
