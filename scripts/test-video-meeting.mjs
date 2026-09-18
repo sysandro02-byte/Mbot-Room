@@ -90,7 +90,7 @@ const register = async (name, email) => {
   return result.data;
 };
 
-const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
+const openAuthenticatedMeeting = async (browser, session, meetingId, label, liveKitMode = 'fail') => {
   const context = await browser.newContext({
     permissions: ['camera', 'microphone'],
     locale: 'fr-FR',
@@ -100,16 +100,33 @@ const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
     localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('token', token);
   }, { user: session.user, token: session.token });
-  await context.addInitScript(() => {
-    class FailingLiveKitRoom {
+  await context.addInitScript(({ mode }) => {
+    window.__mboteLiveKitPublishedKinds = [];
+    window.__mbotePeerConnectionCount = 0;
+    const NativePeerConnection = window.RTCPeerConnection;
+    window.RTCPeerConnection = class CountingPeerConnection extends NativePeerConnection {
+      constructor(...args) {
+        super(...args);
+        window.__mbotePeerConnectionCount += 1;
+      }
+    };
+
+    class TestLiveKitRoom {
       remoteParticipants = new Map();
       activeSpeakers = [];
+      listeners = new Map();
       localParticipant = {
         trackPublications: new Map(),
-        publishTrack: async () => ({ isMuted: false }),
+        publishTrack: async (track) => {
+          window.__mboteLiveKitPublishedKinds.push(track.kind);
+          return {
+            isMuted: false,
+            mute: async () => undefined,
+            unmute: async () => undefined,
+          };
+        },
         unpublishTrack: async () => undefined,
       };
-      listeners = new Map();
       on(event, listener) {
         const values = this.listeners.get(event) || [];
         values.push(listener);
@@ -122,12 +139,12 @@ const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
         return this;
       }
       async connect() {
-        throw new Error('CI LiveKit intentionally unavailable');
+        if (mode === 'fail') throw new Error('CI LiveKit intentionally unavailable');
       }
       async disconnect() {}
     }
     window.LivekitClient = {
-      Room: FailingLiveKitRoom,
+      Room: TestLiveKitRoom,
       RoomEvent: {
         TrackSubscribed: 'trackSubscribed',
         TrackUnsubscribed: 'trackUnsubscribed',
@@ -151,7 +168,7 @@ const openAuthenticatedMeeting = async (browser, session, meetingId, label) => {
         },
       },
     };
-  });
+  }, { mode: liveKitMode });
 
   await context.addInitScript(() => {
     if (!navigator.mediaDevices) return;
