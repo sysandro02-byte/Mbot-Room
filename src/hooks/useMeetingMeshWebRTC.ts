@@ -43,6 +43,7 @@ type UseMeetingMeshWebRTCOptions = {
   media: MeetingMediaState;
   breakoutRoomId?: string | null;
   enabled?: boolean;
+  peerConnectionsEnabled?: boolean;
   onNotice?: (message: string) => void;
 };
 
@@ -84,6 +85,7 @@ export function useMeetingMeshWebRTC({
   media,
   breakoutRoomId = null,
   enabled = true,
+  peerConnectionsEnabled = true,
   onNotice,
 }: UseMeetingMeshWebRTCOptions) {
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteMeetingParticipant[]>([]);
@@ -117,6 +119,10 @@ export function useMeetingMeshWebRTC({
     let cancelled = false;
     setRtcConfigReady(false);
     if (!enabled) return () => { cancelled = true; };
+    if (!peerConnectionsEnabled) {
+      setRtcConfigReady(true);
+      return () => { cancelled = true; };
+    }
     void getRtcConfiguration().then((config) => {
       if (cancelled) return;
       rtcConfigRef.current = config;
@@ -125,7 +131,7 @@ export function useMeetingMeshWebRTC({
       if (!cancelled) setRtcConfigReady(true);
     });
     return () => { cancelled = true; };
-  }, [enabled]);
+  }, [enabled, peerConnectionsEnabled]);
 
   const updateRemoteParticipant = useCallback((participant: ServerMeetingParticipant, patch?: Partial<RemoteMeetingParticipant>) => {
     setRemoteParticipants((current) => {
@@ -373,7 +379,9 @@ export function useMeetingMeshWebRTC({
     const handleParticipantJoined = (participant: ServerMeetingParticipant) => {
       if (String(participant.userId) === localUserId) return;
       updateRemoteParticipant(participant);
-      void createOffer(String(participant.socketId)).catch(() => onNotice?.('Connexion vidéo avec un participant impossible.'));
+      if (peerConnectionsEnabled) {
+        void createOffer(String(participant.socketId)).catch(() => onNotice?.('Connexion vidéo avec un participant impossible.'));
+      }
     };
 
     const handleParticipantLeft = ({ socketId }: { socketId: string }) => removeRemoteParticipant(String(socketId));
@@ -389,7 +397,7 @@ export function useMeetingMeshWebRTC({
     };
 
     const handleOffer = async ({ fromSocketId, fromUserId, offer }: { fromSocketId: string; fromUserId: string | number; offer: RTCSessionDescriptionInit }) => {
-      if (!fromSocketId || String(fromUserId) === localUserId || !offer) return;
+      if (!peerConnectionsEnabled || !fromSocketId || String(fromUserId) === localUserId || !offer) return;
       updateRemoteParticipant({ socketId: fromSocketId, userId: fromUserId });
       const state = createPeer(fromSocketId, false);
       const { pc } = state;
@@ -416,6 +424,7 @@ export function useMeetingMeshWebRTC({
     };
 
     const handleAnswer = async ({ fromSocketId, answer }: { fromSocketId: string; answer: RTCSessionDescriptionInit }) => {
+      if (!peerConnectionsEnabled) return;
       const state = peersRef.current.get(String(fromSocketId));
       if (!state || !answer) return;
       state.settingRemoteAnswer = true;
@@ -431,7 +440,7 @@ export function useMeetingMeshWebRTC({
     };
 
     const handleIceCandidate = async ({ fromSocketId, candidate }: { fromSocketId: string; candidate: RTCIceCandidateInit }) => {
-      if (!candidate) return;
+      if (!peerConnectionsEnabled || !candidate) return;
       const state = peersRef.current.get(String(fromSocketId));
       if (state?.ignoreOffer) return;
       if (state?.pc.remoteDescription) {
@@ -448,7 +457,7 @@ export function useMeetingMeshWebRTC({
     };
 
     const handleIceRestartRequested = ({ fromSocketId }: { fromSocketId: string }) => {
-      if (!fromSocketId) return;
+      if (!peerConnectionsEnabled || !fromSocketId) return;
       void createOffer(String(fromSocketId), true).catch(() => onNotice?.('Redémarrage ICE impossible.'));
     };
 
@@ -481,7 +490,7 @@ export function useMeetingMeshWebRTC({
       closeAllPeers();
       joinedRef.current = false;
     };
-  }, [bindRemoteCreatedSenders, breakoutRoomId, closeAllPeers, createOffer, createPeer, enabled, flushPendingCandidates, localAvatar, localName, localUserId, meetingId, onNotice, removeRemoteParticipant, rtcConfigReady, syncLocalTracks, updateRemoteParticipant]);
+  }, [bindRemoteCreatedSenders, breakoutRoomId, closeAllPeers, createOffer, createPeer, enabled, flushPendingCandidates, localAvatar, localName, localUserId, meetingId, onNotice, peerConnectionsEnabled, removeRemoteParticipant, rtcConfigReady, syncLocalTracks, updateRemoteParticipant]);
 
   useEffect(() => {
     if (!joinedRef.current) return;
@@ -489,6 +498,10 @@ export function useMeetingMeshWebRTC({
   }, [media, mediaKey, meetingId]);
 
   useEffect(() => {
+    if (!peerConnectionsEnabled) {
+      closeAllPeers();
+      return;
+    }
     peersRef.current.forEach((state, targetSocketId) => {
       const hadAudio = Boolean(state.audioSender?.track);
       const hadVideo = Boolean(state.videoSender?.track);
@@ -510,11 +523,16 @@ export function useMeetingMeshWebRTC({
         }
       })();
     });
-  }, [createOffer, localStream, meetingId, onNotice, syncLocalTracks]);
+  }, [closeAllPeers, createOffer, localStream, meetingId, onNotice, peerConnectionsEnabled, syncLocalTracks]);
 
   useEffect(() => {
     if (!enabled) {
       setNetworkQuality({ level: 'offline', rttMs: null, packetLossPct: null, connectedPeers: 0, totalPeers: 0 });
+      return undefined;
+    }
+    if (!peerConnectionsEnabled) {
+      setNetworkQuality({ level: 'excellent', rttMs: null, packetLossPct: null, connectedPeers: 0, totalPeers: 0 });
+      setActiveSpeakerSocketId(null);
       return undefined;
     }
 
@@ -600,7 +618,7 @@ export function useMeetingMeshWebRTC({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [enabled]);
+  }, [enabled, peerConnectionsEnabled]);
 
   return { remoteParticipants, networkQuality, activeSpeakerSocketId };
 }
