@@ -82,6 +82,14 @@ const jsonRequest = async (path, options = {}) => {
 
 const authHeaders = (token) => ({ Authorization: `Bearer ${token}` });
 
+const decodeAndVerifyJwt = (token, secret) => {
+  const [header, payload, signature] = String(token || '').split('.');
+  assert.ok(header && payload && signature, 'JWT must have three parts');
+  const expected = crypto.createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64url');
+  assert.equal(signature, expected, 'JWT signature must match');
+  return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+};
+
 const register = async (name, email) => {
   const result = await jsonRequest('/api/auth/register', {
     method: 'POST',
