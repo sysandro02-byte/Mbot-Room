@@ -1,8 +1,11 @@
 import crypto from 'node:crypto';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import type express from 'express';
 import pg from 'pg';
 import type { QueryResultRow } from 'pg';
 import { PGlite } from '@electric-sql/pglite';
+import { dataDir as prepopulatedDataDir } from '@electric-sql/pglite-prepopulatedfs';
 
 export type UserRole = 'admin' | 'user' | 'guest';
 
@@ -95,12 +98,20 @@ export const pool = databaseUrl
   ? new pg.Pool({ connectionString: databaseUrl, ssl: process.env.PGSSLMODE === 'disable' ? undefined : { rejectUnauthorized: false } })
   : null;
 
-const embeddedDatabase = embeddedTestMode
-  ? new PGlite({ dataDir: embeddedDataDir, initialMemory: embeddedInitialMemoryMb * 1024 * 1024 })
-  : null;
+const createEmbeddedDatabase = async () => {
+  const readyMarker = path.join(embeddedDataDir, 'PG_VERSION');
+  const loadDataDir = existsSync(readyMarker) ? undefined : await prepopulatedDataDir();
+  return PGlite.create({
+    dataDir: embeddedDataDir,
+    initialMemory: embeddedInitialMemoryMb * 1024 * 1024,
+    ...(loadDataDir ? { loadDataDir } : {}),
+  });
+};
 
-export const getDatabaseType = () => pool ? 'postgres' : embeddedDatabase ? 'pglite-test' : 'none';
-export const hasDatabase = () => Boolean(pool || embeddedDatabase);
+const embeddedDatabasePromise = embeddedTestMode ? createEmbeddedDatabase() : null;
+
+export const getDatabaseType = () => pool ? 'postgres' : embeddedDatabasePromise ? 'pglite-test' : 'none';
+export const hasDatabase = () => Boolean(pool || embeddedDatabasePromise);
 
 const wrapEmbeddedResult = <T extends QueryResultRow = QueryResultRow>(result: any) => ({
   ...result,
@@ -110,6 +121,7 @@ const wrapEmbeddedResult = <T extends QueryResultRow = QueryResultRow>(result: a
 
 export const query = async <T extends QueryResultRow = QueryResultRow>(text: string, params: unknown[] = []) => {
   if (pool) return pool.query<T>(text, params);
+  const embeddedDatabase = embeddedDatabasePromise ? await embeddedDatabasePromise : null;
   if (embeddedDatabase) {
     const statementCount = params.length === 0
       ? text.split(';').filter((statement) => statement.trim()).length
@@ -126,6 +138,7 @@ export const query = async <T extends QueryResultRow = QueryResultRow>(text: str
 
 export const closeDatabase = async () => {
   await pool?.end().catch(() => undefined);
+  const embeddedDatabase = embeddedDatabasePromise ? await embeddedDatabasePromise.catch(() => null) : null;
   await embeddedDatabase?.close().catch(() => undefined);
 };
 
