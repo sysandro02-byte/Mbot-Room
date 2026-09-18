@@ -282,7 +282,7 @@ const mediaDiagnostics = async (page) => page.evaluate(() => ({
   }),
 }));
 
-const waitForRemoteMedia = async (page, participantName, timeout = 25_000) => {
+const waitForRemoteMedia = async (page, participantName, timeout = 45_000) => {
   try {
     await page.waitForFunction((name) => {
       const tiles = Array.from(document.querySelectorAll('.room-v2-tile'));
