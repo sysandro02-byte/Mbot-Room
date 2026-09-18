@@ -41,6 +41,7 @@ type UseMeetingMeshWebRTCOptions = {
   localAvatar?: string;
   localStream: MediaStream | null;
   media: MeetingMediaState;
+  breakoutRoomId?: string | null;
   enabled?: boolean;
   onNotice?: (message: string) => void;
 };
@@ -81,6 +82,7 @@ export function useMeetingMeshWebRTC({
   localAvatar = '',
   localStream,
   media,
+  breakoutRoomId = null,
   enabled = true,
   onNotice,
 }: UseMeetingMeshWebRTCOptions) {
@@ -342,6 +344,7 @@ export function useMeetingMeshWebRTC({
         name: localName,
         avatar: localAvatar,
         media: mediaRef.current,
+        breakoutRoomId,
       }, (response: { ok?: boolean; error?: string; participants?: ServerMeetingParticipant[] }) => {
         if (!response?.ok) {
           joinedRef.current = false;
@@ -478,7 +481,7 @@ export function useMeetingMeshWebRTC({
       closeAllPeers();
       joinedRef.current = false;
     };
-  }, [bindRemoteCreatedSenders, closeAllPeers, createOffer, createPeer, enabled, flushPendingCandidates, localAvatar, localName, localUserId, meetingId, onNotice, removeRemoteParticipant, rtcConfigReady, syncLocalTracks, updateRemoteParticipant]);
+  }, [bindRemoteCreatedSenders, breakoutRoomId, closeAllPeers, createOffer, createPeer, enabled, flushPendingCandidates, localAvatar, localName, localUserId, meetingId, onNotice, removeRemoteParticipant, rtcConfigReady, syncLocalTracks, updateRemoteParticipant]);
 
   useEffect(() => {
     if (!joinedRef.current) return;
