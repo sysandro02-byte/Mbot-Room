@@ -165,6 +165,12 @@ try {
   assert.equal(hostMe.response.status, 200);
   assert.equal(hostMe.data.user.email, 'host.integration@mbote.test');
 
+  const rtcConfig = await jsonRequest('/api/rtc/config', { headers: authHeaders(host.token) });
+  assert.equal(rtcConfig.response.status, 200, JSON.stringify(rtcConfig.data));
+  assert.ok(Array.isArray(rtcConfig.data.iceServers));
+  assert.ok(rtcConfig.data.iceServers.length >= 1);
+  assert.equal(rtcConfig.data.turnConfigured, false);
+
   const deniedAdmin = await jsonRequest('/api/admin/dashboard', { headers: authHeaders(participant.token) });
   assert.equal(deniedAdmin.response.status, 403);
   assert.equal(deniedAdmin.data.code, 'ADMIN_ACCESS_DENIED');
