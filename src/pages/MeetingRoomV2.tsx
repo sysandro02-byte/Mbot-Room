@@ -871,7 +871,7 @@ export default function MeetingRoomV2() {
       return;
     }
     socket.emit('meeting:leave', { meetingId: meeting.id });
-    stopRecording();
+    await stopActiveRecording();
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
     screenStreamRef.current?.getTracks().forEach((track) => track.stop());
     navigate(`/reunions/${meeting.id}/terminee`, { replace: true });
