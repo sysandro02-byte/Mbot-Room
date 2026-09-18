@@ -59,6 +59,7 @@ type VideoTileProps = {
   activeSpeaker?: boolean;
   pinned?: boolean;
   handRaised?: boolean;
+  reaction?: string;
   onPin?: () => void;
 };
 
@@ -70,7 +71,7 @@ const initials = (value: string) => String(value || 'MB')
   .slice(0, 2)
   .toUpperCase();
 
-function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, local, audioOutputId, activeSpeaker, pinned, handRaised, onPin }: VideoTileProps) {
+function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, local, audioOutputId, activeSpeaker, pinned, handRaised, reaction, onPin }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -99,6 +100,7 @@ function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, l
         {handRaised ? <small className="hand-badge" aria-label="Main levée"><Hand size={13}/> Main</small> : null}
         {muted ? <MicOff size={15} aria-label="Micro coupé" /> : <Mic size={15} aria-label="Micro actif" />}
       </div>
+      {reaction ? <div className="room-v2-reaction-bubble" aria-label={`Réaction ${reaction}`}>{reaction}</div> : null}
       {!local && onPin ? (
         <button
           type="button"
@@ -161,6 +163,9 @@ export default function MeetingRoomV2() {
   const [recording, setRecording] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
   const [raisedHands, setRaisedHands] = useState<Set<number>>(new Set());
+  const [reactions, setReactions] = useState<Record<number, string>>({});
+  const reactionTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const [reactionPanelOpen, setReactionPanelOpen] = useState(false);
   const [participants, setParticipants] = useState<MeetingParticipant[]>([]);
   const [messages, setMessages] = useState<MeetingMessage[]>([]);
   const [messageDraft, setMessageDraft] = useState('');
@@ -334,6 +339,22 @@ export default function MeetingRoomV2() {
         return next;
       });
     };
+    const onReaction = (payload: { meetingId: number; userId: number; reaction: string }) => {
+      if (Number(payload.meetingId) !== id || !payload.reaction) return;
+      const userId = Number(payload.userId);
+      setReactions((current) => ({ ...current, [userId]: payload.reaction }));
+      const previous = reactionTimersRef.current.get(userId);
+      if (previous) clearTimeout(previous);
+      const timer = setTimeout(() => {
+        setReactions((current) => {
+          const next = { ...current };
+          delete next[userId];
+          return next;
+        });
+        reactionTimersRef.current.delete(userId);
+      }, 4000);
+      reactionTimersRef.current.set(userId, timer);
+    };
     const onModeration = (payload: { meetingId:number; mutedByHost?:boolean; cameraDisabledByHost?:boolean; role?:string }) => {
       if (Number(payload.meetingId) !== id) return;
       if (payload.mutedByHost === true) {
@@ -365,6 +386,7 @@ export default function MeetingRoomV2() {
     socket.on('meeting:presence', onPresence);
     socket.on('meeting:lobby-updated', onLobby);
     socket.on('meeting:hand-raised', onHandRaised);
+    socket.on('meeting:reaction', onReaction);
     socket.on('meeting:moderation', onModeration);
     socket.on('meeting:ended', onEnded);
     socket.on('meeting:removed', onRemoved);
@@ -377,7 +399,10 @@ export default function MeetingRoomV2() {
       socket.off('meeting:presence', onPresence);
       socket.off('meeting:lobby-updated', onLobby);
       socket.off('meeting:hand-raised', onHandRaised);
+      socket.off('meeting:reaction', onReaction);
       socket.off('meeting:moderation', onModeration);
+      reactionTimersRef.current.forEach((timer) => clearTimeout(timer));
+      reactionTimersRef.current.clear();
       socket.off('meeting:ended', onEnded);
       socket.off('meeting:removed', onRemoved);
       socket.off('meeting:banned', onBanned);
@@ -658,6 +683,7 @@ export default function MeetingRoomV2() {
                   activeSpeaker={activeSpeakerSocketId === featuredParticipant.socketId}
                   pinned={pinnedSocketId === featuredParticipant.socketId}
                   handRaised={raisedHands.has(Number(featuredParticipant.userId))}
+                  reaction={reactions[Number(featuredParticipant.userId)]}
                   onPin={() => setPinnedSocketId((current) => current === featuredParticipant.socketId ? null : featuredParticipant.socketId)}
                 />
               </div>
@@ -670,6 +696,7 @@ export default function MeetingRoomV2() {
                   videoEnabled={screenSharing || mediaState.video}
                   screen={screenSharing}
                   badge={isModerator ? 'Hôte' : currentUser?.isGuest ? 'Invité' : undefined}
+                  reaction={reactions[Number(currentUser?.id || 0)]}
                   local
                 />
                 {remoteParticipants.filter((participant) => participant.socketId !== featuredParticipant.socketId).map((participant) => (
@@ -686,6 +713,7 @@ export default function MeetingRoomV2() {
                     activeSpeaker={activeSpeakerSocketId === participant.socketId}
                     pinned={pinnedSocketId === participant.socketId}
                     handRaised={raisedHands.has(Number(participant.userId))}
+                    reaction={reactions[Number(participant.userId)]}
                     onPin={() => setPinnedSocketId((current) => current === participant.socketId ? null : participant.socketId)}
                   />
                 ))}
@@ -717,6 +745,7 @@ export default function MeetingRoomV2() {
                   activeSpeaker={activeSpeakerSocketId === participant.socketId}
                   pinned={pinnedSocketId === participant.socketId}
                   handRaised={raisedHands.has(Number(participant.userId))}
+                  reaction={reactions[Number(participant.userId)]}
                   onPin={() => setPinnedSocketId((current) => current === participant.socketId ? null : participant.socketId)}
                 />
               ))}
@@ -821,6 +850,16 @@ export default function MeetingRoomV2() {
         <Control active={cameraEnabled} label={cameraEnabled ? 'Caméra' : 'Caméra coupée'} onClick={toggleCamera}>{cameraEnabled ? <Camera/> : <CameraOff/>}</Control>
         <Control active={screenSharing} label="Partager" onClick={() => void toggleScreenShare()}><MonitorUp/></Control>
         <Control active={handRaised} label={handRaised ? 'Baisser la main' : 'Main'} onClick={() => { const raised = !handRaised; setHandRaised(raised); setRaisedHands((current) => { const next = new Set(current); if (raised) next.add(Number(currentUser?.id || 0)); else next.delete(Number(currentUser?.id || 0)); return next; }); socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised}); }}><Hand/></Control>
+        <div className="room-v2-reaction-wrap">
+          <Control active={reactionPanelOpen} label="Réactions" testId="reaction-button" onClick={() => setReactionPanelOpen((current) => !current)}>😊</Control>
+          {reactionPanelOpen ? (
+            <div className="room-v2-reaction-panel" data-testid="reaction-panel">
+              {['👍','👏','❤️','🎉','😂'].map((reaction) => (
+                <button key={reaction} type="button" onClick={() => { setReactionPanelOpen(false); socket.emit('meeting:reaction',{meetingId:meeting.id,reaction}); }}>{reaction}</button>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <Control active={panel === 'participants'} label="Participants" onClick={() => setPanel(panel === 'participants' ? null : 'participants')}><UsersRound/></Control>
         <Control active={panel === 'chat'} label="Discussion" onClick={() => setPanel(panel === 'chat' ? null : 'chat')}><MessageCircle/></Control>
         <Control active={panel === 'polls'} label="Sondages" onClick={() => setPanel(panel === 'polls' ? null : 'polls')}><Vote/></Control>
