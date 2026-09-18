@@ -14,6 +14,7 @@ import { registerAppRoutes } from './server/appRoutes.js';
 import { registerRealtime } from './server/realtime.js';
 import { registerRtcRoutes } from './server/rtcRoutes.js';
 import { registerSfuRoutes } from './server/sfuRoutes.js';
+import { registerRecordingRoutes } from './server/recordingRoutes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.basename(__dirname) === 'dist' ? __dirname : path.join(__dirname, 'dist');
@@ -101,6 +102,7 @@ registerAdminRoutes(app, io);
 registerAppRoutes(app, io);
 registerRtcRoutes(app);
 registerSfuRoutes(app);
+registerRecordingRoutes(app, io);
 registerRealtime(io);
 
 app.use('/api', (_request, response) => {
