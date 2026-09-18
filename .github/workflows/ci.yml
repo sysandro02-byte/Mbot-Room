@@ -51,6 +51,8 @@ jobs:
         run: npm run build
       - name: Production smoke checks
         run: node scripts/test-production-config.mjs
+      - name: Explicit Render test database fallback
+        run: node scripts/test-pglite-fallback.mjs
       - name: PostgreSQL and realtime integration
         run: node scripts/test-integration.mjs
       - name: Three-browser camera, microphone and reconnect test
