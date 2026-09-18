@@ -68,7 +68,8 @@ export const registerSfuRoutes = (app: express.Express) => {
     response.setHeader('Cache-Control', 'no-store');
     response.json({
       configuredMode: mode,
-      activeMode: mode === 'mesh' ? 'mesh' : livekitReady ? 'livekit' : 'mesh',
+      preferredMode: mode === 'mesh' ? 'mesh' : livekitReady ? 'livekit' : 'mesh',
+      browserTransport: 'mesh',
       livekitReady,
       turnConfigured: Boolean(String(process.env.TURN_URLS || '').trim() && String(process.env.TURN_SHARED_SECRET || '').trim()),
       serverRecordingReady: livekitReady && Boolean(String(process.env.LIVEKIT_EGRESS_ENABLED || '').trim() === 'true'),
