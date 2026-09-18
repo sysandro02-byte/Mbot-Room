@@ -99,6 +99,20 @@ const embeddedDatabase = embeddedTestMode ? new PGlite(embeddedDataDir) : null;
 export const getDatabaseType = () => pool ? 'postgres' : embeddedDatabase ? 'pglite-test' : 'none';
 export const hasDatabase = () => Boolean(pool || embeddedDatabase);
 
+let databaseReady = false;
+let databaseInitializationFailed = false;
+
+export const isDatabaseReady = () => databaseReady;
+export const didDatabaseInitializationFail = () => databaseInitializationFailed;
+export const markDatabaseReady = () => {
+  databaseReady = true;
+  databaseInitializationFailed = false;
+};
+export const markDatabaseInitializationFailed = () => {
+  databaseReady = false;
+  databaseInitializationFailed = true;
+};
+
 const wrapEmbeddedResult = <T extends QueryResultRow = QueryResultRow>(result: any) => ({
   ...result,
   rows: Array.isArray(result?.rows) ? result.rows as T[] : [],
@@ -222,6 +236,10 @@ export const requireDatabase: express.RequestHandler = (_request, response, next
     sendApiError(response, 503, 'DATABASE_REQUIRED', 'La base PostgreSQL n’est pas configurée.');
     return;
   }
+  if (!isDatabaseReady()) {
+    sendApiError(response, 503, 'DATABASE_INITIALIZING', 'La base de données est en cours d’initialisation.');
+    return;
+  }
   next();
 };
 
@@ -260,7 +278,7 @@ export const getRawSessionTokenFromRequest = (request: express.Request) =>
   getBearerToken(request) || getCookieValue(request.headers.cookie, SESSION_COOKIE_NAME);
 
 export const getUserByRawToken = async (rawToken: string): Promise<PublicUser | null> => {
-  if (!hasDatabase() || !rawToken) return null;
+  if (!hasDatabase() || !isDatabaseReady() || !rawToken) return null;
   const result = await query(
     `SELECT u.* FROM room_sessions s
        JOIN room_users u ON u.id = s.user_id
