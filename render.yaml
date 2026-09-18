@@ -16,11 +16,7 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_MODE
-        value: pglite-test
-      - key: PGLITE_DATA_DIR
-        value: /tmp/mboteroom-pglite-test
-      - key: PGLITE_INITIAL_MEMORY_MB
-        value: "64"
+        value: postgres
       - key: ADMIN_EMAILS
         sync: false
       - key: MBOTE_ROOM_APP_URL
