@@ -364,6 +364,11 @@ export default function MeetingRoomV2() {
       }, 4000);
       reactionTimersRef.current.set(userId, timer);
     };
+    const onLocked = (payload: { meetingId: number; locked: boolean }) => {
+      if (Number(payload.meetingId) !== id) return;
+      setMeeting((current) => current ? { ...current, settings: { ...(current.settings || {}), locked: Boolean(payload.locked) } } : current);
+      setNotice(payload.locked ? 'La réunion a été verrouillée par l’hôte.' : 'La réunion a été déverrouillée.');
+    };
     const onModeration = (payload: { meetingId:number; mutedByHost?:boolean; cameraDisabledByHost?:boolean; role?:string }) => {
       if (Number(payload.meetingId) !== id) return;
       if (payload.mutedByHost === true) {
@@ -396,6 +401,7 @@ export default function MeetingRoomV2() {
     socket.on('meeting:lobby-updated', onLobby);
     socket.on('meeting:hand-raised', onHandRaised);
     socket.on('meeting:reaction', onReaction);
+    socket.on('meeting:locked', onLocked);
     socket.on('meeting:moderation', onModeration);
     socket.on('meeting:ended', onEnded);
     socket.on('meeting:removed', onRemoved);
@@ -409,6 +415,7 @@ export default function MeetingRoomV2() {
       socket.off('meeting:lobby-updated', onLobby);
       socket.off('meeting:hand-raised', onHandRaised);
       socket.off('meeting:reaction', onReaction);
+      socket.off('meeting:locked', onLocked);
       socket.off('meeting:moderation', onModeration);
       reactionTimersRef.current.forEach((timer) => clearTimeout(timer));
       reactionTimersRef.current.clear();
@@ -630,6 +637,19 @@ export default function MeetingRoomV2() {
       await refreshParticipants();
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : 'Action de modération impossible.');
+    }
+  };
+
+  const toggleMeetingLock = async () => {
+    if (!meeting?.id || !isModerator) return;
+    const next = !Boolean(meeting.settings?.locked);
+    try {
+      const result = await meetingService.setMeetingLocked(meeting.id, next);
+      if (result.meeting) setMeeting(result.meeting);
+      else setMeeting((current) => current ? { ...current, settings: { ...(current.settings || {}), locked: result.locked } } : current);
+      setNotice(result.locked ? 'Réunion verrouillée.' : 'Réunion déverrouillée.');
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Impossible de modifier le verrouillage.');
     }
   };
 
@@ -927,6 +947,7 @@ export default function MeetingRoomV2() {
         <Control active={panel === 'chat'} label="Discussion" onClick={() => setPanel(panel === 'chat' ? null : 'chat')}><MessageCircle/></Control>
         <Control active={panel === 'polls'} label="Sondages" onClick={() => setPanel(panel === 'polls' ? null : 'polls')}><Vote/></Control>
         <Control active={panel === 'luna'} label="Luna" onClick={() => setPanel(panel === 'luna' ? null : 'luna')}><Bot/></Control>
+        {isModerator ? <Control active={Boolean(meeting.settings?.locked)} label={meeting.settings?.locked ? 'Déverrouiller' : 'Verrouiller'} testId="meeting-lock-button" onClick={() => void toggleMeetingLock()}><ShieldCheck/></Control> : null}
         <div className="room-v2-device-wrap">
           <Control
             active={devicePanelOpen}
