@@ -53,7 +53,8 @@ const waitForServer = async () => {
     if (serverExit) throw new Error(`Server exited early: ${JSON.stringify(serverExit)}\n${serverOutput}`);
     try {
       const response = await fetch(`${baseUrl}/api/health`);
-      if (response.ok) return;
+      const health = await response.json().catch(() => ({}));
+      if (response.ok && health?.ok === true && health?.database?.connected === true) return;
     } catch {
       // Still starting.
     }
