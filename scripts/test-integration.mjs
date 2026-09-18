@@ -186,6 +186,7 @@ const decodeAndVerifyJwt = (token, secret) => {
 const register = async (name, email) => {
   const result = await jsonRequest('/api/auth/register', {
     method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
     body: JSON.stringify({ name, email, password: 'Password2026!' }),
   });
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
@@ -293,6 +294,34 @@ try {
 
   const host = await register('Hôte Integration', 'host.integration@mbote.test');
   assert.equal(host.user.role, 'admin');
+
+  const browserLogin = await jsonRequest('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: 'host.integration@mbote.test',
+      password: 'Password2026!',
+      rememberMe: true,
+    }),
+  });
+  assert.equal(browserLogin.response.status, 200, JSON.stringify(browserLogin.data));
+  assert.equal(browserLogin.data.token, undefined, 'Browser session must not expose a bearer token');
+  const browserSetCookie = browserLogin.response.headers.get('set-cookie') || '';
+  assert.match(browserSetCookie, /mbote_room_session=/);
+  assert.match(browserSetCookie, /HttpOnly/i);
+  assert.match(browserSetCookie, /SameSite=Lax/i);
+  const browserCookie = browserSetCookie.split(';')[0];
+
+  const browserMe = await jsonRequest('/api/auth/me', { headers: { Cookie: browserCookie } });
+  assert.equal(browserMe.response.status, 200, JSON.stringify(browserMe.data));
+  assert.equal(browserMe.data.user.email, 'host.integration@mbote.test');
+
+  const browserLogout = await jsonRequest('/api/auth/logout', {
+    method: 'POST',
+    headers: { Cookie: browserCookie },
+  });
+  assert.equal(browserLogout.response.status, 204);
+  const browserMeAfterLogout = await jsonRequest('/api/auth/me', { headers: { Cookie: browserCookie } });
+  assert.equal(browserMeAfterLogout.response.status, 401);
 
   const participant = await register('Participant Integration', 'participant.integration@mbote.test');
   assert.equal(participant.user.role, 'user');
