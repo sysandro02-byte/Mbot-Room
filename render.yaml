@@ -35,6 +35,12 @@ services:
         value: llama-3.1-8b-instant
       - key: GROQ_TIMEOUT_MS
         value: "30000"
+      - key: GROQ_TRANSCRIPTION_MODEL
+        value: whisper-large-v3-turbo
+      - key: GROQ_TRANSCRIPTION_TIMEOUT_MS
+        value: "30000"
+      - key: CAPTION_CHUNK_SECONDS
+        value: "10"
       - key: RESEND_API_KEY
         sync: false
       - key: MEETING_INVITE_FROM
