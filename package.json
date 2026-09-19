@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "vite:internal": "vite",
-    "start": "node --max-old-space-size=96 dist/server.js",
+    "start": "node --max-old-space-size=64 dist/server.js",
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && vite build --configLoader bundle && esbuild server-v2.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.js",
     "lint": "node node_modules/typescript/bin/tsc --noEmit",
     "test": "npm run lint && node scripts/test-production-config.mjs",
