@@ -10,7 +10,7 @@ const dataDir = join(tmpdir(), 'mboteroom-pglite-ci');
 
 await rm(dataDir, { recursive: true, force: true });
 
-const server = spawn(process.execPath, ['dist/server.js'], {
+const server = spawn(process.execPath, ['--max-old-space-size=96', 'dist/server.js'], {
   cwd: process.cwd(),
   env: {
     ...process.env,
