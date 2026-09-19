@@ -96,7 +96,21 @@ export const pool = databaseUrl
   : null;
 
 const embeddedDatabase = embeddedTestMode
-  ? new PGlite({ dataDir: embeddedDataDir, initialMemory: embeddedInitialMemoryMb * 1024 * 1024 })
+  ? new PGlite({
+      dataDir: embeddedDataDir,
+      initialMemory: embeddedInitialMemoryMb * 1024 * 1024,
+      postgresqlconf: [
+        'shared_buffers=8MB',
+        'work_mem=1MB',
+        'maintenance_work_mem=8MB',
+        'temp_buffers=1MB',
+        'max_connections=10',
+        'autovacuum=off',
+        'max_worker_processes=1',
+        'max_parallel_workers=0',
+        'max_parallel_workers_per_gather=0',
+      ],
+    })
   : null;
 
 export const getDatabaseType = () => pool ? 'postgres' : embeddedDatabase ? 'pglite-test' : 'none';
