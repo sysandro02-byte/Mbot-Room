@@ -325,6 +325,11 @@ export function useMeetingMeshWebRTC({
     return state;
   }, [ensureOffererSenders, meetingId, onNotice, removeRemoteParticipant, syncLocalTracks]);
 
+  const shouldInitiateOffer = useCallback((targetSocketId: string) => {
+    const localSocketId = String(socket.id || '');
+    return Boolean(localSocketId && targetSocketId && localSocketId.localeCompare(targetSocketId) < 0);
+  }, []);
+
   const createOffer = useCallback(async (targetSocketId: string, iceRestart = false) => {
     const state = createPeer(targetSocketId, true);
     const { pc } = state;
@@ -359,11 +364,22 @@ export function useMeetingMeshWebRTC({
           return;
         }
         joinedRef.current = true;
-        const participants = Array.isArray(response.participants) ? response.participants : [];
+        const rawParticipants = Array.isArray(response.participants) ? response.participants : [];
+        const participantsByUser = new Map<string, ServerMeetingParticipant>();
+        for (const participant of rawParticipants) {
+          const participantUserId = String(participant.userId);
+          if (!participant.socketId || participantUserId === localUserId) continue;
+          participantsByUser.set(participantUserId, participant);
+        }
+        const participants = [...participantsByUser.values()];
         setRemoteParticipants(participants.map((participant) => normalizeParticipant(participant)));
-        // Les participants déjà présents initient l'offre lorsqu'ils reçoivent
-        // meeting:participant-joined. Le nouvel arrivant attend cette offre afin
-        // d'éviter deux offres simultanées et des transceivers dupliqués.
+        if (peerConnectionsEnabled) {
+          for (const participant of participants) {
+            const targetSocketId = String(participant.socketId);
+            if (!shouldInitiateOffer(targetSocketId)) continue;
+            void createOffer(targetSocketId).catch(() => onNotice?.('Connexion vidéo avec un participant impossible.'));
+          }
+        }
       });
     };
 
@@ -378,10 +394,11 @@ export function useMeetingMeshWebRTC({
     };
 
     const handleParticipantJoined = (participant: ServerMeetingParticipant) => {
-      if (String(participant.userId) === localUserId) return;
+      if (String(participant.userId) === localUserId || !participant.socketId) return;
       updateRemoteParticipant(participant);
-      if (peerConnectionsEnabled) {
-        void createOffer(String(participant.socketId)).catch(() => onNotice?.('Connexion vidéo avec un participant impossible.'));
+      const targetSocketId = String(participant.socketId);
+      if (peerConnectionsEnabled && shouldInitiateOffer(targetSocketId)) {
+        void createOffer(targetSocketId).catch(() => onNotice?.('Connexion vidéo avec un participant impossible.'));
       }
     };
 
@@ -491,7 +508,7 @@ export function useMeetingMeshWebRTC({
       closeAllPeers();
       joinedRef.current = false;
     };
-  }, [bindRemoteCreatedSenders, breakoutRoomId, closeAllPeers, createOffer, createPeer, enabled, flushPendingCandidates, localAvatar, localName, localUserId, meetingId, onNotice, peerConnectionsEnabled, removeRemoteParticipant, rtcConfigReady, syncLocalTracks, updateRemoteParticipant]);
+  }, [bindRemoteCreatedSenders, breakoutRoomId, closeAllPeers, createOffer, createPeer, enabled, flushPendingCandidates, localAvatar, localName, localUserId, meetingId, onNotice, peerConnectionsEnabled, removeRemoteParticipant, rtcConfigReady, shouldInitiateOffer, syncLocalTracks, updateRemoteParticipant]);
 
   useEffect(() => {
     if (!joinedRef.current) return;

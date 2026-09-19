@@ -96,7 +96,21 @@ export const pool = databaseUrl
   : null;
 
 const embeddedDatabase = embeddedTestMode
-  ? new PGlite({ dataDir: embeddedDataDir, initialMemory: embeddedInitialMemoryMb * 1024 * 1024 })
+  ? new PGlite({
+      dataDir: embeddedDataDir,
+      initialMemory: embeddedInitialMemoryMb * 1024 * 1024,
+      postgresqlconf: [
+        'shared_buffers=8MB',
+        'work_mem=1MB',
+        'maintenance_work_mem=8MB',
+        'temp_buffers=1MB',
+        'max_connections=10',
+        'autovacuum=off',
+        'max_worker_processes=1',
+        'max_parallel_workers=0',
+        'max_parallel_workers_per_gather=0',
+      ],
+    })
   : null;
 
 export const getDatabaseType = () => pool ? 'postgres' : embeddedDatabase ? 'pglite-test' : 'none';
@@ -111,12 +125,15 @@ const wrapEmbeddedResult = <T extends QueryResultRow = QueryResultRow>(result: a
 export const query = async <T extends QueryResultRow = QueryResultRow>(text: string, params: unknown[] = []) => {
   if (pool) return pool.query<T>(text, params);
   if (embeddedDatabase) {
-    const statementCount = params.length === 0
-      ? text.split(';').filter((statement) => statement.trim()).length
-      : 1;
-    if (statementCount > 1) {
-      const results = await embeddedDatabase.exec(text) as any[];
-      return wrapEmbeddedResult<T>(Array.isArray(results) && results.length ? results[results.length - 1] : { rows: [] }) as any;
+    if (params.length === 0) {
+      const statements = text.split(';').map((statement) => statement.trim()).filter(Boolean);
+      if (statements.length > 1) {
+        let lastResult: any = { rows: [] };
+        for (const statement of statements) {
+          lastResult = await embeddedDatabase.query(statement);
+        }
+        return wrapEmbeddedResult<T>(lastResult) as any;
+      }
     }
     const result = await embeddedDatabase.query<T>(text, params as any[]);
     return wrapEmbeddedResult<T>(result) as any;
