@@ -2,7 +2,6 @@ import crypto from 'node:crypto';
 import type express from 'express';
 import pg from 'pg';
 import type { QueryResultRow } from 'pg';
-import { PGlite } from '@electric-sql/pglite';
 
 export type UserRole = 'admin' | 'user' | 'guest';
 
@@ -86,47 +85,15 @@ export const adminPermissions = [
 ];
 
 const databaseUrl = String(process.env.DATABASE_URL || '').trim();
-const databaseMode = String(process.env.DATABASE_MODE || '').trim().toLowerCase();
-const embeddedTestMode = !databaseUrl && databaseMode === 'pglite-test';
-const embeddedDataDir = String(process.env.PGLITE_DATA_DIR || '/tmp/mboteroom-pglite-test').trim();
-const embeddedInitialMemoryMb = Math.max(32, Math.min(128, Number(process.env.PGLITE_INITIAL_MEMORY_MB || 64)));
-
 export const pool = databaseUrl
   ? new pg.Pool({ connectionString: databaseUrl, ssl: process.env.PGSSLMODE === 'disable' ? undefined : { rejectUnauthorized: false } })
   : null;
 
-const embeddedDatabase = embeddedTestMode
-  ? new PGlite({ dataDir: embeddedDataDir, initialMemory: embeddedInitialMemoryMb * 1024 * 1024 })
-  : null;
-
-export const getDatabaseType = () => pool ? 'postgres' : embeddedDatabase ? 'pglite-test' : 'none';
-export const hasDatabase = () => Boolean(pool || embeddedDatabase);
-
-const wrapEmbeddedResult = <T extends QueryResultRow = QueryResultRow>(result: any) => ({
-  ...result,
-  rows: Array.isArray(result?.rows) ? result.rows as T[] : [],
-  rowCount: Number(result?.affectedRows ?? result?.rows?.length ?? 0),
-});
+export const hasDatabase = () => Boolean(pool);
 
 export const query = async <T extends QueryResultRow = QueryResultRow>(text: string, params: unknown[] = []) => {
-  if (pool) return pool.query<T>(text, params);
-  if (embeddedDatabase) {
-    const statementCount = params.length === 0
-      ? text.split(';').filter((statement) => statement.trim()).length
-      : 1;
-    if (statementCount > 1) {
-      const results = await embeddedDatabase.exec(text) as any[];
-      return wrapEmbeddedResult<T>(Array.isArray(results) && results.length ? results[results.length - 1] : { rows: [] }) as any;
-    }
-    const result = await embeddedDatabase.query<T>(text, params as any[]);
-    return wrapEmbeddedResult<T>(result) as any;
-  }
-  throw new Error('DATABASE_URL is required unless DATABASE_MODE=pglite-test is explicitly enabled');
-};
-
-export const closeDatabase = async () => {
-  await pool?.end().catch(() => undefined);
-  await embeddedDatabase?.close().catch(() => undefined);
+  if (!pool) throw new Error('DATABASE_URL is required');
+  return pool.query<T>(text, params);
 };
 
 export const normalizeEmail = (value: unknown) => String(value || '').trim().toLowerCase();
@@ -221,7 +188,7 @@ export const sendApiError = (response: express.Response, status: number, code: s
 };
 
 export const requireDatabase: express.RequestHandler = (_request, response, next) => {
-  if (!hasDatabase()) {
+  if (!pool) {
     sendApiError(response, 503, 'DATABASE_REQUIRED', 'La base PostgreSQL n’est pas configurée.');
     return;
   }
@@ -263,7 +230,7 @@ export const getRawSessionTokenFromRequest = (request: express.Request) =>
   getBearerToken(request) || getCookieValue(request.headers.cookie, SESSION_COOKIE_NAME);
 
 export const getUserByRawToken = async (rawToken: string): Promise<PublicUser | null> => {
-  if (!hasDatabase() || !rawToken) return null;
+  if (!pool || !rawToken) return null;
   const result = await query(
     `SELECT u.* FROM room_sessions s
        JOIN room_users u ON u.id = s.user_id
@@ -332,7 +299,7 @@ export const validateMeetingPassword = (meeting: Meeting, password: unknown) => 
 };
 
 export const runMigrations = async () => {
-  if (!hasDatabase()) return;
+  if (!pool) return;
   await query(`
     CREATE SEQUENCE IF NOT EXISTS room_users_id_seq;
     CREATE SEQUENCE IF NOT EXISTS room_meetings_id_seq;
