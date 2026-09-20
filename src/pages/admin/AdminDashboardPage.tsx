@@ -351,7 +351,7 @@ export default function AdminDashboardPage() {
             <kbd>Ctrl + K</kbd>
           </form>
           <nav className="admin-topbar-actions" aria-label="Actions administrateur">
-            <button className="admin-topbar-icon" type="button" aria-label="Notifications administrateur" onClick={() => setToast('Centre de notifications administrateur à connecter.')}>
+            <button className="admin-topbar-icon" type="button" aria-label="Notifications administrateur" onClick={() => navigate('/app/notifications')}>
               <Bell size={22} aria-hidden="true" />
               <span>{dashboard?.recentActivity.length || 0}</span>
             </button>
