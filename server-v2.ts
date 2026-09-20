@@ -16,6 +16,7 @@ import { registerRtcRoutes } from './server/rtcRoutes.js';
 import { registerSfuRoutes } from './server/sfuRoutes.js';
 import { registerRecordingRoutes } from './server/recordingRoutes.js';
 import { registerTranscriptionRoutes } from './server/transcriptionRoutes.js';
+import { getRuntimeReadiness } from './server/readiness.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.basename(__dirname) === 'dist' ? __dirname : path.join(__dirname, 'dist');
@@ -133,7 +134,9 @@ const start = async () => {
     await runProductMigrations();
   }
   httpServer.listen(port, () => {
-    console.log(`MBotéRoom API V2 listening on port ${port} · database=${getDatabaseType()}`);
+    const databaseType = getDatabaseType();
+    console.log(`MBotéRoom API V2 listening on port ${port} · database=${databaseType}`);
+    console.log(`MBotéRoom readiness ${JSON.stringify(getRuntimeReadiness(databaseType))}`);
   });
 };
 

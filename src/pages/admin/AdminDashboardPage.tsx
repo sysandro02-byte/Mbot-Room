@@ -10,15 +10,12 @@ import {
   CircleHelp,
   CirclePlay,
   Clock3,
-  Database,
-  FileText,
   Flag,
   Home,
   LogOut,
   Menu,
   MessageCircle,
   MoreVertical,
-  Plug,
   Plus,
   Search,
   Settings,
@@ -37,6 +34,7 @@ import {
   adminDashboardService,
 } from '../../services/adminDashboardService';
 import { DashboardTip, getMeetingAccessCode, Meeting } from '../../services/meetingService';
+import { collaborationService } from '../../services/collaborationService';
 import './AdminDashboardPage.css';
 
 type ActivityTone = 'green' | 'blue' | 'orange' | 'red' | 'violet';
@@ -239,6 +237,27 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const copyMeetingId = async (meeting: Meeting) => {
+    const id = getMeetingAccessCode(meeting);
+    try {
+      await navigator.clipboard.writeText(id);
+      setToast(`ID ${id} copié.`);
+    } catch {
+      setToast(`ID de réunion : ${id}`);
+    }
+  };
+
+  const endLiveMeeting = async (meeting: Meeting) => {
+    try {
+      await collaborationService.endMeeting(meeting.id);
+      setActiveMeetingMenu(null);
+      setToast('Réunion terminée.');
+      await loadDashboard();
+    } catch (endError) {
+      setToast(endError instanceof Error ? endError.message : 'Impossible de terminer la réunion.');
+    }
+  };
+
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!debouncedSearch) return;
@@ -351,7 +370,7 @@ export default function AdminDashboardPage() {
             <kbd>Ctrl + K</kbd>
           </form>
           <nav className="admin-topbar-actions" aria-label="Actions administrateur">
-            <button className="admin-topbar-icon" type="button" aria-label="Notifications administrateur" onClick={() => setToast('Centre de notifications administrateur à connecter.')}>
+            <button className="admin-topbar-icon" type="button" aria-label="Notifications administrateur" onClick={() => navigate('/app/notifications')}>
               <Bell size={22} aria-hidden="true" />
               <span>{dashboard?.recentActivity.length || 0}</span>
             </button>
@@ -393,7 +412,8 @@ export default function AdminDashboardPage() {
               activeMenu={activeMeetingMenu}
               onToggleMenu={(meetingId) => setActiveMeetingMenu((current) => (current === meetingId ? null : meetingId))}
               onJoin={(meeting) => void joinAsAdmin(meeting)}
-              onToast={setToast}
+              onCopyId={(meeting) => void copyMeetingId(meeting)}
+              onEnd={(meeting) => void endLiveMeeting(meeting)}
             />
             <RecentActivityCard activities={dashboard?.recentActivity || []} />
             <GuestAccessSlidesCard slides={guestSlides} draft={guestDraft} editingId={editingGuestSlideId} onDraftChange={setGuestDraft} onEdit={(slide) => { setEditingGuestSlideId(slide.id); setGuestDraft({ title: slide.title, body: slide.body, imageUrl: slide.imageUrl, isActive: slide.isActive }); }} onCancel={() => { setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); }} onSubmit={async (event) => { event.preventDefault(); try { await adminDashboardService.saveGuestAccessSlide(guestDraft, editingGuestSlideId || undefined); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); setToast('Slide enregistre.'); } catch (saveError) { setToast(saveError instanceof Error ? saveError.message : 'Enregistrement impossible.'); } }} onDelete={async (id) => { try { await adminDashboardService.deleteGuestAccessSlide(id); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setToast('Slide supprime.'); } catch (deleteError) { setToast(deleteError instanceof Error ? deleteError.message : 'Suppression impossible.'); } }} />
@@ -426,21 +446,23 @@ export default function AdminDashboardPage() {
 }
 
 function AdminSidebar({ userName, open, onClose }: { userName: string; open: boolean; onClose: () => void }) {
-  const menuItems = [
+  const menuItems: Array<{
+    label: string;
+    icon: typeof Home;
+    path: string;
+    active?: boolean;
+    live?: boolean;
+    count?: number;
+  }> = [
     { label: 'Tableau de bord', icon: Home, path: '/admin', active: true },
-    { label: 'Utilisateurs', icon: UsersRound, path: '/admin/utilisateurs' },
-    { label: 'Réunions', icon: CalendarDays, path: '/admin/reunions' },
-    { label: 'Réunions en direct', icon: UsersRound, path: '/admin/reunions/direct', live: true },
-    { label: 'Enregistrements', icon: CirclePlay, path: '/admin/enregistrements' },
-    { label: 'Signalements', icon: ShieldCheck, path: '/admin/signalements', count: 0 },
-    { label: 'Bannissements', icon: Ban, path: '/admin/bannissements' },
-    { label: 'Messages', icon: MessageCircle, path: '/admin/messages' },
-    { label: 'Statistiques', icon: BarChart3, path: '/admin/statistiques' },
-    { label: 'Paramètres système', icon: Settings, path: '/admin/systeme' },
-    { label: 'Journaux d’activité', icon: FileText, path: '/admin/journaux' },
-    { label: 'Intégrations', icon: Plug, path: '/admin/integrations' },
-    { label: 'Sauvegarde & stockage', icon: Database, path: '/admin/sauvegarde' },
-    { label: 'Paramètres', icon: Settings, path: '/admin/parametres' },
+    { label: 'Réunions', icon: CalendarDays, path: '/app/meetings' },
+    { label: 'Enregistrements', icon: CirclePlay, path: '/app/recordings' },
+    { label: 'Messages', icon: MessageCircle, path: '/app/messages' },
+    { label: 'Notifications', icon: Bell, path: '/app/notifications' },
+    { label: 'Calendrier', icon: CalendarDays, path: '/app/calendar' },
+    { label: 'Tableau blanc', icon: BarChart3, path: '/app/whiteboard' },
+    { label: 'Paramètres', icon: Settings, path: '/app/settings' },
+    { label: 'Aide', icon: CircleHelp, path: '/aide' },
   ];
   return (
     <aside className={`admin-sidebar ${open ? 'is-open' : ''}`}>
@@ -499,17 +521,19 @@ function LiveMeetingsCard({
   activeMenu,
   onToggleMenu,
   onJoin,
-  onToast,
+  onCopyId,
+  onEnd,
 }: {
   meetings: Meeting[];
   activeMenu: number | null;
   onToggleMenu: (meetingId: number) => void;
   onJoin: (meeting: Meeting) => void;
-  onToast: (message: string) => void;
+  onCopyId: (meeting: Meeting) => void;
+  onEnd: (meeting: Meeting) => void;
 }) {
   return (
     <section className="admin-live-meetings-card">
-      <header><div><h2>Réunions en direct</h2><span>LIVE</span></div><Link to="/admin/reunions/direct">Voir toutes</Link></header>
+      <header><div><h2>Réunions en direct</h2><span>LIVE</span></div><Link to="/app/meetings">Voir toutes</Link></header>
       <div className="admin-live-table">
         <div className="admin-live-table-head"><span>Titre de la réunion</span><span>Hôte</span><span>Participants</span><span>Début</span><span>Actions</span></div>
         <div>
@@ -528,9 +552,9 @@ function LiveMeetingsCard({
                   <button type="button" aria-label={`Actions pour ${meeting.title}`} aria-expanded={activeMenu === meeting.id} onClick={() => onToggleMenu(meeting.id)}><MoreVertical size={19} /></button>
                   {activeMenu === meeting.id && (
                     <div>
-                      <button type="button" onClick={() => onToast(`ID ${getMeetingAccessCode(meeting)} copié visuellement.`)}>Voir les détails</button>
-                      <button type="button" onClick={() => onToast('Modération à connecter au backend.')}>Ouvrir la modération</button>
-                      <button type="button" onClick={() => onToast('Action destructive non exécutée sans endpoint dédié.')}>Terminer la réunion</button>
+                      <button type="button" onClick={() => onCopyId(meeting)}>Copier l’ID</button>
+                      <button type="button" onClick={() => onJoin(meeting)}>Ouvrir la modération</button>
+                      <button type="button" onClick={() => onEnd(meeting)}>Terminer la réunion</button>
                     </div>
                   )}
                 </div>
@@ -546,7 +570,7 @@ function LiveMeetingsCard({
 function RecentActivityCard({ activities }: { activities: AdminActivity[] }) {
   return (
     <section className="admin-activity-card">
-      <header><h2>Activité récente</h2><Link to="/admin/journaux">Voir tout</Link></header>
+      <header><h2>Activité récente</h2><span>Dernières actions serveur</span></header>
       {activities.length ? activities.map((activity) => (
         <article className={`admin-activity-row is-${activityTones[activity.type]}`} key={activity.id}>
           <span>{activityIcons[activity.type]}</span>
@@ -691,7 +715,7 @@ function UserDistributionCard({ distribution }: { distribution: { active: number
 function CountriesCard({ countries }: { countries: Array<{ id: string; name: string; flag: string; count: number; percentage: number }> }) {
   return (
     <section className="admin-countries-card">
-      <header><h2>Utilisateurs par pays</h2><Link to="/admin/statistiques">Voir tout</Link></header>
+      <header><h2>Utilisateurs par pays</h2><span>Données disponibles</span></header>
       {countries.length ? countries.map((country) => (
         <article key={country.id}><span>{country.flag}</span><strong>{country.name}</strong><em>{formatNumber(country.count)} ({country.percentage}%)</em></article>
       )) : <p className="admin-empty">Aucune statistique de pays disponible.</p>}

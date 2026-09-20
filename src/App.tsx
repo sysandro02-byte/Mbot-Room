@@ -15,6 +15,7 @@ const RealDashboardPage = lazy(() => import('./pages/dashboard/RealDashboardPage
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
 const GlobalSearchPage = lazy(() => import('./pages/GlobalSearchPage'));
 const HelpPage = lazy(() => import('./pages/HelpPage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const Login = lazy(() => import('./pages/Login'));
 
 function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: boolean }) {
@@ -122,6 +123,7 @@ export default function App() {
     <Route path="/app/recordings" element={<ProtectedRoute><RealFeaturePage kind="recordings" /></ProtectedRoute>} />
     <Route path="/app/messages" element={<ProtectedRoute><RealFeaturePage kind="messages" /></ProtectedRoute>} />
     <Route path="/app/contacts" element={<ProtectedRoute><RealFeaturePage kind="contacts" /></ProtectedRoute>} />
+    <Route path="/app/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
     <Route path="/app/whiteboard" element={<ProtectedRoute><RealFeaturePage kind="whiteboard" /></ProtectedRoute>} />
     <Route path="/app/polls" element={<ProtectedRoute><RealFeaturePage kind="polls" /></ProtectedRoute>} />
     <Route path="/app/settings" element={<ProtectedRoute><RealFeaturePage kind="settings" /></ProtectedRoute>} />

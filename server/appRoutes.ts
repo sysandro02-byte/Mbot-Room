@@ -1,5 +1,6 @@
 import type express from 'express';
 import type { Server } from 'socket.io';
+import { getRuntimeReadiness } from './readiness.js';
 import {
   AuthedRequest,
   authenticateToken,
@@ -22,7 +23,12 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
   app.get('/api/health', async (_request, response) => {
     const databaseType = getDatabaseType();
     if (!hasDatabase()) {
-      response.status(503).json({ ok:false,service:'mbote-room',database:{configured:false,connected:false,type:databaseType} });
+      response.status(503).json({
+        ok:false,
+        service:'mbote-room',
+        database:{configured:false,connected:false,type:databaseType},
+        readiness:getRuntimeReadiness(databaseType),
+      });
       return;
     }
     try {
@@ -36,10 +42,17 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
           turnConfigured:Boolean(String(process.env.TURN_URLS||'').trim() && String(process.env.TURN_SHARED_SECRET||'').trim()),
           turnCredentialTtlSeconds:Number(process.env.TURN_CREDENTIAL_TTL_SECONDS||3600),
         },
+        readiness:getRuntimeReadiness(databaseType),
         serverTime:result.rows[0].now,
       });
     } catch (error) {
-      response.status(503).json({ ok:false,service:'mbote-room',database:{configured:true,connected:false,type:databaseType},error:error instanceof Error?error.message:'Database unavailable' });
+      response.status(503).json({
+        ok:false,
+        service:'mbote-room',
+        database:{configured:true,connected:false,type:databaseType},
+        readiness:getRuntimeReadiness(databaseType),
+        error:error instanceof Error?error.message:'Database unavailable',
+      });
     }
   });
 

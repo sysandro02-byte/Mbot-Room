@@ -2,6 +2,7 @@ import { ReactNode, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
+  Bell,
   CalendarDays,
   CirclePlay,
   Home,
@@ -32,6 +33,7 @@ const navItems = [
   { label: 'Enregistrements', icon: CirclePlay, to: '/app/recordings' },
   { label: 'Messages', icon: MessageCircle, to: '/app/messages' },
   { label: 'Contacts', icon: UsersRound, to: '/app/contacts' },
+  { label: 'Notifications', icon: Bell, to: '/app/notifications' },
   { label: 'Tableau blanc', icon: Sparkles, to: '/app/whiteboard' },
   { label: 'Sondages', icon: BarChart3, to: '/app/polls' },
   { label: 'Paramètres', icon: Settings, to: '/app/settings' },

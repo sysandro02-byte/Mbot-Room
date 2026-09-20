@@ -55,6 +55,8 @@ jobs:
         run: node scripts/test-pglite-fallback.mjs
       - name: PostgreSQL and realtime integration
         run: node scripts/test-integration.mjs
+      - name: Authenticated multi-page application smoke
+        run: node scripts/test-app-smoke.mjs
       - name: Three-browser camera, microphone and reconnect test
         run: node scripts/test-video-meeting.mjs
       - name: Upload video diagnostics on failure
