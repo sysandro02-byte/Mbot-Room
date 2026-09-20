@@ -183,8 +183,8 @@ try {
     ['/app/settings', 'Paramètres'],
     ['/app/profile', 'Mon profil'],
     ['/join', 'Rejoindre'],
-    ['/admin', 'Administration'],
-    ['/aide', 'Aide'],
+    ['/admin', 'Tableau de bord'],
+    ['/aide', 'Centre d’aide MBotéRoom'],
   ];
 
   for (const [route, expectedText] of routes) {
@@ -197,7 +197,7 @@ try {
     assert.ok(body.includes(expectedText), `${route} should render "${expectedText}". Body: ${body.slice(0, 500)}`);
 
     const visibleFunctionalError = await page.locator(
-      '.real-feature-error, .real-dashboard-error, .admin-dashboard-error'
+      '.real-feature-error, .real-dashboard-error, .utility-error, .admin-inline-error, .admin-dashboard-page [role="alert"]'
     ).filter({ visible: true }).allTextContents().catch(() => []);
     assert.deepEqual(visibleFunctionalError, [], `${route} rendered functional errors: ${visibleFunctionalError.join(' | ')}`);
   }
