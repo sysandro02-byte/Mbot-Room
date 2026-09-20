@@ -69,6 +69,7 @@ const authHeaders = (token) => ({ Authorization: `Bearer ${token}` });
 const register = async (name, email) => {
   const result = await jsonRequest('/api/auth/register', {
     method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
     body: JSON.stringify({ name, email, password: 'Password2026!' }),
   });
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
