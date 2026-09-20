@@ -59,6 +59,8 @@ type PeerState = {
   audioSender: RTCRtpSender | null;
   videoSender: RTCRtpSender | null;
   postAnswerOfferSent: boolean;
+  mediaRecoveryTimer: ReturnType<typeof setTimeout> | null;
+  mediaRecoveryAttempts: number;
 };
 
 const DISCONNECT_GRACE_MS = 8_000;
@@ -166,6 +168,7 @@ export function useMeetingMeshWebRTC({
   const removeRemoteParticipant = useCallback((socketId: string) => {
     const state = peersRef.current.get(socketId);
     if (state?.disconnectTimer) clearTimeout(state.disconnectTimer);
+    if (state?.mediaRecoveryTimer) clearTimeout(state.mediaRecoveryTimer);
     peersRef.current.delete(socketId);
     pendingCandidatesRef.current.delete(socketId);
     state?.remoteStream.getTracks().forEach((track) => state.remoteStream.removeTrack(track));
@@ -176,6 +179,7 @@ export function useMeetingMeshWebRTC({
   const closeAllPeers = useCallback(() => {
     peersRef.current.forEach((state) => {
       if (state.disconnectTimer) clearTimeout(state.disconnectTimer);
+      if (state.mediaRecoveryTimer) clearTimeout(state.mediaRecoveryTimer);
       state.remoteStream.getTracks().forEach((track) => state.remoteStream.removeTrack(track));
       state.pc.close();
     });
@@ -247,6 +251,8 @@ export function useMeetingMeshWebRTC({
       audioSender: null,
       videoSender: null,
       postAnswerOfferSent: false,
+      mediaRecoveryTimer: null,
+      mediaRecoveryAttempts: 0,
     };
 
     if (prepareOfferer) ensureOffererSenders(state);
@@ -269,12 +275,44 @@ export function useMeetingMeshWebRTC({
         participant.socketId === targetSocketId ? { ...participant, stream: remoteStream } : participant
       )));
 
+      const clearMediaRecovery = () => {
+        if (state.mediaRecoveryTimer) clearTimeout(state.mediaRecoveryTimer);
+        state.mediaRecoveryTimer = null;
+      };
+      const scheduleMediaRecovery = () => {
+        clearMediaRecovery();
+        if (
+          !event.track.muted
+          || !peerConnectionsEnabledRef.current
+          || state.mediaRecoveryAttempts >= 2
+          || pc.connectionState === 'closed'
+        ) return;
+        state.mediaRecoveryTimer = setTimeout(() => {
+          state.mediaRecoveryTimer = null;
+          if (
+            !event.track.muted
+            || !peerConnectionsEnabledRef.current
+            || state.mediaRecoveryAttempts >= 2
+            || pc.connectionState === 'closed'
+          ) return;
+          state.mediaRecoveryAttempts += 1;
+          void restartIce();
+        }, 1_200);
+      };
+
+      event.track.addEventListener('mute', scheduleMediaRecovery);
+      event.track.addEventListener('unmute', () => {
+        clearMediaRecovery();
+        state.mediaRecoveryAttempts = 0;
+      });
       event.track.addEventListener('ended', () => {
+        clearMediaRecovery();
         remoteStream.removeTrack(event.track);
         setRemoteParticipants((current) => current.map((participant) => (
           participant.socketId === targetSocketId ? { ...participant, stream: remoteStream } : participant
         )));
       }, { once: true });
+      scheduleMediaRecovery();
     };
 
     const clearDisconnectTimer = () => {
