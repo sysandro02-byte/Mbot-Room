@@ -14,7 +14,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@electric-sql/pglite": "0.5.8",
     "@tinbase/pg-mem": "^3.5.0",
     "@vitejs/plugin-react": "^5.0.4",
     "clsx": "^2.1.1",
