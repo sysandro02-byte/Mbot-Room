@@ -58,6 +58,7 @@ type PeerState = {
   disconnectTimer: ReturnType<typeof setTimeout> | null;
   audioSender: RTCRtpSender | null;
   videoSender: RTCRtpSender | null;
+  postAnswerOfferSent: boolean;
 };
 
 const DISCONNECT_GRACE_MS = 8_000;
@@ -245,6 +246,7 @@ export function useMeetingMeshWebRTC({
       disconnectTimer: null,
       audioSender: null,
       videoSender: null,
+      postAnswerOfferSent: false,
     };
 
     if (prepareOfferer) ensureOffererSenders(state);
@@ -436,6 +438,23 @@ export function useMeetingMeshWebRTC({
           await syncLocalTracks(state, false);
           await pc.setLocalDescription(await pc.createAnswer());
           socket.emit('meeting:answer', { meetingId, targetSocketId: fromSocketId, answer: pc.localDescription });
+
+          const hasOutgoingTrack = Boolean(state.audioSender?.track || state.videoSender?.track);
+          if (hasOutgoingTrack && !state.postAnswerOfferSent) {
+            state.postAnswerOfferSent = true;
+            window.setTimeout(() => {
+              const latest = peersRef.current.get(String(fromSocketId));
+              if (
+                !peerConnectionsEnabledRef.current
+                || !latest
+                || latest.pc.connectionState === 'closed'
+                || latest.pc.signalingState !== 'stable'
+              ) return;
+              void createOffer(String(fromSocketId)).catch(() =>
+                onNotice?.('Renégociation du flux sortant impossible avec un participant.')
+              );
+            }, 250);
+          }
         }
       } catch {
         onNotice?.('Négociation audio/vidéo interrompue avec un participant.');
