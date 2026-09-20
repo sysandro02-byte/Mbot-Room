@@ -15,4 +15,15 @@ if (!core.includes('room_meeting_members') || !core.includes('room_messages') ||
   throw new Error('Zoom core persistence tables are incomplete');
 }
 
+const readiness = fs.readFileSync(new URL('../server/readiness.ts', import.meta.url), 'utf8');
+if (!readiness.includes("databaseType === 'postgres'")) {
+  throw new Error('Production readiness must require a persistent PostgreSQL database');
+}
+if (!readiness.includes("'persistent_database'")) {
+  throw new Error('Production readiness must expose the persistent database blocker');
+}
+if (!server.includes('getRuntimeReadiness')) {
+  throw new Error('Production server must log runtime readiness at startup');
+}
+
 console.log('Production configuration smoke checks passed.');
