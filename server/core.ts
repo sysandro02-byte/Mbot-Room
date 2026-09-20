@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import type express from 'express';
 import pg from 'pg';
 import type { QueryResultRow } from 'pg';
-import { PGlite } from '@electric-sql/pglite';
+import { newDb } from '@tinbase/pg-mem';
 
 export type UserRole = 'admin' | 'user' | 'guest';
 
@@ -87,63 +87,34 @@ export const adminPermissions = [
 
 const databaseUrl = String(process.env.DATABASE_URL || '').trim();
 const databaseMode = String(process.env.DATABASE_MODE || '').trim().toLowerCase();
-const embeddedTestMode = !databaseUrl && databaseMode === 'pglite-test';
-const embeddedDataDir = String(process.env.PGLITE_DATA_DIR || '/tmp/mboteroom-pglite-test').trim();
-const embeddedInitialMemoryMb = Math.max(32, Math.min(128, Number(process.env.PGLITE_INITIAL_MEMORY_MB || 64)));
+const embeddedTestMode = !databaseUrl && (databaseMode === 'pgmem-test' || databaseMode === 'pglite-test');
 
 export const pool = databaseUrl
   ? new pg.Pool({ connectionString: databaseUrl, ssl: process.env.PGSSLMODE === 'disable' ? undefined : { rejectUnauthorized: false } })
   : null;
 
 const embeddedDatabase = embeddedTestMode
-  ? new PGlite({
-      dataDir: embeddedDataDir,
-      initialMemory: embeddedInitialMemoryMb * 1024 * 1024,
-      postgresqlconf: [
-        'shared_buffers=8MB',
-        'work_mem=1MB',
-        'maintenance_work_mem=8MB',
-        'temp_buffers=1MB',
-        'max_connections=10',
-        'autovacuum=off',
-        'max_worker_processes=1',
-        'max_parallel_workers=0',
-        'max_parallel_workers_per_gather=0',
-      ],
+  ? newDb({
+      autoCreateForeignKeyIndices: true,
+      noAstCoverageCheck: true,
     })
   : null;
 
-export const getDatabaseType = () => pool ? 'postgres' : embeddedDatabase ? 'pglite-test' : 'none';
-export const hasDatabase = () => Boolean(pool || embeddedDatabase);
+const embeddedPg = embeddedDatabase?.adapters.createPg();
+const embeddedPool = embeddedPg ? new embeddedPg.Pool() : null;
 
-const wrapEmbeddedResult = <T extends QueryResultRow = QueryResultRow>(result: any) => ({
-  ...result,
-  rows: Array.isArray(result?.rows) ? result.rows as T[] : [],
-  rowCount: Number(result?.affectedRows ?? result?.rows?.length ?? 0),
-});
+export const getDatabaseType = () => pool ? 'postgres' : embeddedPool ? 'pgmem-test' : 'none';
+export const hasDatabase = () => Boolean(pool || embeddedPool);
 
 export const query = async <T extends QueryResultRow = QueryResultRow>(text: string, params: unknown[] = []) => {
   if (pool) return pool.query<T>(text, params);
-  if (embeddedDatabase) {
-    if (params.length === 0) {
-      const statements = text.split(';').map((statement) => statement.trim()).filter(Boolean);
-      if (statements.length > 1) {
-        let lastResult: any = { rows: [] };
-        for (const statement of statements) {
-          lastResult = await embeddedDatabase.query(statement);
-        }
-        return wrapEmbeddedResult<T>(lastResult) as any;
-      }
-    }
-    const result = await embeddedDatabase.query<T>(text, params as any[]);
-    return wrapEmbeddedResult<T>(result) as any;
-  }
-  throw new Error('DATABASE_URL is required unless DATABASE_MODE=pglite-test is explicitly enabled');
+  if (embeddedPool) return embeddedPool.query<T>(text, params);
+  throw new Error('DATABASE_URL is required unless DATABASE_MODE=pgmem-test is explicitly enabled');
 };
 
 export const closeDatabase = async () => {
   await pool?.end().catch(() => undefined);
-  await embeddedDatabase?.close().catch(() => undefined);
+  await embeddedPool?.end().catch(() => undefined);
 };
 
 export const normalizeEmail = (value: unknown) => String(value || '').trim().toLowerCase();
