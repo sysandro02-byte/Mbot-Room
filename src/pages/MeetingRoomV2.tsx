@@ -80,20 +80,34 @@ const initials = (value: string) => String(value || 'MB')
 function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, local, audioOutputId, activeSpeaker, pinned, handRaised, reaction, onPin }: VideoTileProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  useEffect(() => {
-    if (!videoRef.current) return;
-    videoRef.current.srcObject = stream;
-    const mediaElement = videoRef.current as HTMLVideoElement & { setSinkId?: (deviceId: string) => Promise<void> };
+  const attachVideo = useCallback((node: HTMLVideoElement | null) => {
+    videoRef.current = node;
+    if (!node) return;
+    node.srcObject = stream;
+    node.muted = Boolean(local);
+    const mediaElement = node as HTMLVideoElement & { setSinkId?: (deviceId: string) => Promise<void> };
     if (!local && audioOutputId && typeof mediaElement.setSinkId === 'function') {
       void mediaElement.setSinkId(audioOutputId).catch(() => undefined);
     }
-    if (stream) void videoRef.current.play().catch(() => undefined);
-  }, [audioOutputId, local, stream, videoEnabled]);
+    const startPlayback = () => {
+      if (videoRef.current !== node || node.srcObject !== stream) return;
+      void node.play().catch(() => undefined);
+    };
+    node.addEventListener('loadedmetadata', startPlayback, { once: true });
+    startPlayback();
+  }, [audioOutputId, local, stream]);
+
+  useEffect(() => {
+    const node = videoRef.current;
+    if (!node) return;
+    if (node.srcObject !== stream) node.srcObject = stream;
+    if (stream) void node.play().catch(() => undefined);
+  }, [stream, videoEnabled]);
 
   return (
     <article className={`room-v2-tile ${screen ? 'is-screen' : ''} ${activeSpeaker ? 'is-speaking' : ''} ${pinned ? 'is-pinned' : ''}`} data-speaking={activeSpeaker ? 'true' : 'false'}>
       {stream && videoEnabled !== false ? (
-        <video ref={videoRef} autoPlay playsInline muted={Boolean(local)} />
+        <video ref={attachVideo} autoPlay playsInline muted={Boolean(local)} />
       ) : (
         <div className="room-v2-avatar" aria-label={`${name}, caméra coupée`}>
           {avatar ? <img src={avatar} alt="" /> : <span>{initials(name)}</span>}
