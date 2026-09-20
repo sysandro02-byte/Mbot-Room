@@ -338,6 +338,21 @@ try {
   assert.equal(hostMeCookieOnly.response.status, 200, JSON.stringify(hostMeCookieOnly.data));
   assert.equal(hostMeCookieOnly.data.user.email, 'host.integration@mbote.test');
 
+  const webLogin = await jsonRequest('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: 'host.integration@mbote.test',
+      password: 'Password2026!',
+      rememberMe: true,
+    }),
+  });
+  assert.equal(webLogin.response.status, 200, JSON.stringify(webLogin.data));
+  assert.equal(webLogin.data.token, undefined);
+  assert.equal(webLogin.data.user.email, 'host.integration@mbote.test');
+  const webLoginCookie = webLogin.response.headers.get('set-cookie') || '';
+  assert.match(webLoginCookie, /mbote_room_session=/);
+  assert.match(webLoginCookie, /HttpOnly/i);
+
   const cookieSocket = await socketConnectWithCookie(host.cookie);
   assert.equal(cookieSocket.connected, true);
   cookieSocket.close();
