@@ -451,19 +451,14 @@ export default function AdminDashboardPage() {
 function AdminSidebar({ userName, open, onClose }: { userName: string; open: boolean; onClose: () => void }) {
   const menuItems = [
     { label: 'Tableau de bord', icon: Home, path: '/admin', active: true },
-    { label: 'Utilisateurs', icon: UsersRound, path: '/admin/utilisateurs' },
-    { label: 'Réunions', icon: CalendarDays, path: '/admin/reunions' },
-    { label: 'Réunions en direct', icon: UsersRound, path: '/admin/reunions/direct', live: true },
-    { label: 'Enregistrements', icon: CirclePlay, path: '/admin/enregistrements' },
-    { label: 'Signalements', icon: ShieldCheck, path: '/admin/signalements', count: 0 },
-    { label: 'Bannissements', icon: Ban, path: '/admin/bannissements' },
-    { label: 'Messages', icon: MessageCircle, path: '/admin/messages' },
-    { label: 'Statistiques', icon: BarChart3, path: '/admin/statistiques' },
-    { label: 'Paramètres système', icon: Settings, path: '/admin/systeme' },
-    { label: 'Journaux d’activité', icon: FileText, path: '/admin/journaux' },
-    { label: 'Intégrations', icon: Plug, path: '/admin/integrations' },
-    { label: 'Sauvegarde & stockage', icon: Database, path: '/admin/sauvegarde' },
-    { label: 'Paramètres', icon: Settings, path: '/admin/parametres' },
+    { label: 'Réunions', icon: CalendarDays, path: '/app/meetings' },
+    { label: 'Enregistrements', icon: CirclePlay, path: '/app/recordings' },
+    { label: 'Messages', icon: MessageCircle, path: '/app/messages' },
+    { label: 'Notifications', icon: Bell, path: '/app/notifications' },
+    { label: 'Calendrier', icon: CalendarDays, path: '/app/calendar' },
+    { label: 'Tableau blanc', icon: BarChart3, path: '/app/whiteboard' },
+    { label: 'Paramètres', icon: Settings, path: '/app/settings' },
+    { label: 'Aide', icon: CircleHelp, path: '/aide' },
   ];
   return (
     <aside className={`admin-sidebar ${open ? 'is-open' : ''}`}>
@@ -534,7 +529,7 @@ function LiveMeetingsCard({
 }) {
   return (
     <section className="admin-live-meetings-card">
-      <header><div><h2>Réunions en direct</h2><span>LIVE</span></div><Link to="/admin/reunions/direct">Voir toutes</Link></header>
+      <header><div><h2>Réunions en direct</h2><span>LIVE</span></div><Link to="/app/meetings">Voir toutes</Link></header>
       <div className="admin-live-table">
         <div className="admin-live-table-head"><span>Titre de la réunion</span><span>Hôte</span><span>Participants</span><span>Début</span><span>Actions</span></div>
         <div>
@@ -571,7 +566,7 @@ function LiveMeetingsCard({
 function RecentActivityCard({ activities }: { activities: AdminActivity[] }) {
   return (
     <section className="admin-activity-card">
-      <header><h2>Activité récente</h2><Link to="/admin/journaux">Voir tout</Link></header>
+      <header><h2>Activité récente</h2><span>Dernières actions serveur</span></header>
       {activities.length ? activities.map((activity) => (
         <article className={`admin-activity-row is-${activityTones[activity.type]}`} key={activity.id}>
           <span>{activityIcons[activity.type]}</span>
@@ -716,7 +711,7 @@ function UserDistributionCard({ distribution }: { distribution: { active: number
 function CountriesCard({ countries }: { countries: Array<{ id: string; name: string; flag: string; count: number; percentage: number }> }) {
   return (
     <section className="admin-countries-card">
-      <header><h2>Utilisateurs par pays</h2><Link to="/admin/statistiques">Voir tout</Link></header>
+      <header><h2>Utilisateurs par pays</h2><span>Données disponibles</span></header>
       {countries.length ? countries.map((country) => (
         <article key={country.id}><span>{country.flag}</span><strong>{country.name}</strong><em>{formatNumber(country.count)} ({country.percentage}%)</em></article>
       )) : <p className="admin-empty">Aucune statistique de pays disponible.</p>}
