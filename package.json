@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "vite:internal": "vite",
-    "start": "node --max-old-space-size=64 dist/server.js",
+    "start": "node dist/server.js",
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && vite build --configLoader bundle && esbuild server-v2.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.js",
     "lint": "node node_modules/typescript/bin/tsc --noEmit",
     "test": "npm run lint && node scripts/test-production-config.mjs",
@@ -14,6 +14,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tinbase/pg-mem": "^3.5.0",
     "@vitejs/plugin-react": "^5.0.4",
     "clsx": "^2.1.1",
     "cors": "^2.8.6",
@@ -32,8 +33,7 @@
     "tailwind-merge": "^3.5.0",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0",
-    "@electric-sql/pglite": "0.5.8"
+    "vite": "^6.2.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

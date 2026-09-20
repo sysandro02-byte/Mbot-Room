@@ -1,15 +1,8 @@
 import assert from 'node:assert/strict';
-import { rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 
 const port = Number(process.env.MBOTE_ROOM_PGLITE_TEST_PORT || 4327);
 const baseUrl = `http://127.0.0.1:${port}`;
-const dataDir = join(tmpdir(), 'mboteroom-pglite-ci');
-
-await rm(dataDir, { recursive: true, force: true });
-
 const server = spawn(process.execPath, ['--max-old-space-size=64', 'dist/server.js'], {
   cwd: process.cwd(),
   env: {
@@ -17,9 +10,7 @@ const server = spawn(process.execPath, ['--max-old-space-size=64', 'dist/server.
     PORT: String(port),
     NODE_ENV: 'test',
     DATABASE_URL: '',
-    DATABASE_MODE: 'pglite-test',
-    PGLITE_DATA_DIR: dataDir,
-    PGLITE_INITIAL_MEMORY_MB: '128',
+    DATABASE_MODE: 'pgmem-test',
     MBOTE_ROOM_ALLOWED_ORIGINS: baseUrl,
     MBOTE_ROOM_APP_URL: baseUrl,
     ADMIN_EMAILS: '',
@@ -57,30 +48,30 @@ const requestJson = async (path, options = {}) => {
 const waitForHealth = async () => {
   const deadline = Date.now() + 40_000;
   while (Date.now() < deadline) {
-    if (exitState) throw new Error(`PGlite server exited early: ${JSON.stringify(exitState)}\n${output}`);
+    if (exitState) throw new Error(`pg-mem server exited early: ${JSON.stringify(exitState)}\n${output}`);
     try {
       const result = await requestJson('/api/health');
       if (result.response.ok) return result;
     } catch {
-      // PGlite initdb and migrations are still starting.
+      // pg-mem initdb and migrations are still starting.
     }
     await sleep(200);
   }
-  throw new Error(`PGlite server did not become healthy.\n${output}`);
+  throw new Error(`pg-mem server did not become healthy.\n${output}`);
 };
 
 try {
   const health = await waitForHealth();
   assert.equal(health.data.ok, true);
   assert.equal(health.data.database?.connected, true);
-  assert.equal(health.data.database?.type, 'pglite-test');
+  assert.equal(health.data.database?.type, 'pgmem-test');
   assert.equal(Number(health.data.database?.users || 0), 0);
   assert.equal(Number(health.data.database?.meetings || 0), 0);
 
   const register = await requestJson('/api/auth/register', {
     method: 'POST',
     body: JSON.stringify({
-      name: 'Test PGlite',
+      name: 'Test pg-mem',
       email: 'pglite.test@mbote.test',
       password: 'Password2026!',
     }),
@@ -101,7 +92,7 @@ try {
     headers: { Cookie: cookie },
     body: JSON.stringify({
       title: 'Réunion test Render',
-      description: 'Validation du mode PGlite explicitement réservé au test.',
+      description: 'Validation du mode pg-mem explicitement réservé au test.',
       startTime: new Date(Date.now() + 60_000).toISOString(),
       duration: 30,
       settings: {
@@ -120,7 +111,7 @@ try {
   assert.equal(after.response.status, 200, JSON.stringify(after.data));
   assert.equal(Number(after.data.database?.users), 1);
   assert.equal(Number(after.data.database?.meetings), 1);
-  assert.equal(after.data.database?.type, 'pglite-test');
+  assert.equal(after.data.database?.type, 'pgmem-test');
 
   const logout = await requestJson('/api/auth/logout', {
     method: 'POST',
@@ -131,12 +122,11 @@ try {
   const expired = await requestJson('/api/auth/me', { headers: { Cookie: cookie } });
   assert.equal(expired.response.status, 401);
 
-  console.log('PGlite Render test database fallback checks passed.');
+  console.log('pg-mem Render test database fallback checks passed.');
 } finally {
   if (!server.killed) server.kill('SIGTERM');
   await Promise.race([
     new Promise((resolve) => server.once('exit', resolve)),
     sleep(5_000),
   ]);
-  await rm(dataDir, { recursive: true, force: true }).catch(() => undefined);
 }
