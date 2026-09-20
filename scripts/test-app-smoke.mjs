@@ -178,6 +178,7 @@ try {
     ['/app/recordings', 'Enregistrements'],
     ['/app/messages', 'Messages'],
     ['/app/contacts', 'Contacts'],
+    ['/app/notifications', 'Centre de notifications'],
     ['/app/whiteboard', 'Tableau blanc'],
     ['/app/polls', 'Sondages'],
     ['/app/settings', 'Paramètres'],
