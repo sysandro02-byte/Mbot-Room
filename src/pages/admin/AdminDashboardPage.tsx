@@ -37,6 +37,7 @@ import {
   adminDashboardService,
 } from '../../services/adminDashboardService';
 import { DashboardTip, getMeetingAccessCode, Meeting } from '../../services/meetingService';
+import { collaborationService } from '../../services/collaborationService';
 import './AdminDashboardPage.css';
 
 type ActivityTone = 'green' | 'blue' | 'orange' | 'red' | 'violet';
@@ -239,6 +240,27 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const copyMeetingId = async (meeting: Meeting) => {
+    const id = getMeetingAccessCode(meeting);
+    try {
+      await navigator.clipboard.writeText(id);
+      setToast(`ID ${id} copié.`);
+    } catch {
+      setToast(`ID de réunion : ${id}`);
+    }
+  };
+
+  const endLiveMeeting = async (meeting: Meeting) => {
+    try {
+      await collaborationService.endMeeting(meeting.id);
+      setActiveMeetingMenu(null);
+      setToast('Réunion terminée.');
+      await loadDashboard();
+    } catch (endError) {
+      setToast(endError instanceof Error ? endError.message : 'Impossible de terminer la réunion.');
+    }
+  };
+
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!debouncedSearch) return;
@@ -393,7 +415,8 @@ export default function AdminDashboardPage() {
               activeMenu={activeMeetingMenu}
               onToggleMenu={(meetingId) => setActiveMeetingMenu((current) => (current === meetingId ? null : meetingId))}
               onJoin={(meeting) => void joinAsAdmin(meeting)}
-              onToast={setToast}
+              onCopyId={(meeting) => void copyMeetingId(meeting)}
+              onEnd={(meeting) => void endLiveMeeting(meeting)}
             />
             <RecentActivityCard activities={dashboard?.recentActivity || []} />
             <GuestAccessSlidesCard slides={guestSlides} draft={guestDraft} editingId={editingGuestSlideId} onDraftChange={setGuestDraft} onEdit={(slide) => { setEditingGuestSlideId(slide.id); setGuestDraft({ title: slide.title, body: slide.body, imageUrl: slide.imageUrl, isActive: slide.isActive }); }} onCancel={() => { setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); }} onSubmit={async (event) => { event.preventDefault(); try { await adminDashboardService.saveGuestAccessSlide(guestDraft, editingGuestSlideId || undefined); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); setToast('Slide enregistre.'); } catch (saveError) { setToast(saveError instanceof Error ? saveError.message : 'Enregistrement impossible.'); } }} onDelete={async (id) => { try { await adminDashboardService.deleteGuestAccessSlide(id); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setToast('Slide supprime.'); } catch (deleteError) { setToast(deleteError instanceof Error ? deleteError.message : 'Suppression impossible.'); } }} />
@@ -499,13 +522,15 @@ function LiveMeetingsCard({
   activeMenu,
   onToggleMenu,
   onJoin,
-  onToast,
+  onCopyId,
+  onEnd,
 }: {
   meetings: Meeting[];
   activeMenu: number | null;
   onToggleMenu: (meetingId: number) => void;
   onJoin: (meeting: Meeting) => void;
-  onToast: (message: string) => void;
+  onCopyId: (meeting: Meeting) => void;
+  onEnd: (meeting: Meeting) => void;
 }) {
   return (
     <section className="admin-live-meetings-card">
@@ -528,9 +553,9 @@ function LiveMeetingsCard({
                   <button type="button" aria-label={`Actions pour ${meeting.title}`} aria-expanded={activeMenu === meeting.id} onClick={() => onToggleMenu(meeting.id)}><MoreVertical size={19} /></button>
                   {activeMenu === meeting.id && (
                     <div>
-                      <button type="button" onClick={() => onToast(`ID ${getMeetingAccessCode(meeting)} copié visuellement.`)}>Voir les détails</button>
-                      <button type="button" onClick={() => onToast('Modération à connecter au backend.')}>Ouvrir la modération</button>
-                      <button type="button" onClick={() => onToast('Action destructive non exécutée sans endpoint dédié.')}>Terminer la réunion</button>
+                      <button type="button" onClick={() => onCopyId(meeting)}>Copier l’ID</button>
+                      <button type="button" onClick={() => onJoin(meeting)}>Ouvrir la modération</button>
+                      <button type="button" onClick={() => onEnd(meeting)}>Terminer la réunion</button>
                     </div>
                   )}
                 </div>
