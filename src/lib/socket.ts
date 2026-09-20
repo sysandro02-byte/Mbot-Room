@@ -5,7 +5,6 @@ export const socket = io(getSocketUrl(), {
   autoConnect: false,
   withCredentials: true,
   transports: ['websocket', 'polling'],
-  withCredentials: true,
 }) as Socket & {
   on: (event: string, listener: (...args: any[]) => void) => typeof socket;
   off: (event: string, listener?: (...args: any[]) => void) => typeof socket;
