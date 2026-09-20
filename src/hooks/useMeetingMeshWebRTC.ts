@@ -61,6 +61,9 @@ type PeerState = {
   postAnswerOfferSent: boolean;
   mediaRecoveryTimer: ReturnType<typeof setTimeout> | null;
   mediaRecoveryAttempts: number;
+  lastInboundVideoBytes: number;
+  stalledVideoSamples: number;
+  stalledVideoRecoveryAttempts: number;
 };
 
 const DISCONNECT_GRACE_MS = 8_000;
@@ -253,6 +256,9 @@ export function useMeetingMeshWebRTC({
       postAnswerOfferSent: false,
       mediaRecoveryTimer: null,
       mediaRecoveryAttempts: 0,
+      lastInboundVideoBytes: -1,
+      stalledVideoSamples: 0,
+      stalledVideoRecoveryAttempts: 0,
     };
 
     if (prepareOfferer) ensureOffererSenders(state);
@@ -637,8 +643,12 @@ export function useMeetingMeshWebRTC({
       let loudestSocketId: string | null = null;
       let loudestAudioLevel = 0;
 
-      await Promise.all(peers.map(async ([socketId, { pc }]) => {
+      const recoveryTargets: string[] = [];
+      await Promise.all(peers.map(async ([socketId, state]) => {
+        const { pc } = state;
         if (pc.connectionState === 'connected') connectedPeers += 1;
+        let inboundVideoBytes = 0;
+        let sawInboundVideoStats = false;
         try {
           const reports = await pc.getStats();
           reports.forEach((report) => {
@@ -661,6 +671,12 @@ export function useMeetingMeshWebRTC({
                 loudestAudioLevel = audioLevel;
                 loudestSocketId = socketId;
               }
+              if (mediaKind === 'video') {
+                sawInboundVideoStats = true;
+                inboundVideoBytes += typeof stat.bytesReceived === 'number'
+                  ? Math.max(0, stat.bytesReceived)
+                  : received;
+              }
             }
             if (stat.type === 'track' && String(stat.kind || '') === 'audio') {
               const audioLevel = typeof stat.audioLevel === 'number' ? stat.audioLevel : 0;
@@ -673,9 +689,40 @@ export function useMeetingMeshWebRTC({
         } catch {
           // A peer can disappear while stats are being sampled.
         }
+
+        const expectsVideo = state.remoteStream.getVideoTracks().some(
+          (track) => track.readyState === 'live' && !track.muted,
+        );
+        if (pc.connectionState === 'connected' && expectsVideo && sawInboundVideoStats) {
+          if (state.lastInboundVideoBytes < 0 || inboundVideoBytes > state.lastInboundVideoBytes) {
+            state.stalledVideoSamples = 0;
+            state.stalledVideoRecoveryAttempts = 0;
+          } else {
+            state.stalledVideoSamples += 1;
+            if (
+              state.stalledVideoSamples >= 2
+              && state.stalledVideoRecoveryAttempts < 2
+              && pc.signalingState === 'stable'
+              && !state.makingOffer
+            ) {
+              state.stalledVideoSamples = 0;
+              state.stalledVideoRecoveryAttempts += 1;
+              recoveryTargets.push(socketId);
+            }
+          }
+          state.lastInboundVideoBytes = inboundVideoBytes;
+        } else {
+          state.lastInboundVideoBytes = inboundVideoBytes;
+          state.stalledVideoSamples = 0;
+        }
       }));
 
       if (cancelled) return;
+      for (const targetSocketId of recoveryTargets) {
+        void createOffer(targetSocketId, true).catch(() =>
+          onNotice?.('Récupération automatique d’un flux vidéo distant impossible.')
+        );
+      }
       const total = totalLost + totalReceived;
       const packetLossPct = total > 0 ? (totalLost / total) * 100 : 0;
       const rttMs = maxRttSeconds > 0 ? Math.round(maxRttSeconds * 1000) : null;
@@ -701,7 +748,7 @@ export function useMeetingMeshWebRTC({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [enabled, peerConnectionsEnabled]);
+  }, [createOffer, enabled, onNotice, peerConnectionsEnabled]);
 
   return { remoteParticipants, networkQuality, activeSpeakerSocketId };
 }
