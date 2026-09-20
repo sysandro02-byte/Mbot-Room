@@ -446,7 +446,14 @@ export default function AdminDashboardPage() {
 }
 
 function AdminSidebar({ userName, open, onClose }: { userName: string; open: boolean; onClose: () => void }) {
-  const menuItems = [
+  const menuItems: Array<{
+    label: string;
+    icon: typeof Home;
+    path: string;
+    active?: boolean;
+    live?: boolean;
+    count?: number;
+  }> = [
     { label: 'Tableau de bord', icon: Home, path: '/admin', active: true },
     { label: 'Réunions', icon: CalendarDays, path: '/app/meetings' },
     { label: 'Enregistrements', icon: CirclePlay, path: '/app/recordings' },
