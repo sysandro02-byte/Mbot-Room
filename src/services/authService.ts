@@ -17,7 +17,7 @@ export type RoomUser = {
 
 type AuthResponse = {
   user: RoomUser;
-  token: string;
+  token?: string;
   expiresAt?: string;
 };
 
