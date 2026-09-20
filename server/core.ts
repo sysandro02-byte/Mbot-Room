@@ -108,7 +108,10 @@ export const hasDatabase = () => Boolean(pool || embeddedPool);
 
 export const query = async <T extends QueryResultRow = QueryResultRow>(text: string, params: unknown[] = []) => {
   if (pool) return pool.query<T>(text, params);
-  if (embeddedPool) return embeddedPool.query<T>(text, params);
+  if (embeddedPool) {
+    const result = await embeddedPool.query(text, params);
+    return result as unknown as { rows: T[]; rowCount: number };
+  }
   throw new Error('DATABASE_URL is required unless DATABASE_MODE=pgmem-test is explicitly enabled');
 };
 
