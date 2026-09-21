@@ -36,4 +36,25 @@ if (!server.includes('process.exitCode = 1')) {
   throw new Error('Production startup failures must be handled without an unhandled PostgreSQL stack dump');
 }
 
+const authService = fs.readFileSync(new URL('../src/services/authService.ts', import.meta.url), 'utf8');
+if (!authService.includes("'X-MBote-Room-Session-Mode': 'bearer'")) {
+  throw new Error('Login/register must explicitly request a Bearer session for cross-origin hosting');
+}
+if (!authService.includes('storage.setItem(TOKEN_KEY, token)')) {
+  throw new Error('Authentication must persist the Bearer token returned by the backend');
+}
+
+const apiClient = fs.readFileSync(new URL('../src/lib/api.ts', import.meta.url), 'utf8');
+if (!apiClient.includes('https://mbote-room-api.onrender.com')) {
+  throw new Error('Hosted frontend must have a production Render API fallback');
+}
+if (!apiClient.includes("parsed.hostname.endsWith('.invalid')")) {
+  throw new Error('Invalid placeholder API hosts must be rejected in production');
+}
+
+const renderBlueprint = fs.readFileSync(new URL('../render.yaml', import.meta.url), 'utf8');
+if (!renderBlueprint.includes('https://mbote-room.vercel.app')) {
+  throw new Error('Render CORS configuration must allow the MBotéRoom Vercel frontend');
+}
+
 console.log('Production configuration smoke checks passed.');
