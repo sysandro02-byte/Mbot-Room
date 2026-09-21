@@ -82,6 +82,14 @@ if (!liveSmoke.includes('GITHUB_RUN_ATTEMPT') || !liveSmoke.includes('Date.now()
   throw new Error('Live production smoke must generate a unique identity for every rerun attempt');
 }
 
+const packageJson = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+if (!String(packageJson.scripts?.start || '').includes('wait-for-ci-gate.mjs')) {
+  throw new Error('Production start must wait for the CI release gate');
+}
+const releaseGate = fs.readFileSync(new URL('../scripts/wait-for-ci-gate.mjs', import.meta.url), 'utf8');
+if (!releaseGate.includes('RENDER_GIT_COMMIT') || !releaseGate.includes('MBoteRoom CI') || !releaseGate.includes("run.conclusion === 'success'")) {
+  throw new Error('Render release gate must verify the exact deployed commit has a successful MBoteRoom CI run');
+}
 const renderBlueprint = fs.readFileSync(new URL('../render.yaml', import.meta.url), 'utf8');
 if (!renderBlueprint.includes('qwen/qwen3.8-27b,openai/gpt-oss-120b,openai/gpt-oss-20b')) {
   throw new Error('Render must configure a resilient Groq model order for Luna');
@@ -98,6 +106,9 @@ if (!originPolicy.includes('configuredOriginPatterns') || !originPolicy.includes
 }
 if (!renderBlueprint.includes('autoDeployTrigger: checksPass')) {
   throw new Error('Render production deploys must wait for CI checks to pass');
+}
+if (!renderBlueprint.includes('MBOTE_ROOM_REQUIRE_CI_GATE') || !renderBlueprint.includes('MBOTE_ROOM_REQUIRED_WORKFLOW')) {
+  throw new Error('Render blueprint must enable the runtime CI release gate');
 }
 
 const appRoutes = fs.readFileSync(new URL('../server/appRoutes.ts', import.meta.url), 'utf8');
