@@ -1,4 +1,4 @@
-import { apiUrl, getAuthHeaders } from '../lib/api';
+import { apiFetch, apiUrl, getAuthHeaders } from '../lib/api';
 
 const readJson = async <T>(response: Response): Promise<T> => {
   const data = await response.json().catch(() => ({}));
@@ -39,72 +39,72 @@ export type BreakoutRoom = {
 
 export const collaborationService = {
   async getMessages(meetingId:number) {
-    return readJson<MeetingMessage[]>(await fetch(apiUrl(`/api/meetings/${meetingId}/messages?limit=150`), { headers:getAuthHeaders() }));
+    return readJson<MeetingMessage[]>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/messages?limit=150`), { headers:getAuthHeaders() }));
   },
   async sendMessage(meetingId:number,text:string) {
-    return readJson<MeetingMessage>(await fetch(apiUrl(`/api/meetings/${meetingId}/messages`), { method:'POST',headers:getAuthHeaders(),body:JSON.stringify({text}) }));
+    return readJson<MeetingMessage>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/messages`), { method:'POST',headers:getAuthHeaders(),body:JSON.stringify({text}) }));
   },
   async deleteMessage(meetingId:number,messageId:string) {
-    const response=await fetch(apiUrl(`/api/meetings/${meetingId}/messages/${encodeURIComponent(messageId)}`),{method:'DELETE',headers:getAuthHeaders()});
+    const response=await apiFetch(apiUrl(`/api/meetings/${meetingId}/messages/${encodeURIComponent(messageId)}`),{method:'DELETE',headers:getAuthHeaders()});
     if(!response.ok) throw new Error((await response.json().catch(()=>({}))).error||'Suppression impossible.');
   },
   async getParticipants(meetingId:number) {
-    return readJson<MeetingParticipant[]>(await fetch(apiUrl(`/api/meetings/${meetingId}/participants`),{headers:getAuthHeaders()}));
+    return readJson<MeetingParticipant[]>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/participants`),{headers:getAuthHeaders()}));
   },
   async muteAllParticipants(meetingId:number) {
-    return readJson<{success:boolean;muted:number;userIds:number[]}>(await fetch(apiUrl(`/api/meetings/${meetingId}/participants/mute-all`),{method:'POST',headers:getAuthHeaders()}));
+    return readJson<{success:boolean;muted:number;userIds:number[]}>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/participants/mute-all`),{method:'POST',headers:getAuthHeaders()}));
   },
   async updateParticipant(meetingId:number,userId:number,patch:{role?:'cohost'|'participant';mutedByHost?:boolean;cameraDisabledByHost?:boolean}) {
-    return readJson<any>(await fetch(apiUrl(`/api/meetings/${meetingId}/participants/${userId}`),{method:'PATCH',headers:getAuthHeaders(),body:JSON.stringify(patch)}));
+    return readJson<any>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/participants/${userId}`),{method:'PATCH',headers:getAuthHeaders(),body:JSON.stringify(patch)}));
   },
   async removeParticipant(meetingId:number,userId:number) {
-    const response=await fetch(apiUrl(`/api/meetings/${meetingId}/participants/${userId}`),{method:'DELETE',headers:getAuthHeaders()});
+    const response=await apiFetch(apiUrl(`/api/meetings/${meetingId}/participants/${userId}`),{method:'DELETE',headers:getAuthHeaders()});
     if(!response.ok) throw new Error((await response.json().catch(()=>({}))).error||'Retrait impossible.');
   },
   async banParticipant(meetingId:number,userId:number,reason='') {
-    return readJson<{success:boolean}>(await fetch(apiUrl(`/api/meetings/${meetingId}/participants/${userId}/ban`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({reason})}));
+    return readJson<{success:boolean}>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/participants/${userId}/ban`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({reason})}));
   },
   async moveToLobby(meetingId:number,userId:number) {
-    return readJson<{success:boolean}>(await fetch(apiUrl(`/api/meetings/${meetingId}/participants/${userId}/move-to-lobby`),{method:'POST',headers:getAuthHeaders()}));
+    return readJson<{success:boolean}>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/participants/${userId}/move-to-lobby`),{method:'POST',headers:getAuthHeaders()}));
   },
   async getBreakoutRooms(meetingId:number) {
-    return readJson<BreakoutRoom[]>(await fetch(apiUrl(`/api/meetings/${meetingId}/breakouts`),{headers:getAuthHeaders()}));
+    return readJson<BreakoutRoom[]>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/breakouts`),{headers:getAuthHeaders()}));
   },
   async createBreakoutRooms(meetingId:number,names:string[]) {
-    return readJson<BreakoutRoom[]>(await fetch(apiUrl(`/api/meetings/${meetingId}/breakouts`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({names})}));
+    return readJson<BreakoutRoom[]>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/breakouts`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({names})}));
   },
   async assignBreakoutParticipant(meetingId:number,breakoutId:string,userId:number) {
-    return readJson<{success:boolean}>(await fetch(apiUrl(`/api/meetings/${meetingId}/breakouts/${encodeURIComponent(breakoutId)}/assign`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({userId})}));
+    return readJson<{success:boolean}>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/breakouts/${encodeURIComponent(breakoutId)}/assign`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({userId})}));
   },
   async openBreakoutRooms(meetingId:number) {
-    return readJson<{success:boolean;assignments:number}>(await fetch(apiUrl(`/api/meetings/${meetingId}/breakouts/open`),{method:'POST',headers:getAuthHeaders()}));
+    return readJson<{success:boolean;assignments:number}>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/breakouts/open`),{method:'POST',headers:getAuthHeaders()}));
   },
   async closeBreakoutRooms(meetingId:number) {
-    return readJson<{success:boolean}>(await fetch(apiUrl(`/api/meetings/${meetingId}/breakouts/close`),{method:'POST',headers:getAuthHeaders()}));
+    return readJson<{success:boolean}>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/breakouts/close`),{method:'POST',headers:getAuthHeaders()}));
   },
   async getPolls(meetingId:number) {
-    return readJson<MeetingPoll[]>(await fetch(apiUrl(`/api/meetings/${meetingId}/polls`),{headers:getAuthHeaders()}));
+    return readJson<MeetingPoll[]>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/polls`),{headers:getAuthHeaders()}));
   },
   async createPoll(meetingId:number,question:string,options:string[]) {
-    return readJson<MeetingPoll>(await fetch(apiUrl(`/api/meetings/${meetingId}/polls`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({question,options})}));
+    return readJson<MeetingPoll>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/polls`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({question,options})}));
   },
   async vote(meetingId:number,pollId:string,optionId:string) {
-    return readJson<MeetingPoll>(await fetch(apiUrl(`/api/meetings/${meetingId}/polls/${pollId}/vote`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({optionId})}));
+    return readJson<MeetingPoll>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/polls/${pollId}/vote`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({optionId})}));
   },
   async closePoll(meetingId:number,pollId:string) {
-    return readJson<MeetingPoll>(await fetch(apiUrl(`/api/meetings/${meetingId}/polls/${pollId}/close`),{method:'POST',headers:getAuthHeaders()}));
+    return readJson<MeetingPoll>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/polls/${pollId}/close`),{method:'POST',headers:getAuthHeaders()}));
   },
   async endMeeting(meetingId:number) {
-    return readJson<{success:boolean}>(await fetch(apiUrl(`/api/meetings/${meetingId}/end`),{method:'POST',headers:getAuthHeaders()}));
+    return readJson<{success:boolean}>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/end`),{method:'POST',headers:getAuthHeaders()}));
   },
   async generateSummary(meetingId:number) {
-    return readJson<{bullets:string[];decisions:string[];actions:string[];nextMeeting:string}>(await fetch(apiUrl(`/api/meetings/${meetingId}/summary/generate`),{method:'POST',headers:getAuthHeaders()}));
+    return readJson<{bullets:string[];decisions:string[];actions:string[];nextMeeting:string}>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/summary/generate`),{method:'POST',headers:getAuthHeaders()}));
   },
   async getRecordings(meetingId:number) {
-    return readJson<RecordingMetadata[]>(await fetch(apiUrl(`/api/meetings/${meetingId}/recordings`),{headers:getAuthHeaders()}));
+    return readJson<RecordingMetadata[]>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/recordings`),{headers:getAuthHeaders()}));
   },
   async startServerRecording(meetingId:number, options?:{breakoutRoomId?:string|null;layout?:'grid'|'speaker'|'single-speaker'}) {
-    return readJson<RecordingMetadata>(await fetch(apiUrl(`/api/meetings/${meetingId}/recordings/start`),{
+    return readJson<RecordingMetadata>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/recordings/start`),{
       method:'POST',
       headers:getAuthHeaders(),
       body:JSON.stringify({
@@ -114,13 +114,13 @@ export const collaborationService = {
     }));
   },
   async getServerRecordingStatus(meetingId:number, recordingId:string) {
-    return readJson<RecordingMetadata>(await fetch(apiUrl(`/api/meetings/${meetingId}/recordings/${encodeURIComponent(recordingId)}/status`),{
+    return readJson<RecordingMetadata>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/recordings/${encodeURIComponent(recordingId)}/status`),{
       headers:getAuthHeaders(),
       cache:'no-store',
     }));
   },
   async stopServerRecording(meetingId:number, recordingId:string) {
-    return readJson<RecordingMetadata>(await fetch(apiUrl(`/api/meetings/${meetingId}/recordings/${encodeURIComponent(recordingId)}/stop`),{
+    return readJson<RecordingMetadata>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/recordings/${encodeURIComponent(recordingId)}/stop`),{
       method:'POST',
       headers:getAuthHeaders(),
     }));

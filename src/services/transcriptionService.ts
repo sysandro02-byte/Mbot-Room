@@ -1,4 +1,4 @@
-import { apiUrl, getAuthHeaders } from '../lib/api';
+import { apiFetch, apiUrl, getAuthHeaders } from '../lib/api';
 
 export type MeetingCaption = {
   id: string;
@@ -28,7 +28,7 @@ const readJson = async <T>(response: Response): Promise<T> => {
 
 export const transcriptionService = {
   async getStatus(): Promise<TranscriptionStatus> {
-    const response = await fetch(apiUrl('/api/transcription/status'), {
+    const response = await apiFetch(apiUrl('/api/transcription/status'), {
       headers: getAuthHeaders(),
       cache: 'no-store',
     });
@@ -36,7 +36,7 @@ export const transcriptionService = {
   },
 
   async getCaptions(meetingId: number): Promise<MeetingCaption[]> {
-    const response = await fetch(apiUrl('/api/meetings/' + meetingId + '/captions'), {
+    const response = await apiFetch(apiUrl('/api/meetings/' + meetingId + '/captions'), {
       headers: getAuthHeaders(),
       cache: 'no-store',
     });
@@ -52,7 +52,7 @@ export const transcriptionService = {
     if (options?.language) query.set('language', options.language);
     if (options?.breakoutRoomId) query.set('breakoutRoomId', options.breakoutRoomId);
     const suffix = query.size ? '?' + query.toString() : '';
-    const response = await fetch(apiUrl('/api/meetings/' + meetingId + '/transcription/chunk' + suffix), {
+    const response = await apiFetch(apiUrl('/api/meetings/' + meetingId + '/transcription/chunk' + suffix), {
       method: 'POST',
       headers: {
         ...getAuthHeaders(),
@@ -69,7 +69,7 @@ export const transcriptionService = {
     text: string,
     options?: { language?: string; breakoutRoomId?: string | null },
   ): Promise<MeetingCaption> {
-    const response = await fetch(apiUrl('/api/meetings/' + meetingId + '/captions/text'), {
+    const response = await apiFetch(apiUrl('/api/meetings/' + meetingId + '/captions/text'), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({

@@ -11,7 +11,8 @@
     "lint": "node node_modules/typescript/bin/tsc --noEmit",
     "test": "npm run lint && node scripts/test-production-config.mjs",
     "test:integration": "node scripts/test-integration.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "health:production": "node scripts/check-production-health.mjs"
   },
   "dependencies": {
     "@tinbase/pg-mem": "^3.5.0",

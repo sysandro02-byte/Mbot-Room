@@ -7,6 +7,7 @@ import {
   createToken,
   hashPassword,
   hashToken,
+  verifyPasswordHash,
   mapMeeting,
   normalizeEmail,
   normalizeText,
@@ -172,8 +173,9 @@ export const registerAuthRoutes = (app: express.Express) => {
       const user = result.rows[0];
       if (!user) return sendApiError(response, 401, 'INVALID_CREDENTIALS', 'Email ou mot de passe incorrect.');
       const password = String(request.body?.password || '');
-      const passwordData = hashPassword(password, user.password_salt);
-      if (passwordData.hash !== user.password_hash) return sendApiError(response, 401, 'INVALID_CREDENTIALS', 'Email ou mot de passe incorrect.');
+      if (!verifyPasswordHash(password, String(user.password_salt || ''), String(user.password_hash || ''))) {
+        return sendApiError(response, 401, 'INVALID_CREDENTIALS', 'Email ou mot de passe incorrect.');
+      }
       const session = await createSession(Number(user.id), Boolean(request.body?.rememberMe));
       respondWithSession(request, response, session);
     } catch (error) { next(error); }

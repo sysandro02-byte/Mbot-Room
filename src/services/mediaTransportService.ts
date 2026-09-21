@@ -1,4 +1,4 @@
-import { apiUrl, getAuthHeaders } from '../lib/api';
+import { apiFetch, apiUrl, getAuthHeaders } from '../lib/api';
 
 export type MediaTransportStatus = {
   configuredMode: 'auto' | 'mesh' | 'livekit';
@@ -30,7 +30,7 @@ const readJson = async <T>(response: Response): Promise<T> => {
 
 export const mediaTransportService = {
   async getStatus(): Promise<MediaTransportStatus> {
-    const response = await fetch(apiUrl('/api/media/status'), {
+    const response = await apiFetch(apiUrl('/api/media/status'), {
       headers: getAuthHeaders(),
       cache: 'no-store',
     });
@@ -39,7 +39,7 @@ export const mediaTransportService = {
 
   async getMeetingSession(meetingId: number, breakoutRoomId?: string | null): Promise<MediaSession> {
     const query = breakoutRoomId ? `?breakoutRoomId=${encodeURIComponent(breakoutRoomId)}` : '';
-    const response = await fetch(apiUrl(`/api/meetings/${meetingId}/media-session${query}`), {
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/media-session${query}`), {
       headers: getAuthHeaders(),
       cache: 'no-store',
     });

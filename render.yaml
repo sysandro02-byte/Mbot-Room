@@ -3,6 +3,7 @@ services:
     name: mbote-room-api
     runtime: node
     plan: free
+    autoDeployTrigger: checksPass
     buildCommand: npm ci && npm run build
     startCommand: npm run start
     healthCheckPath: /api/health
@@ -20,7 +21,7 @@ services:
       - key: ADMIN_EMAILS
         sync: false
       - key: MBOTE_ROOM_APP_URL
-        value: https://mbote-room-api.onrender.com
+        value: https://mbote-room.vercel.app
       - key: MBOTE_ROOM_ALLOWED_ORIGINS
         value: https://mbote-room-api.onrender.com,https://mbote-room.vercel.app
       - key: MBOTE_ROOM_SESSION_COOKIE

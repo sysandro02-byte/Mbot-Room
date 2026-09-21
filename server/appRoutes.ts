@@ -39,7 +39,12 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
         database:{configured:true,connected:true,type:databaseType,users:Number(result.rows[0].users),meetings:Number(result.rows[0].meetings)},
         media:{
           topology:'mesh',
-          turnConfigured:Boolean(String(process.env.TURN_URLS||'').trim() && String(process.env.TURN_SHARED_SECRET||'').trim()),
+          turnConfigured:Boolean(
+            (String(process.env.TURN_URLS||'').trim() && String(process.env.TURN_SHARED_SECRET||'').trim())
+            || (String(process.env.MBOTEROOM_TURN_URL||'').trim()
+              && String(process.env.MBOTEROOM_TURN_USERNAME||'').trim()
+              && String(process.env.MBOTEROOM_TURN_CREDENTIAL||'').trim())
+          ),
           turnCredentialTtlSeconds:Number(process.env.TURN_CREDENTIAL_TTL_SECONDS||3600),
         },
         readiness:getRuntimeReadiness(databaseType),

@@ -1,4 +1,4 @@
-import { apiUrl, getAuthHeaders } from '../lib/api';
+import { apiFetch, apiUrl, getAuthHeaders } from '../lib/api';
 import { DashboardTip, Meeting } from './meetingService';
 
 export type GuestAccessSlide = { id: string; title: string; body: string; imageUrl: string; isActive: boolean; createdAt: string; updatedAt: string };
@@ -63,21 +63,21 @@ const readJson = async <T>(response: Response): Promise<T> => {
 
 export const adminDashboardService = {
   async getDashboard(period: string): Promise<AdminDashboardPayload> {
-    const response = await fetch(apiUrl(`/api/admin/dashboard?period=${encodeURIComponent(period)}`), {
+    const response = await apiFetch(apiUrl(`/api/admin/dashboard?period=${encodeURIComponent(period)}`), {
       headers: getAuthHeaders(),
     });
     return readJson<AdminDashboardPayload>(response);
   },
 
   async search(query: string) {
-    const response = await fetch(apiUrl(`/api/admin/search?q=${encodeURIComponent(query)}`), {
+    const response = await apiFetch(apiUrl(`/api/admin/search?q=${encodeURIComponent(query)}`), {
       headers: getAuthHeaders(),
     });
     return readJson<{ meetings: Meeting[]; users: Array<{ id: number; name: string; email: string }> }>(response);
   },
 
   async joinMeeting(meetingId: number) {
-    const response = await fetch(apiUrl(`/api/admin/meetings/${meetingId}/join`), {
+    const response = await apiFetch(apiUrl(`/api/admin/meetings/${meetingId}/join`), {
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -85,14 +85,14 @@ export const adminDashboardService = {
   },
 
   async getDashboardTips() {
-    const response = await fetch(apiUrl('/api/admin/dashboard-tips'), {
+    const response = await apiFetch(apiUrl('/api/admin/dashboard-tips'), {
       headers: getAuthHeaders(),
     });
     return readJson<DashboardTip[]>(response);
   },
 
   async createDashboardTip(payload: Pick<DashboardTip, 'title' | 'body' | 'actionLabel' | 'actionPath' | 'isActive'>) {
-    const response = await fetch(apiUrl('/api/admin/dashboard-tips'), {
+    const response = await apiFetch(apiUrl('/api/admin/dashboard-tips'), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
@@ -101,7 +101,7 @@ export const adminDashboardService = {
   },
 
   async updateDashboardTip(tipId: string, payload: Pick<DashboardTip, 'title' | 'body' | 'actionLabel' | 'actionPath' | 'isActive'>) {
-    const response = await fetch(apiUrl(`/api/admin/dashboard-tips/${encodeURIComponent(tipId)}`), {
+    const response = await apiFetch(apiUrl(`/api/admin/dashboard-tips/${encodeURIComponent(tipId)}`), {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(payload),
@@ -110,21 +110,21 @@ export const adminDashboardService = {
   },
 
   async getGuestAccessSlides() {
-    const response = await fetch(apiUrl('/api/admin/guest-access-slides'), { headers: getAuthHeaders() });
+    const response = await apiFetch(apiUrl('/api/admin/guest-access-slides'), { headers: getAuthHeaders() });
     return readJson<GuestAccessSlide[]>(response);
   },
   async saveGuestAccessSlide(payload: Pick<GuestAccessSlide, 'title' | 'body' | 'imageUrl' | 'isActive'>, id?: string) {
-    const response = await fetch(apiUrl(id ? `/api/admin/guest-access-slides/${encodeURIComponent(id)}` : '/api/admin/guest-access-slides'), {
+    const response = await apiFetch(apiUrl(id ? `/api/admin/guest-access-slides/${encodeURIComponent(id)}` : '/api/admin/guest-access-slides'), {
       method: id ? 'PUT' : 'POST', headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
     });
     return readJson<GuestAccessSlide>(response);
   },
   async deleteGuestAccessSlide(id: string) {
-    const response = await fetch(apiUrl(`/api/admin/guest-access-slides/${encodeURIComponent(id)}`), { method: 'DELETE', headers: getAuthHeaders() });
+    const response = await apiFetch(apiUrl(`/api/admin/guest-access-slides/${encodeURIComponent(id)}`), { method: 'DELETE', headers: getAuthHeaders() });
     if (!response.ok) throw new Error('Suppression impossible.');
   },
   async deleteDashboardTip(tipId: string) {
-    const response = await fetch(apiUrl(`/api/admin/dashboard-tips/${encodeURIComponent(tipId)}`), {
+    const response = await apiFetch(apiUrl(`/api/admin/dashboard-tips/${encodeURIComponent(tipId)}`), {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });

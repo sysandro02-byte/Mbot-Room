@@ -1,4 +1,4 @@
-import { apiUrl, getAuthHeaders } from '../lib/api';
+import { apiFetch, apiUrl, getAuthHeaders } from '../lib/api';
 
 export interface Meeting {
   id: number;
@@ -155,25 +155,25 @@ export interface EndedMeetingPayload {
 
 export const meetingService = {
   async getMeetings(): Promise<Meeting[]> {
-    const response = await fetch(apiUrl('/api/meetings'), { headers: getAuthHeaders() });
+    const response = await apiFetch(apiUrl('/api/meetings'), { headers: getAuthHeaders() });
     return response.json();
   },
 
   async getDashboardTips(): Promise<DashboardTip[]> {
-    const response = await fetch(apiUrl('/api/dashboard/tips'), { headers: getAuthHeaders() });
+    const response = await apiFetch(apiUrl('/api/dashboard/tips'), { headers: getAuthHeaders() });
     if (!response.ok) return [];
     const data = await response.json().catch(() => []);
     return Array.isArray(data) ? data : [];
   },
 
   async getActusEvents(): Promise<ActusEvent[]> {
-    const response = await fetch(apiUrl('/api/actus/events'), { headers: getAuthHeaders() });
+    const response = await apiFetch(apiUrl('/api/actus/events'), { headers: getAuthHeaders() });
     if (!response.ok) return [];
     return response.json();
   },
 
   async getMeetingByLink(meetingLink: string): Promise<Meeting> {
-    const response = await fetch(apiUrl(`/api/meetings/link/${encodeURIComponent(meetingLink)}`), { headers: getAuthHeaders() });
+    const response = await apiFetch(apiUrl(`/api/meetings/link/${encodeURIComponent(meetingLink)}`), { headers: getAuthHeaders() });
     if (!response.ok) {
       throw new Error('Réunion introuvable');
     }
@@ -181,7 +181,7 @@ export const meetingService = {
   },
 
   async lookupMeetingAccess(value: string, password: string): Promise<Meeting> {
-    const response = await fetch(apiUrl('/api/meetings/join-lookup'), {
+    const response = await apiFetch(apiUrl('/api/meetings/join-lookup'), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ value, password }),
@@ -194,7 +194,7 @@ export const meetingService = {
   },
 
   async scheduleMeeting(data: ScheduleMeetingPayload): Promise<Meeting> {
-    const response = await fetch(apiUrl('/api/meetings'), {
+    const response = await apiFetch(apiUrl('/api/meetings'), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -207,7 +207,7 @@ export const meetingService = {
   },
 
   async updateMeeting(meetingId: number, data: ScheduleMeetingPayload): Promise<Meeting> {
-    const response = await fetch(apiUrl(`/api/meetings/${meetingId}`), {
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}`), {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(data),
@@ -220,7 +220,7 @@ export const meetingService = {
   },
 
   async searchParticipantSuggestions(query: string): Promise<MeetingParticipantSuggestion[]> {
-    const response = await fetch(apiUrl(`/api/meetings/participant-suggestions?query=${encodeURIComponent(query)}`), {
+    const response = await apiFetch(apiUrl(`/api/meetings/participant-suggestions?query=${encodeURIComponent(query)}`), {
       headers: getAuthHeaders(),
     });
     if (!response.ok) return [];
@@ -235,7 +235,7 @@ export const meetingService = {
   },
 
   async getLobby(meetingId: number): Promise<LobbyParticipant[]> {
-    const response = await fetch(apiUrl(`/api/meetings/${meetingId}/lobby`), { headers: getAuthHeaders() });
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/lobby`), { headers: getAuthHeaders() });
     if (!response.ok) return [];
     const data = await response.json().catch(() => []);
     if (Array.isArray(data)) return data;
@@ -246,7 +246,7 @@ export const meetingService = {
   },
 
   async getEndedMeeting(meetingId: string | number): Promise<EndedMeetingPayload> {
-    const response = await fetch(apiUrl(`/api/meetings/${encodeURIComponent(String(meetingId))}/ended`), {
+    const response = await apiFetch(apiUrl(`/api/meetings/${encodeURIComponent(String(meetingId))}/ended`), {
       headers: getAuthHeaders(),
     });
     const data = await response.json().catch(() => ({}));
@@ -257,7 +257,7 @@ export const meetingService = {
   },
 
   async requestJoin(meetingId: number, userId?: number, password?: string): Promise<{ success: boolean; status?: 'accepted' | 'requested' }> {
-    const response = await fetch(apiUrl(`/api/meetings/${meetingId}/join-request`), {
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/join-request`), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ userId, password }),
@@ -270,7 +270,7 @@ export const meetingService = {
   },
 
   async setMeetingLocked(meetingId: number, locked: boolean): Promise<{ success: boolean; locked: boolean; meeting?: Meeting }> {
-    const response = await fetch(apiUrl(`/api/meetings/${meetingId}/lock`), {
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/lock`), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ locked }),
@@ -281,7 +281,7 @@ export const meetingService = {
   },
 
   async startMeetingAndNotify(meetingId: number): Promise<{ success: boolean; notifiedCount: number; meeting?: Meeting }> {
-    const response = await fetch(apiUrl(`/api/meetings/${meetingId}/start-notify`), {
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/start-notify`), {
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -293,7 +293,7 @@ export const meetingService = {
   },
 
   async deleteMeeting(meetingId: number): Promise<void> {
-    const response = await fetch(apiUrl(`/api/meetings/${meetingId}`), {
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}`), {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -304,7 +304,7 @@ export const meetingService = {
   },
 
   async admitAllLobby(meetingId: number): Promise<{ success: boolean; admitted: number; userIds: number[] }> {
-    const response = await fetch(apiUrl(`/api/meetings/${meetingId}/lobby/admit-all`), {
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/lobby/admit-all`), {
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -314,7 +314,7 @@ export const meetingService = {
   },
 
   async respondToLobby(meetingId: number, userId: number, status: 'accepted' | 'rejected'): Promise<void> {
-    const response = await fetch(apiUrl(`/api/meetings/${meetingId}/lobby/respond`), {
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/lobby/respond`), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ userId, status }),
@@ -326,7 +326,7 @@ export const meetingService = {
   },
 
   async requestMediaControl(meetingId: number, targetUserId: number, kind: 'mic' | 'camera'): Promise<MeetingMediaRequest> {
-    const response = await fetch(apiUrl(`/api/meetings/${meetingId}/media-requests`), {
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/media-requests`), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ targetUserId, kind }),
@@ -339,7 +339,7 @@ export const meetingService = {
   },
 
   async getMediaRequests(meetingId: number): Promise<MeetingMediaRequest[]> {
-    const response = await fetch(apiUrl(`/api/meetings/${meetingId}/media-requests`), {
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/media-requests`), {
       headers: getAuthHeaders(),
     });
     if (!response.ok) return [];
@@ -347,7 +347,7 @@ export const meetingService = {
   },
 
   async respondToMediaRequest(meetingId: number, requestId: string, status: 'accepted' | 'rejected'): Promise<MeetingMediaRequest | null> {
-    const response = await fetch(apiUrl(`/api/meetings/${meetingId}/media-requests/${encodeURIComponent(requestId)}/respond`), {
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/media-requests/${encodeURIComponent(requestId)}/respond`), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ status }),
@@ -360,7 +360,7 @@ export const meetingService = {
   },
 
   async askLuna(meetingId: number, prompt: string, tone: 'professional' | 'casual' | 'creative' = 'professional'): Promise<LunaMeetingResponse> {
-    const response = await fetch(apiUrl('/api/ai/luna'), {
+    const response = await apiFetch(apiUrl('/api/ai/luna'), {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify({ meetingId, prompt, tone }),

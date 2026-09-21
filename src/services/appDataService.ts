@@ -1,4 +1,4 @@
-import { apiUrl, getAuthHeaders } from '../lib/api';
+import { apiFetch, apiUrl, getAuthHeaders } from '../lib/api';
 import type { RoomUser } from './authService';
 
 const readJson = async <T>(response: Response): Promise<T> => {
@@ -22,44 +22,44 @@ export type Preferences = {
 
 export const appDataService = {
   async getCalendar() {
-    return readJson<CalendarEvent[]>(await fetch(apiUrl('/api/calendar/events'), { headers:getAuthHeaders() }));
+    return readJson<CalendarEvent[]>(await apiFetch(apiUrl('/api/calendar/events'), { headers:getAuthHeaders() }));
   },
   async createCalendarEvent(payload:{title:string;description?:string;startsAt:string;endsAt:string;meetingId?:number}) {
-    return readJson<CalendarEvent>(await fetch(apiUrl('/api/calendar/events'), { method:'POST',headers:getAuthHeaders(),body:JSON.stringify(payload) }));
+    return readJson<CalendarEvent>(await apiFetch(apiUrl('/api/calendar/events'), { method:'POST',headers:getAuthHeaders(),body:JSON.stringify(payload) }));
   },
   async deleteCalendarEvent(id:string) {
-    const response=await fetch(apiUrl(`/api/calendar/events/${encodeURIComponent(id)}`),{method:'DELETE',headers:getAuthHeaders()});
+    const response=await apiFetch(apiUrl(`/api/calendar/events/${encodeURIComponent(id)}`),{method:'DELETE',headers:getAuthHeaders()});
     if(!response.ok) throw new Error((await response.json().catch(()=>({}))).error||'Suppression impossible.');
   },
   async getContacts() {
-    return readJson<Contact[]>(await fetch(apiUrl('/api/contacts'),{headers:getAuthHeaders()}));
+    return readJson<Contact[]>(await apiFetch(apiUrl('/api/contacts'),{headers:getAuthHeaders()}));
   },
   async getRecordings() {
-    return readJson<Recording[]>(await fetch(apiUrl('/api/recordings'),{headers:getAuthHeaders()}));
+    return readJson<Recording[]>(await apiFetch(apiUrl('/api/recordings'),{headers:getAuthHeaders()}));
   },
   async getPreferences() {
-    return readJson<Preferences>(await fetch(apiUrl('/api/preferences'),{headers:getAuthHeaders()}));
+    return readJson<Preferences>(await apiFetch(apiUrl('/api/preferences'),{headers:getAuthHeaders()}));
   },
   async updatePreferences(payload:Preferences) {
-    return readJson<Preferences>(await fetch(apiUrl('/api/preferences'),{method:'PUT',headers:getAuthHeaders(),body:JSON.stringify(payload)}));
+    return readJson<Preferences>(await apiFetch(apiUrl('/api/preferences'),{method:'PUT',headers:getAuthHeaders(),body:JSON.stringify(payload)}));
   },
   async getProfile() {
-    return readJson<{user:RoomUser}>(await fetch(apiUrl('/api/profile'),{headers:getAuthHeaders()}));
+    return readJson<{user:RoomUser}>(await apiFetch(apiUrl('/api/profile'),{headers:getAuthHeaders()}));
   },
   async updateProfile(payload:Partial<Pick<RoomUser,'name'|'username'|'avatar'|'phoneNumber'|'organization'|'jobTitle'>>) {
-    return readJson<{user:RoomUser}>(await fetch(apiUrl('/api/profile'),{method:'PUT',headers:getAuthHeaders(),body:JSON.stringify(payload)}));
+    return readJson<{user:RoomUser}>(await apiFetch(apiUrl('/api/profile'),{method:'PUT',headers:getAuthHeaders(),body:JSON.stringify(payload)}));
   },
   async getWhiteboards() {
-    return readJson<Whiteboard[]>(await fetch(apiUrl('/api/whiteboards'),{headers:getAuthHeaders()}));
+    return readJson<Whiteboard[]>(await apiFetch(apiUrl('/api/whiteboards'),{headers:getAuthHeaders()}));
   },
   async createWhiteboard(payload:{title:string;document:{strokes:WhiteboardStroke[]};meetingId?:number}) {
-    return readJson<Whiteboard>(await fetch(apiUrl('/api/whiteboards'),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify(payload)}));
+    return readJson<Whiteboard>(await apiFetch(apiUrl('/api/whiteboards'),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify(payload)}));
   },
   async updateWhiteboard(id:string,payload:{title:string;document:{strokes:WhiteboardStroke[]}}) {
-    return readJson<Whiteboard>(await fetch(apiUrl(`/api/whiteboards/${encodeURIComponent(id)}`),{method:'PUT',headers:getAuthHeaders(),body:JSON.stringify(payload)}));
+    return readJson<Whiteboard>(await apiFetch(apiUrl(`/api/whiteboards/${encodeURIComponent(id)}`),{method:'PUT',headers:getAuthHeaders(),body:JSON.stringify(payload)}));
   },
   async deleteWhiteboard(id:string) {
-    const response=await fetch(apiUrl(`/api/whiteboards/${encodeURIComponent(id)}`),{method:'DELETE',headers:getAuthHeaders()});
+    const response=await apiFetch(apiUrl(`/api/whiteboards/${encodeURIComponent(id)}`),{method:'DELETE',headers:getAuthHeaders()});
     if(!response.ok) throw new Error((await response.json().catch(()=>({}))).error||'Suppression impossible.');
   },
 };

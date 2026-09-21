@@ -76,9 +76,21 @@ app.use((request, response, next) => {
 app.use(express.json({ limit: '1mb' }));
 
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+let nextRateCleanupAt = 0;
+
+const cleanupRateBuckets = (now: number) => {
+  if (now < nextRateCleanupAt) return;
+  nextRateCleanupAt = now + 60_000;
+  for (const [key, bucket] of rateBuckets) {
+    if (bucket.resetAt <= now) rateBuckets.delete(key);
+  }
+};
+
 const rateLimit = (limit: number, windowMs: number): express.RequestHandler => (request, response, next) => {
-  const key = `${request.ip}:${request.path}`;
   const now = Date.now();
+  cleanupRateBuckets(now);
+  const routeKey = String(request.originalUrl || request.path).split('?')[0];
+  const key = `${request.ip}:${routeKey}`;
   const current = rateBuckets.get(key);
   if (!current || current.resetAt <= now) {
     rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
@@ -94,7 +106,10 @@ const rateLimit = (limit: number, windowMs: number): express.RequestHandler => (
   next();
 };
 
-app.use('/api/auth', rateLimit(30, 60_000));
+app.use('/api/auth/login', rateLimit(10, 60_000));
+app.use('/api/auth/register', rateLimit(8, 60_000));
+app.use('/api/auth/forgot-password', rateLimit(5, 60_000));
+app.use('/api/auth', rateLimit(60, 60_000));
 app.use('/api/meetings', rateLimit(240, 60_000));
 app.use('/api/ai', rateLimit(30, 60_000));
 

@@ -50,4 +50,27 @@ export const getAuthHeaders = () => {
   };
 };
 
+export const apiFetch = async (
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = 45_000,
+) => {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, {
+      credentials: 'include',
+      ...init,
+      signal: init.signal || controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Le serveur MBotéRoom met trop de temps à répondre. Réessayez.');
+    }
+    throw new Error('Impossible de joindre le serveur MBotéRoom. Vérifiez votre connexion puis réessayez.');
+  } finally {
+    window.clearTimeout(timer);
+  }
+};
+
 export const handleExpiredAuthSession = () => undefined;
