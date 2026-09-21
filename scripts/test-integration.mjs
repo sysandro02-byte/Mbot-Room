@@ -113,6 +113,7 @@ const server = spawn(process.execPath, ['dist/server.js'], {
     NODE_ENV: 'test',
     PGSSLMODE: 'disable',
     MBOTE_ROOM_ALLOWED_ORIGINS: baseUrl,
+    MBOTE_ROOM_ALLOWED_ORIGIN_PATTERNS: 'https://mbote-room-*.vercel.app',
     MBOTE_ROOM_APP_URL: baseUrl,
     ADMIN_EMAILS: '',
     RESEND_API_KEY: '',
@@ -289,6 +290,28 @@ try {
 
   assert.equal(health.media?.topology, 'mesh');
   assert.equal(health.media?.turnConfigured, false);
+
+  const previewOrigin = 'https://mbote-room-pr-123.vercel.app';
+  const corsPreflight = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: previewOrigin,
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'content-type,x-mbote-room-session-mode',
+    },
+  });
+  assert.equal(corsPreflight.status, 204);
+  assert.equal(corsPreflight.headers.get('access-control-allow-origin'), previewOrigin);
+  assert.match(corsPreflight.headers.get('access-control-allow-headers') || '', /X-MBote-Room-Session-Mode/i);
+
+  const blockedPreflight = await fetch(`${baseUrl}/api/auth/login`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: 'https://unrelated-project.vercel.app',
+      'Access-Control-Request-Method': 'POST',
+    },
+  });
+  assert.equal(blockedPreflight.status, 403);
 
   await expectRejectedSocket();
 
