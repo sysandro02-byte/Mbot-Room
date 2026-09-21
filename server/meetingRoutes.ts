@@ -177,18 +177,38 @@ type ActusMeetingPayload = Meeting & {
 const callGroq = async (system: string, prompt: string) => {
   const key = String(process.env.GROQ_API_KEY || '').trim();
   if (!key) return null;
-  const models = String(process.env.GROQ_MODEL || 'llama-3.1-8b-instant').split(',').map((m) => m.trim()).filter(Boolean);
+  const models = String(process.env.GROQ_MODEL || 'openai/gpt-oss-20b,openai/gpt-oss-120b').split(',').map((m) => m.trim()).filter(Boolean);
   for (const model of models) {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, temperature: 0.2, max_tokens: 900, messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] }),
-      signal: AbortSignal.timeout(Number(process.env.GROQ_TIMEOUT_MS || 30000)),
-    }).catch(() => null);
-    if (!response?.ok) continue;
+    let response: Response | null = null;
+    try {
+      response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, temperature: 0.2, max_tokens: 900, messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }] }),
+        signal: AbortSignal.timeout(Number(process.env.GROQ_TIMEOUT_MS || 30000)),
+      });
+    } catch (error) {
+      console.warn('Groq request failed', {
+        model,
+        reason: error instanceof Error ? error.message.slice(0, 240) : 'network_error',
+      });
+      continue;
+    }
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      console.warn('Groq completion rejected', {
+        model,
+        status: response.status,
+        code: String(payload?.error?.code || ''),
+        type: String(payload?.error?.type || ''),
+        message: String(payload?.error?.message || '').slice(0, 300),
+      });
+      continue;
+    }
     const data = await response.json().catch(() => null);
     const text = data?.choices?.[0]?.message?.content;
     if (text) return String(text).trim();
+    console.warn('Groq completion returned no text', { model, status: response.status });
   }
   return null;
 };

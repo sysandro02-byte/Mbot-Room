@@ -48,6 +48,12 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
           turnCredentialTtlSeconds:Number(process.env.TURN_CREDENTIAL_TTL_SECONDS||3600),
         },
         readiness:getRuntimeReadiness(databaseType),
+        deployment:{
+          commit:String(process.env.RENDER_GIT_COMMIT||''),
+          branch:String(process.env.RENDER_GIT_BRANCH||''),
+          serviceId:String(process.env.RENDER_SERVICE_ID||''),
+          instanceId:String(process.env.RENDER_INSTANCE_ID||''),
+        },
         serverTime:result.rows[0].now,
       });
     } catch (error) {
@@ -56,6 +62,12 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
         service:'mbote-room',
         database:{configured:true,connected:false,type:databaseType},
         readiness:getRuntimeReadiness(databaseType),
+        deployment:{
+          commit:String(process.env.RENDER_GIT_COMMIT||''),
+          branch:String(process.env.RENDER_GIT_BRANCH||''),
+          serviceId:String(process.env.RENDER_SERVICE_ID||''),
+          instanceId:String(process.env.RENDER_INSTANCE_ID||''),
+        },
         error:error instanceof Error?error.message:'Database unavailable',
       });
     }
