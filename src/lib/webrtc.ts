@@ -1,4 +1,4 @@
-import { apiUrl, getAuthHeaders } from './api';
+import { apiFetch, apiUrl, getAuthHeaders } from './api';
 
 const splitUrls = (value: string | undefined) =>
   String(value || '')
@@ -32,7 +32,7 @@ export const getRtcConfiguration = async (): Promise<RTCConfiguration> => {
   if (cachedConfig && Date.now() < cachedUntil) return cachedConfig;
 
   try {
-    const response = await fetch(apiUrl('/api/rtc/config'), {
+    const response = await apiFetch(apiUrl('/api/rtc/config'), {
       headers: getAuthHeaders(),
       cache: 'no-store',
     });
