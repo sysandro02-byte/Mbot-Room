@@ -125,14 +125,64 @@ app.use((error: unknown, _request: express.Request, response: express.Response, 
 
 const port = Number(process.env.PORT || 3004);
 
+type DatabaseStartupError = Error & { code?: string };
+
+const transientDatabaseErrorCodes = new Set([
+  '08000', '08001', '08003', '08006', '53300', '57P01',
+  'ECONNRESET', 'ETIMEDOUT', 'ENETUNREACH', 'EHOSTUNREACH',
+]);
+
+const databaseStartupMessage = (error: unknown) => {
+  const candidate = error as DatabaseStartupError;
+  const code = String(candidate?.code || '').trim();
+
+  if (code === '28P01') {
+    return 'PostgreSQL a refusé les identifiants DATABASE_URL (28P01). Vérifiez le mot de passe, l’utilisateur et la chaîne de connexion Supabase configurés dans Render.';
+  }
+  if (code === '3D000') {
+    return 'La base PostgreSQL indiquée dans DATABASE_URL est introuvable (3D000). Vérifiez le nom de la base.';
+  }
+  if (code === '28000') {
+    return 'PostgreSQL a refusé l’autorisation de connexion (28000). Vérifiez l’utilisateur DATABASE_URL et les droits Supabase.';
+  }
+  if (transientDatabaseErrorCodes.has(code)) {
+    return `Connexion PostgreSQL temporairement indisponible (${code || 'network'}).`;
+  }
+
+  return `Initialisation PostgreSQL impossible${code ? ` (${code})` : ''}: ${candidate?.message || 'erreur inconnue'}`;
+};
+
+const runDatabaseStartup = async () => {
+  const maxAttempts = Math.max(1, Math.min(5, Number(process.env.DATABASE_STARTUP_ATTEMPTS || 3)));
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await runMigrations();
+      await runExtraMigrations();
+      await runProductMigrations();
+      return;
+    } catch (error) {
+      const code = String((error as DatabaseStartupError)?.code || '').trim();
+      const transient = transientDatabaseErrorCodes.has(code);
+      const lastAttempt = attempt >= maxAttempts;
+
+      if (!transient || lastAttempt) {
+        throw new Error(databaseStartupMessage(error), { cause: error });
+      }
+
+      const delayMs = Math.min(5000, 500 * (2 ** (attempt - 1)));
+      console.warn(`[database startup] tentative ${attempt}/${maxAttempts} échouée; nouvelle tentative dans ${delayMs} ms (${code || 'network'}).`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+};
+
 const start = async () => {
   if (!hasDatabase()) {
-    console.error('DATABASE_URL est obligatoire, sauf si DATABASE_MODE=pglite-test est explicitement activé.');
-  } else {
-    await runMigrations();
-    await runExtraMigrations();
-    await runProductMigrations();
+    throw new Error('DATABASE_URL est obligatoire en production. DATABASE_MODE=pgmem-test est réservé aux tests explicites.');
   }
+
+  await runDatabaseStartup();
+
   httpServer.listen(port, () => {
     const databaseType = getDatabaseType();
     console.log(`MBotéRoom API V2 listening on port ${port} · database=${databaseType}`);
@@ -150,4 +200,10 @@ const shutdown = async () => {
 process.on('SIGTERM', () => void shutdown());
 process.on('SIGINT', () => void shutdown());
 
-await start();
+try {
+  await start();
+} catch (error) {
+  console.error(`[MBotéRoom startup] ${error instanceof Error ? error.message : 'Erreur de démarrage inconnue.'}`);
+  await closeDatabase();
+  process.exitCode = 1;
+}
