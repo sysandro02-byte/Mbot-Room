@@ -84,7 +84,7 @@ const postAuth = async (path: string, body: unknown): Promise<AuthResponse> => {
   }
   return {
     user: normalizeUser(result.user),
-    token: String(result.token || ''),
+    token: typeof result.token === 'string' ? result.token : undefined,
     expiresAt: typeof result.expiresAt === 'string' ? result.expiresAt : undefined,
   };
 };
@@ -115,7 +115,7 @@ export const authService = {
     }
     const session = {
       user: normalizeUser(result.user),
-      token: String(result.token || ''),
+      token: typeof result.token === 'string' ? result.token : undefined,
       expiresAt: typeof result.expiresAt === 'string' ? result.expiresAt : undefined,
     };
     saveSession(session, false);
@@ -145,7 +145,7 @@ export const authService = {
     const result = await readJson(response);
     if (!response.ok) throw new Error(result.error || "Autorisation MBoté impossible.");
     const session = {
-      user: normalizeUser(result.user), token: String(result.token || ''),
+      user: normalizeUser(result.user), token: typeof result.token === 'string' ? result.token : undefined,
       expiresAt: typeof result.expiresAt === 'string' ? result.expiresAt : undefined,
     };
     saveSession(session, true);
