@@ -328,6 +328,21 @@ try {
   const outsider = await register('Participant Bloqué', 'outsider.integration@mbote.test');
   assert.equal(outsider.user.role, 'user');
 
+  const webLogin = await jsonRequest('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: 'participant.integration@mbote.test',
+      password: 'Password2026!',
+      rememberMe: true,
+    }),
+  });
+  assert.equal(webLogin.response.status, 200, JSON.stringify(webLogin.data));
+  assert.equal(webLogin.data.token, undefined);
+  assert.ok(webLogin.data.user?.id);
+  const webSetCookie = webLogin.response.headers.get('set-cookie') || '';
+  assert.match(webSetCookie, /mbote_room_session=/);
+  assert.match(webSetCookie, /HttpOnly/i);
+
   const hostMe = await jsonRequest('/api/auth/me', { headers: authHeaders(host.token) });
   assert.equal(hostMe.response.status, 200);
   assert.equal(hostMe.data.user.email, 'host.integration@mbote.test');
