@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'scripts/test-production-live.mjs'
+      - 'scripts/wait-for-ci-gate.mjs'
       - '.github/workflows/production-live-smoke.yml'
       - 'server/meetingRoutes.ts'
       - 'server/appRoutes.ts'
