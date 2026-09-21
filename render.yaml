@@ -14,6 +14,12 @@ services:
         value: "22.22.0"
       - key: NODE_OPTIONS
         value: "--max-old-space-size=192"
+      - key: MBOTE_ROOM_REQUIRE_CI_GATE
+        value: "true"
+      - key: MBOTE_ROOM_GITHUB_REPOSITORY
+        value: sysandro02-byte/Mbot-Room
+      - key: MBOTE_ROOM_REQUIRED_WORKFLOW
+        value: MBoteRoom CI
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_MODE
@@ -23,7 +29,7 @@ services:
       - key: MBOTE_ROOM_APP_URL
         value: https://mbote-room.vercel.app
       - key: MBOTE_ROOM_ALLOWED_ORIGINS
-        value: https://mbote-room-api.onrender.com,https://mbote-room.vercel.app
+        value: https://mbote-room-api.onrender.com,https://mbote-room.vercel.app,https://mboteroom.loukatech.com
       - key: MBOTE_ROOM_ALLOWED_ORIGIN_PATTERNS
         value: https://mbote-room-*.vercel.app
       - key: MBOTE_ROOM_SESSION_COOKIE
@@ -94,6 +100,10 @@ services:
         sync: false
       - key: LIVEKIT_TOKEN_TTL_SECONDS
         value: "900"
+      - key: MBOTE_ROOM_REQUIRE_LIVEKIT
+        value: "false"
+      - key: MBOTE_ROOM_REQUIRE_SERVER_RECORDING
+        value: "false"
       - key: LIVEKIT_EGRESS_ENABLED
         value: "false"
       - key: LIVEKIT_EGRESS_USE_SERVER_DEFAULT_STORAGE

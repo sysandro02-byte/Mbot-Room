@@ -164,6 +164,18 @@ try {
   assert.equal(previewPreflight.status, 204);
   assert.equal(previewPreflight.headers.get('access-control-allow-origin'), previewOrigin);
 
+  const officialOrigin = 'https://mboteroom.loukatech.com';
+  const officialPreflight = await fetch(`${backendUrl}/api/auth/login`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: officialOrigin,
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'content-type,x-mbote-room-session-mode',
+    },
+  });
+  assert.equal(officialPreflight.status, 204);
+  assert.equal(officialPreflight.headers.get('access-control-allow-origin'), officialOrigin);
+
   const unrelatedPreflight = await fetch(`${backendUrl}/api/auth/login`, {
     method: 'OPTIONS',
     headers: {

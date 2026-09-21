@@ -18,6 +18,7 @@ import { registerRecordingRoutes } from './server/recordingRoutes.js';
 import { registerTranscriptionRoutes } from './server/transcriptionRoutes.js';
 import { getRuntimeReadiness } from './server/readiness.js';
 import { isAllowedOrigin } from './server/originPolicy.js';
+import { getEmailDeliveryStatus, sendTransactionalEmail } from './server/emailDelivery.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.basename(__dirname) === 'dist' ? __dirname : path.join(__dirname, 'dist');
@@ -178,6 +179,26 @@ const runDatabaseStartup = async () => {
   }
 };
 
+const runReleaseEmailProbe = async () => {
+  const enabled = String(process.env.MBOTE_ROOM_RELEASE_EMAIL_TEST || '').toLowerCase() === 'true';
+  const to = String(process.env.MBOTE_ROOM_RELEASE_EMAIL_TEST_TO || '').trim();
+  if (!enabled || !to) return;
+
+  const commit = String(process.env.RENDER_GIT_COMMIT || '').trim();
+  const shortCommit = commit ? commit.slice(0, 12) : 'unknown';
+  const subject = `[MBotéRoom] Test email production ${shortCommit}`;
+  const status = getEmailDeliveryStatus();
+
+  const ok = await sendTransactionalEmail({
+    to,
+    subject,
+    text: `Test de livraison email MBotéRoom en production. Commit: ${shortCommit}. Si vous recevez ce message, le canal email transactionnel fonctionne.`,
+    html: `<p><strong>MBotéRoom — test email production</strong></p><p>Commit : <code>${shortCommit}</code></p><p>Si vous recevez ce message, le canal email transactionnel fonctionne.</p>`,
+  }).catch(() => false);
+
+  console.log(`MBotéRoom release email probe ${JSON.stringify({ ok, provider: status.provider, commit: shortCommit })}`);
+};
+
 const start = async () => {
   if (!hasDatabase()) {
     throw new Error('DATABASE_URL est obligatoire en production. DATABASE_MODE=pgmem-test est réservé aux tests explicites.');
@@ -189,6 +210,7 @@ const start = async () => {
     const databaseType = getDatabaseType();
     console.log(`MBotéRoom API V2 listening on port ${port} · database=${databaseType}`);
     console.log(`MBotéRoom readiness ${JSON.stringify(getRuntimeReadiness(databaseType))}`);
+    void runReleaseEmailProbe();
   });
 };
 

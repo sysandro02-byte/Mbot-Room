@@ -1,7 +1,8 @@
 {
   "installCommand": "npm ci",
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build:frontend",
   "outputDirectory": "dist",
+  "cleanUrls": true,
   "headers": [
     {
       "source": "/(.*)",
@@ -31,7 +32,7 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!assets/|favicon.ico|manifest.webmanifest|sw.js).*)",
+      "source": "/((?!assets/|favicon.ico|manifest.webmanifest|sw.js|icons/).*)",
       "destination": "/index.html"
     }
   ]

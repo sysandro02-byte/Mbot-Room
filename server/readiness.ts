@@ -43,12 +43,16 @@ export const getRuntimeReadiness = (databaseType: string): RuntimeReadiness => {
     && has(process.env.LIVEKIT_EGRESS_S3_SECRET_KEY)
     && (has(process.env.LIVEKIT_EGRESS_S3_ENDPOINT) || has(process.env.LIVEKIT_EGRESS_S3_REGION));
   const serverRecording = livekit && egressEnabled && (defaultStorage || s3Storage);
+  const requireLivekit = String(process.env.MBOTE_ROOM_REQUIRE_LIVEKIT || '').trim().toLowerCase() === 'true';
+  const requireServerRecording = String(process.env.MBOTE_ROOM_REQUIRE_SERVER_RECORDING || '').trim().toLowerCase() === 'true';
 
   const blockers: string[] = [];
   if (!persistentDatabase) blockers.push('persistent_database');
   if (!groq) blockers.push('luna_groq');
   if (!emailDelivery.configured) blockers.push('email_delivery');
   if (!livekit && !turn) blockers.push('resilient_media');
+  if (requireLivekit && !livekit) blockers.push('livekit');
+  if (requireServerRecording && !serverRecording) blockers.push('server_recording');
 
   return {
     database: {
