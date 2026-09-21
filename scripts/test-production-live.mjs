@@ -4,7 +4,11 @@ import { chromium } from '@playwright/test';
 // This suite targets the already deployed production services.
 const frontendUrl = String(process.env.MBOTE_ROOM_FRONTEND_URL || 'https://mbote-room.vercel.app').replace(/\/+$/, '');
 const backendUrl = String(process.env.MBOTE_ROOM_BACKEND_URL || 'https://mbote-room-api.onrender.com').replace(/\/+$/, '');
-const runSuffix = String(process.env.GITHUB_RUN_ID || Date.now()).replace(/\D/g, '').slice(-10) || String(Date.now());
+const runSuffix = [process.env.GITHUB_RUN_ID, process.env.GITHUB_RUN_ATTEMPT, Date.now()]
+  .filter(Boolean)
+  .join('-')
+  .replace(/[^a-zA-Z0-9-]/g, '')
+  .slice(-48) || String(Date.now());
 const hostEmail = `prod.smoke.host+${runSuffix}@mbote.test`;
 const guestName = `Invité Smoke ${runSuffix}`;
 const password = 'MboteRoom-Smoke-2026!';
