@@ -2,6 +2,7 @@ let refreshing = false;
 
 export const registerPwa = () => {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
+  const hadController = Boolean(navigator.serviceWorker.controller);
 
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' })
@@ -26,7 +27,7 @@ export const registerPwa = () => {
   });
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return;
+    if (!hadController || refreshing) return;
     refreshing = true;
     window.location.reload();
   });
