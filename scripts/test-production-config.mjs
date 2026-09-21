@@ -26,4 +26,14 @@ if (!server.includes('getRuntimeReadiness')) {
   throw new Error('Production server must log runtime readiness at startup');
 }
 
+if (!server.includes("code === '28P01'") || !server.includes('PostgreSQL a refusé les identifiants DATABASE_URL')) {
+  throw new Error('Production startup must expose a clear PostgreSQL authentication diagnostic');
+}
+if (!server.includes('transientDatabaseErrorCodes') || !server.includes('DATABASE_STARTUP_ATTEMPTS')) {
+  throw new Error('Production startup must retry transient PostgreSQL connection failures');
+}
+if (!server.includes('process.exitCode = 1')) {
+  throw new Error('Production startup failures must be handled without an unhandled PostgreSQL stack dump');
+}
+
 console.log('Production configuration smoke checks passed.');
