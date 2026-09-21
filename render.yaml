@@ -24,6 +24,8 @@ services:
         value: https://mbote-room.vercel.app
       - key: MBOTE_ROOM_ALLOWED_ORIGINS
         value: https://mbote-room-api.onrender.com,https://mbote-room.vercel.app
+      - key: MBOTE_ROOM_ALLOWED_ORIGIN_PATTERNS
+        value: https://mbote-room-*.vercel.app
       - key: MBOTE_ROOM_SESSION_COOKIE
         value: mbote_room_session
       - key: MBOTE_ROOM_COOKIE_SAMESITE
