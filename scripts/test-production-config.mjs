@@ -72,7 +72,15 @@ for (const relativePath of resilientClientFiles) {
   }
 }
 
+const meetingRoutes = fs.readFileSync(new URL('../server/meetingRoutes.ts', import.meta.url), 'utf8');
+if (!meetingRoutes.includes('qwen/qwen3.8-27b') || !meetingRoutes.includes('openai/gpt-oss-120b')) {
+  throw new Error('Luna must keep current Groq fallback models when the configured model is blocked');
+}
+
 const renderBlueprint = fs.readFileSync(new URL('../render.yaml', import.meta.url), 'utf8');
+if (!renderBlueprint.includes('qwen/qwen3.8-27b,openai/gpt-oss-120b,openai/gpt-oss-20b')) {
+  throw new Error('Render must configure a resilient Groq model order for Luna');
+}
 if (!renderBlueprint.includes('https://mbote-room.vercel.app')) {
   throw new Error('Render CORS configuration must allow the MBotéRoom Vercel frontend');
 }
