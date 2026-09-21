@@ -12,7 +12,8 @@
     "test": "npm run lint && node scripts/test-production-config.mjs",
     "test:integration": "node scripts/test-integration.mjs",
     "preview": "vite preview",
-    "health:production": "node scripts/check-production-health.mjs"
+    "health:production": "node scripts/check-production-health.mjs",
+    "build:frontend": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && vite build --configLoader bundle"
   },
   "dependencies": {
     "@tinbase/pg-mem": "^3.5.0",
