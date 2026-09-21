@@ -149,7 +149,7 @@ export const authService = {
 
   async verifyMboteCredentials(identifier: string, password: string) {
     const response = await fetchAuth(apiUrl('/api/auth/mbote/credentials'), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: authRequestHeaders(),
       body: JSON.stringify({ identifier, password }),
       credentials: 'include',
     });
@@ -235,7 +235,7 @@ export const authService = {
   async logout(notifyServer = true) {
     const legacyToken = this.getToken();
     if (notifyServer) {
-      await fetch(apiUrl('/api/auth/logout'), {
+      await fetchAuth(apiUrl('/api/auth/logout'), {
         method: 'POST',
         headers: legacyToken ? { Authorization: `Bearer ${legacyToken}` } : undefined,
         credentials: 'include',

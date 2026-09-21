@@ -76,6 +76,13 @@ const renderBlueprint = fs.readFileSync(new URL('../render.yaml', import.meta.ur
 if (!renderBlueprint.includes('https://mbote-room.vercel.app')) {
   throw new Error('Render CORS configuration must allow the MBotéRoom Vercel frontend');
 }
+if (!renderBlueprint.includes('MBOTE_ROOM_ALLOWED_ORIGIN_PATTERNS') || !renderBlueprint.includes('https://mbote-room-*.vercel.app')) {
+  throw new Error('Render CORS configuration must allow only MBotéRoom Vercel preview origins');
+}
+const originPolicy = fs.readFileSync(new URL('../server/originPolicy.ts', import.meta.url), 'utf8');
+if (!originPolicy.includes('configuredOriginPatterns') || !originPolicy.includes('resolveAllowedClientOrigin')) {
+  throw new Error('Server must centralize exact and preview frontend origin validation');
+}
 if (!renderBlueprint.includes('autoDeployTrigger: checksPass')) {
   throw new Error('Render production deploys must wait for CI checks to pass');
 }

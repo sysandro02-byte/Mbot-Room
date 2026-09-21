@@ -136,6 +136,39 @@ try {
   assert.equal(health.data.readiness?.integrations?.groq, true);
   assert.equal(health.data.readiness?.integrations?.email, true);
 
+  const authPreflight = await fetch(`${backendUrl}/api/auth/login`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: frontendUrl,
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'content-type,x-mbote-room-session-mode',
+    },
+  });
+  assert.equal(authPreflight.status, 204);
+  assert.equal(authPreflight.headers.get('access-control-allow-origin'), frontendUrl);
+  assert.match(authPreflight.headers.get('access-control-allow-headers') || '', /X-MBote-Room-Session-Mode/i);
+
+  const previewOrigin = 'https://mbote-room-production-smoke.vercel.app';
+  const previewPreflight = await fetch(`${backendUrl}/api/auth/register`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: previewOrigin,
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'content-type,x-mbote-room-session-mode',
+    },
+  });
+  assert.equal(previewPreflight.status, 204);
+  assert.equal(previewPreflight.headers.get('access-control-allow-origin'), previewOrigin);
+
+  const unrelatedPreflight = await fetch(`${backendUrl}/api/auth/login`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: 'https://not-mbote-room.vercel.app',
+      'Access-Control-Request-Method': 'POST',
+    },
+  });
+  assert.equal(unrelatedPreflight.status, 403);
+
   const register = await api('/api/auth/register', {
     method: 'POST',
     headers: authBearer,

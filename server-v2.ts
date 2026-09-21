@@ -17,25 +17,12 @@ import { registerSfuRoutes } from './server/sfuRoutes.js';
 import { registerRecordingRoutes } from './server/recordingRoutes.js';
 import { registerTranscriptionRoutes } from './server/transcriptionRoutes.js';
 import { getRuntimeReadiness } from './server/readiness.js';
+import { isAllowedOrigin } from './server/originPolicy.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.basename(__dirname) === 'dist' ? __dirname : path.join(__dirname, 'dist');
 const app = express();
 const httpServer = createServer(app);
-
-const configuredOrigins = [
-  process.env.MBOTE_ROOM_APP_URL,
-  ...(String(process.env.MBOTE_ROOM_ALLOWED_ORIGINS || '').split(',')),
-]
-  .map((value) => String(value || '').trim().replace(/\/+$/, ''))
-  .filter(Boolean);
-
-const isAllowedOrigin = (origin?: string) => {
-  if (!origin) return true;
-  if (configuredOrigins.includes(origin.replace(/\/+$/, ''))) return true;
-  if (process.env.NODE_ENV !== 'production') return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
-  return false;
-};
 
 const io = new Server(httpServer, {
   cors: {
