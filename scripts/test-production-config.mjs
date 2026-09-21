@@ -67,8 +67,14 @@ for (const source of [appRoutes, sfuRoutes]) {
 
 const manifestPath = new URL('../public/manifest.webmanifest', import.meta.url);
 const serviceWorkerPath = new URL('../public/sw.js', import.meta.url);
-if (!fs.existsSync(manifestPath) || !fs.existsSync(serviceWorkerPath)) {
-  throw new Error('Installable PWA manifest and service worker are required');
+const icon192Path = new URL('../public/icons/mbote-room-192.png', import.meta.url);
+const icon512Path = new URL('../public/icons/mbote-room-512.png', import.meta.url);
+if (!fs.existsSync(manifestPath) || !fs.existsSync(serviceWorkerPath) || !fs.existsSync(icon192Path) || !fs.existsSync(icon512Path)) {
+  throw new Error('Installable PWA manifest, service worker and standard icons are required');
+}
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+if (!manifest.icons?.some((icon) => icon.sizes === '192x192') || !manifest.icons?.some((icon) => icon.sizes === '512x512')) {
+  throw new Error('PWA manifest must expose 192x192 and 512x512 icons');
 }
 const serviceWorker = fs.readFileSync(serviceWorkerPath, 'utf8');
 if (!serviceWorker.includes("url.pathname.startsWith('/api/')") || !serviceWorker.includes("url.pathname.startsWith('/socket.io/')")) {
