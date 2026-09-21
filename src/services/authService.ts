@@ -63,18 +63,39 @@ const readJson = async (response: Response) => {
   }
 };
 
-const saveSession = ({ user, expiresAt }: AuthResponse, persist: boolean) => {
+const saveSession = ({ user, token, expiresAt }: AuthResponse, persist: boolean) => {
   clearStoredSession();
   const storage = getStorage(persist);
   storage.setItem(USER_KEY, JSON.stringify(normalizeUser(user)));
+  if (token) storage.setItem(TOKEN_KEY, token);
   if (expiresAt) storage.setItem(EXPIRY_KEY, expiresAt);
   window.dispatchEvent(new CustomEvent('mbote-room-auth-changed'));
 };
 
+const authRequestHeaders = {
+  'Content-Type': 'application/json',
+  'X-MBote-Room-Session-Mode': 'bearer',
+};
+
+const fetchAuth = async (input: RequestInfo | URL, init: RequestInit = {}) => {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 20_000);
+  try {
+    return await fetch(input, { ...init, signal: init.signal || controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Le serveur MBotéRoom met trop de temps à répondre. Réessayez.');
+    }
+    throw new Error('Impossible de joindre le serveur MBotéRoom. Vérifiez votre connexion puis réessayez.');
+  } finally {
+    window.clearTimeout(timeout);
+  }
+};
+
 const postAuth = async (path: string, body: unknown): Promise<AuthResponse> => {
-  const response = await fetch(apiUrl(path), {
+  const response = await fetchAuth(apiUrl(path), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authRequestHeaders,
     body: JSON.stringify(body),
     credentials: 'include',
   });
@@ -103,9 +124,9 @@ export const authService = {
   },
 
   async guestJoin(payload: { name: string; meetingCode: string; password: string }) {
-    const response = await fetch(apiUrl('/api/auth/guest-join'), {
+    const response = await fetchAuth(apiUrl('/api/auth/guest-join'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authRequestHeaders,
       body: JSON.stringify(payload),
       credentials: 'include',
     });
@@ -138,8 +159,8 @@ export const authService = {
   },
 
   async authorizeMbote(challengeId: string, redirectTo = '/app') {
-    const response = await fetch(apiUrl('/api/auth/mbote/authorize'), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ challengeId }),
+    const response = await fetchAuth(apiUrl('/api/auth/mbote/authorize'), {
+      method: 'POST', headers: authRequestHeaders, body: JSON.stringify({ challengeId }),
       credentials: 'include',
     });
     const result = await readJson(response);
@@ -182,9 +203,9 @@ export const authService = {
   },
 
   async forgotPassword(email: string) {
-    const response = await fetch(apiUrl('/api/auth/forgot-password'), {
+    const response = await fetchAuth(apiUrl('/api/auth/forgot-password'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authRequestHeaders,
       body: JSON.stringify({ email }),
       credentials: 'include',
     });
