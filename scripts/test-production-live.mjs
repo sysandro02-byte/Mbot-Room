@@ -11,6 +11,23 @@ const password = 'MboteRoom-Smoke-2026!';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const waitForProductionCommit = async () => {
+  const expected = String(process.env.GITHUB_SHA || '').trim();
+  if (!expected) return;
+  const deadline = Date.now() + 8 * 60_000;
+  let lastSeen = '';
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`${backendUrl}/api/health`, { headers: { Origin: frontendUrl } });
+      const data = await response.json().catch(() => ({}));
+      lastSeen = String(data?.deployment?.commit || '');
+      if (response.ok && lastSeen === expected) return;
+    } catch {}
+    await sleep(5_000);
+  }
+  throw new Error(`Production backend did not reach commit ${expected}. Last deployed commit: ${lastSeen || 'unknown'}`);
+};
+
 const parseBody = async (response) => {
   const text = await response.text();
   if (!text) return {};
@@ -103,6 +120,8 @@ let host = null;
 let guest = null;
 
 try {
+  await waitForProductionCommit();
+
   const frontend = await fetch(frontendUrl, { redirect: 'follow' });
   assert.equal(frontend.ok, true, `Frontend HTTP ${frontend.status}`);
   assert.match(await frontend.text(), /MBot[eé]Room|MBot[eé] Room/i);
