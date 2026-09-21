@@ -77,6 +77,11 @@ if (!meetingRoutes.includes('qwen/qwen3.8-27b') || !meetingRoutes.includes('open
   throw new Error('Luna must keep current Groq fallback models when the configured model is blocked');
 }
 
+const liveSmoke = fs.readFileSync(new URL('../scripts/test-production-live.mjs', import.meta.url), 'utf8');
+if (!liveSmoke.includes('GITHUB_RUN_ATTEMPT') || !liveSmoke.includes('Date.now()')) {
+  throw new Error('Live production smoke must generate a unique identity for every rerun attempt');
+}
+
 const renderBlueprint = fs.readFileSync(new URL('../render.yaml', import.meta.url), 'utf8');
 if (!renderBlueprint.includes('qwen/qwen3.8-27b,openai/gpt-oss-120b,openai/gpt-oss-20b')) {
   throw new Error('Render must configure a resilient Groq model order for Luna');
