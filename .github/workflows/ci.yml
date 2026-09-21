@@ -43,8 +43,8 @@ jobs:
         run: npm ci
       - name: Dependency audit
         run: npm audit
-      - name: Install Chromium for video checks
-        run: npx playwright install --with-deps chromium
+      - name: Install browsers for device and video checks
+        run: npx playwright install --with-deps chromium webkit
       - name: Typecheck
         run: npm run lint
       - name: Build
@@ -57,6 +57,8 @@ jobs:
         run: node scripts/test-integration.mjs
       - name: Authenticated multi-page application smoke
         run: node scripts/test-app-smoke.mjs
+      - name: PC Android iPhone network recovery matrix
+        run: node scripts/test-device-matrix.mjs
       - name: Three-browser camera, microphone and reconnect test
         run: node scripts/test-video-meeting.mjs
       - name: Upload video diagnostics on failure
