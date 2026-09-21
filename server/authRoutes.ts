@@ -21,6 +21,7 @@ import {
   validateMeetingPassword,
 } from './core.js';
 import { sendTransactionalEmail } from './emailDelivery.js';
+import { resolveAllowedClientOrigin } from './originPolicy.js';
 
 const challenges = new Map<string, { profile: any; createdAt: number }>();
 const oauthStates = new Map<string, { redirectTo: string; clientOrigin: string; createdAt: number }>();
@@ -312,7 +313,10 @@ export const registerAuthRoutes = (app: express.Express) => {
     if (!authorizeUrl || !clientId) return sendApiError(response, 503, 'MBOTE_AUTH_NOT_CONFIGURED', 'OAuth MBoté non configuré.');
     const state = createToken();
     const redirectTo = String(request.query.redirect || '/app');
-    const clientOrigin = String(process.env.MBOTE_ROOM_APP_URL || getOrigin(request)).replace(/\/+$/, '');
+    const clientOrigin = resolveAllowedClientOrigin(
+      request.headers.origin,
+      process.env.MBOTE_ROOM_APP_URL || getOrigin(request),
+    );
     oauthStates.set(state, { redirectTo: redirectTo.startsWith('/') ? redirectTo : '/app', clientOrigin, createdAt: Date.now() });
     const url = new URL(authorizeUrl);
     url.searchParams.set('client_id', clientId);
