@@ -82,7 +82,6 @@ if (!liveSmoke.includes('GITHUB_RUN_ATTEMPT') || !liveSmoke.includes('Date.now()
   throw new Error('Live production smoke must generate a unique identity for every rerun attempt');
 }
 
-const packageJson = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 if (!String(packageJson.scripts?.start || '').includes('wait-for-ci-gate.mjs')) {
   throw new Error('Production start must wait for the CI release gate');
 }
@@ -90,12 +89,26 @@ const releaseGate = fs.readFileSync(new URL('../scripts/wait-for-ci-gate.mjs', i
 if (!releaseGate.includes('RENDER_GIT_COMMIT') || !releaseGate.includes('MBoteRoom CI') || !releaseGate.includes("run.conclusion === 'success'")) {
   throw new Error('Render release gate must verify the exact deployed commit has a successful MBoteRoom CI run');
 }
+const deviceMatrix = fs.readFileSync(new URL('../scripts/test-device-matrix.mjs', import.meta.url), 'utf8');
+if (!deviceMatrix.includes('PC Chromium') || !deviceMatrix.includes('Android Pixel 7') || !deviceMatrix.includes('iPhone 15 WebKit') || !deviceMatrix.includes('setOffline')) {
+  throw new Error('CI must cover PC, Android, iPhone and network recovery');
+}
+if (!server.includes('MBOTE_ROOM_RELEASE_EMAIL_TEST_TO') || !server.includes('release email probe')) {
+  throw new Error('Production server must support the private release email delivery probe');
+}
+const vercelConfig = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+if (vercelConfig.buildCommand !== 'npm run build:frontend' || vercelConfig.outputDirectory !== 'dist') {
+  throw new Error('Vercel must use the frontend-only production build');
+}
 const renderBlueprint = fs.readFileSync(new URL('../render.yaml', import.meta.url), 'utf8');
 if (!renderBlueprint.includes('qwen/qwen3.8-27b,openai/gpt-oss-120b,openai/gpt-oss-20b')) {
   throw new Error('Render must configure a resilient Groq model order for Luna');
 }
 if (!renderBlueprint.includes('https://mbote-room.vercel.app')) {
   throw new Error('Render CORS configuration must allow the MBotéRoom Vercel frontend');
+}
+if (!renderBlueprint.includes('https://mboteroom.loukatech.com')) {
+  throw new Error('Render CORS configuration must be ready for the official MBotéRoom domain');
 }
 if (!renderBlueprint.includes('MBOTE_ROOM_ALLOWED_ORIGIN_PATTERNS') || !renderBlueprint.includes('https://mbote-room-*.vercel.app')) {
   throw new Error('Render CORS configuration must allow only MBotéRoom Vercel preview origins');
@@ -109,6 +122,9 @@ if (!renderBlueprint.includes('autoDeployTrigger: checksPass')) {
 }
 if (!renderBlueprint.includes('MBOTE_ROOM_REQUIRE_CI_GATE') || !renderBlueprint.includes('MBOTE_ROOM_REQUIRED_WORKFLOW')) {
   throw new Error('Render blueprint must enable the runtime CI release gate');
+}
+if (!readiness.includes('MBOTE_ROOM_REQUIRE_LIVEKIT') || !readiness.includes('MBOTE_ROOM_REQUIRE_SERVER_RECORDING')) {
+  throw new Error('Readiness must support enforcing LiveKit and server recording when V1 credentials are enabled');
 }
 
 const appRoutes = fs.readFileSync(new URL('../server/appRoutes.ts', import.meta.url), 'utf8');
