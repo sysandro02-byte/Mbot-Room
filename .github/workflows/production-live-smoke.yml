@@ -1,11 +1,14 @@
 name: MBoteRoom Live Production Smoke
 
 on:
-  pull_request:
+  push:
+    branches:
+      - main
     paths:
       - 'scripts/test-production-live.mjs'
       - '.github/workflows/production-live-smoke.yml'
       - 'server/meetingRoutes.ts'
+      - 'server/appRoutes.ts'
       - 'render.yaml'
       - '.env.example'
   workflow_dispatch:
