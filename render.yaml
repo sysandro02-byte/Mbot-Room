@@ -14,6 +14,12 @@ services:
         value: "22.22.0"
       - key: NODE_OPTIONS
         value: "--max-old-space-size=192"
+      - key: MBOTE_ROOM_REQUIRE_CI_GATE
+        value: "true"
+      - key: MBOTE_ROOM_GITHUB_REPOSITORY
+        value: sysandro02-byte/Mbot-Room
+      - key: MBOTE_ROOM_REQUIRED_WORKFLOW
+        value: MBoteRoom CI
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_MODE
