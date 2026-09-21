@@ -1,4 +1,4 @@
-import { apiUrl, getAuthHeaders } from '../lib/api';
+import { apiUrl, getApiBaseUrl, getAuthHeaders } from '../lib/api';
 
 export type RoomUser = {
   id: string;
@@ -72,10 +72,10 @@ const saveSession = ({ user, token, expiresAt }: AuthResponse, persist: boolean)
   window.dispatchEvent(new CustomEvent('mbote-room-auth-changed'));
 };
 
-const authRequestHeaders = {
+const authRequestHeaders = () => ({
   'Content-Type': 'application/json',
-  'X-MBote-Room-Session-Mode': 'bearer',
-};
+  ...(getApiBaseUrl() ? { 'X-MBote-Room-Session-Mode': 'bearer' } : {}),
+});
 
 const fetchAuth = async (input: RequestInfo | URL, init: RequestInit = {}) => {
   const controller = new AbortController();
@@ -95,7 +95,7 @@ const fetchAuth = async (input: RequestInfo | URL, init: RequestInit = {}) => {
 const postAuth = async (path: string, body: unknown): Promise<AuthResponse> => {
   const response = await fetchAuth(apiUrl(path), {
     method: 'POST',
-    headers: authRequestHeaders,
+    headers: authRequestHeaders(),
     body: JSON.stringify(body),
     credentials: 'include',
   });
@@ -126,7 +126,7 @@ export const authService = {
   async guestJoin(payload: { name: string; meetingCode: string; password: string }) {
     const response = await fetchAuth(apiUrl('/api/auth/guest-join'), {
       method: 'POST',
-      headers: authRequestHeaders,
+      headers: authRequestHeaders(),
       body: JSON.stringify(payload),
       credentials: 'include',
     });
@@ -160,7 +160,7 @@ export const authService = {
 
   async authorizeMbote(challengeId: string, redirectTo = '/app') {
     const response = await fetchAuth(apiUrl('/api/auth/mbote/authorize'), {
-      method: 'POST', headers: authRequestHeaders, body: JSON.stringify({ challengeId }),
+      method: 'POST', headers: authRequestHeaders(), body: JSON.stringify({ challengeId }),
       credentials: 'include',
     });
     const result = await readJson(response);
@@ -205,7 +205,7 @@ export const authService = {
   async forgotPassword(email: string) {
     const response = await fetchAuth(apiUrl('/api/auth/forgot-password'), {
       method: 'POST',
-      headers: authRequestHeaders,
+      headers: authRequestHeaders(),
       body: JSON.stringify({ email }),
       credentials: 'include',
     });
