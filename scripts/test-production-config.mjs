@@ -57,4 +57,26 @@ if (!renderBlueprint.includes('https://mbote-room.vercel.app')) {
   throw new Error('Render CORS configuration must allow the MBotéRoom Vercel frontend');
 }
 
+const appRoutes = fs.readFileSync(new URL('../server/appRoutes.ts', import.meta.url), 'utf8');
+const sfuRoutes = fs.readFileSync(new URL('../server/sfuRoutes.ts', import.meta.url), 'utf8');
+for (const source of [appRoutes, sfuRoutes]) {
+  if (!source.includes('MBOTEROOM_TURN_URL') || !source.includes('MBOTEROOM_TURN_USERNAME') || !source.includes('MBOTEROOM_TURN_CREDENTIAL')) {
+    throw new Error('Runtime media readiness must recognize static Metered TURN configuration');
+  }
+}
+
+const manifestPath = new URL('../public/manifest.webmanifest', import.meta.url);
+const serviceWorkerPath = new URL('../public/sw.js', import.meta.url);
+if (!fs.existsSync(manifestPath) || !fs.existsSync(serviceWorkerPath)) {
+  throw new Error('Installable PWA manifest and service worker are required');
+}
+const serviceWorker = fs.readFileSync(serviceWorkerPath, 'utf8');
+if (!serviceWorker.includes("url.pathname.startsWith('/api/')") || !serviceWorker.includes("url.pathname.startsWith('/socket.io/')")) {
+  throw new Error('PWA service worker must never cache API or Socket.IO traffic');
+}
+const indexHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+if (!indexHtml.includes('rel="manifest"') || !indexHtml.includes('theme-color')) {
+  throw new Error('PWA metadata is missing from index.html');
+}
+
 console.log('Production configuration smoke checks passed.');
