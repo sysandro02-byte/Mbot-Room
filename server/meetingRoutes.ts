@@ -177,7 +177,18 @@ type ActusMeetingPayload = Meeting & {
 const callGroq = async (system: string, prompt: string) => {
   const key = String(process.env.GROQ_API_KEY || '').trim();
   if (!key) return null;
-  const models = String(process.env.GROQ_MODEL || 'openai/gpt-oss-20b,openai/gpt-oss-120b').split(',').map((m) => m.trim()).filter(Boolean);
+
+  const configuredModels = String(process.env.GROQ_MODEL || '')
+    .split(',')
+    .map((model) => model.trim())
+    .filter(Boolean);
+  const fallbackModels = [
+    'qwen/qwen3.8-27b',
+    'openai/gpt-oss-120b',
+    'openai/gpt-oss-20b',
+  ];
+  const models = [...new Set([...configuredModels, ...fallbackModels])];
+
   for (const model of models) {
     let response: Response | null = null;
     try {
