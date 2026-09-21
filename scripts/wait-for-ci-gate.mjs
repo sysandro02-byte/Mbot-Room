@@ -1,3 +1,5 @@
+import http from 'node:http';
+
 const enabled = String(process.env.MBOTE_ROOM_REQUIRE_CI_GATE || '').toLowerCase() === 'true';
 
 if (!enabled) {
@@ -10,11 +12,60 @@ const repoFullName = String(process.env.MBOTE_ROOM_GITHUB_REPOSITORY || 'sysandr
 const workflowName = String(process.env.MBOTE_ROOM_REQUIRED_WORKFLOW || 'MBoteRoom CI').trim();
 const timeoutMs = Math.max(60_000, Number(process.env.MBOTE_ROOM_CI_GATE_TIMEOUT_MS || 600_000));
 const pollMs = Math.max(10_000, Number(process.env.MBOTE_ROOM_CI_GATE_POLL_MS || 15_000));
+const port = Number(process.env.PORT || 10000);
 
 if (!commit) {
   console.error('[release-gate] RENDER_GIT_COMMIT is missing; refusing production startup.');
   process.exit(1);
 }
+
+let gateServer = null;
+
+const closeGateServer = async () => {
+  if (!gateServer?.listening) return;
+  await new Promise((resolve) => gateServer.close(() => resolve()));
+};
+
+const exitGate = async (code) => {
+  await closeGateServer();
+  process.exit(code);
+};
+
+// Render scans for an open PORT while a new revision starts. The CI gate can take
+// several minutes, so expose a temporary *not-ready* HTTP listener while waiting.
+// Returning 503 on the health path prevents the gated revision from receiving
+// production traffic until the required GitHub workflow succeeds.
+gateServer = http.createServer((request, response) => {
+  response.statusCode = 503;
+  response.setHeader('Content-Type', 'application/json; charset=utf-8');
+  response.setHeader('Cache-Control', 'no-store');
+  response.end(JSON.stringify({
+    ok: false,
+    status: 'waiting-for-ci',
+    workflow: workflowName,
+    commit: commit.slice(0, 12),
+    path: request.url || '/',
+  }));
+});
+
+await new Promise((resolve, reject) => {
+  const onError = (error) => {
+    gateServer?.off('listening', onListening);
+    reject(error);
+  };
+  const onListening = () => {
+    gateServer?.off('error', onError);
+    resolve();
+  };
+  gateServer.once('error', onError);
+  gateServer.once('listening', onListening);
+  gateServer.listen(port, '0.0.0.0');
+}).catch((error) => {
+  console.error('[release-gate] Unable to open temporary Render gate listener.', error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});
+
+console.log(`[release-gate] Temporary not-ready listener active on 0.0.0.0:${port} while waiting for CI.`);
 
 const endpoint = `https://api.github.com/repos/${repoFullName}/actions/runs?head_sha=${encodeURIComponent(commit)}&per_page=30`;
 const deadline = Date.now() + timeoutMs;
@@ -49,11 +100,11 @@ while (Date.now() < deadline) {
     } else if (run.status === 'completed') {
       if (run.conclusion === 'success') {
         console.log(`[release-gate] "${workflowName}" passed for ${commit.slice(0, 12)}. Starting production.`);
-        process.exit(0);
+        await exitGate(0);
       }
 
       console.error(`[release-gate] "${workflowName}" completed with ${run.conclusion || 'unknown'}; refusing production startup.`);
-      process.exit(1);
+      await exitGate(1);
     } else {
       lastState = `${run.status || 'unknown'}`;
       console.log(`[release-gate] "${workflowName}" is ${lastState}; waiting…`);
@@ -67,4 +118,4 @@ while (Date.now() < deadline) {
 }
 
 console.error(`[release-gate] Timed out while waiting for "${workflowName}" (${lastState}); refusing production startup.`);
-process.exit(1);
+await exitGate(1);
