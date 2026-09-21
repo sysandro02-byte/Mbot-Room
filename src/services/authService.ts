@@ -148,7 +148,7 @@ export const authService = {
   },
 
   async verifyMboteCredentials(identifier: string, password: string) {
-    const response = await fetch(apiUrl('/api/auth/mbote/credentials'), {
+    const response = await fetchAuth(apiUrl('/api/auth/mbote/credentials'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier, password }),
       credentials: 'include',
@@ -173,7 +173,7 @@ export const authService = {
     return { ...session, redirectTo };
   },
   async startMboteAuth(redirectTo = '/app') {
-    const response = await fetch(apiUrl(`/api/auth/mbote/start?redirect=${encodeURIComponent(redirectTo)}`), { credentials: 'include' });
+    const response = await fetchAuth(apiUrl(`/api/auth/mbote/start?redirect=${encodeURIComponent(redirectTo)}`), { credentials: 'include' });
     const result = await readJson(response);
     if (!response.ok) {
       throw new Error(result.error || "Authentification MBoté indisponible.");
@@ -217,7 +217,7 @@ export const authService = {
   },
 
   async refreshCurrentUser() {
-    const response = await fetch(apiUrl('/api/auth/me'), {
+    const response = await fetchAuth(apiUrl('/api/auth/me'), {
       headers: getAuthHeaders(),
       credentials: 'include',
     });
