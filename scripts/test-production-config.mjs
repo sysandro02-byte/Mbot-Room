@@ -104,8 +104,11 @@ if (vercelConfig.buildCommand !== 'npm run build:frontend' || vercelConfig.outpu
   throw new Error('Vercel must use the frontend-only production build');
 }
 const renderBlueprint = fs.readFileSync(new URL('../render.yaml', import.meta.url), 'utf8');
-if (!renderBlueprint.includes('qwen/qwen3.8-27b,openai/gpt-oss-120b,openai/gpt-oss-20b')) {
-  throw new Error('Render must configure a resilient Groq model order for Luna');
+if (!renderBlueprint.includes('openai/gpt-oss-120b,openai/gpt-oss-20b')) {
+  throw new Error('Render must configure production Groq models for Luna');
+}
+if (renderBlueprint.includes('qwen/qwen3.8-27b')) {
+  throw new Error('Render production config must not use the project-blocked Qwen preview model');
 }
 if (!renderBlueprint.includes('https://mbote-room.vercel.app')) {
   throw new Error('Render CORS configuration must allow the MBotéRoom Vercel frontend');
