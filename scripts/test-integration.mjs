@@ -332,8 +332,24 @@ try {
   assert.equal(hostMe.response.status, 200);
   assert.equal(hostMe.data.user.email, 'host.integration@mbote.test');
 
+  const browserLogin = await jsonRequest('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({
+      email: 'host.integration@mbote.test',
+      password: 'Password2026!',
+      rememberMe: true,
+    }),
+  });
+  assert.equal(browserLogin.response.status, 200, JSON.stringify(browserLogin.data));
+  assert.equal(browserLogin.data.token, undefined, 'Web login must not expose the bearer token');
+  assert.equal(browserLogin.data.user.email, 'host.integration@mbote.test');
+  const browserCookieHeader = browserLogin.response.headers.get('set-cookie') || '';
+  assert.match(browserCookieHeader, /mbote_room_session=/);
+  assert.match(browserCookieHeader, /HttpOnly/i);
+  const browserCookie = browserCookieHeader.split(';')[0];
+
   const hostMeCookieOnly = await jsonRequest('/api/auth/me', {
-    headers: { Cookie: host.cookie },
+    headers: { Cookie: browserCookie },
   });
   assert.equal(hostMeCookieOnly.response.status, 200, JSON.stringify(hostMeCookieOnly.data));
   assert.equal(hostMeCookieOnly.data.user.email, 'host.integration@mbote.test');
@@ -353,7 +369,7 @@ try {
   assert.match(webLoginCookie, /mbote_room_session=/);
   assert.match(webLoginCookie, /HttpOnly/i);
 
-  const cookieSocket = await socketConnectWithCookie(host.cookie);
+  const cookieSocket = await socketConnectWithCookie(browserCookie);
   assert.equal(cookieSocket.connected, true);
   cookieSocket.close();
 
