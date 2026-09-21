@@ -1,3 +1,4 @@
+import { getEmailDeliveryStatus } from './emailDelivery.js';
 export type RuntimeReadiness = {
   database: {
     type: string;
@@ -6,6 +7,10 @@ export type RuntimeReadiness = {
   integrations: {
     groq: boolean;
     transcription: boolean;
+    email: boolean;
+    emailProvider: string;
+    mailRelay: boolean;
+    brevo: boolean;
     resend: boolean;
     mboteAuth: boolean;
     livekit: boolean;
@@ -23,7 +28,7 @@ export const getRuntimeReadiness = (databaseType: string): RuntimeReadiness => {
   const persistentDatabase = databaseType === 'postgres';
   const groq = has(process.env.GROQ_API_KEY);
   const transcription = has(process.env.GROQ_TRANSCRIPTION_API_KEY) || groq;
-  const resend = has(process.env.RESEND_API_KEY) && has(process.env.MEETING_INVITE_FROM);
+  const emailDelivery = getEmailDeliveryStatus();
   const mboteAuth = has(process.env.MBOTE_AUTH_BASE_URL) && has(process.env.MBOTE_AUTH_CLIENT_ID);
   const livekit = has(process.env.LIVEKIT_URL) && has(process.env.LIVEKIT_API_KEY) && has(process.env.LIVEKIT_API_SECRET);
   const dynamicTurn = has(process.env.TURN_URLS) && has(process.env.TURN_SHARED_SECRET);
@@ -42,7 +47,7 @@ export const getRuntimeReadiness = (databaseType: string): RuntimeReadiness => {
   const blockers: string[] = [];
   if (!persistentDatabase) blockers.push('persistent_database');
   if (!groq) blockers.push('luna_groq');
-  if (!resend) blockers.push('email_resend');
+  if (!emailDelivery.configured) blockers.push('email_delivery');
   if (!livekit && !turn) blockers.push('resilient_media');
 
   return {
@@ -53,7 +58,11 @@ export const getRuntimeReadiness = (databaseType: string): RuntimeReadiness => {
     integrations: {
       groq,
       transcription,
-      resend,
+      email: emailDelivery.configured,
+      emailProvider: emailDelivery.provider,
+      mailRelay: emailDelivery.relay,
+      brevo: emailDelivery.brevo,
+      resend: emailDelivery.resend,
       mboteAuth,
       livekit,
       turn,
