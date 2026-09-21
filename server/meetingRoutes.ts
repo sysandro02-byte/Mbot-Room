@@ -22,6 +22,7 @@ import {
   sendApiError,
   validateMeetingPassword,
 } from './core.js';
+import { getEmailDeliveryStatus, sendTransactionalEmail } from './emailDelivery.js';
 
 const findMeetingByValue = async (value: unknown): Promise<Meeting | null> => {
   const normalized = String(value || '').replace(/\s+/g, '').toLowerCase();
@@ -73,27 +74,23 @@ const escapeHtml = (value: unknown) => String(value || '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
 const sendInvitations = async (meeting: Meeting, emails: string[], password: string, request: express.Request) => {
-  if (!emails.length) return { configured: Boolean(process.env.RESEND_API_KEY), sent: 0, failed: 0 };
-  const apiKey = String(process.env.RESEND_API_KEY || '').trim();
-  if (!apiKey) return { configured: false, sent: 0, failed: emails.length };
+  const status = getEmailDeliveryStatus();
+  if (!emails.length) return { configured: status.configured, sent: 0, failed: 0 };
+  if (!status.configured) return { configured: false, sent: 0, failed: emails.length };
+
   const clientOrigin = String(process.env.MBOTE_ROOM_APP_URL || request.headers.origin || '').replace(/\/+$/, '');
   const joinUrl = `${clientOrigin}/join/${encodeURIComponent(meeting.meeting_link)}`;
   const meetingId = String(meeting.settings.meetingAccessId || meeting.id);
-  const results = await Promise.all(emails.map(async (email) => {
-    const result = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: String(process.env.MEETING_INVITE_FROM || 'MBotéRoom <onboarding@resend.dev>'),
-        to: [email],
-        subject: `Invitation MBotéRoom : ${meeting.title}`,
-        text: `${meeting.host_name} vous invite à « ${meeting.title} ».\nID : ${meetingId}\n${password ? `Mot de passe : ${password}\n` : ''}Rejoindre : ${joinUrl}`,
-        html: `<div style="font-family:Arial,sans-serif;color:#17213c"><h2>Invitation MBotéRoom</h2><p><strong>${escapeHtml(meeting.host_name)}</strong> vous invite à <strong>${escapeHtml(meeting.title)}</strong>.</p><p>ID : <strong>${escapeHtml(meetingId)}</strong>${password ? `<br>Mot de passe : <strong>${escapeHtml(password)}</strong>` : ''}</p><p><a href="${escapeHtml(joinUrl)}">Rejoindre la réunion</a></p></div>`,
-      }),
-      signal: AbortSignal.timeout(12000),
-    }).catch(() => null);
-    return Boolean(result?.ok);
-  }));
+
+  const results = await Promise.all(emails.map(async (email) => sendTransactionalEmail({
+    to: email,
+    subject: `Invitation MBotéRoom : ${meeting.title}`,
+    text: `${meeting.host_name} vous invite à « ${meeting.title} ».
+ID : ${meetingId}
+${password ? `Mot de passe : ${password}\n` : ''}Rejoindre : ${joinUrl}`,
+    html: `<div style="font-family:Arial,sans-serif;color:#17213c"><h2>Invitation MBotéRoom</h2><p><strong>${escapeHtml(meeting.host_name)}</strong> vous invite à <strong>${escapeHtml(meeting.title)}</strong>.</p><p>ID : <strong>${escapeHtml(meetingId)}</strong>${password ? `<br>Mot de passe : <strong>${escapeHtml(password)}</strong>` : ''}</p><p><a href="${escapeHtml(joinUrl)}">Rejoindre la réunion</a></p></div>`,
+  })));
+
   const sent = results.filter(Boolean).length;
   return { configured: true, sent, failed: emails.length - sent };
 };
