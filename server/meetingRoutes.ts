@@ -177,7 +177,7 @@ type ActusMeetingPayload = Meeting & {
 const callGroq = async (system: string, prompt: string) => {
   const key = String(process.env.GROQ_API_KEY || '').trim();
   if (!key) return null;
-  const models = String(process.env.GROQ_MODEL || 'llama-3.1-8b-instant').split(',').map((m) => m.trim()).filter(Boolean);
+  const models = String(process.env.GROQ_MODEL || 'openai/gpt-oss-20b,openai/gpt-oss-120b').split(',').map((m) => m.trim()).filter(Boolean);
   for (const model of models) {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
