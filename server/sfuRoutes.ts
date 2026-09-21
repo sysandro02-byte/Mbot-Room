@@ -77,7 +77,12 @@ export const registerSfuRoutes = (app: express.Express) => {
       preferredMode: mode === 'mesh' ? 'mesh' : livekitReady ? 'livekit' : 'mesh',
       browserTransport: 'mesh',
       livekitReady,
-      turnConfigured: Boolean(String(process.env.TURN_URLS || '').trim() && String(process.env.TURN_SHARED_SECRET || '').trim()),
+      turnConfigured: Boolean(
+        (String(process.env.TURN_URLS || '').trim() && String(process.env.TURN_SHARED_SECRET || '').trim())
+        || (String(process.env.MBOTEROOM_TURN_URL || '').trim()
+          && String(process.env.MBOTEROOM_TURN_USERNAME || '').trim()
+          && String(process.env.MBOTEROOM_TURN_CREDENTIAL || '').trim())
+      ),
       serverRecordingReady: isServerRecordingReady(),
     });
   });
