@@ -49,6 +49,20 @@ services:
         value: "30000"
       - key: CAPTION_CHUNK_SECONDS
         value: "10"
+      - key: MBOTE_MAIL_RELAY_URL
+        value: https://mbote-mobile-backend.onrender.com/api/v1/internal/mbote-room/email
+      - key: MBOTE_ROOM_MAIL_SECRET
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_API_URL
+        value: https://api.brevo.com/v3/smtp/email
+      - key: BREVO_SENDER_EMAIL
+        value: contacts@loukatech.com
+      - key: BREVO_SENDER_NAME
+        value: MBotéRoom
+      - key: EMAIL_REPLY_TO
+        value: nzotocare@gmail.com
       - key: RESEND_API_KEY
         sync: false
       - key: MEETING_INVITE_FROM
