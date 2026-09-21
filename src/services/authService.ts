@@ -79,7 +79,7 @@ const authRequestHeaders = {
 
 const fetchAuth = async (input: RequestInfo | URL, init: RequestInit = {}) => {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 20_000);
+  const timeout = window.setTimeout(() => controller.abort(), 45_000);
   try {
     return await fetch(input, { ...init, signal: init.signal || controller.signal });
   } catch (error) {
