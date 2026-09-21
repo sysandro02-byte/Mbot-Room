@@ -4,6 +4,7 @@ import { chromium } from '@playwright/test';
 // This suite targets the already deployed production services.
 const frontendUrl = String(process.env.MBOTE_ROOM_FRONTEND_URL || 'https://mbote-room.vercel.app').replace(/\/+$/, '');
 const backendUrl = String(process.env.MBOTE_ROOM_BACKEND_URL || 'https://mbote-room-api.onrender.com').replace(/\/+$/, '');
+const appUrl = String(process.env.MBOTE_ROOM_SMOKE_APP_URL || backendUrl).replace(/\/+$/, '');
 const runSuffix = [process.env.GITHUB_RUN_ID, process.env.GITHUB_RUN_ATTEMPT, Date.now()]
   .filter(Boolean)
   .join('-')
@@ -78,7 +79,7 @@ const openMeeting = async (browser, session, meetingId, label) => {
     locale: 'fr-FR',
     permissions: ['camera', 'microphone'],
   });
-  await context.grantPermissions(['camera', 'microphone'], { origin: frontendUrl });
+  await context.grantPermissions(['camera', 'microphone'], { origin: appUrl });
 
   await context.addInitScript(({ user, token }) => {
     localStorage.setItem('user', JSON.stringify(user));
@@ -111,8 +112,17 @@ const openMeeting = async (browser, session, meetingId, label) => {
     }
   });
 
-  await page.goto(`${frontendUrl}/reunions/${meetingId}`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-  await page.locator('.room-v2-shell').waitFor({ state: 'visible', timeout: 30_000 });
+  await page.goto(`${appUrl}/reunions/${meetingId}`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+  try {
+    await page.locator('.room-v2-shell').waitFor({ state: 'visible', timeout: 30_000 });
+  } catch (error) {
+    const diagnostics = await page.evaluate(() => ({
+      href: location.href,
+      title: document.title,
+      text: document.body?.innerText?.slice(0, 2000) || '',
+    })).catch(() => ({ href: page.url(), title: '', text: '' }));
+    throw new Error(`${label} meeting UI unavailable at exact production app: ${JSON.stringify(diagnostics)}`, { cause: error });
+  }
   return { context, page, browserErrors, label };
 };
 
@@ -345,6 +355,7 @@ try {
     ok: true,
     frontendUrl,
     backendUrl,
+    appUrl,
     meetingId: meeting.id,
     meetingLink: meeting.meeting_link,
     hostEmail,
