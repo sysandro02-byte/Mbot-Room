@@ -5,6 +5,9 @@ on:
     paths:
       - 'scripts/test-production-live.mjs'
       - '.github/workflows/production-live-smoke.yml'
+      - 'server/meetingRoutes.ts'
+      - 'render.yaml'
+      - '.env.example'
   workflow_dispatch:
 
 permissions:
