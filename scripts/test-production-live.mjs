@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from '@playwright/test';
 
+// This suite targets the already deployed production services.
 const frontendUrl = String(process.env.MBOTE_ROOM_FRONTEND_URL || 'https://mbote-room.vercel.app').replace(/\/+$/, '');
 const backendUrl = String(process.env.MBOTE_ROOM_BACKEND_URL || 'https://mbote-room-api.onrender.com').replace(/\/+$/, '');
 const runSuffix = String(process.env.GITHUB_RUN_ID || Date.now()).replace(/\D/g, '').slice(-10) || String(Date.now());
