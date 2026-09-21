@@ -12,6 +12,9 @@ export const registerRtcRoutes = (app: express.Express) => {
     const stunUrls = splitUrls(process.env.STUN_URLS);
     const turnUrls = splitUrls(process.env.TURN_URLS);
     const sharedSecret = String(process.env.TURN_SHARED_SECRET || '').trim();
+    const staticTurnUrls = splitUrls(process.env.MBOTEROOM_TURN_URL);
+    const staticTurnUsername = String(process.env.MBOTEROOM_TURN_USERNAME || '').trim();
+    const staticTurnCredential = String(process.env.MBOTEROOM_TURN_CREDENTIAL || '').trim();
     const ttlSeconds = Math.max(300, Math.min(86400, Number(process.env.TURN_CREDENTIAL_TTL_SECONDS || 3600)));
 
     const iceServers: Array<{ urls: string | string[]; username?: string; credential?: string }> = [
@@ -28,6 +31,13 @@ export const registerRtcRoutes = (app: express.Express) => {
       iceServers.push({ urls: turnUrls, username, credential });
       turnConfigured = true;
       expiresAt = new Date(expires * 1000).toISOString();
+    } else if (staticTurnUrls.length && staticTurnUsername && staticTurnCredential) {
+      iceServers.push({
+        urls: staticTurnUrls,
+        username: staticTurnUsername,
+        credential: staticTurnCredential,
+      });
+      turnConfigured = true;
     }
 
     response.setHeader('Cache-Control', 'no-store');

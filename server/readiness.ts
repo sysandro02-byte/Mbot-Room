@@ -26,7 +26,11 @@ export const getRuntimeReadiness = (databaseType: string): RuntimeReadiness => {
   const resend = has(process.env.RESEND_API_KEY) && has(process.env.MEETING_INVITE_FROM);
   const mboteAuth = has(process.env.MBOTE_AUTH_BASE_URL) && has(process.env.MBOTE_AUTH_CLIENT_ID);
   const livekit = has(process.env.LIVEKIT_URL) && has(process.env.LIVEKIT_API_KEY) && has(process.env.LIVEKIT_API_SECRET);
-  const turn = has(process.env.TURN_URLS) && has(process.env.TURN_SHARED_SECRET);
+  const dynamicTurn = has(process.env.TURN_URLS) && has(process.env.TURN_SHARED_SECRET);
+  const staticTurn = has(process.env.MBOTEROOM_TURN_URL)
+    && has(process.env.MBOTEROOM_TURN_USERNAME)
+    && has(process.env.MBOTEROOM_TURN_CREDENTIAL);
+  const turn = dynamicTurn || staticTurn;
   const egressEnabled = String(process.env.LIVEKIT_EGRESS_ENABLED || '').trim().toLowerCase() === 'true';
   const defaultStorage = String(process.env.LIVEKIT_EGRESS_USE_SERVER_DEFAULT_STORAGE || '').trim().toLowerCase() === 'true';
   const s3Storage = has(process.env.LIVEKIT_EGRESS_S3_BUCKET)

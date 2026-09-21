@@ -16,7 +16,7 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_MODE
-        value: pgmem-test
+        value: postgres
       - key: ADMIN_EMAILS
         sync: false
       - key: MBOTE_ROOM_APP_URL
@@ -61,6 +61,12 @@ services:
         sync: false
       - key: TURN_CREDENTIAL_TTL_SECONDS
         value: "3600"
+      - key: MBOTEROOM_TURN_URL
+        sync: false
+      - key: MBOTEROOM_TURN_USERNAME
+        sync: false
+      - key: MBOTEROOM_TURN_CREDENTIAL
+        sync: false
       - key: MEDIA_TRANSPORT
         value: auto
       - key: LIVEKIT_URL

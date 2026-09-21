@@ -210,6 +210,22 @@ export const registerRealtime = (io: Server) => {
       callback?.({ ok: true });
     });
 
+    socket.on('meeting:request-renegotiation', (payload: any, callback?: Ack) => {
+      const meetingId = Number(socket.data.meetingId || 0);
+      const targetSocketId = String(payload?.targetSocketId || '');
+      const source = meetings.get(meetingId)?.get(socket.id);
+      const target = meetings.get(meetingId)?.get(targetSocketId);
+      if (!meetingId || Number(payload?.meetingId || meetingId) !== meetingId || !source || !target || source.breakoutRoomId !== target.breakoutRoomId) {
+        return callback?.(fail('REALTIME_TARGET_INVALID', 'Participant cible introuvable dans cette salle média.'));
+      }
+      io.to(targetSocketId).emit('meeting:renegotiation-requested', {
+        meetingId,
+        fromSocketId: socket.id,
+        fromUserId: user.id,
+      });
+      callback?.({ ok: true });
+    });
+
     socket.on('disconnect', () => {
       void removeSocketFromMeeting(io, socket);
     });
