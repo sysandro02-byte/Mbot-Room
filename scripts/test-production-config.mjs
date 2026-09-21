@@ -51,6 +51,26 @@ if (!apiClient.includes('https://mbote-room-api.onrender.com')) {
 if (!apiClient.includes("parsed.hostname.endsWith('.invalid')")) {
   throw new Error('Invalid placeholder API hosts must be rejected in production');
 }
+if (!apiClient.includes('export const apiFetch') || !apiClient.includes('Impossible de joindre le serveur MBotéRoom')) {
+  throw new Error('Frontend API requests must use centralized network timeout/error handling');
+}
+const resilientClientFiles = [
+  '../src/services/meetingService.ts',
+  '../src/services/appDataService.ts',
+  '../src/services/notificationService.ts',
+  '../src/services/transcriptionService.ts',
+  '../src/services/collaborationService.ts',
+  '../src/services/mediaTransportService.ts',
+  '../src/services/adminDashboardService.ts',
+  '../src/lib/webrtc.ts',
+  '../src/pages/GuestJoinPage.tsx',
+];
+for (const relativePath of resilientClientFiles) {
+  const source = fs.readFileSync(new URL(relativePath, import.meta.url), 'utf8');
+  if (source.includes('fetch(apiUrl(')) {
+    throw new Error(`Direct fetch(apiUrl(...)) bypasses resilient API handling in ${relativePath}`);
+  }
+}
 
 const renderBlueprint = fs.readFileSync(new URL('../render.yaml', import.meta.url), 'utf8');
 if (!renderBlueprint.includes('https://mbote-room.vercel.app')) {
