@@ -22,7 +22,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { authService } from '../services/authService';
-import { apiUrl } from '../lib/api';
+import { apiFetch, apiUrl } from '../lib/api';
 import './GuestJoinPage.css';
 
 type JoinForm = {
@@ -150,7 +150,7 @@ export default function GuestJoinPage() {
     let cancelled = false;
     const loadGuestSlides = async () => {
       try {
-        const response = await fetch(apiUrl('/api/public/guest-access-slides'));
+        const response = await apiFetch(apiUrl('/api/public/guest-access-slides'));
         const payload = await response.json().catch(() => []);
         if (!response.ok || !Array.isArray(payload)) return;
         if (!cancelled) setGuestSlides(payload.filter((slide: GuestAccessSlide) => slide.isActive));
@@ -171,7 +171,7 @@ export default function GuestJoinPage() {
     const loadRecentMeetings = async () => {
       setRecentMeetingsState('loading');
       try {
-        const response = await fetch(apiUrl('/api/public/meetings'));
+        const response = await apiFetch(apiUrl('/api/public/meetings'));
         const payload = await response.json().catch(() => []);
         if (!response.ok || !Array.isArray(payload)) {
           throw new Error('Chargement impossible.');
