@@ -19,6 +19,7 @@ import {
   toPublicUser,
   validateMeetingPassword,
 } from './core.js';
+import { sendTransactionalEmail } from './emailDelivery.js';
 
 const challenges = new Map<string, { profile: any; createdAt: number }>();
 const oauthStates = new Map<string, { redirectTo: string; clientOrigin: string; createdAt: number }>();
@@ -131,21 +132,12 @@ const findMeeting = async (value: unknown) => {
   ) || null;
 };
 
-const sendResetEmail = async (email: string, resetUrl: string) => {
-  const apiKey = String(process.env.RESEND_API_KEY || '').trim();
-  if (!apiKey) return false;
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: String(process.env.MEETING_INVITE_FROM || 'MBotéRoom <onboarding@resend.dev>'),
-      to: [email],
-      subject: 'Réinitialisation de votre mot de passe MBotéRoom',
-      text: `Utilisez ce lien pour réinitialiser votre mot de passe : ${resetUrl}`,
-    }),
-  }).catch(() => null);
-  return Boolean(response?.ok);
-};
+const sendResetEmail = async (email: string, resetUrl: string) => sendTransactionalEmail({
+  to: email,
+  subject: 'Réinitialisation de votre mot de passe MBotéRoom',
+  text: `Utilisez ce lien pour réinitialiser votre mot de passe : ${resetUrl}`,
+  html: `<div style="font-family:Arial,sans-serif;color:#17213c"><h2>Réinitialisation du mot de passe MBotéRoom</h2><p>Une demande de réinitialisation a été reçue pour votre compte.</p><p><a href="${resetUrl}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#3156eb;color:#fff;text-decoration:none">Définir un nouveau mot de passe</a></p><p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.</p></div>`,
+});
 
 export const registerAuthRoutes = (app: express.Express) => {
   app.post('/api/auth/register', requireDatabase, async (request, response, next) => {
