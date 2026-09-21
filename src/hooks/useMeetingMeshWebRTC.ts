@@ -273,13 +273,17 @@ export function useMeetingMeshWebRTC({
     };
 
     pc.ontrack = (event) => {
+      const publishRemoteStreamSnapshot = () => {
+        const snapshot = new MediaStream(remoteStream.getTracks().filter((track) => track.readyState === 'live'));
+        setRemoteParticipants((current) => current.map((participant) => (
+          participant.socketId === targetSocketId ? { ...participant, stream: snapshot } : participant
+        )));
+      };
+
       const duplicateKind = remoteStream.getTracks().find((track) => track.kind === event.track.kind && track.id !== event.track.id);
       if (duplicateKind) remoteStream.removeTrack(duplicateKind);
       if (!remoteStream.getTracks().some((track) => track.id === event.track.id)) remoteStream.addTrack(event.track);
-
-      setRemoteParticipants((current) => current.map((participant) => (
-        participant.socketId === targetSocketId ? { ...participant, stream: remoteStream } : participant
-      )));
+      publishRemoteStreamSnapshot();
 
       const clearMediaRecovery = () => {
         if (state.mediaRecoveryTimer) clearTimeout(state.mediaRecoveryTimer);
@@ -310,13 +314,12 @@ export function useMeetingMeshWebRTC({
       event.track.addEventListener('unmute', () => {
         clearMediaRecovery();
         state.mediaRecoveryAttempts = 0;
+        publishRemoteStreamSnapshot();
       });
       event.track.addEventListener('ended', () => {
         clearMediaRecovery();
         remoteStream.removeTrack(event.track);
-        setRemoteParticipants((current) => current.map((participant) => (
-          participant.socketId === targetSocketId ? { ...participant, stream: remoteStream } : participant
-        )));
+        publishRemoteStreamSnapshot();
       }, { once: true });
       scheduleMediaRecovery();
     };
