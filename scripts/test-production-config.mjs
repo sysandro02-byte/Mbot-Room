@@ -76,6 +76,9 @@ const renderBlueprint = fs.readFileSync(new URL('../render.yaml', import.meta.ur
 if (!renderBlueprint.includes('https://mbote-room.vercel.app')) {
   throw new Error('Render CORS configuration must allow the MBotéRoom Vercel frontend');
 }
+if (!renderBlueprint.includes('autoDeployTrigger: checksPass')) {
+  throw new Error('Render production deploys must wait for CI checks to pass');
+}
 
 const appRoutes = fs.readFileSync(new URL('../server/appRoutes.ts', import.meta.url), 'utf8');
 const sfuRoutes = fs.readFileSync(new URL('../server/sfuRoutes.ts', import.meta.url), 'utf8');
