@@ -99,10 +99,49 @@ function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, l
 
   useEffect(() => {
     const node = videoRef.current;
-    if (!node) return;
-    if (node.srcObject !== stream) node.srcObject = stream;
-    if (stream) void node.play().catch(() => undefined);
-  }, [stream, videoEnabled]);
+    if (!node) return undefined;
+    let disposed = false;
+    let recoveryTimer: number | null = null;
+    let attempts = 0;
+
+    const attach = (forceFresh = false) => {
+      if (disposed || !stream) return;
+      const nextStream = forceFresh
+        ? new MediaStream(stream.getTracks().filter((track) => track.readyState === 'live'))
+        : stream;
+      if (forceFresh || node.srcObject !== nextStream) node.srcObject = nextStream;
+      void node.play().catch(() => undefined);
+    };
+
+    const scheduleRecovery = () => {
+      if (disposed || !stream || local || videoEnabled === false) return;
+      if (node.readyState > 0 || node.videoWidth > 0) return;
+      const liveVideo = stream.getVideoTracks().some((track) => track.readyState === 'live' && !track.muted);
+      if (!liveVideo || attempts >= 4) return;
+      recoveryTimer = window.setTimeout(() => {
+        attempts += 1;
+        attach(true);
+        scheduleRecovery();
+      }, attempts === 0 ? 450 : 900);
+    };
+
+    attach(false);
+    scheduleRecovery();
+
+    const tracks = stream?.getTracks() || [];
+    const retry = () => {
+      attempts = 0;
+      attach(true);
+      scheduleRecovery();
+    };
+    tracks.forEach((track) => track.addEventListener('unmute', retry));
+
+    return () => {
+      disposed = true;
+      if (recoveryTimer !== null) window.clearTimeout(recoveryTimer);
+      tracks.forEach((track) => track.removeEventListener('unmute', retry));
+    };
+  }, [local, stream, videoEnabled]);
 
   return (
     <article className={`room-v2-tile ${screen ? 'is-screen' : ''} ${activeSpeaker ? 'is-speaking' : ''} ${pinned ? 'is-pinned' : ''}`} data-speaking={activeSpeaker ? 'true' : 'false'}>
