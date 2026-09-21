@@ -292,8 +292,21 @@ try {
 
   await expectRejectedSocket();
 
+  const browserOnlyRegistration = await jsonRequest('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'Utilisateur Cookie',
+      email: 'cookie.integration@mbote.test',
+      password: 'Password2026!',
+    }),
+  });
+  assert.equal(browserOnlyRegistration.response.status, 201, JSON.stringify(browserOnlyRegistration.data));
+  assert.equal(browserOnlyRegistration.data.token, undefined);
+  assert.ok(browserOnlyRegistration.data.user?.id);
+  assert.match(browserOnlyRegistration.response.headers.get('set-cookie') || '', /HttpOnly/i);
+
   const host = await register('Hôte Integration', 'host.integration@mbote.test');
-  assert.equal(host.user.role, 'admin');
+  assert.equal(host.user.role, 'user');
 
   const browserLogin = await jsonRequest('/api/auth/login', {
     method: 'POST',
@@ -398,7 +411,15 @@ try {
   assert.equal(deniedAdmin.response.status, 403);
   assert.equal(deniedAdmin.data.code, 'ADMIN_ACCESS_DENIED');
 
-  const adminDashboard = await jsonRequest('/api/admin/dashboard', { headers: authHeaders(host.token) });
+  const cookieAdmin = browserOnlyRegistration.data;
+  const adminLogin = await jsonRequest('/api/auth/login', {
+    method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+    body: JSON.stringify({ email: 'cookie.integration@mbote.test', password: 'Password2026!' }),
+  });
+  assert.equal(adminLogin.response.status, 200, JSON.stringify(adminLogin.data));
+  assert.equal(adminLogin.data.user.role, 'admin');
+  const adminDashboard = await jsonRequest('/api/admin/dashboard', { headers: authHeaders(adminLogin.data.token) });
   assert.equal(adminDashboard.response.status, 200, JSON.stringify(adminDashboard.data));
 
   const createMeeting = await jsonRequest('/api/meetings', {
