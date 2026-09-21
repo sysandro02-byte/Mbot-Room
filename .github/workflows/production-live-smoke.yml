@@ -1,0 +1,33 @@
+name: MBoteRoom Live Production Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/test-production-live.mjs'
+      - '.github/workflows/production-live-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run live production smoke
+        env:
+          MBOTE_ROOM_FRONTEND_URL: https://mbote-room.vercel.app
+          MBOTE_ROOM_BACKEND_URL: https://mbote-room-api.onrender.com
+        run: node scripts/test-production-live.mjs
