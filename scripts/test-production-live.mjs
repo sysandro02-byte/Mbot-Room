@@ -1,0 +1,306 @@
+import assert from 'node:assert/strict';
+import { chromium } from '@playwright/test';
+
+const frontendUrl = String(process.env.MBOTE_ROOM_FRONTEND_URL || 'https://mbote-room.vercel.app').replace(/\/+$/, '');
+const backendUrl = String(process.env.MBOTE_ROOM_BACKEND_URL || 'https://mbote-room-api.onrender.com').replace(/\/+$/, '');
+const runSuffix = String(process.env.GITHUB_RUN_ID || Date.now()).replace(/\D/g, '').slice(-10) || String(Date.now());
+const hostEmail = `prod.smoke.host+${runSuffix}@mbote.test`;
+const guestName = `Invité Smoke ${runSuffix}`;
+const password = 'MboteRoom-Smoke-2026!';
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const parseBody = async (response) => {
+  const text = await response.text();
+  if (!text) return {};
+  try { return JSON.parse(text); } catch { return { text }; }
+};
+
+const api = async (path, options = {}, token = '') => {
+  const response = await fetch(`${backendUrl}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Origin: frontendUrl,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+  });
+  return { response, data: await parseBody(response) };
+};
+
+const authBearer = { 'X-MBote-Room-Session-Mode': 'bearer' };
+
+const waitForRemoteMedia = async (page, name, timeout = 35_000) => {
+  await page.waitForFunction((participantName) => {
+    const tiles = Array.from(document.querySelectorAll('.room-v2-tile'));
+    const tile = tiles.find((candidate) => candidate.textContent?.includes(participantName) && !candidate.textContent?.includes('(vous)'));
+    const video = tile?.querySelector('video');
+    const stream = video?.srcObject;
+    if (!(stream instanceof MediaStream)) return false;
+    const tracks = stream.getTracks();
+    return Boolean(
+      video
+      && !video.paused
+      && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+      && tracks.some((track) => track.kind === 'video' && track.readyState === 'live')
+      && tracks.some((track) => track.kind === 'audio' && track.readyState === 'live')
+      && video.videoWidth > 0
+      && video.videoHeight > 0
+    );
+  }, name, { timeout });
+};
+
+const openMeeting = async (browser, session, meetingId, label) => {
+  const context = await browser.newContext({
+    locale: 'fr-FR',
+    permissions: ['camera', 'microphone'],
+  });
+  await context.grantPermissions(['camera', 'microphone'], { origin: frontendUrl });
+
+  await context.addInitScript(({ user, token }) => {
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('token', token);
+    localStorage.setItem('sessionExpiresAt', new Date(Date.now() + 2 * 60 * 60_000).toISOString());
+  }, { user: session.user, token: session.token });
+
+  await context.addInitScript(() => {
+    window.__mboteSmokeIceCandidates = [];
+    window.__mboteSmokePeerConnections = 0;
+    const NativePeerConnection = window.RTCPeerConnection;
+    window.RTCPeerConnection = class SmokePeerConnection extends NativePeerConnection {
+      constructor(configuration = {}) {
+        super({ ...configuration, iceTransportPolicy: 'relay' });
+        window.__mboteSmokePeerConnections += 1;
+        this.addEventListener('icecandidate', (event) => {
+          const candidate = event.candidate?.candidate;
+          if (candidate) window.__mboteSmokeIceCandidates.push(candidate);
+        });
+      }
+    };
+  });
+
+  const page = await context.newPage();
+  const browserErrors = [];
+  page.on('pageerror', (error) => browserErrors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error' && !/favicon|ResizeObserver/i.test(message.text())) {
+      browserErrors.push(message.text());
+    }
+  });
+
+  await page.goto(`${frontendUrl}/reunions/${meetingId}`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+  await page.locator('.room-v2-shell').waitFor({ state: 'visible', timeout: 30_000 });
+  return { context, page, browserErrors, label };
+};
+
+let browser;
+let hostRoom;
+let guestRoom;
+let meeting = null;
+let host = null;
+let guest = null;
+
+try {
+  const frontend = await fetch(frontendUrl, { redirect: 'follow' });
+  assert.equal(frontend.ok, true, `Frontend HTTP ${frontend.status}`);
+  assert.match(await frontend.text(), /MBot[eé]Room|MBot[eé] Room/i);
+
+  const health = await api('/api/health');
+  assert.equal(health.response.status, 200, JSON.stringify(health.data));
+  assert.equal(health.data.ok, true);
+  assert.equal(health.data.database?.type, 'postgres');
+  assert.equal(health.data.database?.connected, true);
+  assert.equal(health.data.readiness?.productionReady, true);
+  assert.equal(health.data.readiness?.integrations?.turn, true);
+  assert.equal(health.data.readiness?.integrations?.groq, true);
+  assert.equal(health.data.readiness?.integrations?.email, true);
+
+  const register = await api('/api/auth/register', {
+    method: 'POST',
+    headers: authBearer,
+    body: JSON.stringify({
+      name: `Hôte Smoke ${runSuffix}`,
+      email: hostEmail,
+      password,
+    }),
+  });
+  assert.equal(register.response.status, 201, JSON.stringify(register.data));
+  assert.ok(register.data.token);
+  host = register.data;
+
+  const created = await api('/api/meetings', {
+    method: 'POST',
+    body: JSON.stringify({
+      title: `Smoke production ${runSuffix}`,
+      description: 'Validation réelle frontend Vercel + backend Render + PostgreSQL Supabase + TURN + Luna',
+      startTime: new Date(Date.now() - 60_000).toISOString(),
+      duration: 30,
+      settings: {
+        password,
+        waitingRoom: true,
+        participantAudio: true,
+        participantVideo: true,
+        chat: true,
+        reactions: true,
+        screenShare: true,
+        lunaSummary: true,
+        externalAccess: true,
+        joinBeforeHost: false,
+      },
+    }),
+  }, host.token);
+  assert.equal(created.response.status, 201, JSON.stringify(created.data));
+  meeting = created.data;
+  assert.ok(meeting.id);
+  assert.ok(meeting.meeting_link);
+
+  const guestJoin = await api('/api/auth/guest-join', {
+    method: 'POST',
+    headers: authBearer,
+    body: JSON.stringify({
+      name: guestName,
+      meetingCode: meeting.meeting_link,
+      password,
+    }),
+  });
+  assert.equal(guestJoin.response.status, 201, JSON.stringify(guestJoin.data));
+  assert.equal(guestJoin.data.lobbyStatus, 'requested');
+  assert.ok(guestJoin.data.token);
+  guest = guestJoin.data;
+
+  const lobby = await api(`/api/meetings/${meeting.id}/lobby`, {}, host.token);
+  assert.equal(lobby.response.status, 200, JSON.stringify(lobby.data));
+  assert.ok(lobby.data.some((item) => Number(item.user_id) === Number(guest.user.id) && item.status === 'requested'));
+
+  const admit = await api(`/api/meetings/${meeting.id}/lobby/respond`, {
+    method: 'POST',
+    body: JSON.stringify({ userId: Number(guest.user.id), status: 'accepted' }),
+  }, host.token);
+  assert.equal(admit.response.status, 200, JSON.stringify(admit.data));
+  assert.equal(admit.data.success, true);
+
+  const participants = await api(`/api/meetings/${meeting.id}/participants`, {}, host.token);
+  assert.equal(participants.response.status, 200, JSON.stringify(participants.data));
+  assert.ok(participants.data.some((item) => Number(item.userId) === Number(guest.user.id) && item.status === 'accepted'));
+
+  const rtcConfig = await api('/api/rtc/config', {}, host.token);
+  assert.equal(rtcConfig.response.status, 200, JSON.stringify(rtcConfig.data));
+  assert.equal(rtcConfig.data.turnConfigured, true);
+  assert.ok(Array.isArray(rtcConfig.data.iceServers));
+  assert.ok(rtcConfig.data.iceServers.some((server) => {
+    const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
+    return urls.some((url) => String(url).startsWith('turn:') || String(url).startsWith('turns:'));
+  }));
+
+  const start = await api(`/api/meetings/${meeting.id}/start-notify`, {
+    method: 'POST',
+  }, host.token);
+  assert.equal(start.response.status, 200, JSON.stringify(start.data));
+
+  browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--use-fake-device-for-media-stream',
+      '--use-fake-ui-for-media-stream',
+      '--autoplay-policy=no-user-gesture-required',
+      '--disable-dev-shm-usage',
+      '--no-sandbox',
+    ],
+  });
+
+  hostRoom = await openMeeting(browser, host, meeting.id, 'host');
+  guestRoom = await openMeeting(browser, guest, meeting.id, 'guest');
+
+  await Promise.all([
+    waitForRemoteMedia(hostRoom.page, guestName),
+    waitForRemoteMedia(guestRoom.page, host.user.name),
+  ]);
+
+  await Promise.all([
+    hostRoom.page.waitForFunction(() => (window.__mboteSmokeIceCandidates || []).some((value) => value.includes(' typ relay ')), undefined, { timeout: 30_000 }),
+    guestRoom.page.waitForFunction(() => (window.__mboteSmokeIceCandidates || []).some((value) => value.includes(' typ relay ')), undefined, { timeout: 30_000 }),
+  ]);
+
+  const relayDiagnostics = {
+    host: await hostRoom.page.evaluate(() => ({
+      peerConnections: window.__mboteSmokePeerConnections || 0,
+      relayCandidates: (window.__mboteSmokeIceCandidates || []).filter((value) => value.includes(' typ relay ')).length,
+    })),
+    guest: await guestRoom.page.evaluate(() => ({
+      peerConnections: window.__mboteSmokePeerConnections || 0,
+      relayCandidates: (window.__mboteSmokeIceCandidates || []).filter((value) => value.includes(' typ relay ')).length,
+    })),
+  };
+  assert.ok(relayDiagnostics.host.peerConnections > 0);
+  assert.ok(relayDiagnostics.guest.peerConnections > 0);
+  assert.ok(relayDiagnostics.host.relayCandidates > 0);
+  assert.ok(relayDiagnostics.guest.relayCandidates > 0);
+
+  const chat = await api(`/api/meetings/${meeting.id}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ text: 'Décision smoke: le test TURN et WebRTC de production est validé.' }),
+  }, guest.token);
+  assert.equal(chat.response.status, 201, JSON.stringify(chat.data));
+
+  const luna = await api('/api/ai/luna', {
+    method: 'POST',
+    body: JSON.stringify({
+      meetingId: Number(meeting.id),
+      prompt: 'Confirme en une phrase que tu peux répondre dans cette réunion de test.',
+    }),
+  }, host.token);
+  assert.equal(luna.response.status, 200, JSON.stringify(luna.data));
+  assert.equal(luna.data.configured, true);
+  assert.ok(String(luna.data.answer || '').trim().length > 0);
+
+  const summary = await api(`/api/meetings/${meeting.id}/summary/generate`, {
+    method: 'POST',
+  }, host.token);
+  assert.equal(summary.response.status, 200, JSON.stringify(summary.data));
+  assert.ok(Array.isArray(summary.data.bullets));
+  assert.ok(Array.isArray(summary.data.decisions));
+  assert.ok(Array.isArray(summary.data.actions));
+
+  const ended = await api(`/api/meetings/${meeting.id}/end`, {
+    method: 'POST',
+  }, host.token);
+  assert.equal(ended.response.status, 200, JSON.stringify(ended.data));
+  assert.equal(ended.data.success, true);
+  assert.equal(ended.data.meeting?.status, 'ended');
+
+  assert.deepEqual(hostRoom.browserErrors, [], `Host browser errors: ${hostRoom.browserErrors.join('\n')}`);
+  assert.deepEqual(guestRoom.browserErrors, [], `Guest browser errors: ${guestRoom.browserErrors.join('\n')}`);
+
+  console.log('PRODUCTION_SMOKE_RESULT', JSON.stringify({
+    ok: true,
+    frontendUrl,
+    backendUrl,
+    meetingId: meeting.id,
+    meetingLink: meeting.meeting_link,
+    hostEmail,
+    hostUserId: host.user.id,
+    guestUserId: guest.user.id,
+    relayDiagnostics,
+    lunaConfigured: true,
+    summaryGenerated: true,
+    meetingEnded: true,
+  }));
+} finally {
+  await guestRoom?.context?.close().catch(() => undefined);
+  await hostRoom?.context?.close().catch(() => undefined);
+  await browser?.close().catch(() => undefined);
+
+  if (meeting?.id && host?.token) {
+    await api(`/api/meetings/${meeting.id}`, { method: 'DELETE' }, host.token).catch(() => undefined);
+  }
+
+  console.log('PRODUCTION_SMOKE_CLEANUP', JSON.stringify({
+    meetingId: meeting?.id || null,
+    hostEmail,
+    hostUserId: host?.user?.id || null,
+    guestUserId: guest?.user?.id || null,
+  }));
+
+  await sleep(250);
+}
