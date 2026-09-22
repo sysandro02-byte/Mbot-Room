@@ -1,4 +1,5 @@
 import { apiUrl, getApiBaseUrl, getAuthHeaders } from '../lib/api';
+import { clearOfflinePrivateData } from '../lib/offline';
 
 export type RoomUser = {
   id: string;
