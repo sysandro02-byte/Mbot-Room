@@ -18,9 +18,7 @@ Configurer dans le dashboard Vercel :
 
 - `VITE_API_URL=https://<service-render>.onrender.com`
 - `VITE_SOCKET_URL=https://<service-render>.onrender.com`
-- `VITE_TURN_URLS` si un serveur TURN est disponible.
-- `VITE_TURN_USERNAME` si le serveur TURN l'exige.
-- `VITE_TURN_CREDENTIAL` si le serveur TURN l'exige.
+- Les identifiants TURN ne doivent jamais être exposés via des variables `VITE_*`. Le frontend récupère une configuration ICE temporaire depuis `/api/rtc/config`.
 
 ## Variables Render
 
