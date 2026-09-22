@@ -298,11 +298,11 @@ export const authService = {
     }
   },
 
-  async forgotPassword(email: string) {
+  async forgotPassword(email: string, admin = false) {
     const response = await fetchAuth(apiUrl('/api/auth/forgot-password'), {
       method: 'POST',
       headers: authRequestHeaders(),
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, admin }),
       credentials: 'include',
     });
     const result = await readJson(response);
