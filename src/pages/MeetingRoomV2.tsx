@@ -752,7 +752,7 @@ export default function MeetingRoomV2() {
       const replacingKind = kind === 'audioinput' ? 'audio' : 'video';
       const preserved = current.getTracks().filter((track) => track.kind !== replacingKind && track.readyState === 'live');
       current.getTracks().filter((track) => track.kind === replacingKind).forEach((track) => track.stop());
-      nextTrack.enabled = kind === 'audioinput' ? micEnabled : cameraEnabled;
+      nextTrack.enabled = kind === 'audioinput' ? (micEnabled && canUseMic) : (cameraEnabled && canUseCamera);
       const nextCameraStream = new MediaStream([...preserved, nextTrack]);
       cameraStreamRef.current = nextCameraStream;
 
@@ -774,7 +774,7 @@ export default function MeetingRoomV2() {
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : 'Impossible de changer de périphérique.');
     }
-  }, [cameraEnabled, micEnabled, refreshMediaDevices, screenSharing]);
+  }, [cameraEnabled, canUseCamera, canUseMic, micEnabled, refreshMediaDevices, screenSharing]);
 
   const stopScreenShare = useCallback(() => {
     screenStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -782,6 +782,19 @@ export default function MeetingRoomV2() {
     setScreenSharing(false);
     setLocalStream(cameraStreamRef.current);
   }, []);
+
+  useEffect(() => {
+    if (!meeting) return;
+    if (!canUseMic) {
+      cameraStreamRef.current?.getAudioTracks().forEach((track) => { track.enabled = false; });
+      setMicEnabled(false);
+    }
+    if (!canUseCamera) {
+      cameraStreamRef.current?.getVideoTracks().forEach((track) => { track.enabled = false; });
+      setCameraEnabled(false);
+    }
+    if (!canShareScreen && screenSharing) stopScreenShare();
+  }, [canShareScreen, canUseCamera, canUseMic, meeting, screenSharing, stopScreenShare]);
 
   const toggleScreenShare = async () => {
     if (screenSharing) {
@@ -797,7 +810,7 @@ export default function MeetingRoomV2() {
       const combined = new MediaStream();
       display.getVideoTracks().forEach((track) => combined.addTrack(track));
       const displayAudio = display.getAudioTracks();
-      const micAudio = cameraStreamRef.current?.getAudioTracks() || [];
+      const micAudio = canUseMic ? (cameraStreamRef.current?.getAudioTracks() || []) : [];
       (displayAudio.length ? displayAudio : micAudio).forEach((track) => combined.addTrack(track));
       display.getVideoTracks()[0]?.addEventListener('ended', stopScreenShare, { once: true });
       screenStreamRef.current = display;
