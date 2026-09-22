@@ -11,3 +11,7 @@
 @media(min-width:720px){.pwa-install-backdrop{align-items:center}.pwa-install-sheet{border-radius:24px}}
 @media(max-width:440px){.pwa-install-backdrop{padding:0;align-items:flex-end}.pwa-install-sheet{border-radius:26px 26px 0 0}.pwa-install-actions{grid-template-columns:1fr}.pwa-install-actions .secondary{order:2}}
 @media(prefers-reduced-motion:reduce){.pwa-install-sheet{animation:none}}
+.pwa-sync-pill,.pwa-sync-success{position:fixed;z-index:1500;top:max(12px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;font-size:11px;font-weight:800;box-shadow:0 8px 24px rgba(0,0,0,.14)}
+.pwa-sync-pill{border:0;background:#eef3ff;color:#3156eb;cursor:pointer}.pwa-sync-pill svg{animation:pwa-sync-spin 1.2s linear infinite}
+.pwa-sync-success{background:#eaf8ef;color:#187747}
+@keyframes pwa-sync-spin{to{transform:rotate(360deg)}}
