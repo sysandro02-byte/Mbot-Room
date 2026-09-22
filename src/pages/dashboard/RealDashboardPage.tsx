@@ -75,7 +75,7 @@ export default function RealDashboardPage(){
   const hosted=useMemo(()=>meetings.filter((meeting)=>Number(meeting.host_id)===Number(user?.id)||Number(meeting.co_host_id||0)===Number(user?.id)),[meetings,user?.id]);
   const completed=useMemo(()=>meetings.filter((meeting)=>meeting.status==='ended'),[meetings]);
   const unread=notifications.filter((notification)=>!notification.readAt).length;
-  const initials=(user?.name||user?.username||'MB').split(/s+/).filter(Boolean).slice(0,2).map((part)=>part[0]?.toUpperCase()).join('');
+  const initials=(user?.name||user?.username||'MB').split(/\s+/).filter(Boolean).slice(0,2).map((part)=>part[0]?.toUpperCase()).join('');
 
   const currentSlide=homeSlides[activeSlide]||null;
   const changeSlide=(direction:1|-1)=>{
