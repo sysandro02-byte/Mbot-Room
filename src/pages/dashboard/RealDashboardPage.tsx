@@ -1,234 +1,232 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Bell,
-  CalendarDays,
-  CheckCheck,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  ContactRound,
-  MessageCircle,
-  Plus,
-  Search,
-  Settings,
-  ShieldCheck,
-  Sparkles,
-  UserRound,
-  UsersRound,
-  Video,
-} from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
+import { appDataService, type Contact, type Recording } from '../../services/appDataService';
 import { HomeSlide, Meeting, meetingService } from '../../services/meetingService';
 import { notificationService, RoomNotification } from '../../services/notificationService';
-import { getAppLocale } from '../../lib/appLanguage';
 import { socket } from '../../lib/socket';
+import HomeHero from './components/HomeHero';
+import { HomeQuickActions, HomeStats, type HomeStatsData } from './components/HomeQuickActions';
+import { NextMeetingCard, RecentMeetings } from './components/HomeMeetings';
+import { HomeFeatureBanner, HomeFooter, HomeQuickAccess, LunaAssistantCard } from './components/HomeExtras';
 import './RealDashboardPage.css';
 
-const formatDate=(value:string)=>new Intl.DateTimeFormat(getAppLocale(),{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
+export default function RealDashboardPage() {
+  const navigate = useNavigate();
+  const user = authService.getCurrentUser();
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [recordings, setRecordings] = useState<Recording[]>([]);
+  const [notifications, setNotifications] = useState<RoomNotification[]>([]);
+  const [tips, setTips] = useState<Array<{id:string;title:string;body:string;actionLabel:string;actionPath:string}>>([]);
+  const [homeSlides, setHomeSlides] = useState<HomeSlide[]>([]);
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-export default function RealDashboardPage(){
-  const navigate=useNavigate();
-  const user=authService.getCurrentUser();
-  const [meetings,setMeetings]=useState<Meeting[]>([]);
-  const [notifications,setNotifications]=useState<RoomNotification[]>([]);
-  const [tips,setTips]=useState<Array<{id:string;title:string;body:string;actionLabel:string;actionPath:string}>>([]);
-  const [homeSlides,setHomeSlides]=useState<HomeSlide[]>([]);
-  const [activeSlide,setActiveSlide]=useState(0);
-  const [loading,setLoading]=useState(true);
-  const [error,setError]=useState('');
-
-  const load=async()=>{
+  const load = async () => {
     setLoading(true);
     setError('');
-    try{
-      const [meetingRows,notificationRows,tipRows,slideRows]=await Promise.all([
+    try {
+      const [meetingRows, contactRows, recordingRows, notificationRows, tipRows, slideRows] = await Promise.all([
         meetingService.getMeetings(),
-        notificationService.list().catch(()=>[]),
-        meetingService.getDashboardTips().catch(()=>[]),
-        meetingService.getHomeSlides().catch(()=>[]),
+        appDataService.getContacts().catch(() => []),
+        appDataService.getRecordings().catch(() => []),
+        notificationService.list().catch(() => []),
+        meetingService.getDashboardTips().catch(() => []),
+        meetingService.getHomeSlides().catch(() => []),
       ]);
-      setMeetings(Array.isArray(meetingRows)?meetingRows:[]);
-      setNotifications(notificationRows);
-      setTips(tipRows);
-      setHomeSlides(slideRows);
+      setMeetings(Array.isArray(meetingRows) ? meetingRows : []);
+      setContacts(Array.isArray(contactRows) ? contactRows : []);
+      setRecordings(Array.isArray(recordingRows) ? recordingRows : []);
+      setNotifications(Array.isArray(notificationRows) ? notificationRows : []);
+      setTips(Array.isArray(tipRows) ? tipRows : []);
+      setHomeSlides(Array.isArray(slideRows) ? slideRows : []);
       setActiveSlide(0);
-    }catch(cause){
-      setError(cause instanceof Error?cause.message:'Impossible de charger le tableau de bord.');
-    }finally{
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossible de charger le tableau de bord.');
+    } finally {
       setLoading(false);
     }
   };
-  useEffect(()=>{void load();},[]);
 
-  useEffect(()=>{
-    if(homeSlides.length<2)return undefined;
-    const timer=window.setInterval(()=>setActiveSlide((current)=>(current+1)%homeSlides.length),7000);
-    return()=>window.clearInterval(timer);
-  },[homeSlides.length]);
+  useEffect(() => { void load(); }, []);
 
-  useEffect(()=>{
-    const refreshSlides=()=>void meetingService.getHomeSlides().then((rows)=>{setHomeSlides(rows);setActiveSlide(0);}).catch(()=>undefined);
-    if(!socket.connected)socket.connect();
-    socket.on('dashboard:slides-updated',refreshSlides);
-    return()=>{socket.off('dashboard:slides-updated',refreshSlides);};
-  },[]);
+  useEffect(() => {
+    if (homeSlides.length < 2) return undefined;
+    const timer = window.setInterval(() => setActiveSlide((current) => (current + 1) % homeSlides.length), 7000);
+    return () => window.clearInterval(timer);
+  }, [homeSlides.length]);
 
+  useEffect(() => {
+    const refreshSlides = () => void meetingService.getHomeSlides()
+      .then((rows) => { setHomeSlides(rows); setActiveSlide(0); })
+      .catch(() => undefined);
+    if (!socket.connected) socket.connect();
+    socket.on('dashboard:slides-updated', refreshSlides);
+    return () => { socket.off('dashboard:slides-updated', refreshSlides); };
+  }, []);
 
-  const upcoming=useMemo(()=>meetings
-    .filter((meeting)=>meeting.status!=='ended'&&meeting.status!=='cancelled'&&(meeting.is_active||new Date(meeting.start_time).getTime()+meeting.duration*60000>=Date.now()))
-    .sort((a,b)=>new Date(a.start_time).getTime()-new Date(b.start_time).getTime())
-    .slice(0,6),[meetings]);
-  const live=useMemo(()=>meetings.filter((meeting)=>meeting.is_active),[meetings]);
-  const hosted=useMemo(()=>meetings.filter((meeting)=>Number(meeting.host_id)===Number(user?.id)||Number(meeting.co_host_id||0)===Number(user?.id)),[meetings,user?.id]);
-  const completed=useMemo(()=>meetings.filter((meeting)=>meeting.status==='ended'),[meetings]);
-  const unread=notifications.filter((notification)=>!notification.readAt).length;
-  const initials=(user?.name||user?.username||'MB').split(/\s+/).filter(Boolean).slice(0,2).map((part)=>part[0]?.toUpperCase()).join('');
+  const now = Date.now();
+  const upcoming = useMemo(() => meetings
+    .filter((meeting) => meeting.status !== 'ended' && meeting.status !== 'cancelled' && (meeting.is_active || new Date(meeting.start_time).getTime() + meeting.duration * 60000 >= now))
+    .sort((left, right) => new Date(left.start_time).getTime() - new Date(right.start_time).getTime()), [meetings, now]);
 
-  const currentSlide=homeSlides[activeSlide]||null;
-  const changeSlide=(direction:1|-1)=>{
-    if(!homeSlides.length)return;
-    setActiveSlide((current)=>(current+direction+homeSlides.length)%homeSlides.length);
+  const recent = useMemo(() => meetings
+    .filter((meeting) => meeting.status === 'ended')
+    .sort((left, right) => new Date(right.start_time).getTime() - new Date(left.start_time).getTime())
+    .slice(0, 3), [meetings]);
+
+  const monthlyMinutes = useMemo(() => {
+    const date = new Date();
+    return meetings
+      .filter((meeting) => {
+        if (meeting.status !== 'ended') return false;
+        const start = new Date(meeting.start_time);
+        return start.getFullYear() === date.getFullYear() && start.getMonth() === date.getMonth();
+      })
+      .reduce((sum, meeting) => sum + Math.max(0, Number(meeting.duration || 0)), 0);
+  }, [meetings]);
+
+  const stats: HomeStatsData = {
+    upcomingMeetings: upcoming.length,
+    contacts: contacts.length,
+    recordings: recordings.length,
+    monthlyMinutes,
   };
 
-  const openMeeting=async(meeting:Meeting)=>{
-    if(meeting.status==='ended'||meeting.status==='cancelled'){
-      navigate('/reunions/'+meeting.meeting_link+'/terminee',{state:{meeting}});
+  const unreadNotifications = notifications.filter((notification) => !notification.readAt).length;
+  const nextMeeting = upcoming[0] || null;
+  const lunaTarget = recent[0] || nextMeeting;
+  const firstName = (user?.name || user?.username || 'Utilisateur').trim().split(/\s+/)[0] || 'Utilisateur';
+
+  const canManage = (meeting: Meeting | null) => Boolean(meeting && user && (
+    Number(meeting.host_id) === Number(user.id) ||
+    user.role === 'admin'
+  ));
+
+  const openMeeting = async (meeting: Meeting) => {
+    if (meeting.status === 'ended' || meeting.status === 'cancelled') {
+      navigate('/reunions/' + meeting.meeting_link + '/terminee', { state: { meeting } });
       return;
     }
-    const moderator=Number(meeting.host_id)===Number(user?.id)||Number(meeting.co_host_id||0)===Number(user?.id)||user?.role==='admin';
-    if(moderator&&!meeting.is_active){
-      try{
-        const result=await meetingService.startMeetingAndNotify(meeting.id);
-        navigate('/reunions/'+meeting.meeting_link,{state:{meeting:result.meeting||meeting}});
+    const moderator = Number(meeting.host_id) === Number(user?.id) || Number(meeting.co_host_id || 0) === Number(user?.id) || user?.role === 'admin';
+    if (moderator && !meeting.is_active) {
+      try {
+        const result = await meetingService.startMeetingAndNotify(meeting.id);
+        navigate('/reunions/' + meeting.meeting_link, { state: { meeting: result.meeting || meeting } });
         return;
-      }catch(cause){
-        setError(cause instanceof Error?cause.message:'Démarrage impossible.');
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : 'Démarrage impossible.');
         return;
       }
     }
-    try{
-      const numericUserId=Number(user?.id);
-      const access=await meetingService.requestJoin(meeting.id,Number.isFinite(numericUserId)?numericUserId:undefined);
-      if(access.status==='requested'){
-        navigate('/reunions/'+meeting.meeting_link+'/salle-attente',{state:{meeting}});
+    try {
+      const numericUserId = Number(user?.id);
+      const access = await meetingService.requestJoin(meeting.id, Number.isFinite(numericUserId) ? numericUserId : undefined);
+      if (access.status === 'requested') {
+        navigate('/reunions/' + meeting.meeting_link + '/salle-attente', { state: { meeting } });
         return;
       }
-      navigate('/reunions/'+meeting.meeting_link,{state:{meeting}});
-    }catch(cause){
-      setError(cause instanceof Error?cause.message:'Accès impossible.');
+      navigate('/reunions/' + meeting.meeting_link, { state: { meeting } });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Accès impossible.');
     }
   };
 
-  const quickActions=[
-    {label:'Nouvelle réunion',description:'Programmer ou démarrer',icon:Plus,path:'/app/meetings',primary:true},
-    {label:'Rejoindre',description:'ID ou lien de réunion',icon:Video,path:'/join'},
-    {label:'Calendrier',description:'Voir votre agenda',icon:CalendarDays,path:'/app/calendar'},
-    {label:'Messages',description:'Conversations de réunion',icon:MessageCircle,path:'/app/messages'},
-    {label:'Contacts',description:'Participants rencontrés',icon:ContactRound,path:'/app/contacts'},
-    {label:'Recherche',description:'Trouver une réunion',icon:Search,path:'/app/search'},
-  ];
+  const manageMeeting = (meeting?: Meeting | null) => {
+    if (meeting?.id) navigate(`/app/meetings?edit=${meeting.id}`);
+    else navigate('/app/meetings');
+  };
+
+  const openLunaTarget = (meeting: Meeting) => {
+    if (meeting.status === 'ended' || meeting.status === 'cancelled') {
+      navigate(`/reunions/${meeting.meeting_link}/terminee`, { state: { meeting } });
+      return;
+    }
+    navigate('/app/meetings');
+  };
+
+  if (loading) {
+    return <main className="real-dashboard home-dashboard-loading" aria-busy="true">
+      <div className="home-skeleton hero"/>
+      <div className="home-skeleton actions"/>
+      <div className="home-skeleton stats"/>
+      <div className="home-skeleton grid"/>
+    </main>;
+  }
 
   return <main className="real-dashboard">
-    <section className="dashboard-hero">
-      <div className="dashboard-hero-copy">
-        <span className="dashboard-eyebrow"><Sparkles size={14}/> Espace personnel MBotéRoom</span>
-        <h1>Bonjour {user?.name||user?.username||'Utilisateur'}</h1>
-        <p>Organisez vos réunions, retrouvez vos échanges et pilotez votre collaboration depuis un seul espace.</p>
-        <div className="dashboard-hero-actions">
-          <button onClick={()=>navigate('/app/meetings')}><Plus size={18}/> Créer une réunion</button>
-          <button className="secondary" onClick={()=>navigate('/join')}><Video size={18}/> Rejoindre</button>
-        </div>
+    <HomeHero
+      firstName={firstName}
+      slides={homeSlides}
+      activeSlide={activeSlide}
+      onSlideChange={setActiveSlide}
+      onCreate={() => navigate('/app/meetings?new=1')}
+      onJoin={() => navigate('/join')}
+    />
+
+    {error ? <div className="real-dashboard-error">{error}</div> : null}
+
+    <HomeQuickActions
+      onNewMeeting={() => navigate('/app/meetings?new=1')}
+      onJoin={() => navigate('/join')}
+      onPlan={() => navigate('/app/meetings?new=1&mode=schedule')}
+      onShareScreen={() => navigate('/app/meetings?new=1&intent=screen-share')}
+      onCalendar={() => navigate('/app/calendar')}
+      onMessages={() => navigate('/app/messages')}
+    />
+
+    <HomeStats data={stats}/>
+
+    <section className="home-main-grid">
+      <div className="home-main-column">
+        <NextMeetingCard
+          meeting={nextMeeting}
+          canManage={canManage(nextMeeting)}
+          onOpen={(meeting) => void openMeeting(meeting)}
+          onManage={manageMeeting}
+        />
+        <RecentMeetings
+          meetings={recent}
+          recordings={recordings}
+          onOpen={openLunaTarget}
+          onManage={manageMeeting}
+        />
       </div>
-      <aside className="dashboard-profile-card">
-        <div className="dashboard-avatar">{user?.avatar?<img src={user.avatar} alt=""/>:<span>{initials}</span>}</div>
-        <div>
-          <strong>{user?.name||user?.username}</strong>
-          <small>{user?.email}</small>
-          <span className="dashboard-role">{user?.role==='admin'?'Administrateur':user?.role==='guest'?'Invité':'Membre MBotéRoom'}</span>
-        </div>
-        <button onClick={()=>navigate('/app/profile')} aria-label="Ouvrir mon profil"><UserRound size={18}/></button>
-      </aside>
+
+      <div className="home-side-column">
+        <LunaAssistantCard
+          targetMeeting={lunaTarget}
+          onOpenMeeting={openLunaTarget}
+          onAllMeetings={() => navigate('/app/meetings')}
+        />
+        <HomeQuickAccess
+          onMessages={() => navigate('/app/messages')}
+          onContacts={() => navigate('/app/contacts')}
+          onCalendar={() => navigate('/app/calendar')}
+          onFiles={() => navigate('/app/files')}
+          onPolls={() => navigate('/app/polls')}
+          onWhiteboard={() => navigate('/app/whiteboard')}
+        />
+      </div>
     </section>
 
-    {homeSlides.length?<section className="dashboard-slider" aria-label="Informations mises en avant">
-      <div className="dashboard-slider-track">
-        <article className="dashboard-slide" key={currentSlide?.slot}>
-          <div className="dashboard-slide-copy">
-            <span className="dashboard-slide-label">À découvrir</span>
-            <h2>{currentSlide?.title}</h2>
-            <p>{currentSlide?.body}</p>
-            {currentSlide?.actionLabel&&currentSlide.actionPath?<button type="button" onClick={()=>navigate(currentSlide.actionPath)}>{currentSlide.actionLabel}<ChevronRight size={17}/></button>:null}
-          </div>
-          <div className="dashboard-slide-visual" aria-hidden="true">
-            {currentSlide?.imageUrl?<img src={currentSlide.imageUrl} alt=""/>:<div className="dashboard-slide-brand"><span><Video size={26}/></span><strong>MBotéRoom</strong><small>Réunions sécurisées</small></div>}
-          </div>
-        </article>
-      </div>
-      <div className="dashboard-slider-controls">
-        <div className="dashboard-slider-dots" role="tablist" aria-label="Choisir un slide">
-          {homeSlides.map((slide,index)=><button key={slide.slot} type="button" className={index===activeSlide?'is-active':''} aria-label={`Afficher le slide ${index+1}`} aria-selected={index===activeSlide} onClick={()=>setActiveSlide(index)} />)}
-        </div>
-        {homeSlides.length>1?<div className="dashboard-slider-arrows"><button type="button" aria-label="Slide précédent" onClick={()=>changeSlide(-1)}><ChevronLeft size={18}/></button><button type="button" aria-label="Slide suivant" onClick={()=>changeSlide(1)}><ChevronRight size={18}/></button></div>:null}
-      </div>
-    </section>:null}
+    {unreadNotifications > 0 ? <button className="home-notification-callout" type="button" onClick={() => navigate('/app/notifications')}>
+      Vous avez <strong>{unreadNotifications}</strong> notification{unreadNotifications > 1 ? 's' : ''} non lue{unreadNotifications > 1 ? 's' : ''}.
+    </button> : null}
 
-    {error?<div className="real-dashboard-error">{error}</div>:null}
+    <HomeFeatureBanner imageUrl={homeSlides[0]?.imageUrl} onDiscover={() => navigate('/fonctionnalites')}/>
 
-    <section className="dashboard-quick-actions" aria-label="Actions rapides">
-      {quickActions.map((action)=>{
-        const Icon=action.icon;
-        return <button key={action.label} className={action.primary?'is-primary':''} onClick={()=>navigate(action.path)}>
-          <span><Icon size={20}/></span>
-          <div><strong>{action.label}</strong><small>{action.description}</small></div>
-        </button>;
-      })}
-    </section>
+    {tips.length ? <section className="home-admin-tips">
+      {tips.map((tip) => <article key={tip.id}><span><Sparkles size={16}/></span><div><strong>{tip.title}</strong><p>{tip.body}</p>{tip.actionLabel && tip.actionPath ? <button type="button" onClick={() => navigate(tip.actionPath)}>{tip.actionLabel}</button> : null}</div></article>)}
+    </section> : null}
 
-    <section className="real-dashboard-stats">
-      <article><span><CalendarDays/></span><div><strong>{meetings.length}</strong><small>Réunions accessibles</small></div></article>
-      <article><span><Video/></span><div><strong>{live.length}</strong><small>En direct</small></div></article>
-      <article><span><UsersRound/></span><div><strong>{hosted.length}</strong><small>Organisées ou co-hébergées</small></div></article>
-      <article><span><CheckCheck/></span><div><strong>{completed.length}</strong><small>Réunions terminées</small></div></article>
-    </section>
-
-    <section className="dashboard-security-card">
-      <div className="dashboard-security-icon"><ShieldCheck/></div>
-      <div>
-        <strong>Connexion renforcée</strong>
-        <p>À chaque connexion avec votre mot de passe, MBotéRoom envoie un code de sécurité à votre adresse e-mail.</p>
-      </div>
-      <button onClick={()=>navigate('/app/settings')}><Settings size={16}/> Paramètres</button>
-    </section>
-
-    {loading?<div className="real-dashboard-loading">Chargement de votre espace…</div>:null}
-
-    {!loading?<section className="real-dashboard-columns">
-      <article className="real-dashboard-card dashboard-upcoming-card">
-        <div className="real-dashboard-card-title">
-          <div><span>Agenda</span><h2>Prochaines réunions</h2></div>
-          <button onClick={()=>navigate('/app/meetings')}>Tout voir</button>
-        </div>
-        {upcoming.length?upcoming.map((meeting)=><button className="real-dashboard-meeting" key={meeting.id} onClick={()=>void openMeeting(meeting)}>
-          <span className={meeting.is_active?'live':''}><Video size={18}/></span>
-          <div><strong>{meeting.title}</strong><small><Clock3 size={13}/>{formatDate(meeting.start_time)} · {meeting.duration} min</small></div>
-          <b>{meeting.is_active?'Rejoindre':'Ouvrir'}</b>
-        </button>):<p className="real-dashboard-empty">Aucune réunion programmée. Créez votre prochaine réunion en quelques secondes.</p>}
-      </article>
-
-      <article className="real-dashboard-card dashboard-notifications-card">
-        <div className="real-dashboard-card-title">
-          <div><span>Activité</span><h2>Notifications {unread?('· '+unread):''}</h2></div>
-          {unread?<button onClick={()=>void notificationService.markAllRead().then(()=>setNotifications((current)=>current.map((item)=>({...item,readAt:item.readAt||new Date().toISOString()}))))}><CheckCheck size={15}/> Tout lire</button>:null}
-        </div>
-        {notifications.length?notifications.slice(0,8).map((notification)=><button className={'real-dashboard-notification '+(notification.readAt?'':'unread')} key={notification.id} onClick={()=>void notificationService.markRead(notification.id).then((updated)=>setNotifications((current)=>current.map((item)=>item.id===updated.id?updated:item)))}>
-          <span><Bell size={16}/></span>
-          <div><strong>{notification.title}</strong><p>{notification.body}</p><small>{formatDate(notification.createdAt)}</small></div>
-        </button>):<p className="real-dashboard-empty">Aucune notification pour le moment.</p>}
-        <button className="dashboard-all-notifications" onClick={()=>navigate('/app/notifications')}>Voir toutes les notifications</button>
-      </article>
-    </section>:null}
-
-    {tips.length?<section className="real-dashboard-tips">{tips.map((tip)=><article key={tip.id}><span><Sparkles size={16}/></span><div><strong>{tip.title}</strong><p>{tip.body}</p>{tip.actionLabel&&tip.actionPath?<button onClick={()=>navigate(tip.actionPath)}>{tip.actionLabel}</button>:null}</div></article>)}</section>:null}
+    <HomeFooter
+      onPrivacy={() => navigate('/confidentialite')}
+      onTerms={() => navigate('/conditions')}
+      onHelp={() => navigate('/aide')}
+    />
   </main>;
 }
