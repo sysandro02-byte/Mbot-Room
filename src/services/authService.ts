@@ -73,6 +73,8 @@ const saveSession = ({ user, token, expiresAt }: AuthResponse, persist: boolean)
   storage.setItem(USER_KEY, JSON.stringify(normalizeUser(user)));
   if (token) storage.setItem(TOKEN_KEY, token);
   if (expiresAt) storage.setItem(EXPIRY_KEY, expiresAt);
+  localStorage.setItem('mboteroom-last-activity-at', String(Date.now()));
+  sessionStorage.removeItem('mboteroom-pwa-resume-done');
   window.dispatchEvent(new CustomEvent('mbote-room-auth-changed'));
 };
 
