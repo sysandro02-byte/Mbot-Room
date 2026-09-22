@@ -89,3 +89,5 @@
 .room-v2-caption-overlay span{color:#f8fafc}
 .room-v2-caption-overlay small{margin-left:8px;padding:2px 5px;border-radius:999px;background:rgba(59,130,246,.22);color:#bfdbfe;font-size:9px;font-weight:700}
 @media(max-width:600px){.room-v2-caption-overlay{bottom:82px;width:calc(100vw - 18px)}.room-v2-caption-overlay p{font-size:12px;padding:7px 9px}}
+
+.room-v2-control:disabled{opacity:.42;cursor:not-allowed}.room-v2-control:disabled:hover{background:transparent}.room-v2-poll-create button:disabled,.room-v2-luna button:disabled{opacity:.45;cursor:not-allowed}
