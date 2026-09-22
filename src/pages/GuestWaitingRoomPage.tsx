@@ -288,7 +288,7 @@ export default function GuestWaitingRoomPage() {
       if (status === 'accepted') {
         setLobbyStatus('accepted');
         stopMedia();
-        navigate(`/reunions/${encodeURIComponent(String(meeting.id))}`, {
+        navigate(`/reunions/${encodeURIComponent(String(meeting.meeting_link))}`, {
           replace: true,
           state: {
             guestName,
