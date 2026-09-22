@@ -82,9 +82,9 @@ export const apiFetch = async (
       if (cached) return cached;
     }
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('Le serveur MBotéRoom met trop de temps à répondre. Réessayez.');
+      throw new Error('MBotéRoom met trop de temps à répondre. Réessayez.');
     }
-    throw new Error('Impossible de joindre le serveur MBotéRoom. Vérifiez votre connexion puis réessayez.');
+    throw new Error('MBotéRoom est momentanément indisponible. Vérifiez votre connexion puis réessayez.');
   } finally {
     window.clearTimeout(timer);
   }
