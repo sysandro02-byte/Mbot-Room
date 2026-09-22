@@ -6,6 +6,7 @@ import {
   CameraOff,
   Captions,
   Circle,
+  Clock3,
   Hand,
   LogOut,
   MessageCircle,
@@ -20,6 +21,7 @@ import {
   Send,
   Settings2,
   ShieldCheck,
+  Sparkles,
   Square,
   UsersRound,
   Volume2,
@@ -40,7 +42,7 @@ import {
   MeetingParticipant,
   MeetingPoll,
 } from '../services/collaborationService';
-import { getMeetingAccessCode, LobbyParticipant, Meeting, MeetingMediaRequest, meetingService } from '../services/meetingService';
+import { getMeetingAccessCode, LobbyParticipant, LunaCatchUpResponse, Meeting, MeetingMediaRequest, meetingService } from '../services/meetingService';
 import { mediaTransportService, type MediaTransportStatus } from '../services/mediaTransportService';
 import { createCompositeMeetingRecording, type CompositeRecordingSession } from '../lib/meetingRecording';
 import './MeetingRoomV2.css';
@@ -263,6 +265,10 @@ export default function MeetingRoomV2() {
   const [lunaPrompt, setLunaPrompt] = useState('');
   const [lunaAnswer, setLunaAnswer] = useState('');
   const [lunaLoading, setLunaLoading] = useState(false);
+  const [catchUp, setCatchUp] = useState<LunaCatchUpResponse | null>(null);
+  const [catchUpLoading, setCatchUpLoading] = useState(false);
+  const [catchUpMinutes, setCatchUpMinutes] = useState(15);
+  const [catchUpDismissed, setCatchUpDismissed] = useState(false);
   const [menuUserId, setMenuUserId] = useState<number | null>(null);
   const [mediaTransportStatus, setMediaTransportStatus] = useState<MediaTransportStatus | null>(null);
   const [mediaTransportChecked, setMediaTransportChecked] = useState(false);
@@ -1061,6 +1067,22 @@ export default function MeetingRoomV2() {
     }
   };
 
+  const requestCatchUp = async (minutes = catchUpMinutes) => {
+    if (!meeting?.id || !canUseLuna) return;
+    setCatchUpMinutes(minutes);
+    setCatchUpLoading(true);
+    setCatchUpDismissed(true);
+    try {
+      const result = await meetingService.getLunaCatchUp(meeting.id, minutes);
+      setCatchUp(result);
+      setPanel('luna');
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Le rattrapage Luna est indisponible.');
+    } finally {
+      setCatchUpLoading(false);
+    }
+  };
+
   const respondToLobby = async (userId: number, status: 'accepted' | 'rejected') => {
     if (!meeting?.id) return;
     try {
@@ -1263,6 +1285,15 @@ export default function MeetingRoomV2() {
       </header>
 
       {notice ? <div className="room-v2-notice" role="status"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Fermer"><X size={16}/></button></div> : null}
+
+      {meeting.is_active && !isModerator && canUseLuna && !catchUpDismissed && (Date.now() - new Date(meeting.start_time).getTime() > 5 * 60_000) ? (
+        <section className="room-v2-catchup-offer" aria-label="Rattrapage intelligent Luna">
+          <span><Sparkles size={18}/></span>
+          <div><strong>Vous arrivez en cours de réunion ?</strong><small>Luna peut vous résumer en privé les 15 dernières minutes sans interrompre les participants.</small></div>
+          <button type="button" disabled={catchUpLoading} onClick={() => void requestCatchUp(15)}>{catchUpLoading ? 'Analyse…' : 'Me rattraper'}</button>
+          <button type="button" className="dismiss" aria-label="Masquer" onClick={() => setCatchUpDismissed(true)}><X size={16}/></button>
+        </section>
+      ) : null}
 
       <section className="room-v2-body">
         <div className={`room-v2-stage ${speakerViewEnabled ? 'speaker-mode' : ''}`}>
@@ -1498,9 +1529,28 @@ export default function MeetingRoomV2() {
 
             {panel === 'luna' ? (
               <div className="room-v2-luna">
-                <p>Luna peut utiliser le chat et les transcriptions audio persistées de la réunion pour produire ses résumés. Elle n’invente pas le contenu qui n’a pas été transcrit.</p>
+                <section className="room-v2-catchup-card">
+                  <div className="room-v2-catchup-title"><span><Sparkles size={18}/></span><div><strong>Rattrapage silencieux</strong><small>Un briefing privé pour rejoindre une réunion déjà commencée sans demander « qu’est-ce que j’ai raté ? ».</small></div></div>
+                  <div className="room-v2-catchup-windows" role="group" aria-label="Durée du rattrapage">
+                    {[5,15,30].map((minutes)=><button key={minutes} type="button" className={catchUpMinutes===minutes?'active':''} onClick={()=>void requestCatchUp(minutes)} disabled={!canUseLuna||catchUpLoading}><Clock3 size={13}/>{minutes} min</button>)}
+                  </div>
+                  {catchUpLoading?<div className="room-v2-catchup-loading"><Sparkles size={17}/> Luna analyse les échanges récents…</div>:null}
+                  {catchUp&&!catchUpLoading?(
+                    catchUp.available?<div className="room-v2-catchup-result">
+                      <span className="room-v2-private-badge"><ShieldCheck size={13}/> Privé · visible seulement par vous</span>
+                      <h4>{catchUp.headline||'Rattrapage express'}</h4>
+                      {catchUp.brief?<p>{catchUp.brief}</p>:null}
+                      {catchUp.keyPoints?.length?<div><strong>À retenir</strong><ul>{catchUp.keyPoints.map((item,index)=><li key={`point-${index}`}>{item}</li>)}</ul></div>:null}
+                      {catchUp.decisions?.length?<div><strong>Décisions déjà prises</strong><ul>{catchUp.decisions.map((item,index)=><li key={`decision-${index}`}>{item}</li>)}</ul></div>:null}
+                      {catchUp.actions?.length?<div><strong>Actions</strong><ul>{catchUp.actions.map((item,index)=><li key={`action-${index}`}>{item}</li>)}</ul></div>:null}
+                      {catchUp.openQuestions?.length?<div><strong>Questions encore ouvertes</strong><ul>{catchUp.openQuestions.map((item,index)=><li key={`question-${index}`}>{item}</li>)}</ul></div>:null}
+                      <small className="room-v2-catchup-sources">Basé sur {catchUp.sources?.captions||0} extrait(s) audio et {catchUp.sources?.chat||0} message(s) de discussion.</small>
+                    </div>:<div className="room-v2-catchup-empty">{catchUp.reason||'Pas encore assez de contenu pour générer un rattrapage.'}</div>
+                  ):null}
+                </section>
+                <p>Luna peut utiliser le chat et les transcriptions audio persistées de la réunion. Elle n’invente pas le contenu qui n’a pas été transcrit.</p>
                 <form onSubmit={askLuna}>
-                  <textarea value={lunaPrompt} onChange={(event) => setLunaPrompt(event.target.value)} placeholder={canUseLuna ? 'Ex. Résume les décisions décrites dans ce texte…' : 'Luna est désactivée par l’hôte'} maxLength={5000} disabled={!canUseLuna}/>
+                  <textarea value={lunaPrompt} onChange={(event) => setLunaPrompt(event.target.value)} placeholder={canUseLuna ? 'Ex. Quelles décisions ont déjà été prises ?' : 'Luna est désactivée par l’hôte'} maxLength={5000} disabled={!canUseLuna}/>
                   <button type="submit" disabled={!canUseLuna || lunaLoading || !lunaPrompt.trim()}>{lunaLoading ? 'Analyse…' : 'Demander à Luna'}</button>
                 </form>
                 {lunaAnswer ? <div className="room-v2-luna-answer">{lunaAnswer}</div> : null}
