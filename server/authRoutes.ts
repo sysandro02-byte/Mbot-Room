@@ -513,9 +513,13 @@ export const registerAuthRoutes = (app: express.Express) => {
   app.post('/api/auth/forgot-password', requireDatabase, async (request, response, next) => {
     try {
       const email = normalizeEmail(request.body?.email);
+      const adminFlow = request.body?.admin === true;
       const userResult = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
         ? await query(`SELECT * FROM room_users WHERE lower(email)=lower($1) AND is_guest=false LIMIT 1`, [email])
         : { rows: [] };
+      if (adminFlow && userResult.rows[0] && String(userResult.rows[0].role) !== 'admin') {
+        userResult.rows = [];
+      }
       if (userResult.rows[0]) {
         const rawToken = createToken();
         await query('DELETE FROM room_password_resets WHERE user_id=$1 OR expires_at<=now()', [userResult.rows[0].id]);
@@ -524,7 +528,8 @@ export const registerAuthRoutes = (app: express.Express) => {
           [hashToken(rawToken), userResult.rows[0].id],
         );
         const appUrl = String(process.env.MBOTE_ROOM_APP_URL || getOrigin(request)).replace(/\/+$/, '');
-        const delivered = await sendResetEmail(email, `${appUrl}/mot-de-passe-oublie#reset=${encodeURIComponent(rawToken)}`);
+        const resetPath = adminFlow ? '/admin/mot-de-passe-oublie' : '/mot-de-passe-oublie';
+        const delivered = await sendResetEmail(email, `${appUrl}${resetPath}#reset=${encodeURIComponent(rawToken)}`);
         if (!delivered) {
           await query('DELETE FROM room_password_resets WHERE token_hash=$1', [hashToken(rawToken)]);
           console.warn('MBotéRoom password reset email delivery failed');
