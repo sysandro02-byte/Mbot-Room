@@ -86,7 +86,9 @@ const runCase = async ({ name, browserType, device, session }) => {
 
   const assertNoViewportOverflow = async (route) => {
     await page.goto(`${baseUrl}${route}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(350);
+    // WebKit treats fetches interrupted by the next navigation as page errors.
+    // Finish the route's network activity before moving to another screen.
+    await page.waitForLoadState('networkidle');
     const metrics = await page.evaluate(() => ({
       viewport: window.innerWidth,
       root: document.documentElement.scrollWidth,
