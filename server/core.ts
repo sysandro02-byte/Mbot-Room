@@ -257,30 +257,30 @@ export const SESSION_IDLE_TIMEOUT_MS = Math.max(60_000, Math.min(60 * 60_000, Nu
 
 export const getUserByRawToken = async (rawToken: string): Promise<PublicUser | null> => {
   if (!hasDatabase() || !rawToken) return null;
-  const idleSeconds = Math.max(60, Math.floor(SESSION_IDLE_TIMEOUT_MS / 1000));
+  const idleCutoff = new Date(Date.now() - SESSION_IDLE_TIMEOUT_MS).toISOString();
   const result = await query(
     `SELECT u.* FROM room_sessions s
        JOIN room_users u ON u.id = s.user_id
       WHERE s.token_hash = $1
         AND s.expires_at::timestamptz > now()
-        AND COALESCE(s.last_activity, s.created_at::timestamptz) > now() - ($2::text || ' seconds')::interval
+        AND COALESCE(s.last_activity, s.created_at::timestamptz) > $2::timestamptz
       LIMIT 1`,
-    [hashToken(rawToken), String(idleSeconds)],
+    [hashToken(rawToken), idleCutoff],
   );
   return result.rows[0] ? toPublicUser(result.rows[0]) : null;
 };
 
 export const touchSessionActivity = async (rawToken: string) => {
   if (!hasDatabase() || !rawToken) return false;
-  const idleSeconds = Math.max(60, Math.floor(SESSION_IDLE_TIMEOUT_MS / 1000));
+  const idleCutoff = new Date(Date.now() - SESSION_IDLE_TIMEOUT_MS).toISOString();
   const result = await query(
     `UPDATE room_sessions
         SET last_activity=now()
       WHERE token_hash=$1
         AND expires_at::timestamptz > now()
-        AND COALESCE(last_activity, created_at::timestamptz) > now() - ($2::text || ' seconds')::interval
+        AND COALESCE(last_activity, created_at::timestamptz) > $2::timestamptz
       RETURNING token_hash`,
-    [hashToken(rawToken), String(idleSeconds)],
+    [hashToken(rawToken), idleCutoff],
   );
   return Boolean(result.rows[0]);
 };
