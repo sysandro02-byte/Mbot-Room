@@ -304,11 +304,15 @@ export default function MeetingRoomV2() {
     }
   }, []);
 
-  const mediaState = useMemo(() => ({
-    audio: canUseMic && micEnabled && Boolean(localStream?.getAudioTracks().some((track) => track.readyState === 'live')),
-    video: canUseCamera && !screenSharing && cameraEnabled && Boolean(localStream?.getVideoTracks().some((track) => track.readyState === 'live')),
-    screen: canShareScreen && screenSharing,
-  }), [cameraEnabled, canShareScreen, canUseCamera, canUseMic, localStream, micEnabled, screenSharing]);
+  const mediaState = useMemo(() => {
+    const micActive = canUseMic && micEnabled && Boolean(cameraStreamRef.current?.getAudioTracks().some((track) => track.readyState === 'live' && track.enabled));
+    const screenAudioActive = canShareScreen && screenSharing && Boolean(screenStreamRef.current?.getAudioTracks().some((track) => track.readyState === 'live' && track.enabled));
+    return {
+      audio: micActive || screenAudioActive,
+      video: canUseCamera && !screenSharing && cameraEnabled && Boolean(cameraStreamRef.current?.getVideoTracks().some((track) => track.readyState === 'live' && track.enabled)),
+      screen: canShareScreen && screenSharing,
+    };
+  }, [cameraEnabled, canShareScreen, canUseCamera, canUseMic, localStream, micEnabled, screenSharing]);
 
   const mediaEnabled = Boolean(meeting?.id && localUserId && isAuthenticated && mediaReady);
   const liveKitDesired = Boolean(
@@ -693,7 +697,7 @@ export default function MeetingRoomV2() {
         const combined = new MediaStream();
         screenStreamRef.current.getVideoTracks().filter((track) => track.readyState === 'live').forEach((track) => combined.addTrack(track));
         const displayAudio = screenStreamRef.current.getAudioTracks().filter((track) => track.readyState === 'live');
-        (displayAudio.length ? displayAudio : [nextTrack]).forEach((track) => combined.addTrack(track));
+        [nextTrack, ...displayAudio].forEach((track) => combined.addTrack(track));
         setLocalStream(combined);
       }
 
@@ -720,7 +724,6 @@ export default function MeetingRoomV2() {
     }
     const next = !micEnabled;
     tracks.forEach((track) => { track.enabled = next; });
-    if (screenSharing) localStream?.getAudioTracks().forEach((track) => { track.enabled = next; });
     setMicEnabled(next);
   };
 
@@ -763,7 +766,7 @@ export default function MeetingRoomV2() {
         const combined = new MediaStream();
         display.getVideoTracks().filter((track) => track.readyState === 'live').forEach((track) => combined.addTrack(track));
         const displayAudio = display.getAudioTracks().filter((track) => track.readyState === 'live');
-        (displayAudio.length ? displayAudio : [nextTrack]).forEach((track) => combined.addTrack(track));
+        [nextTrack, ...displayAudio].forEach((track) => combined.addTrack(track));
         setLocalStream(combined);
       }
 
@@ -809,9 +812,9 @@ export default function MeetingRoomV2() {
       const display = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 15, max: 30 } }, audio: true });
       const combined = new MediaStream();
       display.getVideoTracks().forEach((track) => combined.addTrack(track));
-      const displayAudio = display.getAudioTracks();
-      const micAudio = canUseMic ? (cameraStreamRef.current?.getAudioTracks() || []) : [];
-      (displayAudio.length ? displayAudio : micAudio).forEach((track) => combined.addTrack(track));
+      const displayAudio = display.getAudioTracks().filter((track) => track.readyState === 'live');
+      const micAudio = canUseMic ? (cameraStreamRef.current?.getAudioTracks().filter((track) => track.readyState === 'live') || []) : [];
+      [...micAudio, ...displayAudio].forEach((track) => combined.addTrack(track));
       display.getVideoTracks()[0]?.addEventListener('ended', stopScreenShare, { once: true });
       screenStreamRef.current = display;
       setScreenSharing(true);
