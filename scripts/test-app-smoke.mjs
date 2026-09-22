@@ -171,7 +171,7 @@ try {
   });
 
   const routes = [
-    ['/app', 'Votre espace MBotéRoom'],
+    ['/app', 'Bonjour Admin Smoke'],
     ['/app/meetings', 'Réunions'],
     ['/app/search', 'Recherche'],
     ['/app/calendar', 'Calendrier'],
