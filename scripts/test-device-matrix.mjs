@@ -68,26 +68,11 @@ const register = async () => {
   return data;
 };
 
-const runCase = async ({ name, browserType, device }) => {
+const runCase = async ({ name, browserType, device, session }) => {
   const browser = await browserType.launch({ headless: true });
   const context = await browser.newContext({
     ...(device || {}),
     locale: 'fr-FR',
-  });
-  const session = await register().catch(async (error) => {
-    if (!String(error?.message || '').includes('EMAIL_ALREADY_EXISTS')) throw error;
-    const response = await fetch(`${baseUrl}/api/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Origin: baseUrl,
-        'X-MBote-Room-Session-Mode': 'bearer',
-      },
-      body: JSON.stringify({ email: 'device.matrix@mbote.test', password: 'Password2026!', rememberMe: true }),
-    });
-    const data = await response.json();
-    assert.equal(response.status, 200, JSON.stringify(data));
-    return data;
   });
 
   await context.addInitScript(({ user, token }) => {
@@ -136,9 +121,10 @@ const runCase = async ({ name, browserType, device }) => {
 
 try {
   await waitForServer();
-  await runCase({ name: 'PC Chromium', browserType: chromium });
-  await runCase({ name: 'Android Pixel 7', browserType: chromium, device: devices['Pixel 7'] });
-  await runCase({ name: 'iPhone 15 WebKit', browserType: webkit, device: devices['iPhone 15'] });
+  const sharedSession = await register();
+  await runCase({ name: 'PC Chromium', browserType: chromium, session: sharedSession });
+  await runCase({ name: 'Android Pixel 7', browserType: chromium, device: devices['Pixel 7'], session: sharedSession });
+  await runCase({ name: 'iPhone 15 WebKit', browserType: webkit, device: devices['iPhone 15'], session: sharedSession });
   console.log('DEVICE_MATRIX_RESULT {"ok":true,"devices":3,"networkRecovery":true}');
 } finally {
   server.kill('SIGTERM');
