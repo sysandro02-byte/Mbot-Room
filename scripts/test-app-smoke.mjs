@@ -89,7 +89,7 @@ try {
   assert.equal(health.readiness?.database?.persistent, true);
   assert.equal(health.readiness?.testReady, true);
 
-  const register = await jsonRequest('/api/auth/register', {
+  const register = await jsonRequest('/api/auth/admin/register', {
     method: 'POST',
     headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
     body: JSON.stringify({
