@@ -97,14 +97,14 @@ export default function RealFeaturePage({kind}:Props){
 
   const submitCalendar=async(event:FormEvent<HTMLFormElement>)=>{
     event.preventDefault();const form=new FormData(event.currentTarget);const title=String(form.get('title')||'').trim();const start=String(form.get('start')||'');const end=String(form.get('end')||'');if(!title||!start||!end)return;
-    try{const created=await appDataService.createCalendarEvent({title,description:String(form.get('description')||''),startsAt:new Date(start).toISOString(),endsAt:new Date(end).toISOString()});setCalendar((current)=>[...current,created].sort((a,b)=>new Date(a.starts_at).getTime()-new Date(b.starts_at).getTime()));event.currentTarget.reset();setNotice('Événement enregistré dans PostgreSQL.');}catch(cause){setError(cause instanceof Error?cause.message:'Création impossible.');}
+    try{const created=await appDataService.createCalendarEvent({title,description:String(form.get('description')||''),startsAt:new Date(start).toISOString(),endsAt:new Date(end).toISOString()});setCalendar((current)=>[...current,created].sort((a,b)=>new Date(a.starts_at).getTime()-new Date(b.starts_at).getTime()));event.currentTarget.reset();setNotice('Événement enregistré.');}catch(cause){setError(cause instanceof Error?cause.message:'Création impossible.');}
   };
 
   const sendMessage=async(event:FormEvent)=>{event.preventDefault();if(!selectedMeetingId||!messageDraft.trim())return;try{const message=await collaborationService.sendMessage(selectedMeetingId,messageDraft.trim());setMessages((current)=>current.some((item)=>item.id===message.id)?current:[...current,message]);setMessageDraft('');}catch(cause){setError(cause instanceof Error?cause.message:'Message non envoyé.');}};
 
   const createPoll=async(event:FormEvent)=>{event.preventDefault();if(!selectedMeetingId||!pollQuestion.trim()||!pollA.trim()||!pollB.trim())return;try{const poll=await collaborationService.createPoll(selectedMeetingId,pollQuestion.trim(),[pollA.trim(),pollB.trim()]);setPolls((current)=>[poll,...current]);setPollQuestion('');setPollA('');setPollB('');}catch(cause){setError(cause instanceof Error?cause.message:'Sondage non créé.');}};
 
-  const savePreferences=async(event:FormEvent)=>{event.preventDefault();try{const saved=await appDataService.updatePreferences(preferences);setPreferences(saved);setNotice('Paramètres enregistrés sur le serveur.');}catch(cause){setError(cause instanceof Error?cause.message:'Enregistrement impossible.');}};
+  const savePreferences=async(event:FormEvent)=>{event.preventDefault();try{const saved=await appDataService.updatePreferences(preferences);setPreferences(saved);setNotice('Paramètres enregistrés.');}catch(cause){setError(cause instanceof Error?cause.message:'Enregistrement impossible.');}};
 
   const saveProfile=async(event:FormEvent)=>{event.preventDefault();try{const result=await appDataService.updateProfile(profile);setProfile({...profile,...result.user});await authService.refreshCurrentUser();window.dispatchEvent(new CustomEvent('mbote-room-auth-changed'));setNotice('Profil mis à jour.');}catch(cause){setError(cause instanceof Error?cause.message:'Profil non enregistré.');}};
 
@@ -123,7 +123,7 @@ export default function RealFeaturePage({kind}:Props){
 
       {!loading&&kind==='calendar'?<div className="real-feature-grid"><section className="real-card"><h2>Ajouter un événement</h2><form className="real-form" onSubmit={submitCalendar}><input name="title" required placeholder="Titre"/><textarea name="description" placeholder="Description"/><label>Début<input name="start" type="datetime-local" required defaultValue={toLocalInput(new Date(Date.now()+3600000))}/></label><label>Fin<input name="end" type="datetime-local" required defaultValue={toLocalInput(new Date(Date.now()+7200000))}/></label><button><Plus size={17}/> Enregistrer</button></form></section><section className="real-card"><h2>Agenda</h2>{calendar.length?calendar.map((event)=><article className="real-list-row" key={event.id}><div><strong>{event.title}</strong><small>{formatDate(event.starts_at)} → {formatDate(event.ends_at)}</small><p>{event.description}</p></div><button onClick={()=>void appDataService.deleteCalendarEvent(event.id).then(()=>setCalendar((current)=>current.filter((item)=>item.id!==event.id)))} aria-label="Supprimer"><Trash2 size={17}/></button></article>):<p>Aucun événement.</p>}</section></div>:null}
 
-      {!loading&&kind==='recordings'?<section className="real-card"><h2>Enregistrements réellement disponibles</h2>{recordings.length?recordings.map((recording)=><article className="real-list-row" key={recording.id}><div><strong>{recording.title}</strong><small>{formatDate(recording.created_at)} · {Math.round(recording.size_bytes/1024/1024)} Mo · {Math.round(recording.duration_seconds/60)} min</small></div><a href={recording.storage_url} target="_blank" rel="noreferrer"><Download size={17}/> Ouvrir</a></article>):<p>Aucun enregistrement serveur n’a encore été déclaré. Les enregistrements locaux téléchargés dans une réunion restent sur l’appareil.</p>}</section>:null}
+      {!loading&&kind==='recordings'?<section className="real-card"><h2>Enregistrements disponibles</h2>{recordings.length?recordings.map((recording)=><article className="real-list-row" key={recording.id}><div><strong>{recording.title}</strong><small>{formatDate(recording.created_at)} · {Math.round(recording.size_bytes/1024/1024)} Mo · {Math.round(recording.duration_seconds/60)} min</small></div><a href={recording.storage_url} target="_blank" rel="noreferrer"><Download size={17}/> Ouvrir</a></article>):<p>Aucun enregistrement n’est disponible pour le moment.</p>}</section>:null}
 
       {!loading&&kind==='contacts'?<section className="real-card"><div className="real-search"><Search size={17}/><input value={contactSearch} onChange={(event)=>setContactSearch(event.target.value)} placeholder="Rechercher un participant…"/></div><div className="real-contact-grid">{filteredContacts.map((contact)=><article key={contact.id}><span>{contact.avatar?<img src={contact.avatar} alt=""/>:contact.name.slice(0,2).toUpperCase()}</span><div><strong>{contact.name}</strong><small>@{contact.username} · {contact.email}</small></div></article>)}</div>{!filteredContacts.length?<p>Aucun contact issu de vos réunions.</p>:null}</section>:null}
 
@@ -154,7 +154,7 @@ export default function RealFeaturePage({kind}:Props){
           </div>
           <div className="real-profile-security">
             <span><ShieldCheck size={20}/></span>
-            <div><strong>Connexion protégée</strong><p>Un code OTP envoyé par e-mail est requis à chaque connexion par mot de passe.</p></div>
+            <div><strong>Connexion protégée</strong><p>Un code de sécurité envoyé par e-mail est demandé à chaque connexion par mot de passe.</p></div>
           </div>
           <div className="real-profile-shortcuts">
             <button onClick={()=>navigate('/app/settings')}><Settings size={16}/> Paramètres</button>
@@ -174,8 +174,8 @@ export default function RealFeaturePage({kind}:Props){
             <label><span><Phone size={16}/> Téléphone</span><input value={profile.phoneNumber} onChange={(event)=>setProfile((current)=>({...current,phoneNumber:event.target.value}))} placeholder="+242 ..."/></label>
             <label><span><Building2 size={16}/> Organisation</span><input value={profile.organization} onChange={(event)=>setProfile((current)=>({...current,organization:event.target.value}))} placeholder="Entreprise, école ou équipe"/></label>
             <label><span><BriefcaseBusiness size={16}/> Fonction</span><input value={profile.jobTitle} onChange={(event)=>setProfile((current)=>({...current,jobTitle:event.target.value}))} placeholder="Ex. Chef de projet"/></label>
-            <label className="real-profile-avatar-field"><span><Camera size={16}/> URL de l’avatar</span><input value={profile.avatar} onChange={(event)=>setProfile((current)=>({...current,avatar:event.target.value}))} placeholder="https://..."/></label>
-            <div className="real-profile-email-readonly"><Mail size={17}/><div><small>Adresse de connexion</small><strong>{currentUser?.email}</strong></div><span>Protégée par OTP</span></div>
+            <label className="real-profile-avatar-field"><span><Camera size={16}/> Photo de profil</span><input value={profile.avatar} onChange={(event)=>setProfile((current)=>({...current,avatar:event.target.value}))} placeholder="https://..."/></label>
+            <div className="real-profile-email-readonly"><Mail size={17}/><div><small>Adresse de connexion</small><strong>{currentUser?.email}</strong></div><span>Code de sécurité activé</span></div>
             <button className="real-profile-save"><Save size={17}/> Enregistrer les modifications</button>
           </form>
           <div className="real-profile-tools">
