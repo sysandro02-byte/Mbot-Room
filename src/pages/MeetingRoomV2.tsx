@@ -40,7 +40,7 @@ import {
   MeetingParticipant,
   MeetingPoll,
 } from '../services/collaborationService';
-import { getMeetingAccessCode, LobbyParticipant, Meeting, meetingService } from '../services/meetingService';
+import { getMeetingAccessCode, LobbyParticipant, Meeting, MeetingMediaRequest, meetingService } from '../services/meetingService';
 import { mediaTransportService, type MediaTransportStatus } from '../services/mediaTransportService';
 import { createCompositeMeetingRecording, type CompositeRecordingSession } from '../lib/meetingRecording';
 import './MeetingRoomV2.css';
@@ -247,6 +247,7 @@ export default function MeetingRoomV2() {
   const [mediaTransportChecked, setMediaTransportChecked] = useState(false);
   const [liveKitFailed, setLiveKitFailed] = useState(false);
   const [captionsEnabled, setCaptionsEnabled] = useState(false);
+  const [pendingMediaRequest, setPendingMediaRequest] = useState<MeetingMediaRequest | null>(null);
 
   const localUserId = String(currentUser?.id || '');
   const localName = state?.guestName?.trim() || currentUser?.name || currentUser?.username || currentUser?.email || 'Participant';
@@ -283,10 +284,10 @@ export default function MeetingRoomV2() {
   }, []);
 
   const mediaState = useMemo(() => ({
-    audio: micEnabled && Boolean(localStream?.getAudioTracks().some((track) => track.readyState === 'live')),
-    video: !screenSharing && cameraEnabled && Boolean(localStream?.getVideoTracks().some((track) => track.readyState === 'live')),
-    screen: screenSharing,
-  }), [cameraEnabled, localStream, micEnabled, screenSharing]);
+    audio: canUseMic && micEnabled && Boolean(localStream?.getAudioTracks().some((track) => track.readyState === 'live')),
+    video: canUseCamera && !screenSharing && cameraEnabled && Boolean(localStream?.getVideoTracks().some((track) => track.readyState === 'live')),
+    screen: canShareScreen && screenSharing,
+  }), [cameraEnabled, canShareScreen, canUseCamera, canUseMic, localStream, micEnabled, screenSharing]);
 
   const mediaEnabled = Boolean(meeting?.id && localUserId && isAuthenticated && mediaReady);
   const liveKitDesired = Boolean(
