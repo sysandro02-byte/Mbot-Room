@@ -217,8 +217,13 @@ export function useMeetingMeshWebRTC({
     else bindRemoteCreatedSenders(state);
 
     const stream = localStreamRef.current;
-    const audioTrack = stream?.getAudioTracks().find((track) => track.readyState === 'live') || null;
-    const videoTrack = stream?.getVideoTracks().find((track) => track.readyState === 'live') || null;
+    const allowedMedia = mediaRef.current;
+    const audioTrack = allowedMedia.audio
+      ? stream?.getAudioTracks().find((track) => track.readyState === 'live' && track.enabled) || null
+      : null;
+    const videoTrack = (allowedMedia.video || allowedMedia.screen)
+      ? stream?.getVideoTracks().find((track) => track.readyState === 'live' && track.enabled) || null
+      : null;
     const updates: Promise<void>[] = [];
     if (state.audioSender) updates.push(state.audioSender.replaceTrack(audioTrack));
     if (state.videoSender) updates.push(state.videoSender.replaceTrack(videoTrack));
@@ -611,7 +616,12 @@ export function useMeetingMeshWebRTC({
   useEffect(() => {
     if (!joinedRef.current) return;
     socket.emit('meeting:media-updated', { meetingId, media });
-  }, [media, mediaKey, meetingId]);
+    peersRef.current.forEach((state) => {
+      void syncLocalTracks(state, false).catch(() => {
+        onNotice?.('Mise à jour caméra/micro incomplète pour un participant.');
+      });
+    });
+  }, [media, mediaKey, meetingId, onNotice, syncLocalTracks]);
 
   useEffect(() => {
     if (!peerConnectionsEnabled) {
