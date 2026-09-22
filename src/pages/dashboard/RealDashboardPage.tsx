@@ -64,14 +64,14 @@ export default function RealDashboardPage(){
 
   const openMeeting=async(meeting:Meeting)=>{
     if(meeting.status==='ended'||meeting.status==='cancelled'){
-      navigate('/reunions/'+meeting.id+'/terminee',{state:{meeting}});
+      navigate('/reunions/'+meeting.meeting_link+'/terminee',{state:{meeting}});
       return;
     }
     const moderator=Number(meeting.host_id)===Number(user?.id)||Number(meeting.co_host_id||0)===Number(user?.id)||user?.role==='admin';
     if(moderator&&!meeting.is_active){
       try{
         const result=await meetingService.startMeetingAndNotify(meeting.id);
-        navigate('/reunions/'+meeting.id,{state:{meeting:result.meeting||meeting}});
+        navigate('/reunions/'+meeting.meeting_link,{state:{meeting:result.meeting||meeting}});
         return;
       }catch(cause){
         setError(cause instanceof Error?cause.message:'Démarrage impossible.');
@@ -82,10 +82,10 @@ export default function RealDashboardPage(){
       const numericUserId=Number(user?.id);
       const access=await meetingService.requestJoin(meeting.id,Number.isFinite(numericUserId)?numericUserId:undefined);
       if(access.status==='requested'){
-        navigate('/reunions/'+meeting.id+'/salle-attente',{state:{meeting}});
+        navigate('/reunions/'+meeting.meeting_link+'/salle-attente',{state:{meeting}});
         return;
       }
-      navigate('/reunions/'+meeting.id,{state:{meeting}});
+      navigate('/reunions/'+meeting.meeting_link,{state:{meeting}});
     }catch(cause){
       setError(cause instanceof Error?cause.message:'Accès impossible.');
     }
