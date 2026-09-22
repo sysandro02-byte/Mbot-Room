@@ -6,6 +6,7 @@ import PwaExperience from './components/PwaExperience';
 import MobileSplash from './components/MobileSplash';
 import SessionSecurity from './components/SessionSecurity';
 import { sanitizeInternalPath } from './lib/navigationSecurity';
+import { AppLanguageBridge } from './lib/appLanguage';
 
 const RealMeetingList = lazy(() => import('./components/RealMeetingList'));
 const AppShell = lazy(() => import('./components/AppShell'));
@@ -122,7 +123,7 @@ function SimpleInfoPage({ title, description }: { title: string; description: st
 }
 
 export default function App() {
-  return <><MobileSplash/><PwaExperience/><SessionSecurity/><Suspense fallback={<main className="route-loading" role="status" aria-live="polite">Chargement de MBotéRoom…</main>}><Routes>
+  return <><AppLanguageBridge/><MobileSplash/><PwaExperience/><SessionSecurity/><Suspense fallback={<main className="route-loading" role="status" aria-live="polite">Chargement de MBotéRoom…</main>}><Routes>
     <Route path="/login" element={<Login />} />
     <Route path="/connexion" element={<Login />} />
     <Route path="/inscription" element={<Login initialView="register" />} />
