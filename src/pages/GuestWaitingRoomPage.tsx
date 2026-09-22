@@ -21,6 +21,7 @@ import {
   Volume2,
   X,
 } from 'lucide-react';
+import { socket } from '../lib/socket';
 import { authService } from '../services/authService';
 import { getMeetingAccessCode, Meeting, meetingService } from '../services/meetingService';
 import './GuestWaitingRoomPage.css';
@@ -281,11 +282,10 @@ export default function GuestWaitingRoomPage() {
     if (!meeting || !currentUser?.id) return undefined;
 
     let cancelled = false;
-    const checkLobby = async () => {
-      const lobby = await meetingService.getLobby(meeting.id).catch(() => []);
+    let rejectionTimer: number | null = null;
+    const applyLobbyStatus = (status?: 'accepted' | 'rejected' | 'requested') => {
       if (cancelled) return;
-      const me = lobby.find((item) => String(item.user_id) === String(currentUser.id));
-      if (me?.status === 'accepted') {
+      if (status === 'accepted') {
         setLobbyStatus('accepted');
         stopMedia();
         navigate(`/reunions/${encodeURIComponent(String(meeting.id))}`, {
@@ -302,22 +302,44 @@ export default function GuestWaitingRoomPage() {
             },
           },
         });
-      } else if (me?.status === 'rejected') {
+        return;
+      }
+      if (status === 'rejected') {
         setLobbyStatus('rejected');
         stopMedia();
-        window.setTimeout(() => navigate('/rejoindre-une-reunion', { replace: true }), 1800);
-      } else {
-        setLobbyStatus('waiting');
+        if (rejectionTimer !== null) window.clearTimeout(rejectionTimer);
+        rejectionTimer = window.setTimeout(() => navigate('/rejoindre-une-reunion', { replace: true }), 1800);
+        return;
       }
+      setLobbyStatus('waiting');
     };
+
+    const checkLobby = async () => {
+      const lobby = await meetingService.getLobby(meeting.id).catch(() => []);
+      if (cancelled) return;
+      const me = lobby.find((item) => String(item.user_id) === String(currentUser.id));
+      applyLobbyStatus(me?.status);
+    };
+
+    const onLobbyStatus = (payload: { meetingId?: number; status?: 'accepted' | 'rejected' | 'requested' }) => {
+      if (Number(payload?.meetingId || 0) !== Number(meeting.id)) return;
+      applyLobbyStatus(payload.status);
+    };
+
+    const legacyToken = authService.getToken();
+    socket.auth = legacyToken ? { token: legacyToken } : {};
+    socket.on('meeting:lobby-status', onLobbyStatus);
+    if (!socket.connected) socket.connect();
 
     void checkLobby();
     const intervalId = window.setInterval(checkLobby, 3000);
     return () => {
       cancelled = true;
+      socket.off('meeting:lobby-status', onLobbyStatus);
       window.clearInterval(intervalId);
+      if (rejectionTimer !== null) window.clearTimeout(rejectionTimer);
     };
-  }, [backgroundMode, currentUser?.id, customBackgroundUrl, meeting, navigate, stopMedia]);
+  }, [backgroundMode, currentUser?.id, customBackgroundUrl, guestName, meeting, navigate, stopMedia]);
 
   useEffect(() => {
     return () => {
