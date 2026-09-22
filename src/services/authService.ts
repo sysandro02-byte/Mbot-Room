@@ -327,6 +327,7 @@ export const authService = {
         credentials: 'include',
       }).catch(() => undefined);
     }
+    await clearOfflinePrivateData().catch(() => undefined);
     clearStoredSession();
     window.dispatchEvent(new CustomEvent('mbote-room-auth-changed'));
   },
