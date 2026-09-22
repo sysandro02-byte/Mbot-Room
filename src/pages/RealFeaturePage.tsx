@@ -1,5 +1,6 @@
 import { FormEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, Download, Eraser, MessageCircle, Plus, Save, Search, Settings, Trash2, UserRound, UsersRound, Vote } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { AtSign, Bell, BriefcaseBusiness, Building2, CalendarDays, Camera, Download, Eraser, KeyRound, Mail, MessageCircle, Phone, Plus, Save, Search, Settings, ShieldCheck, Trash2, UserRound, UsersRound, Vote } from 'lucide-react';
 import AppShell from '../components/AppShell';
 import { authService } from '../services/authService';
 import { appDataService, CalendarEvent, Contact, Preferences, Recording, Whiteboard, WhiteboardStroke } from '../services/appDataService';
@@ -20,6 +21,7 @@ const formatDate = (value:string) => new Intl.DateTimeFormat('fr-FR',{dateStyle:
 const toLocalInput = (date:Date) => new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);
 
 export default function RealFeaturePage({kind}:Props){
+  const navigate=useNavigate();
   const currentUser=authService.getCurrentUser();
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
@@ -129,7 +131,59 @@ export default function RealFeaturePage({kind}:Props){
 
       {!loading&&kind==='settings'?<section className="real-card"><h2>Préférences synchronisées</h2><form className="real-form" onSubmit={savePreferences}><label>Langue<select value={preferences.language||'fr'} onChange={(event)=>setPreferences((current)=>({...current,language:event.target.value}))}><option value="fr">Français</option><option value="en">English</option></select></label><label>Thème<select value={preferences.theme||'system'} onChange={(event)=>setPreferences((current)=>({...current,theme:event.target.value}))}><option value="system">Système</option><option value="light">Clair</option><option value="dark">Sombre</option></select></label><Toggle label="Micro actif par défaut" checked={preferences.defaultMic!==false} onChange={(value)=>setPreferences((current)=>({...current,defaultMic:value}))}/><Toggle label="Caméra active par défaut" checked={preferences.defaultCamera!==false} onChange={(value)=>setPreferences((current)=>({...current,defaultCamera:value}))}/><Toggle label="Notifications" checked={preferences.notifications!==false} onChange={(value)=>setPreferences((current)=>({...current,notifications:value}))}/><button><Save size={17}/> Enregistrer</button></form></section>:null}
 
-      {!loading&&kind==='profile'?<section className="real-card"><h2>Informations du compte</h2><form className="real-form" onSubmit={saveProfile}><input value={profile.name} onChange={(event)=>setProfile((current)=>({...current,name:event.target.value}))} placeholder="Nom" required/><input value={profile.username} onChange={(event)=>setProfile((current)=>({...current,username:event.target.value}))} placeholder="Nom d’utilisateur" required/><input value={profile.phoneNumber} onChange={(event)=>setProfile((current)=>({...current,phoneNumber:event.target.value}))} placeholder="Téléphone"/><input value={profile.organization} onChange={(event)=>setProfile((current)=>({...current,organization:event.target.value}))} placeholder="Organisation"/><input value={profile.jobTitle} onChange={(event)=>setProfile((current)=>({...current,jobTitle:event.target.value}))} placeholder="Fonction"/><input value={profile.avatar} onChange={(event)=>setProfile((current)=>({...current,avatar:event.target.value}))} placeholder="URL de l’avatar"/><button><Save size={17}/> Mettre à jour</button></form></section>:null}
+      {!loading&&kind==='profile'?<div className="real-profile-layout">
+        <aside className="real-profile-summary">
+          <div className="real-profile-cover"/>
+          <div className="real-profile-identity">
+            <div className="real-profile-avatar">
+              {profile.avatar?<img src={profile.avatar} alt="Avatar du profil"/>:<span>{(profile.name||profile.username||'MB').split(/\s+/).filter(Boolean).slice(0,2).map((part)=>part[0]?.toUpperCase()).join('')}</span>}
+              <span className="real-profile-avatar-badge"><Camera size={14}/></span>
+            </div>
+            <div>
+              <h2>{profile.name||'Utilisateur MBotéRoom'}</h2>
+              <p>@{profile.username||'utilisateur'}</p>
+              <span className="real-profile-role">{currentUser?.role==='admin'?'Administrateur MBotéRoom':'Membre MBotéRoom'}</span>
+            </div>
+          </div>
+          <div className="real-profile-contact">
+            <span><Mail size={16}/><div><small>E-mail</small><strong>{currentUser?.email||'—'}</strong></div></span>
+            <span><Building2 size={16}/><div><small>Organisation</small><strong>{profile.organization||'Non renseignée'}</strong></div></span>
+            <span><BriefcaseBusiness size={16}/><div><small>Fonction</small><strong>{profile.jobTitle||'Non renseignée'}</strong></div></span>
+          </div>
+          <div className="real-profile-security">
+            <span><ShieldCheck size={20}/></span>
+            <div><strong>Connexion protégée</strong><p>Un code OTP envoyé par e-mail est requis à chaque connexion par mot de passe.</p></div>
+          </div>
+          <div className="real-profile-shortcuts">
+            <button onClick={()=>navigate('/app/settings')}><Settings size={16}/> Paramètres</button>
+            <button onClick={()=>navigate('/app/notifications')}><Bell size={16}/> Notifications</button>
+            <button onClick={()=>navigate('/mot-de-passe-oublie')}><KeyRound size={16}/> Changer le mot de passe</button>
+          </div>
+        </aside>
+
+        <section className="real-card real-profile-editor">
+          <div className="real-profile-editor-head">
+            <div><span>Compte personnel</span><h2>Informations du profil</h2><p>Ces informations sont utilisées dans vos réunions, invitations et espaces collaboratifs.</p></div>
+            <ShieldCheck size={26}/>
+          </div>
+          <form className="real-profile-form" onSubmit={saveProfile}>
+            <label><span><UserRound size={16}/> Nom complet</span><input value={profile.name} onChange={(event)=>setProfile((current)=>({...current,name:event.target.value}))} placeholder="Votre nom complet" required/></label>
+            <label><span><AtSign size={16}/> Nom d’utilisateur</span><input value={profile.username} onChange={(event)=>setProfile((current)=>({...current,username:event.target.value}))} placeholder="Nom d’utilisateur" required/></label>
+            <label><span><Phone size={16}/> Téléphone</span><input value={profile.phoneNumber} onChange={(event)=>setProfile((current)=>({...current,phoneNumber:event.target.value}))} placeholder="+242 ..."/></label>
+            <label><span><Building2 size={16}/> Organisation</span><input value={profile.organization} onChange={(event)=>setProfile((current)=>({...current,organization:event.target.value}))} placeholder="Entreprise, école ou équipe"/></label>
+            <label><span><BriefcaseBusiness size={16}/> Fonction</span><input value={profile.jobTitle} onChange={(event)=>setProfile((current)=>({...current,jobTitle:event.target.value}))} placeholder="Ex. Chef de projet"/></label>
+            <label className="real-profile-avatar-field"><span><Camera size={16}/> URL de l’avatar</span><input value={profile.avatar} onChange={(event)=>setProfile((current)=>({...current,avatar:event.target.value}))} placeholder="https://..."/></label>
+            <div className="real-profile-email-readonly"><Mail size={17}/><div><small>Adresse de connexion</small><strong>{currentUser?.email}</strong></div><span>Protégée par OTP</span></div>
+            <button className="real-profile-save"><Save size={17}/> Enregistrer les modifications</button>
+          </form>
+          <div className="real-profile-tools">
+            <button onClick={()=>navigate('/app/calendar')}><CalendarDays size={17}/><span><strong>Calendrier</strong><small>Vos rendez-vous</small></span></button>
+            <button onClick={()=>navigate('/app/messages')}><MessageCircle size={17}/><span><strong>Messages</strong><small>Conversations de réunion</small></span></button>
+            <button onClick={()=>navigate('/app/contacts')}><UsersRound size={17}/><span><strong>Contacts</strong><small>Participants rencontrés</small></span></button>
+            <button onClick={()=>navigate('/app/recordings')}><Download size={17}/><span><strong>Enregistrements</strong><small>Contenus disponibles</small></span></button>
+          </div>
+        </section>
+      </div>:null}
 
       {!loading&&kind==='whiteboard'?<section className="real-card real-whiteboard-card"><div className="real-whiteboard-toolbar"><select value={activeWhiteboard?.id||''} onChange={(event)=>{const board=whiteboards.find((item)=>item.id===event.target.value)||null;setActiveWhiteboard(board);setStrokes(board?.document?.strokes||[]);}}><option value="">Nouveau tableau</option>{whiteboards.map((board)=><option key={board.id} value={board.id}>{board.title}</option>)}</select><input type="color" value={brushColor} onChange={(event)=>setBrushColor(event.target.value)}/><button onClick={createWhiteboard}><Plus size={17}/> Nouveau</button><button onClick={()=>setStrokes([])}><Eraser size={17}/> Effacer</button><button onClick={saveWhiteboard}><Save size={17}/> Sauvegarder</button></div><canvas ref={canvasRef} onPointerDown={startStroke} onPointerMove={moveStroke} onPointerUp={endStroke} onPointerCancel={endStroke}/></section>:null}
     </section>
