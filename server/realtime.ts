@@ -74,6 +74,7 @@ export const registerRealtime = (io: Server) => {
   io.on('connection', (socket) => {
     const user = socket.data.user as PublicUser;
     socket.join(`user:${user.id}`);
+    if (user.role === 'admin') socket.join('admins');
 
     socket.on('meeting:join', async (payload: any, callback?: Ack) => {
       try {
