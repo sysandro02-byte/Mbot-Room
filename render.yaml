@@ -30,6 +30,8 @@ services:
         value: mbote_room_session
       - key: MBOTE_ROOM_COOKIE_SAMESITE
         value: lax
+      - key: MBOTE_ROOM_IDLE_TIMEOUT_MS
+        value: "300000"
       - key: MBOTE_AUTH_BASE_URL
         value: https://mbote-backend.onrender.com
       - key: MBOTE_AUTH_CLIENT_ID
