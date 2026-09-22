@@ -1017,6 +1017,7 @@ function AuthBrandPanel({
   onLanguageChange: (language: Language) => void;
 }) {
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
+  const navigateToAdmin = useNavigate();
   const selectedLanguage = languageOptions.find((option) => option.value === language) || languageOptions[0];
   const closeLanguageMenuOnBlur = (event: FocusEvent<HTMLDivElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -1061,13 +1062,13 @@ function AuthBrandPanel({
           </div>
         )}
       </div>
-      <div className="mbote-logo" aria-label="MBotéRoom">
+      <button className="mbote-logo admin-entry" type="button" aria-label="Ouvrir la connexion administrateur" title="Administration" onClick={() => navigateToAdmin('/admin/login')}>
         <span className="mbote-logo-icon">
           <UsersRound size={30} aria-hidden="true" />
           <Video size={18} className="mbote-logo-video" aria-hidden="true" />
         </span>
         <strong><span>MBoté</span><span>Room</span></strong>
-      </div>
+      </button>
 
       <div className="brand-panel-copy">
         <h2>{copy.heroTitle.split('\n').map((line) => <span key={line}>{line}</span>)}</h2>
