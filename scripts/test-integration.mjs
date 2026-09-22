@@ -203,8 +203,8 @@ const decodeAndVerifyJwt = (token, secret) => {
   return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
 };
 
-const register = async (name, email) => {
-  const result = await jsonRequest('/api/auth/register', {
+const register = async (name, email, admin = false) => {
+  const result = await jsonRequest(admin ? '/api/auth/admin/register' : '/api/auth/register', {
     method: 'POST',
     headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
     body: JSON.stringify({ name, email, password: 'Password2026!' }),
@@ -334,7 +334,7 @@ try {
 
   await expectRejectedSocket();
 
-  const host = await register('Hôte Integration', 'host.integration@mbote.test');
+  const host = await register('Hôte Integration', 'host.integration@mbote.test', true);
   assert.equal(host.user.role, 'admin');
   const hostWelcomeMail = mailRelayRequests.at(-1);
   assert.equal(hostWelcomeMail?.body?.to, 'host.integration@mbote.test');
