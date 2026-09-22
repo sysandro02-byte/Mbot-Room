@@ -13,6 +13,7 @@ import {
   sendApiError,
   toPublicUser,
 } from './core.js';
+import { createNotificationAndPush, getPushStatus } from './pushService.js';
 
 const parseDate = (value: unknown) => {
   const date = new Date(String(value || ''));
@@ -132,6 +133,57 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
     }catch(error){next(error);}
   });
   app.delete('/api/calendar/events/:eventId', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{try{await query('DELETE FROM room_calendar_events WHERE id=$1 AND user_id=$2',[request.params.eventId,request.user!.id]);io.to(`user:${request.user!.id}`).emit('calendar:event-updated',{id:request.params.eventId,deleted:true});response.status(204).end();}catch(error){next(error);}});
+
+  app.get('/api/push/config', requireDatabase, authenticateToken, (_request:AuthedRequest,response)=>{
+    response.json(getPushStatus());
+  });
+
+  app.post('/api/push/subscribe', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+    try{
+      const endpoint=String(request.body?.endpoint||'').trim();
+      const p256dh=String(request.body?.keys?.p256dh||'').trim();
+      const auth=String(request.body?.keys?.auth||'').trim();
+      const expirationTime=request.body?.expirationTime==null?null:Number(request.body.expirationTime);
+      const platform=String(request.body?.platform||'web').trim().slice(0,40);
+      const userAgent=String(request.headers['user-agent']||'').slice(0,500);
+      if(!endpoint||!p256dh||!auth)return sendApiError(response,400,'PUSH_SUBSCRIPTION_INVALID','Abonnement push invalide.');
+      if(!/^https:\/\//i.test(endpoint))return sendApiError(response,400,'PUSH_ENDPOINT_INVALID','Endpoint push invalide.');
+      const id=createId();
+      const result=await query(
+        `INSERT INTO room_push_subscriptions (id,user_id,endpoint,p256dh,auth,expiration_time,user_agent,platform)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         ON CONFLICT (endpoint) DO UPDATE SET user_id=excluded.user_id,p256dh=excluded.p256dh,auth=excluded.auth,
+           expiration_time=excluded.expiration_time,user_agent=excluded.user_agent,platform=excluded.platform,updated_at=now()
+         RETURNING id,user_id,endpoint,platform,created_at,updated_at`,
+        [id,request.user!.id,endpoint,p256dh,auth,Number.isFinite(expirationTime as number)?expirationTime:null,userAgent,platform],
+      );
+      response.status(201).json({success:true,subscription:result.rows[0]});
+    }catch(error){next(error);}
+  });
+
+  app.delete('/api/push/subscribe', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+    try{
+      const endpoint=String(request.body?.endpoint||'').trim();
+      if(endpoint)await query('DELETE FROM room_push_subscriptions WHERE user_id=$1 AND endpoint=$2',[request.user!.id,endpoint]);
+      else await query('DELETE FROM room_push_subscriptions WHERE user_id=$1',[request.user!.id]);
+      response.json({success:true});
+    }catch(error){next(error);}
+  });
+
+  app.post('/api/push/test', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+    try{
+      const notification=await createNotificationAndPush(request.user!.id,{
+        type:'PUSH_TEST',
+        title:'Notifications MBotéRoom activées',
+        body:'Les notifications push sont prêtes sur cet appareil.',
+        url:'/app/notifications',
+        tag:'mboteroom-push-test',
+        data:{source:'settings'},
+      });
+      io.to(`user:${request.user!.id}`).emit('notification:new',notification);
+      response.json({success:true});
+    }catch(error){next(error);}
+  });
 
   app.get('/api/notifications', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{const result=await query(`SELECT * FROM room_notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100`,[request.user!.id]);response.json(result.rows.map((row)=>({...row,createdAt:new Date(row.created_at).toISOString(),readAt:row.read_at?new Date(row.read_at).toISOString():null})));}catch(error){next(error);}
