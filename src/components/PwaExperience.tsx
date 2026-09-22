@@ -110,7 +110,7 @@ export default function PwaExperience(){
         <div className="pwa-install-icon"><Smartphone size={30}/></div>
         <span className="pwa-install-kicker">{device==='ios'?'Expérience iPhone / iPad':device==='android'?'Expérience Android':'Application MBotéRoom'}</span>
         <h2 id="pwa-install-title">Installez MBotéRoom</h2>
-        <p>Profitez d’une ouverture plein écran, d’une navigation mobile plus fluide, du démarrage depuis l’écran d’accueil et des notifications push.</p>
+        <p>Profitez d’une ouverture plein écran, d’une navigation mobile plus fluide, du démarrage depuis l’écran d’accueil et des notifications.</p>
         {showHelp?<div className="pwa-install-help">
           {device==='ios'?<><strong><Share size={17}/> Sur iPhone/iPad</strong><span>Dans Safari, touchez <b>Partager</b>, puis <b>Sur l’écran d’accueil</b> et confirmez <b>Ajouter</b>.</span></>
           :<><strong><MoreVertical size={17}/> Sur Android</strong><span>Utilisez Chrome ou Edge, ouvrez le menu, puis choisissez <b>Installer l’application</b>. Si le navigateur propose seulement un raccourci, rechargez la page puis utilisez le bouton d’installation MBotéRoom.</span></>}
