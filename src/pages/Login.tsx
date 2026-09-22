@@ -627,7 +627,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                 <h1 id="login-title">{copy.title}</h1>
                 <p>{copy.subtitle}</p>
                 <div className="auth-security-badges" aria-label="Sécurité de connexion">
-                  <span><ShieldCheck size={15}/> OTP par e-mail</span>
+                  <span><ShieldCheck size={15}/> Code de sécurité par e-mail</span>
                   <span><Video size={15}/> Réunions HD</span>
                   <span><Sparkles size={15}/> Luna IA</span>
                 </div>
@@ -901,7 +901,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
             <p>Bienvenue sur MBotéRoom. Votre espace professionnel vient d’être créé.</p>
             <div className="account-created-summary">
               <span><Mail size={18}/><b>{registrationSuccess.email}</b></span>
-              <span><ShieldCheck size={18}/><b>OTP obligatoire à chaque connexion</b></span>
+              <span><ShieldCheck size={18}/><b>Code de sécurité demandé à chaque connexion</b></span>
               <span><Sparkles size={18}/><b>Luna IA, réunions HD et collaboration</b></span>
             </div>
             <div className={registrationSuccess.welcomeEmailSent ? 'account-created-mail sent' : 'account-created-mail warning'}>
