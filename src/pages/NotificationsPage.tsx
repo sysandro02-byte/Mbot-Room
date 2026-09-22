@@ -2,9 +2,10 @@ import { Bell, CheckCheck, CircleCheck, Clock3 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import AppShell from '../components/AppShell';
 import { notificationService, type RoomNotification } from '../services/notificationService';
+import { getAppLocale } from '../lib/appLanguage';
 import './UtilityPages.css';
 
-const formatDate = (value: string) => new Intl.DateTimeFormat('fr-FR', {
+const formatDate = (value: string) => new Intl.DateTimeFormat(getAppLocale(), {
   dateStyle: 'medium',
   timeStyle: 'short',
 }).format(new Date(value));
