@@ -819,8 +819,8 @@
   }
 
   .login-benefits {
-    grid-template-columns: repeat(2, auto);
     justify-content: center;
+    padding-inline: 24px;
   }
 }
 
@@ -864,9 +864,8 @@
   }
 
   .login-benefits {
-    grid-template-columns: 1fr 1fr;
-    justify-items: start;
-    padding-inline: 30px;
+    justify-content: center;
+    padding-inline: 20px;
   }
 }
 
