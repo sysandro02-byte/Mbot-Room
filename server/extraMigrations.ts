@@ -37,6 +37,20 @@ export const runExtraMigrations = async () => {
       updated_at timestamptz NOT NULL DEFAULT now()
     );
 
+    CREATE TABLE IF NOT EXISTS room_platform_settings (
+      key text PRIMARY KEY,
+      enabled boolean NOT NULL DEFAULT true,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    INSERT INTO room_platform_settings (key,enabled) VALUES
+      ('registrationEnabled',true),
+      ('guestAccessEnabled',true),
+      ('meetingCreationEnabled',true),
+      ('lunaEnabled',true),
+      ('recordingEnabled',true),
+      ('publicMeetingsEnabled',true)
+    ON CONFLICT (key) DO NOTHING;
+
     CREATE TABLE IF NOT EXISTS room_user_preferences (
       user_id integer PRIMARY KEY REFERENCES room_users(id) ON DELETE CASCADE,
       preferences jsonb NOT NULL DEFAULT '{}'::jsonb,
