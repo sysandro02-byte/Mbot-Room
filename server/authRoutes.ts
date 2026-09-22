@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import type express from 'express';
 import {
   AuthedRequest,
@@ -144,12 +145,75 @@ const acceptedMemberCount = async (meetingId: number) => {
   return Number(result.rows[0]?.count || 0);
 };
 
+const escapeEmailHtml = (value: unknown) => String(value ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
+const emailFrame = (title: string, subtitle: string, content: string, footer = 'Cet e-mail a été envoyé automatiquement par MBotéRoom.') => [
+  '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>',
+  '<body style="margin:0;background:#f4f7fc;font-family:Inter,Arial,sans-serif;color:#17213c">',
+  '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f7fc;padding:30px 12px"><tr><td align="center">',
+  '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#fff;border:1px solid #e2e8f4;border-radius:24px;overflow:hidden;box-shadow:0 16px 48px rgba(22,34,69,.08)">',
+  '<tr><td style="padding:28px 34px;background:linear-gradient(135deg,#13224d,#3156eb 62%,#6046f4);color:#fff">',
+  '<div style="font-size:25px;font-weight:850">MBoté<span style="color:#c0cbff">Room</span></div><div style="margin-top:6px;font-size:13px;opacity:.84">Réunions professionnelles, simples et sécurisées</div></td></tr>',
+  '<tr><td style="padding:34px"><h1 style="margin:0 0 10px;font-size:28px;line-height:1.2;color:#15203d">'+escapeEmailHtml(title)+'</h1>',
+  '<p style="margin:0 0 25px;color:#68758f;font-size:16px;line-height:1.65">'+escapeEmailHtml(subtitle)+'</p>'+content+'</td></tr>',
+  '<tr><td style="padding:19px 34px;border-top:1px solid #edf1f7;background:#fafcff;color:#7a879d;font-size:12px;line-height:1.6">'+escapeEmailHtml(footer)+'<br>© LoukaTech · MBotéRoom</td></tr>',
+  '</table></td></tr></table></body></html>'
+].join('');
+
+const primaryEmailButton = (label: string, url: string) =>
+  '<a href="'+escapeEmailHtml(url)+'" style="display:inline-block;padding:13px 20px;border-radius:12px;background:#3156eb;color:#fff;text-decoration:none;font-weight:800">'+escapeEmailHtml(label)+'</a>';
+
 const sendResetEmail = async (email: string, resetUrl: string) => sendTransactionalEmail({
   to: email,
-  subject: 'Réinitialisation de votre mot de passe MBotéRoom',
-  text: `Utilisez ce lien pour réinitialiser votre mot de passe : ${resetUrl}`,
-  html: `<div style="font-family:Arial,sans-serif;color:#17213c"><h2>Réinitialisation du mot de passe MBotéRoom</h2><p>Une demande de réinitialisation a été reçue pour votre compte.</p><p><a href="${resetUrl}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#3156eb;color:#fff;text-decoration:none">Définir un nouveau mot de passe</a></p><p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet e-mail.</p></div>`,
+  subject: 'Réinitialisez votre mot de passe MBotéRoom',
+  text: 'Une demande de réinitialisation a été reçue pour votre compte. Ce lien expire dans 30 minutes : '+resetUrl,
+  html: emailFrame(
+    'Réinitialisation du mot de passe',
+    'Nous avons reçu une demande pour définir un nouveau mot de passe sur votre compte.',
+    '<div style="padding:14px 16px;border-radius:13px;background:#fff8e8;border:1px solid #ffe2a9;color:#785b19;font-size:14px;line-height:1.6">Ce lien est temporaire et expire après 30 minutes. Si vous n’êtes pas à l’origine de cette demande, ne faites rien.</div>'+
+    '<p style="margin:26px 0 0">'+primaryEmailButton('Définir un nouveau mot de passe', resetUrl)+'</p>',
+    'Ne communiquez jamais votre mot de passe ou un code de sécurité à une autre personne.'
+  ),
 });
+
+const sendWelcomeEmail = async (email: string, name: string, appUrl: string) => {
+  const feature = (title: string, body: string) =>
+    '<div style="margin:0 0 10px;padding:14px 16px;border:1px solid #e6ebf4;border-radius:13px"><strong style="color:#22325a">'+escapeEmailHtml(title)+'</strong><div style="margin-top:4px;color:#71809b;font-size:14px;line-height:1.5">'+escapeEmailHtml(body)+'</div></div>';
+  return sendTransactionalEmail({
+    to: email,
+    subject: 'Bienvenue sur MBotéRoom — votre espace est prêt',
+    text: 'Bonjour '+name+'. Votre compte '+email+' est prêt. Vous pouvez créer des réunions HD, inviter des participants, utiliser Luna IA, le chat, les sondages, les sous-salles et le partage d’écran. Pour votre sécurité, votre mot de passe n’est jamais envoyé en clair. Un code OTP sera demandé à chaque connexion. '+appUrl,
+    html: emailFrame(
+      'Bienvenue '+name+' !',
+      'Votre espace MBotéRoom est prêt pour vos réunions, votre équipe et Luna IA.',
+      '<div style="padding:16px 18px;border-radius:14px;background:#f2f5ff;border:1px solid #dde5ff"><div style="font-size:12px;color:#73809b">Compte MBotéRoom</div><div style="margin-top:5px;font-weight:800;color:#1b294e">'+escapeEmailHtml(email)+'</div><div style="margin-top:8px;color:#66728d;font-size:13px;line-height:1.55">Pour votre sécurité, MBotéRoom ne conserve pas et n’envoie jamais votre mot de passe en clair. À chaque nouvelle connexion, un code OTP est envoyé à cette adresse.</div></div>'+
+      '<h2 style="margin:28px 0 14px;font-size:18px;color:#182442">Découvrez MBotéRoom</h2>'+
+      feature('Réunions HD', 'Audio, vidéo, partage d’écran et gestion des périphériques.')+
+      feature('Collaboration', 'Chat, réactions, sondages, sous-salles et outils de travail en équipe.')+
+      feature('Luna IA', 'Résumé des échanges, décisions, points clés et actions à suivre.')+
+      feature('Sécurité avancée', 'Salle d’attente, verrouillage, rôles hôte/co-hôte et OTP à la connexion.')+
+      '<p style="margin:26px 0 0">'+primaryEmailButton('Ouvrir MBotéRoom', appUrl)+'</p>',
+      'Votre mot de passe reste secret. MBotéRoom ne vous demandera jamais de communiquer votre mot de passe ou votre code OTP par e-mail.'
+    ),
+  });
+};
+
+const sendLoginOtpEmail = async (email: string, name: string, code: string, expiresMinutes = 10) => sendTransactionalEmail({
+  to: email,
+  subject: code+' · Votre code de connexion MBotéRoom',
+  text: 'Bonjour '+name+'. Votre code de connexion MBotéRoom est '+code+'. Il expire dans '+expiresMinutes+' minutes. Si vous n’êtes pas à l’origine de cette tentative, ignorez ce message.',
+  html: emailFrame(
+    'Confirmez votre connexion',
+    'Bonjour '+name+', saisissez ce code dans MBotéRoom. Il expire dans '+expiresMinutes+' minutes.',
+    '<div style="margin:26px 0;padding:22px;border-radius:16px;background:#121c3e;text-align:center"><div style="font-size:12px;color:#aab8dd;text-transform:uppercase;letter-spacing:1.5px">Code à usage unique</div><div style="margin-top:8px;color:#fff;font-size:38px;font-weight:900;letter-spacing:9px">'+escapeEmailHtml(code)+'</div></div>'+
+    '<p style="margin:0;color:#71809b;font-size:13px;line-height:1.6">Ce code ne peut être utilisé qu’une seule fois. Ne le partagez avec personne, même avec une personne prétendant travailler pour LoukaTech.</p>',
+    'Si vous n’avez pas tenté de vous connecter, ignorez ce message. Aucun accès n’est accordé sans le code.'
+  ),
+});
+
+const createOtpCode = () => String(crypto.randomInt(100000, 1000000));
 
 export const registerAuthRoutes = (app: express.Express) => {
   app.post('/api/auth/register', requireDatabase, async (request, response, next) => {
