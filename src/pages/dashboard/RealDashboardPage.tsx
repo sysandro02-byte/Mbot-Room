@@ -3,6 +3,8 @@ import {
   Bell,
   CalendarDays,
   CheckCheck,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   ContactRound,
   MessageCircle,
@@ -17,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
-import { Meeting, meetingService } from '../../services/meetingService';
+import { HomeSlide, Meeting, meetingService } from '../../services/meetingService';
 import { notificationService, RoomNotification } from '../../services/notificationService';
 import { getAppLocale } from '../../lib/appLanguage';
 import './RealDashboardPage.css';
@@ -30,6 +32,8 @@ export default function RealDashboardPage(){
   const [meetings,setMeetings]=useState<Meeting[]>([]);
   const [notifications,setNotifications]=useState<RoomNotification[]>([]);
   const [tips,setTips]=useState<Array<{id:string;title:string;body:string;actionLabel:string;actionPath:string}>>([]);
+  const [homeSlides,setHomeSlides]=useState<HomeSlide[]>([]);
+  const [activeSlide,setActiveSlide]=useState(0);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
 
@@ -37,14 +41,17 @@ export default function RealDashboardPage(){
     setLoading(true);
     setError('');
     try{
-      const [meetingRows,notificationRows,tipRows]=await Promise.all([
+      const [meetingRows,notificationRows,tipRows,slideRows]=await Promise.all([
         meetingService.getMeetings(),
         notificationService.list().catch(()=>[]),
         meetingService.getDashboardTips().catch(()=>[]),
+        meetingService.getHomeSlides().catch(()=>[]),
       ]);
       setMeetings(Array.isArray(meetingRows)?meetingRows:[]);
       setNotifications(notificationRows);
       setTips(tipRows);
+      setHomeSlides(slideRows);
+      setActiveSlide(0);
     }catch(cause){
       setError(cause instanceof Error?cause.message:'Impossible de charger le tableau de bord.');
     }finally{
@@ -52,6 +59,13 @@ export default function RealDashboardPage(){
     }
   };
   useEffect(()=>{void load();},[]);
+
+  useEffect(()=>{
+    if(homeSlides.length<2)return undefined;
+    const timer=window.setInterval(()=>setActiveSlide((current)=>(current+1)%homeSlides.length),7000);
+    return()=>window.clearInterval(timer);
+  },[homeSlides.length]);
+
 
   const upcoming=useMemo(()=>meetings
     .filter((meeting)=>meeting.status!=='ended'&&meeting.status!=='cancelled'&&(meeting.is_active||new Date(meeting.start_time).getTime()+meeting.duration*60000>=Date.now()))
@@ -62,6 +76,12 @@ export default function RealDashboardPage(){
   const completed=useMemo(()=>meetings.filter((meeting)=>meeting.status==='ended'),[meetings]);
   const unread=notifications.filter((notification)=>!notification.readAt).length;
   const initials=(user?.name||user?.username||'MB').split(/s+/).filter(Boolean).slice(0,2).map((part)=>part[0]?.toUpperCase()).join('');
+
+  const currentSlide=homeSlides[activeSlide]||null;
+  const changeSlide=(direction:1|-1)=>{
+    if(!homeSlides.length)return;
+    setActiveSlide((current)=>(current+direction+homeSlides.length)%homeSlides.length);
+  };
 
   const openMeeting=async(meeting:Meeting)=>{
     if(meeting.status==='ended'||meeting.status==='cancelled'){
@@ -122,6 +142,28 @@ export default function RealDashboardPage(){
         <button onClick={()=>navigate('/app/profile')} aria-label="Ouvrir mon profil"><UserRound size={18}/></button>
       </aside>
     </section>
+
+    {homeSlides.length?<section className="dashboard-slider" aria-label="Informations mises en avant">
+      <div className="dashboard-slider-track">
+        <article className="dashboard-slide" key={currentSlide?.slot}>
+          <div className="dashboard-slide-copy">
+            <span className="dashboard-slide-label">À découvrir</span>
+            <h2>{currentSlide?.title}</h2>
+            <p>{currentSlide?.body}</p>
+            {currentSlide?.actionLabel&&currentSlide.actionPath?<button type="button" onClick={()=>navigate(currentSlide.actionPath)}>{currentSlide.actionLabel}<ChevronRight size={17}/></button>:null}
+          </div>
+          <div className="dashboard-slide-visual" aria-hidden="true">
+            {currentSlide?.imageUrl?<img src={currentSlide.imageUrl} alt=""/>:<div className="dashboard-slide-brand"><span><Video size={26}/></span><strong>MBotéRoom</strong><small>Réunions sécurisées</small></div>}
+          </div>
+        </article>
+      </div>
+      <div className="dashboard-slider-controls">
+        <div className="dashboard-slider-dots" role="tablist" aria-label="Choisir un slide">
+          {homeSlides.map((slide,index)=><button key={slide.slot} type="button" className={index===activeSlide?'is-active':''} aria-label={`Afficher le slide ${index+1}`} aria-selected={index===activeSlide} onClick={()=>setActiveSlide(index)} />)}
+        </div>
+        {homeSlides.length>1?<div className="dashboard-slider-arrows"><button type="button" aria-label="Slide précédent" onClick={()=>changeSlide(-1)}><ChevronLeft size={18}/></button><button type="button" aria-label="Slide suivant" onClick={()=>changeSlide(1)}><ChevronRight size={18}/></button></div>:null}
+      </div>
+    </section>:null}
 
     {error?<div className="real-dashboard-error">{error}</div>:null}
 
