@@ -378,7 +378,6 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
         if (previousCoHostId) {
           await query(`UPDATE room_meeting_members SET role='participant',updated_at=now() WHERE meeting_id=$1 AND user_id=$2 AND role='cohost'`, [meeting.id, previousCoHostId]);
           io.in(`user:${previousCoHostId}`).socketsLeave(`meeting:${meeting.id}:moderators`);
-          io.in(`user:${previousCoHostId}`).socketsLeave(`meeting:${meeting.id}:moderators`);
           io.to(`user:${previousCoHostId}`).emit('meeting:moderation', { meetingId: meeting.id, role: 'participant' });
         }
         if (nextCoHostId) {
@@ -394,7 +393,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       }
 
       const value = publicMeeting(updated.rows[0]);
-      io.emit('meeting:updated', value);
+      io.to(`meeting:${meeting.id}`).emit('meeting:updated', value);
+      io.to('admins').emit('meeting:updated', value);
       io.to(`meeting:${meeting.id}`).emit('meeting:presence', { meetingId: meeting.id, coHostId: nextCoHostId });
       response.json(value);
     } catch (error) { next(error); }
@@ -441,7 +441,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       }
       const moderator = canModerateMeeting(meeting, request.user!);
       const hostHasStarted = meeting.is_active || meeting.status === 'live';
-      const blockedUntilHost = !moderator && !alreadyAccepted && !hostHasStarted && meeting.settings.joinBeforeHost === false;
+      const blockedUntilHost = !moderator && !alreadyAccepted && !hostHasStarted && meeting.settings.joinBeforeHost !== true;
       const status = moderator || alreadyAccepted || (!blockedUntilHost && meeting.settings.waitingRoom === false) ? 'accepted' : 'requested';
       if (status === 'accepted' && !alreadyAccepted && !moderator) {
         const count = await acceptedMemberCount(meeting.id);
