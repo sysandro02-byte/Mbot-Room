@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { CalendarPlus, Clock3, Copy, CopyPlus, ExternalLink, Link2, Lock, MoreVertical, Pencil, Play, Plus, RefreshCw, Share2, Trash2, UsersRound, Video, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { getMeetingAccessCode, getMeetingJoinUrl, Meeting, meetingService } from '../services/meetingService';
 import { getAppLocale } from '../lib/appLanguage';
@@ -19,6 +19,7 @@ const formatDate=(value:string)=>new Intl.DateTimeFormat(getAppLocale(),{dateSty
 
 export default function RealMeetingList(){
   const navigate=useNavigate();
+  const [searchParams,setSearchParams]=useSearchParams();
   const user=authService.getCurrentUser();
   const [meetings,setMeetings]=useState<Meeting[]>([]);
   const [loading,setLoading]=useState(true);
@@ -81,6 +82,26 @@ export default function RealMeetingList(){
     setOpenMenuId(null);
     setShowCreate(true);
   };
+  useEffect(()=>{
+    const createRequested=searchParams.get('new')==='1';
+    const editId=Number(searchParams.get('edit')||0);
+    if(createRequested){
+      setEditingMeeting(null);
+      setForm(defaultForm());
+      setShowCreate(true);
+      if(searchParams.get('intent')==='screen-share')setNotice('Créez la réunion, puis utilisez « Partager l’écran » une fois dans la salle.');
+      setSearchParams({}, { replace:true });
+      return;
+    }
+    if(editId&&meetings.length){
+      const meeting=meetings.find((item)=>item.id===editId);
+      if(meeting&&canManageAsPrimary(meeting)&&!meeting.is_active&&meeting.status!=='ended'&&meeting.status!=='cancelled')openEdit(meeting);
+      else if(meeting)setNotice('Cette réunion ne peut pas être modifiée dans son état actuel.');
+      setSearchParams({}, { replace:true });
+    }
+  },[meetings,searchParams,setSearchParams]);
+
+
 
   const submitMeeting=async(event:FormEvent)=>{
     if(!editingMeeting){await createMeeting(event);return;}
