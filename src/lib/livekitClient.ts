@@ -89,7 +89,7 @@ export const loadLiveKitClient = (): Promise<LiveKitSdk> => {
       if (settled) return;
       settled = true;
       sdkPromise = null;
-      reject(new Error('Le transport SFU LiveKit est momentanément indisponible.'));
+      reject(new Error('La connexion vidéo avancée est momentanément indisponible.'));
     };
 
     let script = document.getElementById(LIVEKIT_SCRIPT_ID) as HTMLScriptElement | null;
