@@ -932,10 +932,10 @@ export default function MeetingRoomV2() {
         setRecordingMode(null);
         setServerRecordingId(null);
         setNotice(stopped.storage_url
-          ? 'Enregistrement serveur terminé et disponible dans vos enregistrements.'
-          : 'Arrêt de l’enregistrement serveur demandé. Le fichier est en finalisation.');
+          ? 'Enregistrement terminé et disponible dans vos enregistrements.'
+          : 'L’enregistrement s’arrête. Le fichier sera disponible dans quelques instants.');
       } catch (cause) {
-        setNotice(cause instanceof Error ? cause.message : 'Impossible d’arrêter l’enregistrement serveur.');
+        setNotice(cause instanceof Error ? cause.message : 'Impossible d’arrêter l’enregistrement.');
       }
       return;
     }
@@ -1254,15 +1254,15 @@ export default function MeetingRoomV2() {
             title={liveKitMedia.connected
               ? 'Transport média SFU LiveKit actif.'
               : liveKitDesired
-                ? 'Connexion au SFU LiveKit en cours.'
+                ? 'Optimisation de la connexion en cours.'
                 : liveKitFailed
-                  ? 'Le SFU est indisponible. Le mesh WebRTC a repris automatiquement.'
-                  : 'Transport média mesh WebRTC actif.'}
+                  ? 'La réunion utilise automatiquement un mode de connexion de secours.'
+                  : 'Connexion de la réunion active.'}
           >
-            {liveKitMedia.connected ? 'SFU actif' : liveKitDesired ? 'Connexion SFU…' : 'Mesh actif'}
+            {liveKitMedia.connected ? 'Connexion optimisée' : liveKitDesired ? 'Optimisation…' : 'Connexion active'}
             {!liveKitMedia.connected && mediaTransportStatus?.livekitReady && !liveKitFailed ? <small> · SFU prêt</small> : null}
             {liveKitFailed ? <small> · secours</small> : null}
-            {mediaTransportStatus?.serverRecordingReady ? <small> · Rec. serveur prêt</small> : null}
+            {mediaTransportStatus?.serverRecordingReady ? <small> · Enregistrement disponible</small> : null}
           </span>
           <span
             className={`room-v2-network ${networkQuality.level}`}
