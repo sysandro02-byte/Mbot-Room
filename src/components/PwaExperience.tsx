@@ -72,8 +72,6 @@ export default function PwaExperience(){
         window.removeEventListener('appinstalled',installed);
         window.removeEventListener('online',online);
         window.removeEventListener('offline',offlineHandler);
-      window.removeEventListener('mbote-room-offline-queue-changed',queueChanged);
-      window.removeEventListener('mbote-room-offline-synced',synced);
         window.removeEventListener('mbote-room-offline-queue-changed',queueChanged);
         window.removeEventListener('mbote-room-offline-synced',synced);
       };
@@ -82,6 +80,8 @@ export default function PwaExperience(){
       window.removeEventListener('appinstalled',installed);
       window.removeEventListener('online',online);
       window.removeEventListener('offline',offlineHandler);
+      window.removeEventListener('mbote-room-offline-queue-changed',queueChanged);
+      window.removeEventListener('mbote-room-offline-synced',synced);
     };
   },[device]);
 
