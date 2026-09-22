@@ -52,6 +52,7 @@ const visibleToUser = async (meeting: Meeting, user: NonNullable<AuthedRequest['
 const meetingRole = (meeting: Meeting, user: NonNullable<AuthedRequest['user']>) => {
   if (meeting.host_id === user.id) return 'host';
   if (meeting.co_host_id === user.id) return 'cohost';
+  if (user.isGuest) return 'guest';
   return 'participant';
 };
 
@@ -967,7 +968,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const summaryResult=await query('SELECT * FROM room_meeting_summaries WHERE meeting_id=$1 LIMIT 1',[meeting.id]); const summaryRow=summaryResult.rows[0];
       const startedAt=meeting.started_at||meeting.start_time; const endedAt=meeting.ended_at||new Date().toISOString(); const durationMinutes=Math.max(0,Math.round((new Date(endedAt).getTime()-new Date(startedAt).getTime())/60000));
       const recordings=await query('SELECT storage_url FROM room_recordings WHERE meeting_id=$1 ORDER BY created_at DESC LIMIT 1',[meeting.id]);
-      response.json({meeting:{...meeting,settings:sanitizeMeetingSettings(meeting.settings)},publicId:String(meeting.settings.meetingAccessId||meeting.id),status:meeting.status==='ended'?'ended':'active',startedAt,endedAt,durationMinutes,timezone:meeting.settings.timeZone||'UTC',userRole:meetingRole(meeting,request.user!),participants:members.rows.map((row)=>({id:String(row.user_id),name:row.name,role:row.role==='host'?'Hôte':row.is_guest?'Invité':'Participant',avatar:row.avatar})),summary:{bullets:summaryRow?.bullets||[],decisions:summaryRow?.decisions||[],actions:summaryRow?.actions||[],nextMeeting:summaryRow?.next_meeting||'',processingStatus:summaryRow?'ready':'pending'},nextActions:[],recording:{available:Boolean(recordings.rows[0]),retentionDays:0,url:recordings.rows[0]?.storage_url||null},permissions:{canDownloadSummary:true,canShareSummary:true,canViewRecording:Boolean(recordings.rows[0]),canExportChat:true,canRate:true},guestRestrictions:Boolean(request.user!.isGuest)});
+      response.json({meeting:{...meeting,settings:sanitizeMeetingSettings(meeting.settings)},publicId:String(meeting.settings.meetingAccessId||meeting.id),status:meeting.status==='ended'?'ended':'active',startedAt,endedAt,durationMinutes,timezone:meeting.settings.timeZone||'UTC',userRole:meetingRole(meeting,request.user!),participants:members.rows.map((row)=>({id:String(row.user_id),name:row.name,role:row.role==='host'?'Hôte':row.role==='cohost'?'Co-hôte':row.is_guest?'Invité':'Participant',avatar:row.avatar})),summary:{bullets:summaryRow?.bullets||[],decisions:summaryRow?.decisions||[],actions:summaryRow?.actions||[],nextMeeting:summaryRow?.next_meeting||'',processingStatus:summaryRow?'ready':'pending'},nextActions:[],recording:{available:Boolean(recordings.rows[0]),retentionDays:0,url:recordings.rows[0]?.storage_url||null},permissions:{canDownloadSummary:true,canShareSummary:true,canViewRecording:Boolean(recordings.rows[0]),canExportChat:true,canRate:true},guestRestrictions:Boolean(request.user!.isGuest)});
     }catch(error){next(error);}
   });
 
