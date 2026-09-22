@@ -106,31 +106,28 @@ const normalizeExternalProfile = (value: any) => {
   };
 };
 
-const upsertExternalUser = async (profile: ReturnType<typeof normalizeExternalProfile>) => {
+const findAndLinkExternalUser = async (profile: ReturnType<typeof normalizeExternalProfile>) => {
   if (!profile) throw new Error('Profil MBoté invalide');
   const existing = await query(
-    `SELECT * FROM room_users WHERE lower(email) = lower($1) OR mbote_user_id = $2 LIMIT 1`,
+    `SELECT * FROM room_users
+      WHERE is_guest=false
+        AND COALESCE(is_suspended,false)=false
+        AND (lower(email)=lower($1) OR mbote_user_id=$2)
+      LIMIT 1`,
     [profile.email, profile.id],
   );
-  if (existing.rows[0]) {
-    const updated = await query(
-      `UPDATE room_users
-          SET name = $2, username = $3, avatar = CASE WHEN $4 <> '' THEN $4 ELSE avatar END,
-              phone_number = CASE WHEN $5 <> '' THEN $5 ELSE phone_number END,
-              mbote_user_id = $6
-        WHERE id = $1 RETURNING *`,
-      [existing.rows[0].id, profile.name, profile.username, profile.avatar, profile.phoneNumber, profile.id],
-    );
-    return updated.rows[0];
-  }
-  const generated = hashPassword(createToken());
-  const inserted = await query(
-    `INSERT INTO room_users
-      (name, username, email, avatar, password_hash, password_salt, is_guest, created_at, phone_number, mbote_user_id, role)
-     VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8,$9,'user') RETURNING *`,
-    [profile.name, profile.username, profile.email, profile.avatar || createAvatar(profile.name), generated.hash, generated.salt, new Date().toISOString(), profile.phoneNumber, profile.id],
+  if (!existing.rows[0]) return null;
+  const updated = await query(
+    `UPDATE room_users
+        SET name = CASE WHEN $2 <> '' THEN $2 ELSE name END,
+            username = CASE WHEN $3 <> '' THEN $3 ELSE username END,
+            avatar = CASE WHEN $4 <> '' THEN $4 ELSE avatar END,
+            phone_number = CASE WHEN $5 <> '' THEN $5 ELSE phone_number END,
+            mbote_user_id = $6
+      WHERE id = $1 RETURNING *`,
+    [existing.rows[0].id, profile.name, profile.username, profile.avatar, profile.phoneNumber, profile.id],
   );
-  return inserted.rows[0];
+  return updated.rows[0];
 };
 
 const findMeeting = async (value: unknown) => {
@@ -631,7 +628,8 @@ export const registerAuthRoutes = (app: express.Express) => {
       const challenge = challenges.get(challengeId);
       challenges.delete(challengeId);
       if (!challenge || Date.now() - challenge.createdAt > 10 * 60_000) return sendApiError(response, 400, 'EXTERNAL_AUTH_STATE_INVALID', 'Autorisation MBoté expirée.');
-      const user = await upsertExternalUser(challenge.profile);
+      const user = await findAndLinkExternalUser(challenge.profile);
+      if (!user) return sendApiError(response, 403, 'ACCOUNT_NOT_REGISTERED', 'Aucun compte MBotéRoom actif n’est associé à ce compte MBoté. Créez d’abord votre compte MBotéRoom.');
       const otp = await issueLoginOtp(user, true);
       if (!otp) return sendApiError(response, 503, 'OTP_DELIVERY_FAILED', 'Impossible d’envoyer le code de connexion. Réessayez dans quelques instants.');
       response.json(otp);
@@ -681,7 +679,12 @@ export const registerAuthRoutes = (app: express.Express) => {
       const profileResponse = await fetch(profileUrl, { headers: { Authorization: `Bearer ${tokenData.access_token || tokenData.token}` }, signal: AbortSignal.timeout(15000) });
       if (!profileResponse.ok) return sendApiError(response, 502, 'EXTERNAL_AUTH_PROFILE_UNAVAILABLE', 'Profil MBoté indisponible.');
       const profile = normalizeExternalProfile(await profileResponse.json());
-      const user = await upsertExternalUser(profile);
+      const user = await findAndLinkExternalUser(profile);
+      if (!user) {
+        const failure = new URLSearchParams({ externalAuth: 'failed', reason: 'Aucun compte MBotéRoom actif n’est associé à ce compte MBoté. Créez d’abord votre compte MBotéRoom.' });
+        response.redirect(`${stored.clientOrigin}/login?${failure.toString()}`);
+        return;
+      }
       const otp = await issueLoginOtp(user, true);
       if (!otp) {
         const failure = new URLSearchParams({ externalAuth: 'failed', reason: 'Impossible d’envoyer le code OTP de connexion.' });
