@@ -4,10 +4,13 @@ import {
   BarChart3,
   Bell,
   CalendarDays,
+  CircleHelp,
   CirclePlay,
+  FolderOpen,
   Home,
   LogOut,
   ChevronDown,
+  MoreVertical,
   UserRound,
   ShieldCheck,
   WifiOff,
@@ -18,10 +21,11 @@ import {
   Sparkles,
   SquareArrowOutUpRight,
   UsersRound,
-  Video,
   X,
 } from 'lucide-react';
 import { authService } from '../services/authService';
+import { notificationService } from '../services/notificationService';
+import { socket } from '../lib/socket';
 import './AppShell.css';
 
 type AppShellProps = {
@@ -29,17 +33,21 @@ type AppShellProps = {
   title?: string;
 };
 
-const navItems = [
+const primaryNavItems = [
   { label: 'Accueil', icon: Home, to: '/app' },
   { label: 'Réunions', icon: CalendarDays, to: '/app/meetings' },
   { label: 'Rejoindre', icon: SquareArrowOutUpRight, to: '/join' },
   { label: 'Calendrier', icon: CalendarDays, to: '/app/calendar' },
-  { label: 'Enregistrements', icon: CirclePlay, to: '/app/recordings' },
   { label: 'Messages', icon: MessageCircle, to: '/app/messages' },
   { label: 'Contacts', icon: UsersRound, to: '/app/contacts' },
+];
+
+const secondaryNavItems = [
   { label: 'Notifications', icon: Bell, to: '/app/notifications' },
-  { label: 'Tableau blanc', icon: Sparkles, to: '/app/whiteboard' },
+  { label: 'Enregistrements', icon: CirclePlay, to: '/app/recordings' },
   { label: 'Sondages', icon: BarChart3, to: '/app/polls' },
+  { label: 'Tableau blanc', icon: Sparkles, to: '/app/whiteboard' },
+  { label: 'Fichiers', icon: FolderOpen, to: '/app/files' },
   { label: 'Paramètres', icon: Settings, to: '/app/settings' },
 ];
 
@@ -48,7 +56,7 @@ const mobileNavItems = [
   { label: 'Réunions', icon: CalendarDays, to: '/app/meetings' },
   { label: 'Rejoindre', icon: SquareArrowOutUpRight, to: '/join', primary: true },
   { label: 'Messages', icon: MessageCircle, to: '/app/messages' },
-  { label: 'Alertes', icon: Bell, to: '/app/notifications' },
+  { label: 'Paramètres', icon: Settings, to: '/app/settings' },
 ];
 
 export default function AppShell({ children, title }: AppShellProps) {
@@ -57,20 +65,42 @@ export default function AppShell({ children, title }: AppShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
+  const [sidebarProfileOpen, setSidebarProfileOpen] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const sidebarProfileRef = useRef<HTMLDivElement | null>(null);
   const user = authService.getCurrentUser();
   const userName = user?.name || user?.email || 'Utilisateur';
   const initials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'MB';
+
+  useEffect(() => {
+    const refreshUnread = () => void notificationService.list()
+      .then((rows) => setUnreadNotifications(rows.filter((item) => !item.readAt).length))
+      .catch(() => undefined);
+    refreshUnread();
+    if (!socket.connected) socket.connect();
+    socket.on('notification:new', refreshUnread);
+    window.addEventListener('focus', refreshUnread);
+    return () => {
+      socket.off('notification:new', refreshUnread);
+      window.removeEventListener('focus', refreshUnread);
+    };
+  }, []);
 
   useEffect(() => {
     const handleOnline = () => setOnline(true);
     const handleOffline = () => setOnline(false);
     const handlePointer = (event: MouseEvent) => {
       if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) setProfileOpen(false);
+      if (sidebarProfileRef.current && !sidebarProfileRef.current.contains(event.target as Node)) setSidebarProfileOpen(false);
     };
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setProfileOpen(false);
+      if (event.key === 'Escape') {
+        setProfileOpen(false);
+        setSidebarProfileOpen(false);
+        setMenuOpen(false);
+      }
     };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -86,8 +116,25 @@ export default function AppShell({ children, title }: AppShellProps) {
 
   const goFromProfile = (path: string) => {
     setProfileOpen(false);
+    setSidebarProfileOpen(false);
     navigate(path);
   };
+
+  const renderNav = (items: typeof primaryNavItems, ariaLabel: string) => (
+    <nav className="app-shell-nav" aria-label={ariaLabel}>
+      {items.map((item) => {
+        const Icon = item.icon;
+        const active = location.pathname === item.to || (item.to !== '/app' && location.pathname.startsWith(item.to));
+        return (
+          <Link className={active ? 'is-active' : ''} to={item.to} key={item.to} onClick={() => setMenuOpen(false)}>
+            <Icon size={20} aria-hidden="true" />
+            <span>{item.label}</span>
+            {item.to === '/app/notifications' && unreadNotifications > 0 ? <b className="app-shell-nav-badge">{Math.min(99, unreadNotifications)}</b> : null}
+          </Link>
+        );
+      })}
+    </nav>
+  );
 
   return (
     <main className="app-shell">
@@ -95,40 +142,49 @@ export default function AppShell({ children, title }: AppShellProps) {
         <button className="app-shell-close" type="button" aria-label="Fermer le menu" onClick={() => setMenuOpen(false)}>
           <X size={22} aria-hidden="true" />
         </button>
+
         <Link className="app-shell-logo" to="/app" onClick={() => setMenuOpen(false)}>
-          <span><img src="/icons/mboteroom-symbol.png" alt="" /></span>
-          <strong>MBoté<span>Room</span><small>Réunions sécurisées</small></strong>
+          <img src="/icons/mboteroom-symbol.png" alt="" />
+          <strong>MBoté<span>Room</span><small>Se réunir. Avancer. Ensemble.</small></strong>
         </Link>
-        <nav className="app-shell-nav" aria-label="Navigation principale">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = location.pathname === item.to || (item.to !== '/app' && location.pathname.startsWith(item.to));
-            return (
-              <Link className={active ? 'is-active' : ''} to={item.to} key={item.to} onClick={() => setMenuOpen(false)}>
-                <Icon size={21} aria-hidden="true" />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
+
+        <div className="app-shell-sidebar-main">{renderNav(primaryNavItems, 'Navigation principale')}</div>
+        <div className="app-shell-sidebar-secondary">{renderNav(secondaryNavItems, 'Navigation secondaire')}</div>
+
         <div className="app-shell-creator">MBotéRoom application créée par <strong>LoukaTech</strong>.</div>
-        <section className="app-shell-profile">
-          <b>{userName.slice(0, 2).toUpperCase()}</b>
-          <div>
-            <strong>{userName}</strong>
-            <small>En ligne</small>
-          </div>
-          <button type="button" aria-label="Déconnexion" onClick={() => void authService.logout()}>
-            <LogOut size={18} aria-hidden="true" />
-          </button>
-        </section>
+
+        <div className="app-shell-sidebar-profile-wrap" ref={sidebarProfileRef}>
+          <section className="app-shell-profile">
+            <span>{user?.avatar ? <img src={user.avatar} alt="" /> : initials}</span>
+            <div>
+              <strong>{userName}</strong>
+              <small>{user?.role === 'admin' ? 'Administrateur MBotéRoom' : user?.role === 'guest' ? 'Invité MBotéRoom' : 'Membre MBotéRoom'}</small>
+            </div>
+            <button type="button" aria-label="Options du profil" aria-expanded={sidebarProfileOpen} onClick={() => setSidebarProfileOpen((value) => !value)}>
+              <MoreVertical size={18} aria-hidden="true" />
+            </button>
+          </section>
+          {sidebarProfileOpen ? <div className="app-shell-sidebar-profile-menu" role="menu">
+            <button type="button" role="menuitem" onClick={() => goFromProfile('/app/profile')}><UserRound size={16}/> Mon profil</button>
+            <button type="button" role="menuitem" onClick={() => goFromProfile('/app/settings')}><Settings size={16}/> Paramètres</button>
+            <button className="is-danger" type="button" role="menuitem" onClick={() => void authService.logout()}><LogOut size={16}/> Se déconnecter</button>
+          </div> : null}
+        </div>
       </aside>
-      {menuOpen && <button className="app-shell-overlay" type="button" aria-label="Fermer le menu" onClick={() => setMenuOpen(false)} />}
+
+      {menuOpen ? <button className="app-shell-overlay" type="button" aria-label="Fermer le menu" onClick={() => setMenuOpen(false)} /> : null}
+
       <section className="app-shell-workspace">
         <header className="app-shell-header">
           <button className="app-shell-menu-button" type="button" aria-label="Ouvrir le menu" onClick={() => setMenuOpen(true)}>
-            <Menu size={24} aria-hidden="true" />
+            <Menu size={23} aria-hidden="true" />
           </button>
+
+          <Link className="app-shell-mobile-brand" to="/app">
+            <img src="/icons/mboteroom-symbol.png" alt="" />
+            <strong>MBoté<span>Room</span></strong>
+          </Link>
+
           <form className="app-shell-search" onSubmit={(event) => {
             event.preventDefault();
             const query = searchTerm.trim();
@@ -139,12 +195,22 @@ export default function AppShell({ children, title }: AppShellProps) {
               type="search"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Rechercher une réunion ou un contact..."
+              placeholder="Rechercher une réunion, un contact ou un fichier..."
               aria-label="Rechercher"
             />
+            <span className="app-shell-search-shortcut" aria-hidden="true">Ctrl K</span>
           </form>
+
           <div className="app-shell-header-actions">
-            <div className="app-shell-header-title">{title}</div>
+            {title ? <span className="app-shell-header-title">{title}</span> : null}
+            <button className="app-shell-header-icon" type="button" aria-label="Notifications" onClick={() => navigate('/app/notifications')}>
+              <Bell size={20}/>
+              {unreadNotifications > 0 ? <b>{Math.min(99, unreadNotifications)}</b> : null}
+            </button>
+            <button className="app-shell-header-icon app-shell-help-button" type="button" aria-label="Aide" onClick={() => navigate('/aide')}>
+              <CircleHelp size={20}/>
+            </button>
+
             <div className="app-shell-profile-menu" ref={profileMenuRef}>
               <button
                 className="app-shell-header-avatar"
@@ -163,6 +229,7 @@ export default function AppShell({ children, title }: AppShellProps) {
                 </span>
                 <ChevronDown size={16} aria-hidden="true" />
               </button>
+
               {profileOpen ? (
                 <div className="app-shell-profile-dropdown" role="menu">
                   <div className="app-shell-profile-dropdown-head">
@@ -181,7 +248,9 @@ export default function AppShell({ children, title }: AppShellProps) {
             </div>
           </div>
         </header>
+
         <div className="app-shell-content">{children}</div>
+
         <nav className="app-shell-bottom-nav" aria-label="Navigation mobile">
           {mobileNavItems.map((item) => {
             const Icon = item.icon;
