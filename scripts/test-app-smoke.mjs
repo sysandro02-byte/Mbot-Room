@@ -26,7 +26,7 @@ const server = spawn(process.execPath, ['dist/server.js'], {
     PGSSLMODE: 'disable',
     MBOTE_ROOM_ALLOWED_ORIGINS: baseUrl,
     MBOTE_ROOM_APP_URL: baseUrl,
-    ADMIN_EMAILS: '',
+    ADMIN_EMAILS: 'admin.smoke@mbote.test',
     RESEND_API_KEY: '',
     GROQ_API_KEY: '',
     GROQ_TRANSCRIPTION_API_KEY: '',
