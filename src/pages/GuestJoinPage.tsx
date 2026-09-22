@@ -323,14 +323,14 @@ export default function GuestJoinPage() {
 
               <JoinField
                 id="meeting-identifier"
-                label="ID ou lien de réunion"
+                label="Code ou lien de réunion"
                 error={errors.meetingIdentifier}
                 icon={<Hash size={24} aria-hidden="true" />}
                 action={form.meetingIdentifier ? (
                   <button
                     className="guest-input-action"
                     type="button"
-                    aria-label="Effacer l'ID de réunion"
+                    aria-label="Effacer l'Code de réunion"
                     onClick={() => updateField('meetingIdentifier', '')}
                   >
                     <XCircle size={20} aria-hidden="true" />
@@ -343,7 +343,7 @@ export default function GuestJoinPage() {
                   type="text"
                   value={form.meetingIdentifier}
                   autoComplete="off"
-                  placeholder="Ex. : 123 456 789 ou https://mboteroom.com/j/123456789"
+                  placeholder="Ex. : 123 456 789"
                   aria-invalid={Boolean(errors.meetingIdentifier)}
                   aria-describedby={errors.meetingIdentifier ? 'meeting-identifier-error' : undefined}
                   onChange={(event) => updateField('meetingIdentifier', event.target.value)}
