@@ -4,6 +4,8 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import { authService } from './services/authService';
 import PwaExperience from './components/PwaExperience';
 import MobileSplash from './components/MobileSplash';
+import SessionSecurity from './components/SessionSecurity';
+import { sanitizeInternalPath } from './lib/navigationSecurity';
 
 const RealMeetingList = lazy(() => import('./components/RealMeetingList'));
 const AppShell = lazy(() => import('./components/AppShell'));
@@ -51,8 +53,9 @@ function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: bo
 
   if (checking) return <main className="route-loading" role="status">Vérification de la session…</main>;
   if (!isAuthenticated) {
-    const redirect = `${location.pathname}${location.search}`;
-    return <Navigate to={`/login?redirect=${encodeURIComponent(redirect)}`} replace />;
+    const redirect = sanitizeInternalPath(`${location.pathname}${location.search}`);
+    sessionStorage.setItem('mboteroom-login-redirect', redirect);
+    return <Navigate to="/login" replace />;
   }
   return children;
 }
@@ -100,8 +103,9 @@ function AdminRoute({ children }: { children: ReactNode }) {
 
   if (checking) return <main className="route-loading" role="status">Vérification de la session…</main>;
   if (!isAuthenticated) {
-    const redirect = `${location.pathname}${location.search}`;
-    return <Navigate to={`/login?redirect=${encodeURIComponent(redirect)}`} replace />;
+    const redirect = sanitizeInternalPath(`${location.pathname}${location.search}`);
+    sessionStorage.setItem('mboteroom-login-redirect', redirect);
+    return <Navigate to="/login" replace />;
   }
   if (!isAdmin) return <Navigate to="/app" replace />;
   return children;
@@ -119,7 +123,7 @@ function SimpleInfoPage({ title, description }: { title: string; description: st
 }
 
 export default function App() {
-  return <><MobileSplash/><PwaExperience/><Suspense fallback={<main className="route-loading" role="status" aria-live="polite">Chargement de MBotéRoom…</main>}><Routes>
+  return <><MobileSplash/><PwaExperience/><SessionSecurity/><Suspense fallback={<main className="route-loading" role="status" aria-live="polite">Chargement de MBotéRoom…</main>}><Routes>
     <Route path="/login" element={<Login />} />
     <Route path="/connexion" element={<Login />} />
     <Route path="/inscription" element={<Login initialView="register" />} />
