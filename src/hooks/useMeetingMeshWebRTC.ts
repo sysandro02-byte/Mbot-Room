@@ -337,7 +337,7 @@ export function useMeetingMeshWebRTC({
     const restartIce = async () => {
       if (pc.connectionState === 'closed') return;
       if (state.restartAttempts >= MAX_ICE_RESTARTS) {
-        onNotice?.('La connexion média avec un participant reste instable. Vérifiez votre réseau ou le serveur TURN.');
+        onNotice?.('La connexion avec un participant reste instable. Vérifiez votre réseau.');
         return;
       }
       state.restartAttempts += 1;
