@@ -112,15 +112,68 @@ const postAuth = async (path: string, body: unknown): Promise<AuthResponse> => {
 
 export const authService = {
   async register(payload: { name: string; email: string; password: string; username?: string; phoneNumber?: string; organization?: string; jobTitle?: string }) {
-    const session = await postAuth('/api/auth/register', payload);
+    const response = await fetchAuth(apiUrl('/api/auth/register'), {
+      method: 'POST',
+      headers: authRequestHeaders(),
+      body: JSON.stringify(payload),
+      credentials: 'include',
+    });
+    const result = await readJson(response);
+    if (!response.ok) throw new Error(result.error || 'Création de compte impossible.');
+    const session = {
+      user: normalizeUser(result.user),
+      token: String(result.token || ''),
+      expiresAt: typeof result.expiresAt === 'string' ? result.expiresAt : undefined,
+    };
     saveSession(session, true);
-    return session;
+    return {
+      ...session,
+      accountCreated: Boolean(result.accountCreated),
+      welcomeEmailSent: Boolean(result.welcomeEmailSent),
+      security: result.security as { otpRequiredOnNextLogin?: boolean; passwordEmailed?: boolean } | undefined,
+    };
   },
 
   async login(payload: { email: string; password: string; rememberMe?: boolean }) {
-    const session = await postAuth('/api/auth/login', payload);
-    saveSession(session, Boolean(payload.rememberMe));
+    const response = await fetchAuth(apiUrl('/api/auth/login'), {
+      method: 'POST',
+      headers: authRequestHeaders(),
+      body: JSON.stringify(payload),
+      credentials: 'include',
+    });
+    const result = await readJson(response);
+    if (!response.ok) throw new Error(result.error || 'Connexion impossible.');
+    return result as { otpRequired: true; challengeId: string; emailHint: string; expiresInSeconds: number };
+  },
+
+  async verifyLoginOtp(challengeId: string, code: string, rememberMe = false) {
+    const response = await fetchAuth(apiUrl('/api/auth/login/otp'), {
+      method: 'POST',
+      headers: authRequestHeaders(),
+      body: JSON.stringify({ challengeId, code }),
+      credentials: 'include',
+    });
+    const result = await readJson(response);
+    if (!response.ok) throw new Error(result.error || 'Code OTP invalide.');
+    const session = {
+      user: normalizeUser(result.user),
+      token: String(result.token || ''),
+      expiresAt: typeof result.expiresAt === 'string' ? result.expiresAt : undefined,
+    };
+    saveSession(session, rememberMe);
     return session;
+  },
+
+  async resendLoginOtp(challengeId: string) {
+    const response = await fetchAuth(apiUrl('/api/auth/login/otp/resend'), {
+      method: 'POST',
+      headers: authRequestHeaders(),
+      body: JSON.stringify({ challengeId }),
+      credentials: 'include',
+    });
+    const result = await readJson(response);
+    if (!response.ok) throw new Error(result.error || 'Impossible de renvoyer le code.');
+    return result as { success: boolean; expiresInSeconds: number };
   },
 
   async guestJoin(payload: { name: string; meetingCode: string; password: string }) {
