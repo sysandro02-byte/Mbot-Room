@@ -65,7 +65,7 @@ export default function GlobalSearchPage() {
   return <main className="utility-page">
     <header className="utility-page-head">
       <button type="button" onClick={() => navigate('/app')}><ArrowLeft size={18}/> Accueil</button>
-      <div><h1>Recherche MBotéRoom</h1><p>Réunions et contacts provenant du serveur.</p></div>
+      <div><h1>Recherche MBotéRoom</h1><p>Retrouvez rapidement vos réunions et vos contacts.</p></div>
     </header>
 
     <form className="utility-search" onSubmit={submit}>
