@@ -2,7 +2,7 @@ import { apiFetch, apiUrl, getAuthHeaders } from '../lib/api';
 
 const readJson = async <T>(response: Response): Promise<T> => {
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(typeof data?.error === 'string' ? data.error : `Erreur API (${response.status})`);
+  if (!response.ok) throw new Error(typeof data?.error === 'string' ? data.error : 'Une erreur est survenue.');
   return data as T;
 };
 
