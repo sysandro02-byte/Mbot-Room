@@ -513,7 +513,7 @@ try {
         chat: true,
         reactions: true,
         joinBeforeHost: false,
-        lunaSummary: false,
+        lunaSummary: true,
       },
     }),
   });
