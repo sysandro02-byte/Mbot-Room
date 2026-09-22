@@ -158,7 +158,7 @@ const emailFrame = (title: string, subtitle: string, content: string, footer = '
   '<div style="font-size:25px;font-weight:850">MBoté<span style="color:#c0cbff">Room</span></div><div style="margin-top:6px;font-size:13px;opacity:.84">Réunions professionnelles, simples et sécurisées</div></td></tr>',
   '<tr><td style="padding:34px"><h1 style="margin:0 0 10px;font-size:28px;line-height:1.2;color:#15203d">'+escapeEmailHtml(title)+'</h1>',
   '<p style="margin:0 0 25px;color:#68758f;font-size:16px;line-height:1.65">'+escapeEmailHtml(subtitle)+'</p>'+content+'</td></tr>',
-  '<tr><td style="padding:19px 34px;border-top:1px solid #edf1f7;background:#fafcff;color:#7a879d;font-size:12px;line-height:1.6">'+escapeEmailHtml(footer)+'<br>© LoukaTech · MBotéRoom</td></tr>',
+  '<tr><td style="padding:19px 34px;border-top:1px solid #edf1f7;background:#fafcff;color:#7a879d;font-size:12px;line-height:1.6">'+escapeEmailHtml(footer)+'<br>MBotéRoom est une application créée par LoukaTech.<br>© LoukaTech · MBotéRoom</td></tr>',
   '</table></td></tr></table></body></html>'
 ].join('');
 
