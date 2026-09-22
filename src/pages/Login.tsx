@@ -306,6 +306,12 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/app';
   }, [searchParams]);
 
+  useEffect(() => {
+    if (!otpChallengeId || otpSecondsLeft <= 0) return undefined;
+    const timer = window.setInterval(() => setOtpSecondsLeft((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [otpChallengeId, otpSecondsLeft]);
+
   if (initialView !== 'forgot' && authService.isAuthenticated() && !registrationSuccess) {
     return <Navigate to={redirectTo} replace />;
   }
@@ -379,12 +385,6 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       setIsOtpResending(false);
     }
   };
-
-  useEffect(() => {
-    if (!otpChallengeId || otpSecondsLeft <= 0) return undefined;
-    const timer = window.setInterval(() => setOtpSecondsLeft((value) => Math.max(0, value - 1)), 1000);
-    return () => window.clearInterval(timer);
-  }, [otpChallengeId, otpSecondsLeft]);
 
   const submitRegister = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -841,7 +841,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
             <h2 id="account-created-title">Votre compte est prêt</h2>
             <p>Bienvenue sur MBotéRoom. Votre espace professionnel vient d’être créé.</p>
             <div className="account-created-summary">
-              <span><Mail size={18}/><b>${registrationSuccess.email}</b></span>
+              <span><Mail size={18}/><b>{registrationSuccess.email}</b></span>
               <span><ShieldCheck size={18}/><b>OTP obligatoire à chaque connexion</b></span>
               <span><Sparkles size={18}/><b>Luna IA, réunions HD et collaboration</b></span>
             </div>
