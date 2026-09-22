@@ -169,3 +169,20 @@ a {
 @media (prefers-reduced-motion: reduce) {
   .route-loading::before { animation-duration: 1.8s; }
 }
+
+html{background:#f8faff;overscroll-behavior-y:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{min-height:100dvh;overscroll-behavior-y:contain;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button,a,[role="button"]{-webkit-tap-highlight-color:transparent}
+button{touch-action:manipulation}
+input,textarea,select{font-size:max(16px,1em)}
+@media(max-width:900px){
+  body{background:#f4f6fb}
+  button,a,[role="button"]{min-touch-target-size:44px}
+  ::-webkit-scrollbar{width:0;height:0}
+}
+html[data-standalone="true"] body{user-select:none;-webkit-user-select:none}
+html[data-standalone="true"] input,
+html[data-standalone="true"] textarea,
+html[data-standalone="true"] [contenteditable="true"]{user-select:text;-webkit-user-select:text}
+html[data-platform="ios"][data-standalone="true"] body{padding-top:0}
+html[data-platform="android"][data-standalone="true"] body{background:#f4f6fb}
