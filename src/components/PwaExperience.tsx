@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, MoreVertical, Share, Smartphone, WifiOff, X } from 'lucide-react';
+import { CheckCircle2, Download, MoreVertical, RefreshCw, Share, Smartphone, WifiOff, X } from 'lucide-react';
+import { flushOfflineQueue, getOfflineQueueCount } from '../lib/offline';
 import './PwaExperience.css';
 
 type InstallPromptEvent = Event & {
@@ -25,6 +26,8 @@ export default function PwaExperience(){
   const [showInstall,setShowInstall]=useState(false);
   const [showHelp,setShowHelp]=useState(false);
   const [offline,setOffline]=useState(!navigator.onLine);
+  const [pendingSync,setPendingSync]=useState(getOfflineQueueCount());
+  const [syncNotice,setSyncNotice]=useState('');
   const device=useMemo(platform,[]);
 
   useEffect(()=>{
@@ -32,11 +35,19 @@ export default function PwaExperience(){
     document.documentElement.dataset.platform=device;
     document.documentElement.dataset.standalone=standalone?'true':'false';
     const installed=()=>{document.documentElement.dataset.standalone='true';setShowInstall(false);localStorage.setItem('mboteroom-installed','1');};
-    const online=()=>setOffline(false);
+    const online=()=>{setOffline(false);void flushOfflineQueue();};
     const offlineHandler=()=>setOffline(true);
+    const queueChanged=(event:Event)=>setPendingSync(Number((event as CustomEvent<{pending:number}>).detail?.pending||getOfflineQueueCount()));
+    const synced=(event:Event)=>{
+      const detail=(event as CustomEvent<{synced:number;pending:number}>).detail;
+      setPendingSync(Number(detail?.pending||0));
+      if(detail?.synced){setSyncNotice(`${detail.synced} modification${detail.synced>1?'s':''} synchronisée${detail.synced>1?'s':''}`);window.setTimeout(()=>setSyncNotice(''),3500);}
+    };
     window.addEventListener('appinstalled',installed);
     window.addEventListener('online',online);
     window.addEventListener('offline',offlineHandler);
+    window.addEventListener('mbote-room-offline-queue-changed',queueChanged);
+    window.addEventListener('mbote-room-offline-synced',synced);
 
     if(!standalone){
       const onBeforeInstall=(event:Event)=>{
@@ -61,6 +72,10 @@ export default function PwaExperience(){
         window.removeEventListener('appinstalled',installed);
         window.removeEventListener('online',online);
         window.removeEventListener('offline',offlineHandler);
+      window.removeEventListener('mbote-room-offline-queue-changed',queueChanged);
+      window.removeEventListener('mbote-room-offline-synced',synced);
+        window.removeEventListener('mbote-room-offline-queue-changed',queueChanged);
+        window.removeEventListener('mbote-room-offline-synced',synced);
       };
     }
     return()=>{
@@ -85,7 +100,9 @@ export default function PwaExperience(){
   };
 
   return <>
-    {offline?<div className="pwa-offline-pill" role="status"><WifiOff size={15}/> Mode hors connexion</div>:null}
+    {offline?<div className="pwa-offline-pill" role="status"><WifiOff size={15}/> Mode hors connexion{pendingSync? ` · ${pendingSync} en attente` : ''}</div>:null}
+    {!offline&&pendingSync?<button className="pwa-sync-pill" type="button" onClick={()=>void flushOfflineQueue()}><RefreshCw size={14}/> Synchroniser {pendingSync}</button>:null}
+    {syncNotice?<div className="pwa-sync-success" role="status"><CheckCircle2 size={15}/>{syncNotice}</div>:null}
     {showInstall?<div className="pwa-install-backdrop">
       <section className="pwa-install-sheet" role="dialog" aria-modal="true" aria-labelledby="pwa-install-title">
         <button className="pwa-install-close" type="button" aria-label="Fermer" onClick={dismiss}><X size={19}/></button>
