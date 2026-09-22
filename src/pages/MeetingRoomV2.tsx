@@ -250,11 +250,23 @@ export default function MeetingRoomV2() {
 
   const localUserId = String(currentUser?.id || '');
   const localName = state?.guestName?.trim() || currentUser?.name || currentUser?.username || currentUser?.email || 'Participant';
-  const isModerator = Boolean(meeting && currentUser && (
-    Number(meeting.host_id) === Number(currentUser.id)
-    || Number(meeting.co_host_id || 0) === Number(currentUser.id)
-    || currentUser.role === 'admin'
+  const localMember = participants.find((participant) => participant.userId === Number(currentUser?.id || 0));
+  const isHost = Boolean(meeting && currentUser && Number(meeting.host_id) === Number(currentUser.id));
+  const isCoHost = Boolean(meeting && currentUser && (
+    Number(meeting.co_host_id || 0) === Number(currentUser.id)
+    || localMember?.role === 'cohost'
   ));
+  const isAdmin = currentUser?.role === 'admin';
+  const isModerator = Boolean(meeting && currentUser && (isHost || isCoHost || isAdmin));
+  const canUseMic = Boolean(meeting && (isModerator || meeting.settings?.participantAudio !== false));
+  const canUseCamera = Boolean(meeting && (isModerator || meeting.settings?.participantVideo !== false));
+  const canShareScreen = Boolean(meeting && (isModerator || meeting.settings?.screenShare !== false));
+  const canUseReactions = Boolean(meeting && (isModerator || meeting.settings?.reactions !== false));
+  const canUseChat = Boolean(meeting && meeting.settings?.chat !== false);
+  const canUseLuna = Boolean(meeting && (isModerator || meeting.settings?.lunaSummary !== false));
+  const canRecord = Boolean(meeting && (isModerator || meeting.settings?.recording === true));
+  const canCreatePoll = isModerator;
+  const canEndForAll = Boolean(meeting && currentUser && (isHost || isAdmin));
 
   const refreshMediaDevices = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -591,16 +603,88 @@ export default function MeetingRoomV2() {
     };
   }, [location.state, meeting?.id, navigate, refreshBreakouts, refreshLobby, refreshParticipants]);
 
-  const toggleMic = () => {
+  const requestMissingMediaTrack = useCallback(async (kind: 'audio' | 'video') => {
+    if (!navigator.mediaDevices?.getUserMedia) return false;
+    try {
+      const fresh = await navigator.mediaDevices.getUserMedia(kind === 'audio'
+        ? {
+            audio: {
+              deviceId: selectedAudioInputId ? { exact: selectedAudioInputId } : undefined,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              channelCount: { ideal: 1 },
+            },
+            video: false,
+          }
+        : {
+            audio: false,
+            video: {
+              deviceId: selectedVideoInputId ? { exact: selectedVideoInputId } : undefined,
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              frameRate: { ideal: 30, max: 30 },
+            },
+          });
+      const nextTrack = kind === 'audio' ? fresh.getAudioTracks()[0] : fresh.getVideoTracks()[0];
+      if (!nextTrack) return false;
+      nextTrack.enabled = true;
+
+      const existing = cameraStreamRef.current;
+      const preserved = (existing?.getTracks() || []).filter((track) => track.kind !== kind && track.readyState === 'live');
+      existing?.getTracks().filter((track) => track.kind === kind).forEach((track) => track.stop());
+      const nextCameraStream = new MediaStream([...preserved, nextTrack]);
+      cameraStreamRef.current = nextCameraStream;
+
+      if (!screenSharing) {
+        setLocalStream(nextCameraStream);
+      } else if (kind === 'audio' && screenStreamRef.current) {
+        const combined = new MediaStream();
+        screenStreamRef.current.getVideoTracks().filter((track) => track.readyState === 'live').forEach((track) => combined.addTrack(track));
+        const displayAudio = screenStreamRef.current.getAudioTracks().filter((track) => track.readyState === 'live');
+        (displayAudio.length ? displayAudio : [nextTrack]).forEach((track) => combined.addTrack(track));
+        setLocalStream(combined);
+      }
+
+      await refreshMediaDevices();
+      return true;
+    } catch (cause) {
+      const denied = cause instanceof DOMException && cause.name === 'NotAllowedError';
+      setNotice(denied
+        ? `Autorisez le ${kind === 'audio' ? 'microphone' : 'caméra'} dans votre navigateur puis réessayez.`
+        : `Impossible d’activer ${kind === 'audio' ? 'le microphone' : 'la caméra'}.`);
+      return false;
+    }
+  }, [refreshMediaDevices, screenSharing, selectedAudioInputId, selectedVideoInputId]);
+
+  const toggleMic = async () => {
+    if (!canUseMic) {
+      setNotice('L’hôte a désactivé le microphone des participants.');
+      return;
+    }
+    const tracks = cameraStreamRef.current?.getAudioTracks().filter((track) => track.readyState === 'live') || [];
+    if (!tracks.length) {
+      if (await requestMissingMediaTrack('audio')) setMicEnabled(true);
+      return;
+    }
     const next = !micEnabled;
-    cameraStreamRef.current?.getAudioTracks().forEach((track) => { track.enabled = next; });
+    tracks.forEach((track) => { track.enabled = next; });
     if (screenSharing) localStream?.getAudioTracks().forEach((track) => { track.enabled = next; });
     setMicEnabled(next);
   };
 
-  const toggleCamera = () => {
+  const toggleCamera = async () => {
+    if (!canUseCamera) {
+      setNotice('L’hôte a désactivé la caméra des participants.');
+      return;
+    }
+    const tracks = cameraStreamRef.current?.getVideoTracks().filter((track) => track.readyState === 'live') || [];
+    if (!tracks.length) {
+      if (await requestMissingMediaTrack('video')) setCameraEnabled(true);
+      return;
+    }
     const next = !cameraEnabled;
-    cameraStreamRef.current?.getVideoTracks().forEach((track) => { track.enabled = next; });
+    tracks.forEach((track) => { track.enabled = next; });
     setCameraEnabled(next);
   };
 
@@ -653,8 +737,8 @@ export default function MeetingRoomV2() {
       stopScreenShare();
       return;
     }
-    if (meeting?.settings?.screenShare === false || !navigator.mediaDevices?.getDisplayMedia) {
-      setNotice('Le partage d’écran est indisponible ou désactivé par l’hôte.');
+    if (!canShareScreen || !navigator.mediaDevices?.getDisplayMedia) {
+      setNotice(!canShareScreen ? 'Le partage d’écran est désactivé pour les participants.' : 'Le partage d’écran est indisponible dans ce navigateur.');
       return;
     }
     try {
@@ -744,6 +828,10 @@ export default function MeetingRoomV2() {
   }, [localName, localStream, meeting?.id, remoteParticipants]);
 
   const toggleRecording = async () => {
+    if (!canRecord) {
+      setNotice('L’enregistrement est réservé à l’hôte/co-hôte, sauf autorisation explicite de la réunion.');
+      return;
+    }
     if (recording) {
       await stopActiveRecording();
       return;
@@ -788,6 +876,10 @@ export default function MeetingRoomV2() {
 
   const createPoll = async (event: FormEvent) => {
     event.preventDefault();
+    if (!canCreatePoll) {
+      setNotice('Seul l’hôte ou le co-hôte peut créer un sondage.');
+      return;
+    }
     const options = pollOptions.map((value) => value.trim()).filter(Boolean);
     if (!meeting?.id || !pollQuestion.trim() || options.length < 2) return;
     try {
@@ -847,13 +939,14 @@ export default function MeetingRoomV2() {
     }
   };
 
-  const moderateParticipant = async (userId: number, action: 'mute' | 'camera' | 'remove' | 'ban' | 'lobby' | 'cohost') => {
+  const moderateParticipant = async (userId: number, action: 'mute' | 'camera' | 'remove' | 'ban' | 'lobby' | 'cohost' | 'participant') => {
     if (!meeting?.id) return;
     setMenuUserId(null);
     try {
       if (action === 'mute') await collaborationService.updateParticipant(meeting.id, userId, { mutedByHost: true });
       if (action === 'camera') await collaborationService.updateParticipant(meeting.id, userId, { cameraDisabledByHost: true });
       if (action === 'cohost') await collaborationService.updateParticipant(meeting.id, userId, { role: 'cohost' });
+      if (action === 'participant') await collaborationService.updateParticipant(meeting.id, userId, { role: 'participant' });
       if (action === 'remove') await collaborationService.removeParticipant(meeting.id, userId);
       if (action === 'ban') await collaborationService.banParticipant(meeting.id, userId, 'Exclusion par le modérateur');
       if (action === 'lobby') await collaborationService.moveToLobby(meeting.id, userId);
@@ -930,7 +1023,7 @@ export default function MeetingRoomV2() {
   const leaveMeeting = async (endForAll = false) => {
     if (!meeting?.id) return;
     try {
-      if (endForAll && isModerator) await collaborationService.endMeeting(meeting.id);
+      if (endForAll && canEndForAll) await collaborationService.endMeeting(meeting.id);
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : 'Impossible de terminer la réunion.');
       return;
@@ -1038,7 +1131,7 @@ export default function MeetingRoomV2() {
                   muted={!mediaState.audio}
                   videoEnabled={screenSharing || mediaState.video}
                   screen={screenSharing}
-                  badge={isModerator ? 'Hôte' : currentUser?.isGuest ? 'Invité' : undefined}
+                  badge={isHost ? 'Hôte' : isCoHost ? 'Co-hôte' : isAdmin ? 'Admin' : currentUser?.isGuest ? 'Invité' : 'Participant'}
                   reaction={reactions[Number(currentUser?.id || 0)]}
                   local
                 />
@@ -1071,7 +1164,7 @@ export default function MeetingRoomV2() {
                 muted={!mediaState.audio}
                 videoEnabled={screenSharing || mediaState.video}
                 screen={screenSharing}
-                badge={isModerator ? 'Hôte' : currentUser?.isGuest ? 'Invité' : undefined}
+                badge={isHost ? 'Hôte' : isCoHost ? 'Co-hôte' : isAdmin ? 'Admin' : currentUser?.isGuest ? 'Invité' : 'Participant'}
                 local
               />
               {remoteParticipants.map((participant) => (
@@ -1133,14 +1226,15 @@ export default function MeetingRoomV2() {
                     <article key={member.userId}>
                       <div className="room-v2-person-avatar">{member.avatar ? <img src={member.avatar} alt=""/> : initials(member.name)}</div>
                       <div><strong>{member.name}{isSelf ? ' (vous)' : ''}{raisedHands.has(member.userId) || (isSelf && handRaised) ? <span className="room-v2-raised-inline"> · ✋</span> : null}</strong><small>{member.role === 'host' ? 'Hôte' : member.role === 'cohost' ? 'Co-hôte' : member.isGuest ? 'Invité' : 'Participant'}{remote || isSelf ? ' · En ligne' : ''}</small></div>
-                      {isModerator && !isSelf && member.role !== 'host' ? (
+                      {isModerator && !isSelf && member.role !== 'host' && (isHost || member.role !== 'cohost') ? (
                         <div className="room-v2-person-menu-wrap">
                           <button type="button" onClick={() => setMenuUserId(menuUserId === member.userId ? null : member.userId)}><MoreVertical size={18}/></button>
                           {menuUserId === member.userId ? (
                             <div className="room-v2-person-menu">
                               <button onClick={() => void moderateParticipant(member.userId, 'mute')}>Couper le micro</button>
                               <button onClick={() => void moderateParticipant(member.userId, 'camera')}>Couper la caméra</button>
-                              <button onClick={() => void moderateParticipant(member.userId, 'cohost')}>Nommer co-hôte</button>
+                              {isHost && member.role !== 'cohost' ? <button onClick={() => void moderateParticipant(member.userId, 'cohost')}>Nommer co-hôte</button> : null}
+                              {isHost && member.role === 'cohost' ? <button onClick={() => void moderateParticipant(member.userId, 'participant')}>Retirer le rôle co-hôte</button> : null}
                               <button onClick={() => void moderateParticipant(member.userId, 'lobby')}>Mettre en salle d’attente</button>
                               <button onClick={() => void moderateParticipant(member.userId, 'remove')}>Retirer</button>
                               <button className="danger" onClick={() => void moderateParticipant(member.userId, 'ban')}>Exclure et bannir</button>
@@ -1165,8 +1259,8 @@ export default function MeetingRoomV2() {
                   )) : <p className="room-v2-empty">Aucun message pour le moment.</p>}
                 </div>
                 <form className="room-v2-chat-form" onSubmit={sendMessage}>
-                  <textarea value={messageDraft} onChange={(event) => setMessageDraft(event.target.value)} maxLength={2000} placeholder={meeting.settings?.chat === false ? 'Chat désactivé' : 'Écrire un message…'} disabled={meeting.settings?.chat === false}/>
-                  <button type="submit" disabled={!messageDraft.trim() || meeting.settings?.chat === false}><Send size={18}/></button>
+                  <textarea value={messageDraft} onChange={(event) => setMessageDraft(event.target.value)} maxLength={2000} placeholder={!canUseChat ? 'Chat désactivé par l’hôte' : 'Écrire un message…'} disabled={!canUseChat}/>
+                  <button type="submit" disabled={!messageDraft.trim() || !canUseChat}><Send size={18}/></button>
                 </form>
               </div>
             ) : null}
@@ -1208,14 +1302,16 @@ export default function MeetingRoomV2() {
 
             {panel === 'polls' ? (
               <div className="room-v2-polls">
-                <form onSubmit={createPoll} className="room-v2-poll-create">
-                  <input value={pollQuestion} onChange={(event) => setPollQuestion(event.target.value)} placeholder="Question du sondage" maxLength={300}/>
-                  {pollOptions.map((option, index) => (
-                    <input key={index} value={option} onChange={(event) => setPollOptions((current) => current.map((value, i) => i === index ? event.target.value : value))} placeholder={`Option ${index + 1}`} maxLength={120}/>
-                  ))}
-                  <button type="button" onClick={() => setPollOptions((current) => current.length < 6 ? [...current, ''] : current)}>+ Option</button>
-                  <button type="submit" disabled={!pollQuestion.trim() || pollOptions.filter((value) => value.trim()).length < 2}>Créer le sondage</button>
-                </form>
+                {canCreatePoll ? (
+                  <form onSubmit={createPoll} className="room-v2-poll-create">
+                    <input value={pollQuestion} onChange={(event) => setPollQuestion(event.target.value)} placeholder="Question du sondage" maxLength={300}/>
+                    {pollOptions.map((option, index) => (
+                      <input key={index} value={option} onChange={(event) => setPollOptions((current) => current.map((value, i) => i === index ? event.target.value : value))} placeholder={`Option ${index + 1}`} maxLength={120}/>
+                    ))}
+                    <button type="button" onClick={() => setPollOptions((current) => current.length < 6 ? [...current, ''] : current)}>+ Option</button>
+                    <button type="submit" disabled={!pollQuestion.trim() || pollOptions.filter((value) => value.trim()).length < 2}>Créer le sondage</button>
+                  </form>
+                ) : <p className="room-v2-empty">Vous pouvez voter aux sondages ouverts. La création est réservée à l’hôte et au co-hôte.</p>}
                 {polls.map((poll) => (
                   <article className="room-v2-poll" key={poll.id}>
                     <strong>{poll.question}</strong>
@@ -1234,8 +1330,8 @@ export default function MeetingRoomV2() {
               <div className="room-v2-luna">
                 <p>Luna peut utiliser le chat et les transcriptions audio persistées de la réunion pour produire ses résumés. Elle n’invente pas le contenu qui n’a pas été transcrit.</p>
                 <form onSubmit={askLuna}>
-                  <textarea value={lunaPrompt} onChange={(event) => setLunaPrompt(event.target.value)} placeholder="Ex. Résume les décisions décrites dans ce texte…" maxLength={5000}/>
-                  <button type="submit" disabled={lunaLoading || !lunaPrompt.trim()}>{lunaLoading ? 'Analyse…' : 'Demander à Luna'}</button>
+                  <textarea value={lunaPrompt} onChange={(event) => setLunaPrompt(event.target.value)} placeholder={canUseLuna ? 'Ex. Résume les décisions décrites dans ce texte…' : 'Luna est désactivée par l’hôte'} maxLength={5000} disabled={!canUseLuna}/>
+                  <button type="submit" disabled={!canUseLuna || lunaLoading || !lunaPrompt.trim()}>{lunaLoading ? 'Analyse…' : 'Demander à Luna'}</button>
                 </form>
                 {lunaAnswer ? <div className="room-v2-luna-answer">{lunaAnswer}</div> : null}
               </div>
@@ -1263,9 +1359,9 @@ export default function MeetingRoomV2() {
       ) : null}
 
       <footer className="room-v2-controls">
-        <Control active={micEnabled} label={micEnabled ? 'Micro' : 'Micro coupé'} onClick={toggleMic}>{micEnabled ? <Mic/> : <MicOff/>}</Control>
-        <Control active={cameraEnabled} label={cameraEnabled ? 'Caméra' : 'Caméra coupée'} onClick={toggleCamera}>{cameraEnabled ? <Camera/> : <CameraOff/>}</Control>
-        <Control active={screenSharing} label="Partager" onClick={() => void toggleScreenShare()}><MonitorUp/></Control>
+        <Control active={micEnabled} disabled={!canUseMic} title={!canUseMic ? 'Microphone désactivé par l’hôte' : undefined} label={micEnabled ? 'Micro' : 'Micro coupé'} onClick={() => void toggleMic()}>{micEnabled ? <Mic/> : <MicOff/>}</Control>
+        <Control active={cameraEnabled} disabled={!canUseCamera} title={!canUseCamera ? 'Caméra désactivée par l’hôte' : undefined} label={cameraEnabled ? 'Caméra' : 'Caméra coupée'} onClick={() => void toggleCamera()}>{cameraEnabled ? <Camera/> : <CameraOff/>}</Control>
+        <Control active={screenSharing} disabled={!canShareScreen} title={!canShareScreen ? 'Partage d’écran désactivé par l’hôte' : undefined} label="Partager" onClick={() => void toggleScreenShare()}><MonitorUp/></Control>
         <Control
           active={captionsEnabled}
           label={captionsEnabled ? (liveCaptions.mode === 'server' ? 'Sous-titres IA' : 'Sous-titres') : 'Sous-titres'}
@@ -1278,7 +1374,7 @@ export default function MeetingRoomV2() {
         ><Captions/></Control>
         <Control active={handRaised} label={handRaised ? 'Baisser la main' : 'Main'} onClick={() => { const raised = !handRaised; setHandRaised(raised); setRaisedHands((current) => { const next = new Set(current); if (raised) next.add(Number(currentUser?.id || 0)); else next.delete(Number(currentUser?.id || 0)); return next; }); socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised}); }}><Hand/></Control>
         <div className="room-v2-reaction-wrap">
-          <Control active={reactionPanelOpen} label="Réactions" testId="reaction-button" onClick={() => setReactionPanelOpen((current) => !current)}>😊</Control>
+          <Control active={reactionPanelOpen} disabled={!canUseReactions} title={!canUseReactions ? 'Réactions désactivées par l’hôte' : undefined} label="Réactions" testId="reaction-button" onClick={() => setReactionPanelOpen((current) => !current)}>😊</Control>
           {reactionPanelOpen ? (
             <div className="room-v2-reaction-panel" data-testid="reaction-panel">
               {['👍','👏','❤️','🎉','😂'].map((reaction) => (
@@ -1291,7 +1387,7 @@ export default function MeetingRoomV2() {
         <Control active={panel === 'chat'} label="Discussion" onClick={() => setPanel(panel === 'chat' ? null : 'chat')}><MessageCircle/></Control>
         <Control active={panel === 'polls'} label="Sondages" onClick={() => setPanel(panel === 'polls' ? null : 'polls')}><Vote/></Control>
         {isModerator ? <Control active={panel === 'breakouts'} label="Sous-salles" testId="breakout-button" onClick={() => { setPanel(panel === 'breakouts' ? null : 'breakouts'); void refreshBreakouts(); }}><UsersRound/></Control> : null}
-        <Control active={panel === 'luna'} label="Luna" onClick={() => setPanel(panel === 'luna' ? null : 'luna')}><Bot/></Control>
+        <Control active={panel === 'luna'} disabled={!canUseLuna} title={!canUseLuna ? 'Luna désactivée par l’hôte' : undefined} label="Luna" onClick={() => setPanel(panel === 'luna' ? null : 'luna')}><Bot/></Control>
         {isModerator ? <Control active={Boolean(meeting.settings?.locked)} label={meeting.settings?.locked ? 'Déverrouiller' : 'Verrouiller'} testId="meeting-lock-button" onClick={() => void toggleMeetingLock()}><ShieldCheck/></Control> : null}
         <div className="room-v2-device-wrap">
           <Control
@@ -1330,16 +1426,16 @@ export default function MeetingRoomV2() {
             </div>
           ) : null}
         </div>
-        <Control active={recording} label={recording ? 'Stop rec.' : 'Enregistrer'} onClick={() => void toggleRecording()}>{recording ? <Square/> : <Circle/>}</Control>
+        <Control active={recording} disabled={!canRecord} title={!canRecord ? 'Enregistrement non autorisé pour votre rôle' : undefined} label={recording ? 'Stop rec.' : 'Enregistrer'} onClick={() => void toggleRecording()}>{recording ? <Square/> : <Circle/>}</Control>
         <div className="room-v2-leave-actions">
           <button type="button" className="room-v2-leave" onClick={() => void leaveMeeting(false)}><LogOut size={18}/> Quitter</button>
-          {isModerator ? <button type="button" className="room-v2-end" onClick={() => void leaveMeeting(true)}><PhoneOff size={18}/> Terminer pour tous</button> : null}
+          {canEndForAll ? <button type="button" className="room-v2-end" onClick={() => void leaveMeeting(true)}><PhoneOff size={18}/> Terminer pour tous</button> : null}
         </div>
       </footer>
     </main>
   );
 }
 
-function Control({ children, label, active, onClick, testId }: { children: ReactNode; label: string; active?: boolean; onClick: () => void; testId?: string }) {
-  return <button type="button" data-testid={testId} className={`room-v2-control ${active ? 'active' : ''}`} onClick={onClick}><span>{children}</span><small>{label}</small></button>;
+function Control({ children, label, active, onClick, testId, disabled, title }: { children: ReactNode; label: string; active?: boolean; onClick: () => void; testId?: string; disabled?: boolean; title?: string }) {
+  return <button type="button" data-testid={testId} className={`room-v2-control ${active ? 'active' : ''}`} onClick={onClick} disabled={disabled} title={title} aria-disabled={disabled ? 'true' : undefined}><span>{children}</span><small>{label}</small></button>;
 }
