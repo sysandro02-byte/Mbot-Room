@@ -25,6 +25,7 @@ import {
 } from './core.js';
 import { sendTransactionalEmail } from './emailDelivery.js';
 import { resolveAllowedClientOrigin } from './originPolicy.js';
+import { isPlatformFeatureEnabled } from './platformSettings.js';
 
 const challenges = new Map<string, { profile: any; createdAt: number }>();
 const oauthStates = new Map<string, { redirectTo: string; clientOrigin: string; createdAt: number }>();
@@ -261,6 +262,9 @@ const issueLoginOtp = async (user: any, rememberMe = false) => {
 export const registerAuthRoutes = (app: express.Express) => {
   app.post('/api/auth/register', requireDatabase, async (request, response, next) => {
     try {
+      if (!(await isPlatformFeatureEnabled('registrationEnabled'))) {
+        return sendApiError(response, 403, 'REGISTRATION_DISABLED', 'La création de nouveaux comptes est temporairement fermée.');
+      }
       const name = normalizeText(request.body?.name).slice(0, 120);
       const email = normalizeEmail(request.body?.email);
       const password = String(request.body?.password || '');
@@ -272,7 +276,10 @@ export const registerAuthRoutes = (app: express.Express) => {
       const duplicate = await query('SELECT 1 FROM room_users WHERE lower(email) = lower($1) LIMIT 1', [email]);
       if (duplicate.rows[0]) return sendApiError(response, 409, 'EMAIL_ALREADY_EXISTS', 'Un compte existe déjà avec cet email.');
       const passwordData = hashPassword(password);
-      const role = getConfiguredAdminEmails().includes(email) ? 'admin' : 'user';
+      if (getConfiguredAdminEmails().includes(email)) {
+        return sendApiError(response, 403, 'ADMIN_REGISTRATION_REQUIRED', 'Utilisez l’espace administrateur pour créer ce compte.');
+      }
+      const role = 'user';
       const inserted = await query(
         `INSERT INTO room_users
           (name,username,email,avatar,password_hash,password_salt,is_guest,created_at,phone_number,organization,job_title,role)
@@ -292,10 +299,44 @@ export const registerAuthRoutes = (app: express.Express) => {
     } catch (error) { next(error); }
   });
 
+  app.post('/api/auth/admin/register', requireDatabase, async (request, response, next) => {
+    try {
+      const name = normalizeText(request.body?.name).slice(0, 120);
+      const email = normalizeEmail(request.body?.email);
+      const password = String(request.body?.password || '');
+      const allowedAdmins = getConfiguredAdminEmails();
+      if (!allowedAdmins.length) return sendApiError(response, 503, 'ADMIN_REGISTRATION_NOT_CONFIGURED', 'Aucune adresse administrateur autorisée n’est configurée.');
+      if (!allowedAdmins.includes(email)) return sendApiError(response, 403, 'ADMIN_EMAIL_NOT_ALLOWED', 'Cette adresse n’est pas autorisée à créer un compte administrateur.');
+      if (!name || !email || !password) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Nom, e-mail et mot de passe sont requis.');
+      const passwordError = validatePasswordStrength(password);
+      if (passwordError) return sendApiError(response, 400, 'PASSWORD_WEAK', passwordError);
+      const duplicate = await query('SELECT 1 FROM room_users WHERE lower(email)=lower($1) LIMIT 1', [email]);
+      if (duplicate.rows[0]) return sendApiError(response, 409, 'EMAIL_ALREADY_EXISTS', 'Un compte existe déjà avec cette adresse.');
+      const passwordData = hashPassword(password);
+      const username = normalizeText(request.body?.username || email.split('@')[0]).toLowerCase().slice(0, 80);
+      const inserted = await query(
+        `INSERT INTO room_users
+          (name,username,email,avatar,password_hash,password_salt,is_guest,created_at,phone_number,organization,job_title,role,is_suspended)
+         VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8,$9,$10,'admin',false) RETURNING *`,
+        [name, username, email, createAvatar(name), passwordData.hash, passwordData.salt, new Date().toISOString(), normalizeText(request.body?.phoneNumber).slice(0,40), normalizeText(request.body?.organization).slice(0,120), normalizeText(request.body?.jobTitle).slice(0,120)],
+      );
+      const session = await createSession(Number(inserted.rows[0].id), true);
+      const appUrl = String(process.env.MBOTE_ROOM_APP_URL || resolveAllowedClientOrigin(request.headers.origin, getOrigin(request))).replace(/\/+$/, '');
+      const welcomeEmailSent = await sendWelcomeEmail(email, name, appUrl).catch(() => false);
+      attachSessionCookie(response, session);
+      response.status(201).json({
+        ...publicSessionPayload(request, session),
+        accountCreated: true,
+        welcomeEmailSent,
+        security: { otpRequiredOnNextLogin: true, passwordEmailed: false },
+      });
+    } catch (error) { next(error); }
+  });
+
   app.post('/api/auth/login', requireDatabase, async (request, response, next) => {
     try {
       const email = normalizeEmail(request.body?.email);
-      const result = await query('SELECT * FROM room_users WHERE lower(email) = lower($1) AND is_guest=false LIMIT 1', [email]);
+      const result = await query('SELECT * FROM room_users WHERE lower(email) = lower($1) AND is_guest=false AND COALESCE(is_suspended,false)=false LIMIT 1', [email]);
       const user = result.rows[0];
       if (!user) return sendApiError(response, 401, 'INVALID_CREDENTIALS', 'Email ou mot de passe incorrect.');
       const password = String(request.body?.password || '');
@@ -383,6 +424,9 @@ export const registerAuthRoutes = (app: express.Express) => {
 
   app.post('/api/auth/guest-join', requireDatabase, async (request, response, next) => {
     try {
+      if (!(await isPlatformFeatureEnabled('guestAccessEnabled'))) {
+        return sendApiError(response, 403, 'GUEST_ACCESS_DISABLED', 'L’accès invité est temporairement indisponible.');
+      }
       const name = normalizeText(request.body?.name).slice(0, 100);
       const meeting = await findMeeting(request.body?.meetingCode);
       if (!name) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Votre nom est requis.');
