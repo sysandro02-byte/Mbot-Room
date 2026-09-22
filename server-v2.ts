@@ -42,6 +42,7 @@ const io = new Server(httpServer, {
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
+app.set('query parser', 'simple');
 app.use((request, response, next) => {
   const origin = String(request.headers.origin || '');
   if (origin && isAllowedOrigin(origin)) {
@@ -53,15 +54,44 @@ app.use((request, response, next) => {
   response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   response.setHeader('X-Content-Type-Options', 'nosniff');
   response.setHeader('X-Frame-Options', 'DENY');
-  response.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  response.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), display-capture=(self), geolocation=()');
+  response.setHeader('Referrer-Policy', 'no-referrer');
+  response.setHeader('X-DNS-Prefetch-Control', 'off');
+  response.setHeader('X-Download-Options', 'noopen');
+  response.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+  response.setHeader('X-XSS-Protection', '0');
+  response.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=(), usb=(), serial=(), bluetooth=()');
   response.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  response.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    "img-src 'self' data: blob: https:",
+    "connect-src 'self' https: wss:",
+    "media-src 'self' blob: https:",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'none'",
+    "form-action 'self'"
+  ].join('; '));
   if (process.env.NODE_ENV === 'production') response.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   if (request.method === 'OPTIONS') return response.sendStatus(isAllowedOrigin(origin) ? 204 : 403);
   if (origin && !isAllowedOrigin(origin)) return response.status(403).json({ error: 'Origin non autorisée.', code: 'ORIGIN_DENIED' });
   next();
 });
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({
+  limit: '1mb',
+  strict: true,
+  type: ['application/json', 'application/*+json'],
+}));
+app.use('/api/auth', (_request, response, next) => {
+  response.setHeader('Cache-Control', 'no-store, max-age=0');
+  response.setHeader('Pragma', 'no-cache');
+  response.setHeader('Expires', '0');
+  next();
+});
 
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 let nextRateCleanupAt = 0;
