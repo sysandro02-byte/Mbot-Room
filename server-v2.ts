@@ -100,6 +100,7 @@ app.post('/api/auth/login', rateLimit(10, 60_000));
 app.post('/api/auth/register', rateLimit(8, 60_000));
 app.post('/api/auth/forgot-password', rateLimit(5, 60_000));
 app.use('/api/auth', rateLimit(60, 60_000));
+app.post('/api/meetings/:meetingId/luna/catch-up', rateLimit(10, 60_000));
 app.use('/api/meetings', rateLimit(240, 60_000));
 app.use('/api/ai', rateLimit(30, 60_000));
 
