@@ -218,12 +218,13 @@ export const authService = {
     });
     const result = await readJson(response);
     if (!response.ok) throw new Error(result.error || "Autorisation MBoté impossible.");
-    const session = {
-      user: normalizeUser(result.user), token: String(result.token || ''),
-      expiresAt: typeof result.expiresAt === 'string' ? result.expiresAt : undefined,
+    return {
+      otpRequired: true as const,
+      challengeId: String(result.challengeId || ''),
+      emailHint: String(result.emailHint || ''),
+      expiresInSeconds: Number(result.expiresInSeconds || 600),
+      redirectTo,
     };
-    saveSession(session, true);
-    return { ...session, redirectTo };
   },
   async startMboteAuth(redirectTo = '/app') {
     const response = await fetchAuth(apiUrl(`/api/auth/mbote/start?redirect=${encodeURIComponent(redirectTo)}`), { credentials: 'include' });
@@ -237,9 +238,24 @@ export const authService = {
 
   consumeMboteAuthCallback() {
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const otpChallengeId = params.get('otpChallengeId') || '';
+    const redirectToRaw = params.get('redirect') || '/app';
+    const redirectTo = redirectToRaw.startsWith('/') && !redirectToRaw.startsWith('//') ? redirectToRaw : '/app';
+
+    if (otpChallengeId) {
+      const result = {
+        type: 'otp' as const,
+        challengeId: otpChallengeId,
+        emailHint: params.get('otpEmailHint') || '',
+        expiresInSeconds: Number(params.get('otpExpiresInSeconds') || 600),
+        redirectTo,
+      };
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      return result;
+    }
+
     const rawUser = params.get('mboteUser');
     if (!rawUser) return null;
-
     try {
       const user = normalizeUser(JSON.parse(rawUser));
       if (!user.id) throw new Error('Profil MBoté incomplet.');
@@ -248,10 +264,9 @@ export const authService = {
         token: '',
         expiresAt: params.get('expiresAt') || undefined,
       }, true);
-      const requestedRedirect = params.get('redirect') || '/app';
-      return requestedRedirect.startsWith('/') && !requestedRedirect.startsWith('//') ? requestedRedirect : '/app';
+      return { type: 'session' as const, redirectTo };
     } finally {
-      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
     }
   },
 
