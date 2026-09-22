@@ -77,6 +77,13 @@ const respondWithSession = (
 const createAvatar = (name: string) =>
   `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'MBoté')}&background=3156eb&color=fff&bold=true`;
 
+const safeRedirectPath = (value: unknown) => {
+  const raw=String(value||'/app').trim();
+  if(!raw.startsWith('/')||raw.startsWith('//')||raw.includes('\\')||raw.length>1500)return '/app';
+  if(/[\u0000-\u001f]/.test(raw))return '/app';
+  return raw;
+};
+
 const getOrigin = (request: express.Request) => {
   const proto = String(request.headers['x-forwarded-proto'] || request.protocol || 'https').split(',')[0];
   const host = String(request.headers['x-forwarded-host'] || request.get('host') || '').split(',')[0].trim();
@@ -544,12 +551,12 @@ export const registerAuthRoutes = (app: express.Express) => {
     const redirectUri = String(process.env.MBOTE_AUTH_REDIRECT_URI || `${getOrigin(request)}/api/auth/mbote/callback`).trim();
     if (!authorizeUrl || !clientId) return sendApiError(response, 503, 'MBOTE_AUTH_NOT_CONFIGURED', 'OAuth MBoté non configuré.');
     const state = createToken();
-    const redirectTo = String(request.query.redirect || '/app');
+    const redirectTo = safeRedirectPath(request.query.redirect);
     const clientOrigin = resolveAllowedClientOrigin(
       request.headers.origin,
       process.env.MBOTE_ROOM_APP_URL || getOrigin(request),
     );
-    oauthStates.set(state, { redirectTo: redirectTo.startsWith('/') ? redirectTo : '/app', clientOrigin, createdAt: Date.now() });
+    oauthStates.set(state, { redirectTo, clientOrigin, createdAt: Date.now() });
     const url = new URL(authorizeUrl);
     url.searchParams.set('client_id', clientId);
     url.searchParams.set('redirect_uri', redirectUri);
