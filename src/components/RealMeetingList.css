@@ -1,1 +1,48 @@
 .real-meeting-page{max-width:1280px;margin:0 auto;padding:24px;display:flex;flex-direction:column;gap:18px}.real-meeting-head{display:flex;align-items:center;justify-content:space-between;gap:16px}.real-meeting-head h1{margin:0;color:#182033;font-size:27px}.real-meeting-head p{margin:5px 0 0;color:#718096}.real-meeting-head>div:last-child{display:flex;gap:8px}.real-meeting-page button{border:0;border-radius:9px;background:#007e83;color:white;padding:10px 13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:7px;cursor:pointer}.real-meeting-page button.secondary{background:#eef2f8;color:#3d4b62}.real-meeting-page button.danger{background:#fff0f0;color:#be2d2d}.real-meeting-page button:disabled{opacity:.5;cursor:not-allowed}.real-meeting-notice,.real-meeting-error{padding:11px 14px;border-radius:10px;font-size:13px}.real-meeting-notice{background:#eaf8ef;color:#176334}.real-meeting-error{background:#fff0f0;color:#a22525}.real-meeting-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}.real-meeting-card{background:white;border:1px solid #e1e6ee;border-radius:15px;padding:17px;box-shadow:0 8px 22px rgba(15,23,42,.04)}.real-meeting-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.real-meeting-card-top>span{padding:4px 7px;border-radius:6px;background:#eef2f8;color:#536079;font-size:10px;font-weight:800}.real-meeting-card-top>span.live{background:#ffe9e9;color:#c02929}.real-meeting-card-top small{color:#7e899a}.real-meeting-card h2{margin:12px 0 5px;color:#1d2739;font-size:18px}.real-meeting-card>p{margin:0 0 12px;color:#657286;font-size:13px;min-height:34px}.real-meeting-card dl{display:flex;flex-direction:column;gap:7px;margin:0}.real-meeting-card dl>div{display:grid;grid-template-columns:105px minmax(0,1fr);gap:8px;font-size:12px}.real-meeting-card dt{display:flex;align-items:center;gap:5px;color:#788498}.real-meeting-card dd{margin:0;color:#303b50;overflow-wrap:anywhere}.real-meeting-actions{display:flex;gap:7px;margin-top:15px}.real-meeting-actions button{flex:1;padding:9px}.real-meeting-actions button.danger{flex:0 0 auto}.real-meeting-empty{min-height:250px;border:1px dashed #cad3e0;border-radius:15px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#6d798b;padding:24px}.real-meeting-empty h2{margin:10px 0 2px;color:#253047}.real-meeting-empty p{max-width:520px}.real-meeting-modal{position:fixed;inset:0;z-index:100;background:rgba(14,20,31,.6);display:grid;place-items:center;padding:20px;overflow:auto}.real-meeting-form{width:min(720px,100%);max-height:92dvh;overflow:auto;background:white;border-radius:17px;padding:20px;box-shadow:0 25px 70px rgba(0,0,0,.24);display:flex;flex-direction:column;gap:11px}.real-meeting-form header{display:flex;align-items:flex-start;justify-content:space-between}.real-meeting-form header h2{margin:0;color:#1e293b}.real-meeting-form header p{margin:4px 0 0;color:#758196;font-size:12px}.real-meeting-form header button{background:transparent;color:#536079;padding:6px}.real-meeting-form label{display:flex;flex-direction:column;gap:5px;color:#647188;font-size:12px}.real-meeting-form input,.real-meeting-form textarea,.real-meeting-form select{width:100%;box-sizing:border-box;border:1px solid #d3dbe6;border-radius:9px;padding:10px 11px;font:inherit;background:white}.real-meeting-form textarea{min-height:78px;resize:vertical}.real-meeting-form-row{display:grid;grid-template-columns:1fr 160px;gap:10px}.real-meeting-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:10px;border:1px solid #e2e6ed;border-radius:10px;background:#fafbfd}.real-meeting-check{display:flex!important;flex-direction:row!important;align-items:center!important;gap:7px!important;color:#405069!important}.real-meeting-check input{width:16px!important;height:16px}.real-meeting-form footer{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}@media(max-width:720px){.real-meeting-page{padding:14px}.real-meeting-head{align-items:flex-start;flex-direction:column}.real-meeting-head>div:last-child{width:100%}.real-meeting-head>div:last-child button{flex:1}.real-meeting-grid{grid-template-columns:1fr}.real-meeting-form-row{grid-template-columns:1fr}.real-meeting-options{grid-template-columns:1fr 1fr}.real-meeting-card dl>div{grid-template-columns:90px 1fr}}
+
+/* 2026 meeting card contextual menu */
+.real-meeting-card{position:relative;overflow:visible;transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease}
+.real-meeting-card:hover{border-color:#d2dde8;box-shadow:0 13px 34px rgba(15,41,55,.075)}
+.real-meeting-card-meta{display:flex;align-items:center;justify-content:flex-end;gap:5px;min-width:0}
+.real-meeting-card-meta>small{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.real-meeting-menu-wrap{position:relative;flex:0 0 auto}
+.real-meeting-page button.real-meeting-menu-trigger{
+  width:32px;height:32px;padding:0;border-radius:9px;background:transparent;color:#68768c;box-shadow:none
+}
+.real-meeting-page button.real-meeting-menu-trigger:hover,
+.real-meeting-page button.real-meeting-menu-trigger[aria-expanded="true"]{background:#eef7f6;color:#007e83}
+.real-meeting-menu{
+  position:absolute;top:calc(100% + 6px);right:0;z-index:60;width:220px;padding:7px;border:1px solid #dfe7ef;border-radius:14px;background:#fff;box-shadow:0 20px 55px rgba(13,33,49,.17);animation:meeting-menu-in .14s ease-out
+}
+.real-meeting-page .real-meeting-menu>button{
+  width:100%;min-height:39px;justify-content:flex-start;gap:10px;padding:8px 10px;border-radius:9px;background:transparent;color:#334057;box-shadow:none;font-size:12px;font-weight:720;text-align:left
+}
+.real-meeting-page .real-meeting-menu>button:hover{background:#f2f8f8;color:#007e83;transform:none}
+.real-meeting-page .real-meeting-menu>button svg{flex:0 0 auto}
+.real-meeting-page .real-meeting-menu>button.is-danger{color:#b83242}
+.real-meeting-page .real-meeting-menu>button.is-danger:hover{background:#fff1f2;color:#b83242}
+.real-meeting-menu-separator{height:1px;margin:6px 4px;background:#edf1f5}
+@keyframes meeting-menu-in{from{opacity:0;transform:translateY(-5px) scale(.98)}to{opacity:1;transform:none}}
+
+.real-meeting-confirm-backdrop{
+  position:fixed;inset:0;z-index:420;display:grid;place-items:center;padding:20px;background:rgba(7,20,39,.56);backdrop-filter:blur(7px)
+}
+.real-meeting-confirm{
+  width:min(100%,440px);padding:26px;border:1px solid #e2e7ee;border-radius:22px;background:#fff;box-shadow:0 28px 80px rgba(10,27,44,.25);text-align:center
+}
+.real-meeting-confirm-icon{
+  display:grid;width:58px;height:58px;margin:0 auto;place-items:center;border-radius:18px;background:#fff0f1;color:#bd3545
+}
+.real-meeting-confirm h2{margin:16px 0 7px;color:#1a263b;font-size:22px}
+.real-meeting-confirm p{margin:0;color:#68768b;font-size:13px;line-height:1.65}
+.real-meeting-confirm>div{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:22px}
+.real-meeting-confirm>div button{min-height:45px}
+.real-meeting-confirm>div button.danger{background:#bd3545;color:#fff}
+@media(max-width:720px){
+  .real-meeting-card-meta>small{max-width:120px}
+  .real-meeting-menu{position:fixed;left:12px;right:12px;top:auto;bottom:calc(88px + env(safe-area-inset-bottom));width:auto;padding:9px;border-radius:18px;box-shadow:0 24px 70px rgba(10,27,44,.25)}
+  .real-meeting-page .real-meeting-menu>button{min-height:46px;font-size:13px}
+  .real-meeting-confirm-backdrop{align-items:end;padding:0}
+  .real-meeting-confirm{width:100%;border-radius:24px 24px 0 0;padding:26px 20px max(24px,calc(env(safe-area-inset-bottom) + 18px))}
+}
+@media(prefers-reduced-motion:reduce){.real-meeting-menu{animation:none}}
