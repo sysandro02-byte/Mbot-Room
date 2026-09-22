@@ -84,10 +84,41 @@ const runCase = async ({ name, browserType, device, session }) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
 
+  const assertNoViewportOverflow = async (route) => {
+    await page.goto(`${baseUrl}${route}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(350);
+    const metrics = await page.evaluate(() => ({
+      viewport: window.innerWidth,
+      root: document.documentElement.scrollWidth,
+      body: document.body.scrollWidth,
+    }));
+    assert.ok(
+      Math.max(metrics.root, metrics.body) <= metrics.viewport + 2,
+      `${name} ${route}: horizontal overflow root=${metrics.root} body=${metrics.body} viewport=${metrics.viewport}`,
+    );
+  };
+
+  for (const route of ['/app', '/app/meetings', '/app/profile', '/app/settings', '/app/notifications', '/join']) {
+    await assertNoViewportOverflow(route);
+  }
+
   await page.goto(`${baseUrl}/app`, { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle');
   assert.ok((await page.locator('body').innerText()).length > 40, `${name}: empty application`);
   assert.ok(!page.url().includes('/login'), `${name}: authenticated session redirected to login`);
+
+  const avatar = page.locator('.app-shell-header-avatar');
+  if (await avatar.count()) {
+    await avatar.click();
+    await page.waitForTimeout(100);
+    assert.equal(await page.locator('.app-shell-profile-dropdown').count(), 1, `${name}: profile menu did not open`);
+    const dropdownMetrics = await page.evaluate(() => ({
+      viewport: window.innerWidth,
+      root: document.documentElement.scrollWidth,
+      body: document.body.scrollWidth,
+    }));
+    assert.ok(Math.max(dropdownMetrics.root, dropdownMetrics.body) <= dropdownMetrics.viewport + 2, `${name}: profile menu caused horizontal overflow`);
+  }
 
   await context.setOffline(true);
   const offlineFailed = await page.evaluate(async () => {
@@ -125,7 +156,38 @@ try {
   await runCase({ name: 'PC Chromium', browserType: chromium, session: sharedSession });
   await runCase({ name: 'Android Pixel 7', browserType: chromium, device: devices['Pixel 7'], session: sharedSession });
   await runCase({ name: 'iPhone 15 WebKit', browserType: webkit, device: devices['iPhone 15'], session: sharedSession });
-  console.log('DEVICE_MATRIX_RESULT {"ok":true,"devices":3,"networkRecovery":true}');
+  await runCase({
+    name: 'Tablet 820x1180 WebKit',
+    browserType: webkit,
+    device: {
+      viewport: { width: 820, height: 1180 },
+      screen: { width: 820, height: 1180 },
+      deviceScaleFactor: 2,
+      isMobile: true,
+      hasTouch: true,
+    },
+    session: sharedSession,
+  });
+
+  const resumeBrowser = await chromium.launch({ headless: true });
+  const resumeContext = await resumeBrowser.newContext({ ...devices['Pixel 7'] });
+  await resumeContext.addInitScript(({ user, token }) => {
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('token', token);
+    localStorage.setItem('mboteroom-last-safe-route', '/app/settings');
+    const originalMatchMedia = window.matchMedia.bind(window);
+    window.matchMedia = (query) => query.includes('display-mode: standalone')
+      ? { matches: true, media: query, onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent() { return true; } }
+      : originalMatchMedia(query);
+  }, { user: sharedSession.user, token: sharedSession.token });
+  const resumePage = await resumeContext.newPage();
+  await resumePage.goto(`${baseUrl}/app`, { waitUntil: 'domcontentloaded' });
+  await resumePage.waitForURL(/\/app\/settings/, { timeout: 5000 });
+  assert.match(resumePage.url(), /\/app\/settings$/, 'Installed PWA must resume the last safe browser route');
+  await resumeContext.close();
+  await resumeBrowser.close();
+
+  console.log('DEVICE_MATRIX_RESULT {"ok":true,"devices":4,"networkRecovery":true,"responsive":true,"pwaResume":true}');
 } finally {
   server.kill('SIGTERM');
 }
