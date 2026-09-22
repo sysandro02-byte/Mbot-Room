@@ -62,7 +62,7 @@ export default function AdminAuthPage({mode='login'}:{mode?:Mode}){
         return;
       }
       if(!email.trim()||!password)throw new Error('Adresse e-mail et mot de passe requis.');
-      const result=await authService.login({email:email.trim(),password,rememberMe});
+      const result=await authService.login({email:email.trim(),password,rememberMe,adminOnly:true});
       setChallengeId(result.challengeId);setEmailHint(result.emailHint);setPassword('');
     }catch(cause){setError(cause instanceof Error?cause.message:'Action impossible.');}
     finally{setBusy(false);}
@@ -85,7 +85,7 @@ export default function AdminAuthPage({mode='login'}:{mode?:Mode}){
   };
 
   const title=mode==='register'?'Créer le compte administrateur':mode==='forgot'?(resetToken?'Nouveau mot de passe':'Mot de passe oublié'):'Connexion administrateur';
-  const subtitle=mode==='register'?'Réservé aux adresses administrateur autorisées.':mode==='forgot'?(resetToken?'Choisissez un nouveau mot de passe pour votre compte administrateur.':'Recevez un lien sécurisé pour choisir un nouveau mot de passe.'):'Accédez au backoffice sécurisé de MBotéRoom.';
+  const subtitle=mode==='register'?'Le premier administrateur peut être créé ici. Les suivants doivent être autorisés depuis la configuration ou le backoffice.':mode==='forgot'?(resetToken?'Choisissez un nouveau mot de passe pour votre compte administrateur.':'Recevez un lien sécurisé pour choisir un nouveau mot de passe.'):'Accédez au backoffice sécurisé de MBotéRoom.';
 
   return <main className="admin-auth-page">
     <section className="admin-auth-visual">
