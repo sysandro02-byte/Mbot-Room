@@ -5,10 +5,10 @@ import './UtilityPages.css';
 const topics = [
   { icon: Video, title: 'Créer ou rejoindre une réunion', text: 'Créez une réunion depuis Réunions, copiez son lien ou rejoignez-la avec son ID/lien et, si nécessaire, son mot de passe.', to: '/app/meetings' },
   { icon: UsersRound, title: 'Salle d’attente et participants', text: 'L’hôte peut admettre/refuser les demandes, couper des micros, retirer ou bannir un participant et utiliser les sous-salles.', to: '/app/meetings' },
-  { icon: Captions, title: 'Sous-titres et Luna IA', text: 'Activez Sous-titres dans la barre de réunion. Lorsque Groq est configuré, la transcription serveur alimente aussi les résumés Luna.', to: '/app/meetings' },
-  { icon: CirclePlay, title: 'Enregistrements', text: 'L’enregistrement serveur utilise LiveKit Egress lorsqu’il est configuré. Sinon MBotéRoom conserve le mode local dans le navigateur.', to: '/app/recordings' },
+  { icon: Captions, title: 'Sous-titres et Luna IA', text: 'Activez les sous-titres pendant la réunion. Luna peut ensuite vous aider à retrouver les points importants.', to: '/app/meetings' },
+  { icon: CirclePlay, title: 'Enregistrements', text: 'Enregistrez une réunion lorsque cette option est autorisée, puis retrouvez les enregistrements disponibles depuis votre espace.', to: '/app/recordings' },
   { icon: CalendarDays, title: 'Calendrier', text: 'Ajoutez vos événements personnels et retrouvez-les dans le calendrier MBotéRoom.', to: '/app/calendar' },
-  { icon: MessageCircle, title: 'Messages et sondages', text: 'Les messages et sondages de réunion sont persistés sur le serveur et restent consultables selon vos droits d’accès.', to: '/app/messages' },
+  { icon: MessageCircle, title: 'Messages et sondages', text: 'Les messages et sondages de réunion restent disponibles selon vos droits d’accès.', to: '/app/messages' },
 ];
 
 export default function HelpPage() {
@@ -37,7 +37,7 @@ export default function HelpPage() {
 
     <section className="utility-card utility-help-security">
       <LockKeyhole size={23}/>
-      <div><h2>Sécurité</h2><p>Les sessions web utilisent un cookie HttpOnly. Les réunions peuvent utiliser mot de passe, salle d’attente, verrouillage et contrôle des participants.</p></div>
+      <div><h2>Sécurité</h2><p>Votre compte et vos réunions bénéficient de plusieurs protections : mot de passe, salle d’attente, verrouillage et contrôle des participants.</p></div>
       <Link to="/securite"><BookOpen size={16}/> Voir la rubrique sécurité</Link>
     </section>
   </main>;
