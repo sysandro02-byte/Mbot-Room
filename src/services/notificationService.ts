@@ -13,7 +13,7 @@ export type PushState={
   platform:'ios'|'android'|'desktop'|'web';
 };
 
-const readJson=async<T>(response:Response):Promise<T>=>{const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(typeof data?.error==='string'?data.error:`Erreur API (${response.status})`);return data as T;};
+const readJson=async<T>(response:Response):Promise<T>=>{const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(typeof data?.error==='string'?data.error:'Une erreur est survenue.');return data as T;};
 
 const detectPlatform=():PushState['platform']=>{
   const ua=navigator.userAgent.toLowerCase();
@@ -58,7 +58,7 @@ export const notificationService={
     const platform=detectPlatform();
     if(platform==='ios'&&!isStandalone())throw new Error('Sur iPhone/iPad, installez d’abord MBotéRoom sur l’écran d’accueil pour activer les notifications push.');
     const config=await readJson<{configured:boolean;publicKey:string}>(await apiFetch(apiUrl('/api/push/config'),{headers:getAuthHeaders()}));
-    if(!config.configured||!config.publicKey)throw new Error('Les notifications push ne sont pas encore configurées sur le serveur.');
+    if(!config.configured||!config.publicKey)throw new Error('Les notifications ne sont pas encore disponibles.');
     const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
     if(permission!=='granted')throw new Error('Autorisation de notification refusée. Vous pouvez la réactiver dans les réglages du navigateur ou du système.');
     const registration=await navigator.serviceWorker.ready;
