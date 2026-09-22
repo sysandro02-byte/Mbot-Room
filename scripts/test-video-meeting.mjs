@@ -475,7 +475,8 @@ try {
 
   const transportBadge = hostRoom.page.locator('[data-testid="media-transport-status"]');
   await transportBadge.waitFor({ state: 'visible', timeout: 10_000 });
-  assert.match(await transportBadge.innerText(), /Mesh actif/);
+  assert.equal(await transportBadge.getAttribute('data-transport'), 'mesh');
+  assert.match(await transportBadge.innerText(), /Connexion active/);
   assert.match(await transportBadge.innerText(), /secours/);
 
   await hostRoom.page.waitForFunction(() => {
@@ -615,7 +616,7 @@ try {
   await successfulSfuBadge.waitFor({ state: 'visible', timeout: 10_000 });
   await successfulSfuRoom.page.waitForFunction(() => {
     const badge = document.querySelector('[data-testid="media-transport-status"]');
-    return badge?.getAttribute('data-transport') === 'livekit' && badge.textContent?.includes('SFU actif');
+    return badge?.getAttribute('data-transport') === 'livekit' && badge.textContent?.includes('Connexion optimisée');
   }, undefined, { timeout: 15_000 });
 
   await successfulSfuRoom.page.waitForFunction(() => {
