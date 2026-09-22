@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
@@ -7,6 +7,10 @@ import {
   CirclePlay,
   Home,
   LogOut,
+  ChevronDown,
+  UserRound,
+  ShieldCheck,
+  WifiOff,
   Menu,
   MessageCircle,
   Search,
@@ -52,8 +56,38 @@ export default function AppShell({ children, title }: AppShellProps) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [online, setOnline] = useState(navigator.onLine);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const user = authService.getCurrentUser();
   const userName = user?.name || user?.email || 'Utilisateur';
+  const initials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'MB';
+
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+    const handlePointer = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) setProfileOpen(false);
+    };
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setProfileOpen(false);
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    document.addEventListener('mousedown', handlePointer);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      document.removeEventListener('mousedown', handlePointer);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, []);
+
+  const goFromProfile = (path: string) => {
+    setProfileOpen(false);
+    navigate(path);
+  };
 
   return (
     <main className="app-shell">
@@ -109,7 +143,43 @@ export default function AppShell({ children, title }: AppShellProps) {
               aria-label="Rechercher"
             />
           </form>
-          <div className="app-shell-header-title">{title}</div>
+          <div className="app-shell-header-actions">
+            <div className="app-shell-header-title">{title}</div>
+            <div className="app-shell-profile-menu" ref={profileMenuRef}>
+              <button
+                className="app-shell-header-avatar"
+                type="button"
+                aria-label="Ouvrir le menu du profil"
+                aria-expanded={profileOpen}
+                onClick={() => setProfileOpen((current) => !current)}
+              >
+                <span className="app-shell-header-avatar-image">
+                  {user?.avatar ? <img src={user.avatar} alt="" /> : <b>{initials}</b>}
+                  <i className={online ? 'is-online' : 'is-offline'} aria-hidden="true" />
+                </span>
+                <span className="app-shell-header-user">
+                  <strong>{userName}</strong>
+                  <small>{online ? 'En ligne' : 'Mode hors ligne'}</small>
+                </span>
+                <ChevronDown size={16} aria-hidden="true" />
+              </button>
+              {profileOpen ? (
+                <div className="app-shell-profile-dropdown" role="menu">
+                  <div className="app-shell-profile-dropdown-head">
+                    <span>{user?.avatar ? <img src={user.avatar} alt="" /> : initials}</span>
+                    <div><strong>{userName}</strong><small>{user?.email}</small></div>
+                  </div>
+                  {!online ? <div className="app-shell-offline-status"><WifiOff size={15}/><span>Vos données déjà chargées restent disponibles. La synchronisation reprendra automatiquement.</span></div> : null}
+                  <button type="button" role="menuitem" onClick={() => goFromProfile('/app/profile')}><UserRound size={17}/><span><strong>Mon profil</strong><small>Identité, avatar et organisation</small></span></button>
+                  <button type="button" role="menuitem" onClick={() => goFromProfile('/app/notifications')}><Bell size={17}/><span><strong>Notifications</strong><small>Alertes et activité</small></span></button>
+                  <button type="button" role="menuitem" onClick={() => goFromProfile('/app/settings')}><Settings size={17}/><span><strong>Paramètres</strong><small>Appareil, PWA et préférences</small></span></button>
+                  <button type="button" role="menuitem" onClick={() => goFromProfile('/securite')}><ShieldCheck size={17}/><span><strong>Sécurité</strong><small>OTP et protection du compte</small></span></button>
+                  <div className="app-shell-profile-dropdown-brand">MBotéRoom · créée par <b>LoukaTech</b></div>
+                  <button className="is-danger" type="button" role="menuitem" onClick={() => void authService.logout()}><LogOut size={17}/><span><strong>Se déconnecter</strong></span></button>
+                </div>
+              ) : null}
+            </div>
+          </div>
         </header>
         <div className="app-shell-content">{children}</div>
         <nav className="app-shell-bottom-nav" aria-label="Navigation mobile">
