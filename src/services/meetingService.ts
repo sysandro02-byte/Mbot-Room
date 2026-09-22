@@ -100,6 +100,21 @@ export interface LunaMeetingResponse {
   configured: boolean;
 }
 
+export interface LunaCatchUpResponse {
+  available: boolean;
+  private?: boolean;
+  minutes: number;
+  headline?: string;
+  brief?: string;
+  keyPoints?: string[];
+  decisions?: string[];
+  actions?: string[];
+  openQuestions?: string[];
+  sources?: { chat: number; captions: number };
+  generatedAt: string;
+  reason?: string;
+}
+
 export interface DashboardTip {
   id: string;
   title: string;
@@ -358,6 +373,17 @@ export const meetingService = {
       throw new Error(error.error || 'Réponse à la demande impossible');
     }
     return response.json();
+  },
+
+  async getLunaCatchUp(meetingId: number, minutes = 15): Promise<LunaCatchUpResponse> {
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/luna/catch-up`), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ minutes }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Le rattrapage Luna est indisponible pour le moment.');
+    return data as LunaCatchUpResponse;
   },
 
   async askLuna(meetingId: number, prompt: string, tone: 'professional' | 'casual' | 'creative' = 'professional'): Promise<LunaMeetingResponse> {
