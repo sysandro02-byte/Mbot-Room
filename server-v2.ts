@@ -94,6 +94,8 @@ const rateLimit = (limit: number, windowMs: number): express.RequestHandler => (
   next();
 };
 
+app.use('/api/auth/login/otp/resend', rateLimit(3, 60_000));
+app.use('/api/auth/login/otp', rateLimit(10, 60_000));
 app.use('/api/auth/login', rateLimit(10, 60_000));
 app.use('/api/auth/register', rateLimit(8, 60_000));
 app.use('/api/auth/forgot-password', rateLimit(5, 60_000));
