@@ -22,6 +22,7 @@ import { authService } from '../../services/authService';
 import { HomeSlide, Meeting, meetingService } from '../../services/meetingService';
 import { notificationService, RoomNotification } from '../../services/notificationService';
 import { getAppLocale } from '../../lib/appLanguage';
+import { socket } from '../../lib/socket';
 import './RealDashboardPage.css';
 
 const formatDate=(value:string)=>new Intl.DateTimeFormat(getAppLocale(),{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
@@ -65,6 +66,13 @@ export default function RealDashboardPage(){
     const timer=window.setInterval(()=>setActiveSlide((current)=>(current+1)%homeSlides.length),7000);
     return()=>window.clearInterval(timer);
   },[homeSlides.length]);
+
+  useEffect(()=>{
+    const refreshSlides=()=>void meetingService.getHomeSlides().then((rows)=>{setHomeSlides(rows);setActiveSlide(0);}).catch(()=>undefined);
+    if(!socket.connected)socket.connect();
+    socket.on('dashboard:slides-updated',refreshSlides);
+    return()=>{socket.off('dashboard:slides-updated',refreshSlides);};
+  },[]);
 
 
   const upcoming=useMemo(()=>meetings
