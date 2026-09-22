@@ -23,6 +23,7 @@ import {
   validateMeetingPassword,
 } from './core.js';
 import { getEmailDeliveryStatus, sendTransactionalEmail } from './emailDelivery.js';
+import { createNotificationAndPush } from './pushService.js';
 
 const findMeetingByValue = async (value: unknown): Promise<Meeting | null> => {
   const normalized = String(value || '').replace(/\s+/g, '').toLowerCase();
@@ -479,6 +480,20 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
         );
       }
       io.to(`meeting:${meeting.id}:moderators`).emit('meeting:lobby-updated', { meetingId: meeting.id, userId: request.user!.id, status });
+      if (status === 'requested') {
+        const moderatorIds=[meeting.host_id,meeting.co_host_id].map(Number).filter((id)=>id&&id!==request.user!.id);
+        await Promise.all(moderatorIds.map(async(userId)=>{
+          const notification=await createNotificationAndPush(userId,{
+            type:'MEETING_LOBBY_REQUEST',
+            title:'Participant en salle d’attente',
+            body:`${request.user!.name || 'Un participant'} souhaite rejoindre « ${meeting.title} ».`,
+            url:`/reunions/${meeting.id}`,
+            tag:`meeting-lobby-${meeting.id}`,
+            data:{meetingId:meeting.id,userId:request.user!.id},
+          });
+          io.to(`user:${userId}`).emit('notification:new',notification);
+        })).catch(()=>undefined);
+      }
       response.json({ success: true, status });
     } catch (error) { next(error); }
   });
@@ -504,6 +519,17 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       await query('UPDATE room_lobby SET status=$3 WHERE meeting_id=$1 AND user_id=$2', [meeting.id, userId, status]);
       io.to(`user:${userId}`).emit('meeting:lobby-status', { meetingId: meeting.id, status });
       io.to(`meeting:${meeting.id}`).emit('meeting:lobby-updated', { meetingId: meeting.id, userId, status });
+      const notification=await createNotificationAndPush(userId,{
+        type:status==='accepted'?'MEETING_LOBBY_ACCEPTED':'MEETING_LOBBY_REJECTED',
+        title:status==='accepted'?'Vous pouvez rejoindre la réunion':'Demande de participation refusée',
+        body:status==='accepted'
+          ? `L’hôte vous a admis dans « ${meeting.title} ».`
+          : `Votre demande pour « ${meeting.title} » n’a pas été acceptée.`,
+        url:status==='accepted'?`/reunions/${meeting.id}`:'/app/meetings',
+        tag:`meeting-lobby-result-${meeting.id}`,
+        data:{meetingId:meeting.id,status},
+      }).catch(()=>null);
+      if(notification)io.to(`user:${userId}`).emit('notification:new',notification);
       response.json({ success: true });
     } catch (error) { next(error); }
   });
@@ -525,6 +551,15 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
             [meeting.id, userId],
           );
           io.to(`user:${userId}`).emit('meeting:lobby-status', { meetingId: meeting.id, status: 'accepted' });
+          const notification=await createNotificationAndPush(userId,{
+            type:'MEETING_LOBBY_ACCEPTED',
+            title:'Vous pouvez rejoindre la réunion',
+            body:`L’hôte vous a admis dans « ${meeting.title} ».`,
+            url:`/reunions/${meeting.id}`,
+            tag:`meeting-lobby-result-${meeting.id}`,
+            data:{meetingId:meeting.id,status:'accepted'},
+          }).catch(()=>null);
+          if(notification)io.to(`user:${userId}`).emit('notification:new',notification);
         }
         io.to(`meeting:${meeting.id}`).emit('meeting:lobby-updated', { meetingId: meeting.id, admitAll: true, userIds });
       }
@@ -573,11 +608,23 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
           io.to(`meeting:${meeting.id}`).emit('meeting:lobby-updated', { meetingId: meeting.id, autoAdmitted: true });
         }
       }
-      const members = await query(`SELECT COUNT(*)::int AS count FROM room_meeting_members WHERE meeting_id=$1 AND user_id<>$2`, [meeting.id, request.user!.id]);
+      const members = await query(`SELECT DISTINCT user_id FROM room_meeting_members WHERE meeting_id=$1 AND user_id<>$2`, [meeting.id, request.user!.id]);
+      const memberIds=members.rows.map((row)=>Number(row.user_id)).filter(Boolean);
       const value = publicMeeting(updated.rows[0]);
       io.to(`meeting:${meeting.id}`).emit('meeting:started', value);
       io.to('admins').emit('meeting:started', value);
-      response.json({ success: true, notifiedCount: Number(members.rows[0]?.count || 0), meeting: value });
+      await Promise.all(memberIds.map(async(userId)=>{
+        const notification=await createNotificationAndPush(userId,{
+          type:'MEETING_STARTED',
+          title:'La réunion a commencé',
+          body:`« ${meeting.title} » est maintenant en direct.`,
+          url:`/reunions/${meeting.id}`,
+          tag:`meeting-started-${meeting.id}`,
+          data:{meetingId:meeting.id},
+        }).catch(()=>null);
+        if(notification)io.to(`user:${userId}`).emit('notification:new',notification);
+      }));
+      response.json({ success: true, notifiedCount: memberIds.length, meeting: value });
     } catch (error) { next(error); }
   });
 
