@@ -700,6 +700,13 @@ try {
   assert.equal(lockedJoin.response.status, 423, JSON.stringify(lockedJoin.data));
   assert.equal(lockedJoin.data.code, 'MEETING_LOCKED');
 
+  const lockedGuestJoin = await jsonRequest('/api/auth/guest-join', {
+    method: 'POST',
+    body: JSON.stringify({ name: 'Invité verrouillé', meetingCode: meeting.meeting_link, password: 'RoomPass2026!' }),
+  });
+  assert.equal(lockedGuestJoin.response.status, 423, JSON.stringify(lockedGuestJoin.data));
+  assert.equal(lockedGuestJoin.data.code, 'MEETING_LOCKED');
+
   const unlockMeeting = await jsonRequest(`/api/meetings/${meeting.id}/lock`, {
     method: 'POST',
     headers: authHeaders(host.token),
@@ -707,6 +714,48 @@ try {
   });
   assert.equal(unlockMeeting.response.status, 200, JSON.stringify(unlockMeeting.data));
   assert.equal(unlockMeeting.data.locked, false);
+
+  const promoteCoHost = await jsonRequest(`/api/meetings/${meeting.id}/participants/${participant.user.id}`, {
+    method: 'PATCH',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ role: 'cohost' }),
+  });
+  assert.equal(promoteCoHost.response.status, 200, JSON.stringify(promoteCoHost.data));
+  assert.equal(promoteCoHost.data.role, 'cohost');
+
+  const coHostEndDenied = await jsonRequest(`/api/meetings/${meeting.id}/end`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(coHostEndDenied.response.status, 403, JSON.stringify(coHostEndDenied.data));
+
+  const coHostLock = await jsonRequest(`/api/meetings/${meeting.id}/lock`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ locked: true }),
+  });
+  assert.equal(coHostLock.response.status, 200, JSON.stringify(coHostLock.data));
+  const coHostUnlock = await jsonRequest(`/api/meetings/${meeting.id}/lock`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ locked: false }),
+  });
+  assert.equal(coHostUnlock.response.status, 200, JSON.stringify(coHostUnlock.data));
+
+  const demoteCoHost = await jsonRequest(`/api/meetings/${meeting.id}/participants/${participant.user.id}`, {
+    method: 'PATCH',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ role: 'participant' }),
+  });
+  assert.equal(demoteCoHost.response.status, 200, JSON.stringify(demoteCoHost.data));
+  assert.equal(demoteCoHost.data.role, 'participant');
+
+  const participantPollDenied = await jsonRequest(`/api/meetings/${meeting.id}/polls`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ question: 'Interdit ?', options: ['Oui', 'Non'] }),
+  });
+  assert.equal(participantPollDenied.response.status, 403, JSON.stringify(participantPollDenied.data));
 
   const unlockedJoin = await jsonRequest(`/api/meetings/${meeting.id}/join-request`, {
     method: 'POST',
@@ -798,6 +847,21 @@ try {
   });
   assert.equal(end.response.status, 200, JSON.stringify(end.data));
   assert.equal(end.data.meeting?.status, 'ended');
+
+  const endedJoin = await jsonRequest(`/api/meetings/${meeting.id}/join-request`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ password: 'RoomPass2026!' }),
+  });
+  assert.equal(endedJoin.response.status, 410, JSON.stringify(endedJoin.data));
+  assert.equal(endedJoin.data.code, 'MEETING_ENDED');
+
+  const endedGuestJoin = await jsonRequest('/api/auth/guest-join', {
+    method: 'POST',
+    body: JSON.stringify({ name: 'Invité trop tard', meetingCode: meeting.meeting_link, password: 'RoomPass2026!' }),
+  });
+  assert.equal(endedGuestJoin.response.status, 410, JSON.stringify(endedGuestJoin.data));
+  assert.equal(endedGuestJoin.data.code, 'MEETING_ENDED');
 
   const ended = await jsonRequest(`/api/meetings/${meeting.id}/ended`, { headers: authHeaders(host.token) });
   assert.equal(ended.response.status, 200, JSON.stringify(ended.data));
