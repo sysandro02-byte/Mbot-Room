@@ -66,6 +66,142 @@
 .brand-panel-copy,
 .feature-list,
 .meeting-illustration {
+  position: relative;
+  z-index: 2;
+}
+
+.mbote-logo {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+}
+
+.mbote-logo-icon {
+  position: relative;
+  display: grid;
+  width: 57px;
+  height: 57px;
+  place-items: center;
+  border-radius: 13px;
+  color: #ffffff;
+  background: linear-gradient(145deg, #007e83, #3d5bfa 60%, #0d5663);
+  box-shadow: 0 10px 24px rgba(43, 76, 227, 0.25);
+}
+
+.mbote-logo-video {
+  position: absolute;
+  top: 18px;
+  right: -9px;
+  padding: 2px;
+  border-radius: 4px;
+  background: #007e83;
+}
+
+.mbote-logo strong {
+  display: flex;
+  align-items: center;
+  font-size: clamp(27px, 2.1vw, 36px);
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.mbote-logo strong span:first-child {
+  color: var(--login-primary-dark);
+}
+
+.mbote-logo strong span:last-child {
+  color: var(--login-primary);
+}
+
+.brand-panel-copy {
+  margin-top: 42px;
+}
+
+.brand-panel-copy h2 {
+  margin: 0;
+  color: var(--login-primary-dark);
+  font-size: clamp(29px, 2.25vw, 39px);
+  font-weight: 800;
+  line-height: 1.16;
+  letter-spacing: 0;
+}
+
+.brand-panel-copy h2 span,
+.brand-panel-copy p span {
+  display: block;
+}
+
+.brand-panel-copy p {
+  margin: 19px 0 0;
+  color: #5d6b8b;
+  font-size: 17px;
+  line-height: 1.52;
+}
+
+.feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin-top: 31px;
+}
+
+.feature-item {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  gap: 17px;
+  align-items: flex-start;
+  max-width: 372px;
+}
+
+.feature-icon {
+  display: grid;
+  width: 57px;
+  height: 57px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+}
+
+.feature-icon-blue {
+  color: #3c62f0;
+  border-color: #dce3ff;
+  background: #eff2ff;
+}
+
+.feature-icon-green {
+  color: #1da05e;
+  border-color: #c9efda;
+  background: #f0fbf5;
+}
+
+.feature-icon-orange {
+  color: #f09318;
+  border-color: #ffe4c4;
+  background: #fff7ec;
+}
+
+.feature-icon-purple {
+  color: #3768e9;
+  border-color: #dce4ff;
+  background: #f0f4ff;
+}
+
+.feature-item strong {
+  display: block;
+  margin: 1px 0 6px;
+  font-size: 15.5px;
+  font-weight: 750;
+  color: #182445;
+}
+
+.feature-item small {
+  display: block;
+  color: #5f6e8f;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.meeting-illustration {
   position: absolute;
   right: 46px;
   bottom: 32px;
@@ -85,8 +221,6 @@
   aspect-ratio: 5 / 3;
   object-fit: cover;
 }
-
-
 
 .auth-side {
   position: relative;
@@ -795,9 +929,7 @@
   }
 
   .login-benefits {
-    grid-template-columns: 1fr;
-    gap: 17px;
-    padding: 25px;
+    padding: 10px 18px;
   }
 }
 
