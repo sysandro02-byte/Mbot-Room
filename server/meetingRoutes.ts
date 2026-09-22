@@ -46,6 +46,11 @@ const visibleToUser = async (meeting: Meeting, user: NonNullable<AuthedRequest['
   if (meeting.settings.isPublic === true || meeting.settings.visibility === 'public') return true;
   const invited = (meeting.settings.participants || []).some((value) => normalizeEmail(value) === normalizeEmail(user.email));
   if (invited) return true;
+  const lobby = await query(
+    `SELECT 1 FROM room_lobby WHERE meeting_id=$1 AND user_id=$2 AND status IN ('requested','accepted') LIMIT 1`,
+    [meeting.id, user.id],
+  );
+  if (lobby.rows[0]) return true;
   return hasMeetingAccess(meeting.id, user);
 };
 
