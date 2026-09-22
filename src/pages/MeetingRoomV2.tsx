@@ -1176,7 +1176,6 @@ export default function MeetingRoomV2() {
     </main>
   );
 
-  const remoteByUser = new Map(remoteParticipants.map((participant) => [Number(participant.userId), participant]));
   const activeMembers = participants.filter((participant) => participant.status === 'accepted');
   const galleryCount = 1 + remoteParticipants.length;
   const featuredSocketId = pinnedSocketId || activeSpeakerSocketId || remoteParticipants[0]?.socketId || null;
@@ -1351,7 +1350,7 @@ export default function MeetingRoomV2() {
                   </section>
                 ) : null}
                 {activeMembers.map((member) => {
-                  const remote = remoteByUser.get(member.userId);
+                  const remote = remoteParticipants.find((participant) => Number(participant.userId) === member.userId);
                   const isSelf = member.userId === Number(currentUser?.id || 0);
                   return (
                     <article key={member.userId}>
