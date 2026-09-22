@@ -320,6 +320,13 @@ export const registerAuthRoutes = (app: express.Express) => {
       );
       const challenge = result.rows[0];
       if (!challenge) return sendApiError(response, 400, 'OTP_EXPIRED', 'Session OTP expirée. Recommencez la connexion.');
+      const lastSentAt = new Date(challenge.created_at).getTime();
+      const resendDelayMs = 30_000;
+      if (Number.isFinite(lastSentAt) && Date.now() - lastSentAt < resendDelayMs) {
+        const retryAfter = Math.max(1, Math.ceil((resendDelayMs - (Date.now() - lastSentAt)) / 1000));
+        response.setHeader('Retry-After', String(retryAfter));
+        return sendApiError(response, 429, 'OTP_RESEND_TOO_SOON', `Patientez ${retryAfter} seconde(s) avant de demander un nouveau code.`);
+      }
       const code = createOtpCode();
       await query(
         `UPDATE room_login_otps SET code_hash=$2,attempts=0,expires_at=now()+interval '10 minutes',created_at=now() WHERE challenge_id=$1`,
