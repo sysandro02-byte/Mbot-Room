@@ -388,6 +388,22 @@ try {
   assert.equal(browserMe.response.status, 200, JSON.stringify(browserMe.data));
   assert.equal(browserMe.data.user.email, 'host.integration@mbote.test');
 
+  const browserActivity = await jsonRequest('/api/auth/activity', {
+    method: 'POST',
+    headers: { Cookie: browserCookie },
+  });
+  assert.equal(browserActivity.response.status, 204, JSON.stringify(browserActivity.data));
+
+  const idleUser = await register('Session Idle', 'idle.integration@mbote.test');
+  const idleDb = new pg.Pool({ connectionString: databaseUrl, ssl: false });
+  await idleDb.query(
+    `UPDATE room_sessions SET last_activity=now()-interval '6 minutes' WHERE token_hash=$1`,
+    [crypto.createHash('sha256').update(idleUser.token).digest('hex')],
+  );
+  await idleDb.end();
+  const idleExpired = await jsonRequest('/api/auth/me', { headers: authHeaders(idleUser.token) });
+  assert.equal(idleExpired.response.status, 401, 'Server must reject a session inactive for more than five minutes');
+
   const browserLogout = await jsonRequest('/api/auth/logout', {
     method: 'POST',
     headers: { Cookie: browserCookie },
@@ -414,15 +430,17 @@ try {
   const resetUrl = new URL(resetLink);
   assert.equal(resetUrl.origin, baseUrl);
   assert.equal(resetUrl.pathname, '/mot-de-passe-oublie');
-  const resetToken = resetUrl.searchParams.get('token');
-  assert.ok(resetToken, 'Password reset link must contain a token');
+  assert.equal(resetUrl.searchParams.has('token'), false, 'Password reset token must not appear in the query string');
+  const resetHash = new URLSearchParams(resetUrl.hash.replace(/^#/, ''));
+  const resetToken = resetHash.get('reset');
+  assert.ok(resetToken, 'Password reset link must contain its one-time token in the URL fragment');
 
   const shortResetPassword = await jsonRequest('/api/auth/reset-password', {
     method: 'POST',
     body: JSON.stringify({ token: resetToken, password: 'court' }),
   });
   assert.equal(shortResetPassword.response.status, 400);
-  assert.equal(shortResetPassword.data.code, 'PASSWORD_TOO_SHORT');
+  assert.equal(shortResetPassword.data.code, 'PASSWORD_WEAK');
 
   const resetPassword = await jsonRequest('/api/auth/reset-password', {
     method: 'POST',
