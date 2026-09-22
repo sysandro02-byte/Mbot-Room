@@ -1160,3 +1160,38 @@
   border-color: #ffd6d6;
   color: #d84040;
 }
+
+.admin-home-slides-card{
+  border-color:#dce7ef;
+  background:linear-gradient(180deg,#fff,#fbfefd);
+}
+.admin-home-slide-tabs{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:9px;
+}
+.admin-home-slide-tabs button{
+  display:grid;
+  gap:3px;
+  min-height:58px;
+  padding:10px 12px;
+  border:1px solid #dfe7f1;
+  border-radius:12px;
+  background:#fff;
+  color:#26344f;
+  cursor:pointer;
+  text-align:left;
+}
+.admin-home-slide-tabs button strong{font-size:12px}
+.admin-home-slide-tabs button small{color:#7d899c;font-size:10px}
+.admin-home-slide-tabs button.is-active{
+  border-color:#7bc9c5;
+  background:linear-gradient(135deg,#eaf8f6,#f5fbff);
+  box-shadow:0 8px 20px rgba(0,126,131,.08);
+}
+.admin-home-slide-tabs button.is-active strong{color:#007e83}
+.admin-home-slide-form{border-radius:14px;padding:16px}
+@media(max-width:620px){
+  .admin-home-slide-tabs{grid-template-columns:1fr}
+  .admin-tip-form-grid{grid-template-columns:1fr}
+}
