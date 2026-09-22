@@ -459,8 +459,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       if (!meeting || !canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'LOBBY_HOST_REQUIRED', 'Seul l’hôte ou le co-hôte peut gérer la salle d’attente.');
       const userId = Number(request.body?.userId);
       const status = request.body?.status === 'rejected' ? 'rejected' : 'accepted';
-      const updated = await query('UPDATE room_lobby SET status=$3 WHERE meeting_id=$1 AND user_id=$2 RETURNING *', [meeting.id, userId, status]);
-      if (!updated.rows[0]) return sendApiError(response, 404, 'PARTICIPANT_NOT_FOUND', 'Participant introuvable dans la salle d’attente.');
+      const lobbyEntry = await query('SELECT status FROM room_lobby WHERE meeting_id=$1 AND user_id=$2 LIMIT 1', [meeting.id, userId]);
+      if (!lobbyEntry.rows[0]) return sendApiError(response, 404, 'PARTICIPANT_NOT_FOUND', 'Participant introuvable dans la salle d’attente.');
       if (status === 'accepted') {
         const existingAccepted = await query(`SELECT 1 FROM room_meeting_members WHERE meeting_id=$1 AND user_id=$2 AND status='accepted' LIMIT 1`, [meeting.id, userId]);
         if (!existingAccepted.rows[0] && await acceptedMemberCount(meeting.id) >= meetingCapacity(meeting)) {
@@ -468,9 +468,10 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
         }
         await query(
           `INSERT INTO room_meeting_members (meeting_id,user_id,role,status,joined_at) VALUES ($1,$2,'participant','accepted',now())
-           ON CONFLICT (meeting_id,user_id) DO UPDATE SET status='accepted',joined_at=COALESCE(room_meeting_members.joined_at,now()),updated_at=now()`, [meeting.id,userId],
+           ON CONFLICT (meeting_id,user_id) DO UPDATE SET status='accepted',joined_at=COALESCE(room_meeting_members.joined_at,now()),left_at=NULL,updated_at=now()`, [meeting.id,userId],
         );
       }
+      await query('UPDATE room_lobby SET status=$3 WHERE meeting_id=$1 AND user_id=$2', [meeting.id, userId, status]);
       io.to(`user:${userId}`).emit('meeting:lobby-status', { meetingId: meeting.id, status });
       io.to(`meeting:${meeting.id}`).emit('meeting:lobby-updated', { meetingId: meeting.id, userId, status });
       response.json({ success: true });
