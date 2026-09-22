@@ -283,11 +283,17 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const start = new Date(request.body?.startTime || request.body?.start_time || Date.now());
       const duration = Math.max(15, Math.min(1440, Number(request.body?.duration || 60)));
       const { settings, invitationEmails, plainPassword } = buildSettings(request.body);
+      const requestedCoHostId = Number(request.body?.coHostId || 0) || null;
+      if (requestedCoHostId === request.user!.id) return sendApiError(response, 400, 'VALIDATION_ERROR', 'L’hôte principal ne peut pas être son propre co-hôte.');
+      if (requestedCoHostId) {
+        const coHost = await query('SELECT id FROM room_users WHERE id=$1 AND is_guest=false LIMIT 1', [requestedCoHostId]);
+        if (!coHost.rows[0]) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Co-hôte introuvable ou compte invité non autorisé.');
+      }
       const inserted = await query(
         `INSERT INTO room_meetings
           (title,description,host_id,co_host_id,host_name,host_avatar,start_time,duration,meeting_link,is_active,settings,participant_count,status)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,$10::jsonb,1,'scheduled') RETURNING *`,
-        [title, description, request.user!.id, request.body?.coHostId ? Number(request.body.coHostId) : null, request.user!.name, request.user!.avatar, Number.isNaN(start.getTime()) ? new Date().toISOString() : start.toISOString(), duration, createMeetingLink(), JSON.stringify(settings)],
+        [title, description, request.user!.id, requestedCoHostId, request.user!.name, request.user!.avatar, Number.isNaN(start.getTime()) ? new Date().toISOString() : start.toISOString(), duration, createMeetingLink(), JSON.stringify(settings)],
       );
       const meeting = mapMeeting(inserted.rows[0]);
       await query(`INSERT INTO room_meeting_members (meeting_id,user_id,role,status) VALUES ($1,$2,'host','accepted') ON CONFLICT DO NOTHING`, [meeting.id, request.user!.id]);
@@ -337,13 +343,51 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const meeting = await getMeetingById(Number(request.params.meetingId));
       if (!meeting) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
       if (!canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte ou le co-hôte peut modifier cette réunion.');
+
+      const actorIsPrimaryHost = meeting.host_id === request.user!.id || request.user!.role === 'admin';
+      const coHostChangeRequested = Object.prototype.hasOwnProperty.call(request.body || {}, 'coHostId');
+      if (coHostChangeRequested && !actorIsPrimaryHost) {
+        return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte principal peut changer le co-hôte.');
+      }
+
+      let nextCoHostId = Number(meeting.co_host_id || 0) || null;
+      if (coHostChangeRequested) {
+        nextCoHostId = Number(request.body?.coHostId || 0) || null;
+        if (nextCoHostId === meeting.host_id) return sendApiError(response, 400, 'VALIDATION_ERROR', 'L’hôte principal ne peut pas être son propre co-hôte.');
+        if (nextCoHostId) {
+          const coHost = await query('SELECT id FROM room_users WHERE id=$1 AND is_guest=false LIMIT 1', [nextCoHostId]);
+          if (!coHost.rows[0]) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Co-hôte introuvable ou compte invité non autorisé.');
+        }
+      }
+
       const { settings } = buildSettings(request.body, meeting);
       const updated = await query(
         `UPDATE room_meetings SET title=$2,description=$3,start_time=$4,duration=$5,co_host_id=$6,settings=$7::jsonb,updated_at=now() WHERE id=$1 RETURNING *`,
-        [meeting.id, normalizeText(request.body?.title || meeting.title).slice(0,160), normalizeText(request.body?.description ?? meeting.description).slice(0,1500), new Date(request.body?.startTime || request.body?.start_time || meeting.start_time).toISOString(), Math.max(15,Number(request.body?.duration || meeting.duration)), request.body?.coHostId ? Number(request.body.coHostId) : meeting.co_host_id || null, JSON.stringify(settings)],
+        [meeting.id, normalizeText(request.body?.title || meeting.title).slice(0,160), normalizeText(request.body?.description ?? meeting.description).slice(0,1500), new Date(request.body?.startTime || request.body?.start_time || meeting.start_time).toISOString(), Math.max(15,Number(request.body?.duration || meeting.duration)), nextCoHostId, JSON.stringify(settings)],
       );
+
+      const previousCoHostId = Number(meeting.co_host_id || 0) || null;
+      if (coHostChangeRequested && previousCoHostId !== nextCoHostId) {
+        if (previousCoHostId) {
+          await query(`UPDATE room_meeting_members SET role='participant',updated_at=now() WHERE meeting_id=$1 AND user_id=$2 AND role='cohost'`, [meeting.id, previousCoHostId]);
+          io.in(`user:${previousCoHostId}`).socketsLeave(`meeting:${meeting.id}:moderators`);
+          io.to(`user:${previousCoHostId}`).emit('meeting:moderation', { meetingId: meeting.id, role: 'participant' });
+        }
+        if (nextCoHostId) {
+          await query(
+            `INSERT INTO room_meeting_members (meeting_id,user_id,role,status,joined_at)
+             VALUES ($1,$2,'cohost','accepted',now())
+             ON CONFLICT (meeting_id,user_id) DO UPDATE SET role='cohost',status='accepted',left_at=NULL,updated_at=now()`,
+            [meeting.id, nextCoHostId],
+          );
+          io.in(`user:${nextCoHostId}`).socketsJoin(`meeting:${meeting.id}:moderators`);
+          io.to(`user:${nextCoHostId}`).emit('meeting:moderation', { meetingId: meeting.id, role: 'cohost' });
+        }
+      }
+
       const value = publicMeeting(updated.rows[0]);
       io.emit('meeting:updated', value);
+      io.to(`meeting:${meeting.id}`).emit('meeting:presence', { meetingId: meeting.id, coHostId: nextCoHostId });
       response.json(value);
     } catch (error) { next(error); }
   });
@@ -352,7 +396,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     try {
       const meeting = await getMeetingById(Number(request.params.meetingId));
       if (!meeting) return response.status(204).end();
-      if (!canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte peut annuler cette réunion.');
+      if (meeting.host_id !== request.user!.id && request.user!.role !== 'admin') return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte principal peut annuler cette réunion.');
       await query(`UPDATE room_meetings SET status='cancelled',is_active=false,ended_at=COALESCE(ended_at,now()),updated_at=now() WHERE id=$1`, [meeting.id]);
       io.emit('meeting:cancelled', { meetingId: meeting.id });
       response.status(204).end();
