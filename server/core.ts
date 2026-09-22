@@ -153,7 +153,7 @@ export const getConfiguredAdminEmails = () => String(process.env.ADMIN_EMAILS ||
 
 const resolveRole = (row: any): UserRole => {
   if (row.is_guest) return 'guest';
-  if (row.role === 'admin' || Number(row.id) === 1 || getConfiguredAdminEmails().includes(normalizeEmail(row.email))) return 'admin';
+  if (row.role === 'admin' || getConfiguredAdminEmails().includes(normalizeEmail(row.email))) return 'admin';
   return 'user';
 };
 
@@ -253,16 +253,36 @@ export const getRawSessionToken = (authorization: unknown, cookieHeader: unknown
 export const getRawSessionTokenFromRequest = (request: express.Request) =>
   getBearerToken(request) || getCookieValue(request.headers.cookie, SESSION_COOKIE_NAME);
 
+export const SESSION_IDLE_TIMEOUT_MS = Math.max(60_000, Math.min(60 * 60_000, Number(process.env.MBOTE_ROOM_IDLE_TIMEOUT_MS || 5 * 60_000)));
+
 export const getUserByRawToken = async (rawToken: string): Promise<PublicUser | null> => {
   if (!hasDatabase() || !rawToken) return null;
+  const idleSeconds = Math.max(60, Math.floor(SESSION_IDLE_TIMEOUT_MS / 1000));
   const result = await query(
     `SELECT u.* FROM room_sessions s
        JOIN room_users u ON u.id = s.user_id
-      WHERE s.token_hash = $1 AND s.expires_at::timestamptz > now()
+      WHERE s.token_hash = $1
+        AND s.expires_at::timestamptz > now()
+        AND COALESCE(s.last_activity, s.created_at::timestamptz) > now() - ($2::text || ' seconds')::interval
       LIMIT 1`,
-    [hashToken(rawToken)],
+    [hashToken(rawToken), String(idleSeconds)],
   );
   return result.rows[0] ? toPublicUser(result.rows[0]) : null;
+};
+
+export const touchSessionActivity = async (rawToken: string) => {
+  if (!hasDatabase() || !rawToken) return false;
+  const idleSeconds = Math.max(60, Math.floor(SESSION_IDLE_TIMEOUT_MS / 1000));
+  const result = await query(
+    `UPDATE room_sessions
+        SET last_activity=now()
+      WHERE token_hash=$1
+        AND expires_at::timestamptz > now()
+        AND COALESCE(last_activity, created_at::timestamptz) > now() - ($2::text || ' seconds')::interval
+      RETURNING token_hash`,
+    [hashToken(rawToken), String(idleSeconds)],
+  );
+  return Boolean(result.rows[0]);
 };
 
 export const authenticateToken: express.RequestHandler = async (request: AuthedRequest, response, next) => {
@@ -292,8 +312,8 @@ export const createSession = async (userId: number, rememberMe = false) => {
   const createdAt = new Date();
   const expiresAt = new Date(createdAt.getTime() + (rememberMe ? 30 : 0.5) * 24 * 60 * 60 * 1000);
   await query(
-    `INSERT INTO room_sessions (token_hash, user_id, created_at, expires_at)
-     VALUES ($1, $2, $3, $4)`,
+    `INSERT INTO room_sessions (token_hash, user_id, created_at, expires_at, last_activity)
+     VALUES ($1, $2, $3, $4, $3::timestamptz)`,
     [hashToken(token), userId, createdAt.toISOString(), expiresAt.toISOString()],
   );
   const userResult = await query('SELECT * FROM room_users WHERE id = $1', [userId]);
@@ -350,8 +370,12 @@ export const runMigrations = async () => {
       token_hash text PRIMARY KEY,
       user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
       created_at text NOT NULL,
-      expires_at text NOT NULL
+      expires_at text NOT NULL,
+      last_activity timestamptz NOT NULL DEFAULT now()
     );
+    ALTER TABLE room_sessions ADD COLUMN IF NOT EXISTS last_activity timestamptz;
+    UPDATE room_sessions SET last_activity=now() WHERE last_activity IS NULL;
+    ALTER TABLE room_sessions ALTER COLUMN last_activity SET DEFAULT now();
 
     CREATE TABLE IF NOT EXISTS room_meetings (
       id integer PRIMARY KEY DEFAULT nextval('room_meetings_id_seq'),
