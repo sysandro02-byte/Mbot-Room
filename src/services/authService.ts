@@ -319,6 +319,22 @@ export const authService = {
     return user;
   },
 
+  async touchActivity() {
+    const response = await fetchAuth(apiUrl('/api/auth/activity'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+    if (response.status === 401 || response.status === 403) {
+      await this.logout(false);
+      throw new Error('Votre session a expiré après une période d’inactivité.');
+    }
+    if (!response.ok) {
+      const result = await readJson(response);
+      throw new Error(result.error || 'Impossible de prolonger la session.');
+    }
+  },
+
   async logout(notifyServer = true) {
     const legacyToken = this.getToken();
     if (notifyServer) {
@@ -363,6 +379,6 @@ export const authService = {
 
   isAdmin() {
     const user = this.getCurrentUser();
-    return Boolean(user?.role === 'admin' || user?.id === '1' || user?.permissions?.includes('admin.dashboard.view'));
+    return Boolean(user?.role === 'admin' || user?.permissions?.includes('admin.dashboard.view'));
   },
 };
