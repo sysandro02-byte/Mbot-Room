@@ -19,6 +19,10 @@ const feedbackSelector = [
   '.waiting-error',
   '.video-error',
   '.admin-inline-error',
+  '.room-v2-notice',
+  '.push-settings-message',
+  '.offline-settings-message',
+  '.pwa-sync-success',
   '[data-global-message="true"]',
 ].join(',');
 
