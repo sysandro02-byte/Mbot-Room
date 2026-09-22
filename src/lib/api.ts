@@ -1,3 +1,5 @@
+import { cacheApiResponse, isCacheableApiGet, readCachedApiResponse } from './offline';
+
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 
 const PRODUCTION_API_FALLBACK = 'https://mbote-room-api.onrender.com';
@@ -58,12 +60,27 @@ export const apiFetch = async (
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(input, {
+    const response = await fetch(input, {
       credentials: 'include',
       ...init,
       signal: init.signal || controller.signal,
     });
+    const method = String(init.method || 'GET').toUpperCase();
+    if (isCacheableApiGet(input, method)) {
+      if (response.ok) {
+        void cacheApiResponse(input, response);
+      } else if (response.status >= 500) {
+        const cached = await readCachedApiResponse(input);
+        if (cached) return cached;
+      }
+    }
+    return response;
   } catch (error) {
+    const method = String(init.method || 'GET').toUpperCase();
+    if (isCacheableApiGet(input, method)) {
+      const cached = await readCachedApiResponse(input);
+      if (cached) return cached;
+    }
     if (error instanceof DOMException && error.name === 'AbortError') {
       throw new Error('Le serveur MBotéRoom met trop de temps à répondre. Réessayez.');
     }
