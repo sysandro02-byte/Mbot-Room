@@ -120,6 +120,10 @@ const productionHealth = fs.readFileSync(new URL('../scripts/check-production-he
 if (!productionHealth.includes('getWithRetry') || !productionHealth.includes('attempts: 5') || !productionHealth.includes('45_000')) {
   throw new Error('Production health monitoring must tolerate Render cold starts with retries and backoff');
 }
+const productionHealthWorkflow = fs.readFileSync(new URL('../.github/workflows/production-health.yml', import.meta.url), 'utf8');
+if (!productionHealthWorkflow.includes('workflow_run:') || !productionHealthWorkflow.includes('MBoteRoom CI')) {
+  throw new Error('Production health monitoring must run after a successful main CI workflow');
+}
 const renderBlueprint = fs.readFileSync(new URL('../render.yaml', import.meta.url), 'utf8');
 if (!renderBlueprint.includes('openai/gpt-oss-120b,openai/gpt-oss-20b')) {
   throw new Error('Render must configure production Groq models for Luna');
