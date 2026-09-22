@@ -87,14 +87,33 @@ const sendInvitations = async (meeting: Meeting, emails: string[], password: str
   const clientOrigin = String(process.env.MBOTE_ROOM_APP_URL || request.headers.origin || '').replace(/\/+$/, '');
   const joinUrl = `${clientOrigin}/join/${encodeURIComponent(meeting.meeting_link)}`;
   const meetingId = String(meeting.settings.meetingAccessId || meeting.id);
+  const startLabel = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'full', timeStyle: 'short' }).format(new Date(meeting.start_time));
+  const passwordRow = password
+    ? `<tr><td style="padding:8px 0;color:#7b879e;font-size:13px">Mot de passe de réunion</td><td align="right" style="padding:8px 0;font-weight:850;color:#24345c">${escapeHtml(password)}</td></tr>`
+    : '';
 
   const results = await Promise.all(emails.map(async (email) => sendTransactionalEmail({
     to: email,
     subject: `Invitation MBotéRoom : ${meeting.title}`,
     text: `${meeting.host_name} vous invite à « ${meeting.title} ».
 ID : ${meetingId}
+Début : ${startLabel}
 ${password ? `Mot de passe : ${password}\n` : ''}Rejoindre : ${joinUrl}`,
-    html: `<div style="font-family:Arial,sans-serif;color:#17213c"><h2>Invitation MBotéRoom</h2><p><strong>${escapeHtml(meeting.host_name)}</strong> vous invite à <strong>${escapeHtml(meeting.title)}</strong>.</p><p>ID : <strong>${escapeHtml(meetingId)}</strong>${password ? `<br>Mot de passe : <strong>${escapeHtml(password)}</strong>` : ''}</p><p><a href="${escapeHtml(joinUrl)}">Rejoindre la réunion</a></p></div>`,
+    html: `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;background:#f4f7fc;font-family:Inter,Arial,sans-serif;color:#17213c">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f7fc;padding:30px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#fff;border:1px solid #e2e8f4;border-radius:24px;overflow:hidden;box-shadow:0 16px 48px rgba(22,34,69,.08)">
+<tr><td style="padding:28px 34px;background:linear-gradient(135deg,#13224d,#3156eb 62%,#6046f4);color:#fff"><div style="font-size:25px;font-weight:850">MBoté<span style="color:#c0cbff">Room</span></div><div style="margin-top:6px;font-size:13px;opacity:.84">Invitation à une réunion sécurisée</div></td></tr>
+<tr><td style="padding:34px"><div style="font-size:12px;color:#3156eb;font-weight:850;text-transform:uppercase;letter-spacing:1px">Vous êtes invité(e)</div><h1 style="margin:8px 0 10px;font-size:27px;line-height:1.2;color:#15203d">${escapeHtml(meeting.title)}</h1><p style="margin:0 0 24px;color:#68758f;line-height:1.65"><strong style="color:#26365a">${escapeHtml(meeting.host_name)}</strong> vous invite à participer à une réunion MBotéRoom.</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:6px 16px;border:1px solid #e5eaf3;border-radius:14px;background:#fafcff">
+<tr><td style="padding:8px 0;color:#7b879e;font-size:13px">ID de réunion</td><td align="right" style="padding:8px 0;font-weight:850;color:#24345c">${escapeHtml(meetingId)}</td></tr>
+<tr><td style="padding:8px 0;color:#7b879e;font-size:13px">Début</td><td align="right" style="padding:8px 0;font-weight:850;color:#24345c">${escapeHtml(startLabel)}</td></tr>
+${passwordRow}
+</table>
+<p style="margin:28px 0 12px"><a href="${escapeHtml(joinUrl)}" style="display:inline-block;padding:13px 20px;border-radius:12px;background:#3156eb;color:#fff;text-decoration:none;font-weight:850">Rejoindre la réunion</a></p>
+<p style="margin:0;color:#7b8798;font-size:12px;line-height:1.6">Vous pouvez rejoindre depuis un ordinateur, un téléphone ou une tablette. L’hôte peut utiliser une salle d’attente avant de vous admettre.</p></td></tr>
+<tr><td style="padding:19px 34px;border-top:1px solid #edf1f7;background:#fafcff;color:#7a879d;font-size:12px;line-height:1.6">Ne transférez cette invitation qu’aux personnes autorisées à participer.<br>© LoukaTech · MBotéRoom</td></tr>
+</table></td></tr></table></body></html>`,
   })));
 
   const sent = results.filter(Boolean).length;
