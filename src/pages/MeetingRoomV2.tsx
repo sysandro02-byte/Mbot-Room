@@ -391,7 +391,7 @@ export default function MeetingRoomV2() {
       const lobby = await meetingService.getLobby(found.id).catch(() => []);
       const ownLobby = lobby.find((item) => String(item.user_id) === String(currentUser?.id || ''));
       if (currentUser?.isGuest && ownLobby?.status === 'requested') {
-        navigate(`/reunions/${found.id}/salle-attente`, { replace: true, state: location.state });
+        navigate(`/reunions/${found.meeting_link}/salle-attente`, { replace: true, state: location.state });
         return;
       }
       if (currentUser?.isGuest && ownLobby?.status === 'rejected') throw new Error('L’hôte a refusé votre demande d’accès.');
@@ -1217,7 +1217,7 @@ export default function MeetingRoomV2() {
     await stopActiveRecording();
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
     screenStreamRef.current?.getTracks().forEach((track) => track.stop());
-    navigate(`/reunions/${meeting.id}/terminee`, { replace: true });
+    navigate(`/reunions/${meeting.meeting_link}/terminee`, { replace: true });
   };
 
   if (loading) return <main className="room-v2-loading">Connexion à la réunion…</main>;
