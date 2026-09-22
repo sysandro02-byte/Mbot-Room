@@ -237,22 +237,97 @@ export const registerAuthRoutes = (app: express.Express) => {
         [name, username, email, createAvatar(name), passwordData.hash, passwordData.salt, new Date().toISOString(), normalizeText(request.body?.phoneNumber).slice(0, 40), normalizeText(request.body?.organization).slice(0, 120), normalizeText(request.body?.jobTitle).slice(0, 120), role],
       );
       const session = await createSession(Number(inserted.rows[0].id), true);
-      respondWithSession(request, response, session, 201);
+      const appUrl = String(process.env.MBOTE_ROOM_APP_URL || resolveAllowedClientOrigin(request.headers.origin, getOrigin(request))).replace(/\/+$/, '');
+      const welcomeEmailSent = await sendWelcomeEmail(email, name, appUrl).catch(() => false);
+      attachSessionCookie(response, session);
+      response.status(201).json({
+        ...publicSessionPayload(request, session),
+        accountCreated: true,
+        welcomeEmailSent,
+        security: { otpRequiredOnNextLogin: true, passwordEmailed: false },
+      });
     } catch (error) { next(error); }
   });
 
   app.post('/api/auth/login', requireDatabase, async (request, response, next) => {
     try {
       const email = normalizeEmail(request.body?.email);
-      const result = await query('SELECT * FROM room_users WHERE lower(email) = lower($1) LIMIT 1', [email]);
+      const result = await query('SELECT * FROM room_users WHERE lower(email) = lower($1) AND is_guest=false LIMIT 1', [email]);
       const user = result.rows[0];
       if (!user) return sendApiError(response, 401, 'INVALID_CREDENTIALS', 'Email ou mot de passe incorrect.');
       const password = String(request.body?.password || '');
       if (!verifyPasswordHash(password, String(user.password_salt || ''), String(user.password_hash || ''))) {
         return sendApiError(response, 401, 'INVALID_CREDENTIALS', 'Email ou mot de passe incorrect.');
       }
-      const session = await createSession(Number(user.id), Boolean(request.body?.rememberMe));
+
+      await query('DELETE FROM room_login_otps WHERE user_id=$1 OR expires_at<=now() OR consumed_at IS NOT NULL', [user.id]);
+      const challengeId = createId();
+      const code = createOtpCode();
+      const expiresMinutes = 10;
+      await query(
+        `INSERT INTO room_login_otps (challenge_id,user_id,code_hash,remember_me,expires_at)
+         VALUES ($1,$2,$3,$4,now()+interval '10 minutes')`,
+        [challengeId, user.id, hashToken(code), Boolean(request.body?.rememberMe)],
+      );
+      const delivered = await sendLoginOtpEmail(String(user.email), String(user.name || user.username || 'Utilisateur'), code, expiresMinutes).catch(() => false);
+      if (!delivered) {
+        await query('DELETE FROM room_login_otps WHERE challenge_id=$1', [challengeId]);
+        return sendApiError(response, 503, 'OTP_DELIVERY_FAILED', 'Impossible d’envoyer le code de connexion. Réessayez dans quelques instants.');
+      }
+      const [local, domain] = String(user.email).split('@');
+      const emailHint = local && domain ? local.slice(0, 2)+'***@'+domain : 'votre adresse e-mail';
+      response.json({ otpRequired: true, challengeId, emailHint, expiresInSeconds: expiresMinutes * 60 });
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/auth/login/otp', requireDatabase, async (request, response, next) => {
+    try {
+      const challengeId = String(request.body?.challengeId || '');
+      const code = String(request.body?.code || '').replace(/\D/g, '').slice(0, 6);
+      if (!challengeId || code.length !== 6) return sendApiError(response, 400, 'OTP_INVALID', 'Saisissez le code à 6 chiffres reçu par e-mail.');
+      const result = await query(
+        `SELECT o.*,u.email,u.name,u.username FROM room_login_otps o
+         JOIN room_users u ON u.id=o.user_id
+         WHERE o.challenge_id=$1 LIMIT 1`,
+        [challengeId],
+      );
+      const challenge = result.rows[0];
+      if (!challenge || challenge.consumed_at || new Date(challenge.expires_at).getTime() <= Date.now()) {
+        return sendApiError(response, 400, 'OTP_EXPIRED', 'Ce code a expiré. Recommencez la connexion.');
+      }
+      if (Number(challenge.attempts || 0) >= 5) {
+        await query('UPDATE room_login_otps SET consumed_at=now() WHERE challenge_id=$1', [challengeId]);
+        return sendApiError(response, 429, 'OTP_TOO_MANY_ATTEMPTS', 'Trop de tentatives. Recommencez la connexion.');
+      }
+      if (hashToken(code) !== String(challenge.code_hash)) {
+        await query('UPDATE room_login_otps SET attempts=attempts+1 WHERE challenge_id=$1', [challengeId]);
+        return sendApiError(response, 401, 'OTP_INVALID', 'Code incorrect. Vérifiez l’e-mail reçu.');
+      }
+      await query('UPDATE room_login_otps SET consumed_at=now() WHERE challenge_id=$1', [challengeId]);
+      const session = await createSession(Number(challenge.user_id), Boolean(challenge.remember_me));
       respondWithSession(request, response, session);
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/auth/login/otp/resend', requireDatabase, async (request, response, next) => {
+    try {
+      const challengeId = String(request.body?.challengeId || '');
+      const result = await query(
+        `SELECT o.*,u.email,u.name,u.username FROM room_login_otps o
+         JOIN room_users u ON u.id=o.user_id
+         WHERE o.challenge_id=$1 AND o.consumed_at IS NULL LIMIT 1`,
+        [challengeId],
+      );
+      const challenge = result.rows[0];
+      if (!challenge) return sendApiError(response, 400, 'OTP_EXPIRED', 'Session OTP expirée. Recommencez la connexion.');
+      const code = createOtpCode();
+      await query(
+        `UPDATE room_login_otps SET code_hash=$2,attempts=0,expires_at=now()+interval '10 minutes',created_at=now() WHERE challenge_id=$1`,
+        [challengeId, hashToken(code)],
+      );
+      const delivered = await sendLoginOtpEmail(String(challenge.email), String(challenge.name || challenge.username || 'Utilisateur'), code, 10).catch(() => false);
+      if (!delivered) return sendApiError(response, 503, 'OTP_DELIVERY_FAILED', 'Impossible de renvoyer le code pour le moment.');
+      response.json({ success: true, expiresInSeconds: 600 });
     } catch (error) { next(error); }
   });
 
