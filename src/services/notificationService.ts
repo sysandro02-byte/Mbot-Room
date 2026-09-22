@@ -54,9 +54,9 @@ export const notificationService={
   },
 
   async enablePush(){
-    if(!('serviceWorker'in navigator)||!('PushManager'in window)||!('Notification'in window))throw new Error('Les notifications push ne sont pas prises en charge sur cet appareil.');
+    if(!('serviceWorker'in navigator)||!('PushManager'in window)||!('Notification'in window))throw new Error('Les notifications ne sont pas prises en charge sur cet appareil.');
     const platform=detectPlatform();
-    if(platform==='ios'&&!isStandalone())throw new Error('Sur iPhone/iPad, installez d’abord MBotéRoom sur l’écran d’accueil pour activer les notifications push.');
+    if(platform==='ios'&&!isStandalone())throw new Error('Sur iPhone/iPad, installez d’abord MBotéRoom sur l’écran d’accueil pour activer les notifications.');
     const config=await readJson<{configured:boolean;publicKey:string}>(await apiFetch(apiUrl('/api/push/config'),{headers:getAuthHeaders()}));
     if(!config.configured||!config.publicKey)throw new Error('Les notifications ne sont pas encore disponibles.');
     const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
