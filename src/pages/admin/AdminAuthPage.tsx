@@ -17,7 +17,9 @@ export default function AdminAuthPage({mode='login'}:{mode?:Mode}){
   const [name,setName]=useState('');
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
+  const [confirmPassword,setConfirmPassword]=useState('');
   const [showPassword,setShowPassword]=useState(false);
+  const [resetToken]=useState(()=>new URLSearchParams(window.location.hash.replace(/^#/,'')).get('reset')||'');
   const [rememberMe,setRememberMe]=useState(true);
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState('');
@@ -27,6 +29,7 @@ export default function AdminAuthPage({mode='login'}:{mode?:Mode}){
   const [otp,setOtp]=useState('');
 
   useEffect(()=>{setError('');setMessage('');setChallengeId('');setOtp('');},[mode]);
+  useEffect(()=>{if(resetToken)window.history.replaceState(null,'',window.location.pathname);},[resetToken]);
 
   if(authService.isAuthenticated()&&authService.isAdmin())return <Navigate to="/admin" replace/>;
 
@@ -36,8 +39,17 @@ export default function AdminAuthPage({mode='login'}:{mode?:Mode}){
     setBusy(true);setError('');setMessage('');
     try{
       if(mode==='forgot'){
+        if(resetToken){
+          if(password!==confirmPassword)throw new Error('Les mots de passe ne correspondent pas.');
+          const passwordError=passwordMessage(password);
+          if(passwordError)throw new Error(passwordError);
+          const result=await authService.resetPassword(resetToken,password);
+          setPassword('');setConfirmPassword('');
+          setMessage(result.message||'Mot de passe modifié. Vous pouvez maintenant vous connecter.');
+          return;
+        }
         if(!email.trim())throw new Error('Saisissez votre adresse e-mail administrateur.');
-        const result=await authService.forgotPassword(email.trim());
+        const result=await authService.forgotPassword(email.trim(),true);
         setMessage(result.message||'Si cette adresse correspond à un compte administrateur, un lien vous sera envoyé.');
         return;
       }
@@ -73,8 +85,8 @@ export default function AdminAuthPage({mode='login'}:{mode?:Mode}){
     finally{setBusy(false);}
   };
 
-  const title=mode==='register'?'Créer le compte administrateur':mode==='forgot'?'Mot de passe oublié':'Connexion administrateur';
-  const subtitle=mode==='register'?'Réservé aux adresses administrateur autorisées.':mode==='forgot'?'Recevez un lien sécurisé pour choisir un nouveau mot de passe.':'Accédez au backoffice sécurisé de MBotéRoom.';
+  const title=mode==='register'?'Créer le compte administrateur':mode==='forgot'?(resetToken?'Nouveau mot de passe':'Mot de passe oublié'):'Connexion administrateur';
+  const subtitle=mode==='register'?'Réservé aux adresses administrateur autorisées.':mode==='forgot'?(resetToken?'Choisissez un nouveau mot de passe pour votre compte administrateur.':'Recevez un lien sécurisé pour choisir un nouveau mot de passe.'):'Accédez au backoffice sécurisé de MBotéRoom.';
 
   return <main className="admin-auth-page">
     <section className="admin-auth-visual">
@@ -90,12 +102,13 @@ export default function AdminAuthPage({mode='login'}:{mode?:Mode}){
         <h2>{title}</h2><p>{subtitle}</p>
         <form onSubmit={submit}>
           {mode==='register'&&<label><span>Nom complet</span><div><UserRound size={18}/><input value={name} autoComplete="name" onChange={e=>setName(e.target.value)} placeholder="Nom de l’administrateur"/></div></label>}
-          <label><span>Adresse e-mail</span><div><Mail size={18}/><input value={email} type="email" autoComplete="email" onChange={e=>setEmail(e.target.value)} placeholder="admin@exemple.com"/></div></label>
-          {mode!=='forgot'&&<label><span>Mot de passe</span><div><KeyRound size={18}/><input value={password} type={showPassword?'text':'password'} autoComplete={mode==='register'?'new-password':'current-password'} onChange={e=>setPassword(e.target.value)} placeholder="Votre mot de passe"/><button type="button" className="admin-password-toggle" aria-label={showPassword?'Masquer le mot de passe':'Afficher le mot de passe'} onClick={()=>setShowPassword(v=>!v)}>{showPassword?<EyeOff size={17}/>:<Eye size={17}/>}</button></div></label>}
+          {!(mode==='forgot'&&resetToken)&&<label><span>Adresse e-mail</span><div><Mail size={18}/><input value={email} type="email" autoComplete="email" onChange={e=>setEmail(e.target.value)} placeholder="admin@exemple.com"/></div></label>}
+          {(mode!=='forgot'||resetToken)&&<label><span>{resetToken?'Nouveau mot de passe':'Mot de passe'}</span><div><KeyRound size={18}/><input value={password} type={showPassword?'text':'password'} autoComplete={mode==='register'||resetToken?'new-password':'current-password'} onChange={e=>setPassword(e.target.value)} placeholder="Votre mot de passe"/><button type="button" className="admin-password-toggle" aria-label={showPassword?'Masquer le mot de passe':'Afficher le mot de passe'} onClick={()=>setShowPassword(v=>!v)}>{showPassword?<EyeOff size={17}/>:<Eye size={17}/>}</button></div></label>}
+          {mode==='forgot'&&resetToken&&<label><span>Confirmer le mot de passe</span><div><KeyRound size={18}/><input value={confirmPassword} type={showPassword?'text':'password'} autoComplete="new-password" onChange={e=>setConfirmPassword(e.target.value)} placeholder="Confirmez le mot de passe"/></div></label>}
           {mode==='login'&&<label className="admin-auth-remember"><input type="checkbox" checked={rememberMe} onChange={e=>setRememberMe(e.target.checked)}/><span>Se souvenir de moi</span></label>}
           {error&&<div className="admin-auth-error" role="alert">{error}</div>}
           {message&&<div className="admin-auth-message" role="status">{message}</div>}
-          <button className="admin-auth-primary" disabled={busy}>{busy?'Veuillez patienter…':mode==='register'?'Créer le compte admin':mode==='forgot'?'Envoyer le lien':'Se connecter'}</button>
+          <button className="admin-auth-primary" disabled={busy}>{busy?'Veuillez patienter…':mode==='register'?'Créer le compte admin':mode==='forgot'?(resetToken?'Enregistrer le nouveau mot de passe':'Envoyer le lien'):'Se connecter'}</button>
         </form>
         <div className="admin-auth-links">
           {mode==='login'&&<><Link to="/admin/mot-de-passe-oublie">Mot de passe oublié ?</Link><Link to="/admin/inscription">Créer le compte admin</Link></>}
