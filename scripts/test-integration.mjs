@@ -134,7 +134,7 @@ const server = spawn(process.execPath, ['dist/server.js'], {
     MBOTE_MAIL_RELAY_URL: `http://127.0.0.1:${mailRelayPort}/email`,
     MBOTE_ROOM_MAIL_SECRET: 'integration-mail-secret',
     BREVO_API_KEY: '',
-    ADMIN_EMAILS: '',
+    ADMIN_EMAILS: 'host.integration@mbote.test',
     RESEND_API_KEY: '',
     GROQ_API_KEY: '',
     GROQ_TRANSCRIPTION_API_KEY: 'transcription-test-key',
