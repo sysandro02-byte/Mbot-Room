@@ -77,12 +77,13 @@ type RecentProps = {
   recordings: Recording[];
   onOpen: (meeting: Meeting) => void;
   onManage: (meeting: Meeting) => void;
+  onAll: () => void;
 };
 
-export function RecentMeetings({ meetings, recordings, onOpen, onManage }: RecentProps) {
+export function RecentMeetings({ meetings, recordings, onOpen, onManage, onAll }: RecentProps) {
   return (
     <section className="home-card home-recent-meetings">
-      <div className="home-section-head"><h2>Réunions récentes</h2><button type="button" onClick={() => onManage(meetings[0] || ({} as Meeting))}>Tout voir</button></div>
+      <div className="home-section-head"><h2>Réunions récentes</h2><button type="button" onClick={onAll}>Tout voir</button></div>
       {meetings.length ? <div className="home-recent-list">
         {meetings.slice(0, 3).map((meeting) => {
           const recording = recordings.find((item) => Number(item.meeting_id) === Number(meeting.id));
