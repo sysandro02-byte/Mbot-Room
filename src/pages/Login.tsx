@@ -27,10 +27,11 @@ import {
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { sanitizeInternalPath } from '../lib/navigationSecurity';
+import { getStoredLanguage, persistAppLanguage, type AppLanguage } from '../lib/appLanguage';
 import './Login.css';
 
 type AuthView = 'login' | 'register' | 'guest' | 'forgot';
-type Language = 'fr' | 'en' | 'ln' | 'ar';
+type Language = AppLanguage;
 
 type LoginProps = {
   initialView?: AuthView;
@@ -77,8 +78,8 @@ const translations = {
     submit: 'Se connecter',
     submitting: 'Connexion en cours...',
     or: 'ou',
-    google: 'Continuer avec MBoté',
-    mboteLoading: 'Redirection vers MBoté...',
+    google: 'Continuer avec MBoté Connect',
+    mboteLoading: 'Redirection vers MBoté Connect...',
     joinTitle: 'Rejoindre une réunion',
     joinText: "Vous n'avez pas de compte ? Rejoignez une réunion en tant qu'invité.",
     noAccount: 'Pas encore de compte ?',
@@ -113,8 +114,8 @@ const translations = {
     submit: 'Sign in',
     submitting: 'Signing in...',
     or: 'or',
-    google: 'Continue with MBoté',
-    mboteLoading: 'Redirecting to MBoté...',
+    google: 'Continue with MBoté Connect',
+    mboteLoading: 'Redirecting to MBoté Connect...',
     joinTitle: 'Join a meeting',
     joinText: "No account? Join a meeting as a guest.",
     noAccount: "Don't have an account?",
@@ -149,8 +150,8 @@ const translations = {
     submit: 'Kokota',
     submitting: 'Kokota ezali kosalema...',
     or: 'to',
-    google: 'Koba na MBoté',
-    mboteLoading: 'Kokende na MBoté...',
+    google: 'Koba na MBoté Connect',
+    mboteLoading: 'Kokende na MBoté Connect...',
     joinTitle: 'Kokota na réunion',
     joinText: "Ozangi compte ? Kota na réunion lokola invité.",
     noAccount: 'Ozali nanu na compte te ?',
@@ -185,8 +186,8 @@ const translations = {
     submit: 'Sign in',
     submitting: 'Signing in...',
     or: 'or',
-    google: 'Continue with MBot\u00e9',
-    mboteLoading: 'Redirecting to MBot\u00e9...',
+    google: 'Continue with MBot\u00e9 Connect',
+    mboteLoading: 'Redirecting to MBot\u00e9 Connect...',
     joinTitle: 'Join a meeting',
     joinText: 'No account? Join a meeting as a guest.',
     noAccount: "Don't have an account?",
@@ -263,7 +264,7 @@ const footerBenefitIcons = [
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
 export default function Login({ initialView = 'login' }: LoginProps) {
-  const [language, setLanguage] = useState<Language>('fr');
+  const [language, setLanguage] = useState<Language>(() => getStoredLanguage());
   const [name, setName] = useState('');
   const [email, setEmail] = useState(() => localStorage.getItem('mboteroom-remember-me') === 'true' ? (localStorage.getItem('mboteroom-remember-email') || '') : '');
   const [password, setPassword] = useState('');
@@ -308,6 +309,10 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     return (hash.get('reset') || searchParams.get('token') || '').trim();
   });
+
+  useEffect(() => {
+    persistAppLanguage(language);
+  }, [language]);
 
   useEffect(() => {
     localStorage.setItem('mboteroom-remember-me', String(rememberMe));
@@ -1024,7 +1029,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
             {mboteStep === 'credentials' ? (
               <>
                 <span className="auth-modal-icon" aria-hidden="true">M</span>
-                <h2 id="mbote-flow-title">Se connecter avec MBoté</h2>
+                <h2 id="mbote-flow-title">Se connecter avec MBoté Connect</h2>
                 <p>Entrez d’abord vos identifiants MBoté pour continuer.</p>
                 <form className="mbote-credentials-form" onSubmit={submitMboteCredentials}>
                   <label htmlFor="mbote-identifier">Identifiant MBoté</label>
