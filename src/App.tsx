@@ -2,6 +2,7 @@ import { lazy, ReactNode, Suspense, useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { authService } from './services/authService';
+import PwaExperience from './components/PwaExperience';
 
 const RealMeetingList = lazy(() => import('./components/RealMeetingList'));
 const AppShell = lazy(() => import('./components/AppShell'));
@@ -117,7 +118,7 @@ function SimpleInfoPage({ title, description }: { title: string; description: st
 }
 
 export default function App() {
-  return <Suspense fallback={<main className="route-loading" role="status" aria-live="polite">Chargement de MBotéRoom…</main>}><Routes>
+  return <><PwaExperience/><Suspense fallback={<main className="route-loading" role="status" aria-live="polite">Chargement de MBotéRoom…</main>}><Routes>
     <Route path="/login" element={<Login />} />
     <Route path="/connexion" element={<Login />} />
     <Route path="/inscription" element={<Login initialView="register" />} />
@@ -151,5 +152,5 @@ export default function App() {
     <Route path="/join" element={<ProtectedRoute><AppShell title="Rejoindre"><RealJoinPage /></AppShell></ProtectedRoute>} />
     <Route path="/join/:meetingLink" element={<ProtectedRoute><AppShell title="Rejoindre"><RealJoinPage /></AppShell></ProtectedRoute>} />
     <Route path="*" element={<Navigate to="/app" replace />} />
-  </Routes></Suspense>;
+  </Routes></Suspense></>;
 }
