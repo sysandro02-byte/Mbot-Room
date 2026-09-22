@@ -35,6 +35,7 @@ import {
 } from '../../services/adminDashboardService';
 import { DashboardTip, getMeetingAccessCode, Meeting } from '../../services/meetingService';
 import { collaborationService } from '../../services/collaborationService';
+import AdminControlCenter from './AdminControlCenter';
 import './AdminDashboardPage.css';
 
 type ActivityTone = 'green' | 'blue' | 'orange' | 'red' | 'violet';
@@ -416,6 +417,7 @@ export default function AdminDashboardPage() {
               onEnd={(meeting) => void endLiveMeeting(meeting)}
             />
             <RecentActivityCard activities={dashboard?.recentActivity || []} />
+            <AdminControlCenter />
             <GuestAccessSlidesCard slides={guestSlides} draft={guestDraft} editingId={editingGuestSlideId} onDraftChange={setGuestDraft} onEdit={(slide) => { setEditingGuestSlideId(slide.id); setGuestDraft({ title: slide.title, body: slide.body, imageUrl: slide.imageUrl, isActive: slide.isActive }); }} onCancel={() => { setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); }} onSubmit={async (event) => { event.preventDefault(); try { await adminDashboardService.saveGuestAccessSlide(guestDraft, editingGuestSlideId || undefined); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); setToast('Slide enregistre.'); } catch (saveError) { setToast(saveError instanceof Error ? saveError.message : 'Enregistrement impossible.'); } }} onDelete={async (id) => { try { await adminDashboardService.deleteGuestAccessSlide(id); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setToast('Slide supprime.'); } catch (deleteError) { setToast(deleteError instanceof Error ? deleteError.message : 'Suppression impossible.'); } }} />
             <DashboardTipsCard
               tips={dashboardTips}
