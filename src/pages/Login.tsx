@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   Building2,
+  CalendarDays,
   Eye,
   EyeOff,
   Globe2,
@@ -14,6 +15,7 @@ import {
   LoaderCircle,
   LogIn,
   Mail,
+  MapPin,
   Monitor,
   Phone,
   Sparkles,
@@ -34,7 +36,7 @@ type LoginProps = {
   initialView?: AuthView;
 };
 
-type FieldErrors = Partial<Record<'name' | 'email' | 'password' | 'confirmPassword' | 'phoneNumber' | 'organization' | 'jobTitle' | 'meetingCode' | 'meetingPassword', string>>;
+type FieldErrors = Partial<Record<'name' | 'email' | 'password' | 'confirmPassword' | 'phoneNumber' | 'organization' | 'jobTitle' | 'country' | 'city' | 'birthDate' | 'birthPlace' | 'address' | 'meetingCode' | 'meetingPassword', string>>;
 
 const passwordStrengthError = (password: string) => {
   if (password.length < 10) return 'Le mot de passe doit contenir au moins 10 caractères.';
@@ -263,15 +265,21 @@ const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.
 export default function Login({ initialView = 'login' }: LoginProps) {
   const [language, setLanguage] = useState<Language>('fr');
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => localStorage.getItem('mboteroom-remember-me') === 'true' ? (localStorage.getItem('mboteroom-remember-email') || '') : '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [organization, setOrganization] = useState('');
   const [jobTitle, setJobTitle] = useState('');
+  const [country, setCountry] = useState('');
+  const [city, setCity] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [birthPlace, setBirthPlace] = useState('');
+  const [address, setAddress] = useState('');
+  const [isRegisterModalOpen, setRegisterModalOpen] = useState(false);
   const [forgotMessage, setForgotMessage] = useState('');
   const [resetComplete, setResetComplete] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('mboteroom-remember-me') === 'true');
   const [guestName, setGuestName] = useState('');
   const [meetingCode, setMeetingCode] = useState('');
   const [meetingPassword, setMeetingPassword] = useState('');
@@ -300,6 +308,12 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     return (hash.get('reset') || searchParams.get('token') || '').trim();
   });
+
+  useEffect(() => {
+    localStorage.setItem('mboteroom-remember-me', String(rememberMe));
+    if (rememberMe && email.trim()) localStorage.setItem('mboteroom-remember-email', email.trim());
+    if (!rememberMe) localStorage.removeItem('mboteroom-remember-email');
+  }, [email, rememberMe]);
 
   useEffect(() => {
     if (!resetToken) return;
@@ -455,8 +469,14 @@ export default function Login({ initialView = 'login' }: LoginProps) {
         phoneNumber: phoneNumber.trim(),
         organization: organization.trim(),
         jobTitle: jobTitle.trim(),
+        country: country.trim(),
+        city: city.trim(),
+        birthDate,
+        birthPlace: birthPlace.trim(),
+        address: address.trim(),
       });
       setPassword('');
+      setRegisterModalOpen(false);
       setRegistrationSuccess({ email: email.trim(), welcomeEmailSent: result.welcomeEmailSent });
     } catch (submitError) {
       setFormError(submitError instanceof Error ? submitError.message : 'Création de compte impossible.');
@@ -614,6 +634,44 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     }
   };
 
+  const renderRegistrationFields = () => (
+    <>
+      <FormField id="register-name" label="Nom complet" icon={<User size={21} aria-hidden="true" />} error={fieldErrors.name}>
+        <input id="register-name" value={name} placeholder="Ex : Marie Louka" autoComplete="name" onChange={(event) => { setName(event.target.value); clearErrors(); }} />
+      </FormField>
+      <FormField id="register-email" label="Adresse e-mail" icon={<Mail size={21} aria-hidden="true" />} error={fieldErrors.email}>
+        <input id="register-email" type="email" value={email} placeholder="exemple@mail.com" autoComplete="email" onChange={(event) => { setEmail(event.target.value); clearErrors(); }} />
+      </FormField>
+      <FormField id="register-phone" label="Téléphone" icon={<Phone size={21} aria-hidden="true" />} error={fieldErrors.phoneNumber}>
+        <input id="register-phone" type="tel" value={phoneNumber} placeholder="+242 06 000 00 00" autoComplete="tel" onChange={(event) => { setPhoneNumber(event.target.value); clearErrors(); }} />
+      </FormField>
+      <FormField id="register-country" label="Pays" icon={<Globe2 size={21} aria-hidden="true" />} error={fieldErrors.country}>
+        <input id="register-country" value={country} placeholder="Ex : Congo-Brazzaville" autoComplete="country-name" onChange={(event) => { setCountry(event.target.value); clearErrors(); }} />
+      </FormField>
+      <FormField id="register-city" label="Ville" icon={<MapPin size={21} aria-hidden="true" />} error={fieldErrors.city}>
+        <input id="register-city" value={city} placeholder="Ex : Brazzaville" autoComplete="address-level2" onChange={(event) => { setCity(event.target.value); clearErrors(); }} />
+      </FormField>
+      <FormField id="register-birth-date" label="Date de naissance" icon={<CalendarDays size={21} aria-hidden="true" />} error={fieldErrors.birthDate}>
+        <input id="register-birth-date" type="date" value={birthDate} max={new Date().toISOString().slice(0, 10)} autoComplete="bday" onChange={(event) => { setBirthDate(event.target.value); clearErrors(); }} />
+      </FormField>
+      <FormField id="register-birth-place" label="Lieu de naissance" icon={<MapPin size={21} aria-hidden="true" />} error={fieldErrors.birthPlace}>
+        <input id="register-birth-place" value={birthPlace} placeholder="Ex : Pointe-Noire" onChange={(event) => { setBirthPlace(event.target.value); clearErrors(); }} />
+      </FormField>
+      <FormField id="register-address" label="Adresse" icon={<MapPin size={21} aria-hidden="true" />} error={fieldErrors.address}>
+        <input id="register-address" value={address} placeholder="Quartier, rue ou avenue" autoComplete="street-address" onChange={(event) => { setAddress(event.target.value); clearErrors(); }} />
+      </FormField>
+      <FormField id="register-organization" label="Organisation" icon={<Building2 size={21} aria-hidden="true" />} error={fieldErrors.organization}>
+        <input id="register-organization" value={organization} placeholder="Entreprise, école ou équipe" autoComplete="organization" onChange={(event) => { setOrganization(event.target.value); clearErrors(); }} />
+      </FormField>
+      <FormField id="register-job-title" label="Fonction" icon={<Sparkles size={21} aria-hidden="true" />} error={fieldErrors.jobTitle}>
+        <input id="register-job-title" value={jobTitle} placeholder="Ex : Chef de projet" autoComplete="organization-title" onChange={(event) => { setJobTitle(event.target.value); clearErrors(); }} />
+      </FormField>
+      <FormField id="register-password" label="Mot de passe" icon={<Lock size={21} aria-hidden="true" />} error={fieldErrors.password}>
+        <input id="register-password" type="password" value={password} placeholder="10 caractères minimum" autoComplete="new-password" onChange={(event) => { setPassword(event.target.value); clearErrors(); }} />
+      </FormField>
+    </>
+  );
+
   return (
     <main className="login-page" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <section className="login-shell" aria-label="Connexion MBotéRoom">
@@ -689,7 +747,12 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                     <input
                       type="checkbox"
                       checked={rememberMe}
-                      onChange={(event) => setRememberMe(event.target.checked)}
+                      onChange={(event) => {
+                        const nextValue = event.target.checked;
+                        setRememberMe(nextValue);
+                        localStorage.setItem('mboteroom-remember-me', String(nextValue));
+                        if (!nextValue) localStorage.removeItem('mboteroom-remember-email');
+                      }}
                     />
                     <span aria-hidden="true" />
                     {copy.remember}
@@ -738,7 +801,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
 
                 <p className="create-account-copy">
                   {copy.noAccount}
-                  <button type="button" onClick={() => navigate('/inscription')}>
+                  <button type="button" onClick={() => { clearErrors(); setRegisterModalOpen(true); }} aria-haspopup="dialog">
                     {copy.createAccount}
                   </button>
                 </p>
@@ -757,24 +820,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
               loadingLabel="Création en cours..."
               footer={<AuthFooterAction label="Déjà un compte ?" action="Se connecter" onClick={() => navigate('/connexion')} />}
             >
-              <FormField id="register-name" label="Nom complet" icon={<User size={21} aria-hidden="true" />} error={fieldErrors.name}>
-                <input id="register-name" value={name} placeholder="Ex : Marie Louka" autoComplete="name" onChange={(event) => { setName(event.target.value); clearErrors(); }} />
-              </FormField>
-              <FormField id="register-email" label="Adresse e-mail" icon={<Mail size={21} aria-hidden="true" />} error={fieldErrors.email}>
-                <input id="register-email" type="email" value={email} placeholder="exemple@mail.com" autoComplete="email" onChange={(event) => { setEmail(event.target.value); clearErrors(); }} />
-              </FormField>
-              <FormField id="register-phone" label="Téléphone" icon={<Phone size={21} aria-hidden="true" />} error={fieldErrors.phoneNumber}>
-                <input id="register-phone" type="tel" value={phoneNumber} placeholder="+242 06 000 00 00" autoComplete="tel" onChange={(event) => { setPhoneNumber(event.target.value); clearErrors(); }} />
-              </FormField>
-              <FormField id="register-organization" label="Organisation" icon={<Building2 size={21} aria-hidden="true" />} error={fieldErrors.organization}>
-                <input id="register-organization" value={organization} placeholder="Entreprise, école ou équipe" autoComplete="organization" onChange={(event) => { setOrganization(event.target.value); clearErrors(); }} />
-              </FormField>
-              <FormField id="register-job-title" label="Fonction" icon={<Sparkles size={21} aria-hidden="true" />} error={fieldErrors.jobTitle}>
-                <input id="register-job-title" value={jobTitle} placeholder="Ex : Chef de projet" autoComplete="organization-title" onChange={(event) => { setJobTitle(event.target.value); clearErrors(); }} />
-              </FormField>
-              <FormField id="register-password" label="Mot de passe" icon={<Lock size={21} aria-hidden="true" />} error={fieldErrors.password}>
-                <input id="register-password" type="password" value={password} placeholder="10 caractères minimum" autoComplete="new-password" onChange={(event) => { setPassword(event.target.value); clearErrors(); }} />
-              </FormField>
+              {renderRegistrationFields()}
             </CompactAuthCard>
           )}
 
@@ -892,6 +938,34 @@ export default function Login({ initialView = 'login' }: LoginProps) {
         })}
         <div className="login-created-by">MBotéRoom est une application créée par <strong>LoukaTech</strong>.</div>
       </footer>
+
+      {isRegisterModalOpen && !registrationSuccess && (
+        <div
+          className="auth-modal-backdrop registration-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setRegisterModalOpen(false);
+          }}
+        >
+          <section className="auth-modal registration-modal" role="dialog" aria-modal="true" aria-labelledby="registration-modal-title">
+            <button className="registration-modal-close" type="button" aria-label="Fermer la création de compte" onClick={() => setRegisterModalOpen(false)}>×</button>
+            <header className="registration-modal-header">
+              <span className="auth-card-kicker">Nouveau compte MBotéRoom</span>
+              <h2 id="registration-modal-title">Créer un compte</h2>
+              <p>Renseignez vos informations pour créer votre espace sécurisé.</p>
+            </header>
+            <form className="login-form registration-modal-form" onSubmit={submitRegister} noValidate>
+              <div className="registration-modal-grid">
+                {renderRegistrationFields()}
+              </div>
+              {formError && <p className="auth-error" role="alert">{formError}</p>}
+              <button className="primary-login-button" type="submit" disabled={isLoading}>
+                {isLoading ? 'Création en cours...' : 'Créer le compte'}
+              </button>
+            </form>
+          </section>
+        </div>
+      )}
 
       {registrationSuccess && (
         <div className="auth-modal-backdrop" role="presentation">
