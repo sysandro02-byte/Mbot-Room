@@ -172,7 +172,7 @@ export default function RealMeetingList(){
   const remove=async(meeting:Meeting)=>{setBusyId(meeting.id);try{await meetingService.deleteMeeting(meeting.id);setMeetings((current)=>current.filter((item)=>item.id!==meeting.id));setDeleteTarget(null);setOpenMenuId(null);setNotice('Réunion supprimée de votre liste.');}catch(cause){setError(cause instanceof Error?cause.message:'Suppression impossible.');}finally{setBusyId(null);}};
   const copy=async(meeting:Meeting)=>{setOpenMenuId(null);try{await navigator.clipboard.writeText(getMeetingJoinUrl(meeting));setNotice('Lien de réunion copié.');}catch{setError('Impossible de copier le lien.');}};
 
-  return <section className="real-meeting-page">
+  return <section className="real-meeting-page" onMouseDown={(event)=>{if(openMenuId&&!(event.target as HTMLElement).closest('.real-meeting-menu-wrap'))setOpenMenuId(null);}}>
     <header className="real-meeting-head"><div><h1>Réunions</h1><p>Planifiez, organisez et rejoignez vos réunions depuis cet espace.</p></div><div><button className="secondary" onClick={()=>void load()}><RefreshCw size={17}/> Actualiser</button><button onClick={()=>setShowCreate(true)}><Plus size={17}/> Nouvelle réunion</button></div></header>
     {notice?<div className="real-meeting-notice">{notice}</div>:null}{error?<div className="real-meeting-error">{error}</div>:null}
     {loading?<div className="real-meeting-empty">Chargement des réunions…</div>:null}
