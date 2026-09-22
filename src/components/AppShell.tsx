@@ -19,6 +19,9 @@ import {
   Search,
   Settings,
   Sparkles,
+  Download,
+  MonitorSmartphone,
+  Smartphone,
   SquareArrowOutUpRight,
   UsersRound,
   X,
@@ -150,6 +153,13 @@ export default function AppShell({ children, title }: AppShellProps) {
 
         <div className="app-shell-sidebar-main">{renderNav(primaryNavItems, 'Navigation principale')}</div>
         <div className="app-shell-sidebar-secondary">{renderNav(secondaryNavItems, 'Navigation secondaire')}</div>
+
+        <section className="app-shell-pwa-card">
+          <div className="app-shell-pwa-visual" aria-hidden="true"><MonitorSmartphone size={34}/><Smartphone size={23}/></div>
+          <strong>Toujours connecté</strong>
+          <p>Accédez à vos réunions depuis tous vos appareils.</p>
+          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('mboteroom-install-request'))}><Download size={15}/> Installer l’application</button>
+        </section>
 
         <div className="app-shell-creator">MBotéRoom application créée par <strong>LoukaTech</strong>.</div>
 
