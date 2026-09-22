@@ -336,6 +336,10 @@ try {
 
   const host = await register('Hôte Integration', 'host.integration@mbote.test');
   assert.equal(host.user.role, 'admin');
+  const hostWelcomeMail = mailRelayRequests.at(-1);
+  assert.equal(hostWelcomeMail?.body?.to, 'host.integration@mbote.test');
+  assert.match(String(hostWelcomeMail?.body?.subject || ''), /Bienvenue sur MBotéRoom/i);
+  assert.doesNotMatch(String(hostWelcomeMail?.body?.text || ''), /Password2026!/i, 'Welcome email must never expose the password');
 
   const browserLogin = await jsonRequest('/api/auth/login', {
     method: 'POST',
@@ -346,12 +350,39 @@ try {
     }),
   });
   assert.equal(browserLogin.response.status, 200, JSON.stringify(browserLogin.data));
-  assert.equal(browserLogin.data.token, undefined, 'Browser session must not expose a bearer token');
-  const browserSetCookie = browserLogin.response.headers.get('set-cookie') || '';
+  assert.equal(browserLogin.data.otpRequired, true);
+  assert.ok(browserLogin.data.challengeId);
+  assert.equal(browserLogin.response.headers.get('set-cookie'), null, 'Password step must not create a session before OTP');
+  const browserOtpMail = mailRelayRequests.at(-1);
+  assert.equal(browserOtpMail?.body?.to, 'host.integration@mbote.test');
+  const browserOtp = String(browserOtpMail?.body?.text || '').match(/\b\d{6}\b/)?.[0];
+  assert.ok(browserOtp, 'Login OTP email must contain a six-digit code');
+
+  const wrongBrowserOtp = await jsonRequest('/api/auth/login/otp', {
+    method: 'POST',
+    body: JSON.stringify({ challengeId: browserLogin.data.challengeId, code: '000000' }),
+  });
+  assert.equal(wrongBrowserOtp.response.status, 401);
+  assert.equal(wrongBrowserOtp.data.code, 'OTP_INVALID');
+
+  const browserOtpVerify = await jsonRequest('/api/auth/login/otp', {
+    method: 'POST',
+    body: JSON.stringify({ challengeId: browserLogin.data.challengeId, code: browserOtp }),
+  });
+  assert.equal(browserOtpVerify.response.status, 200, JSON.stringify(browserOtpVerify.data));
+  assert.equal(browserOtpVerify.data.token, undefined, 'Browser OTP session must not expose a bearer token');
+  const browserSetCookie = browserOtpVerify.response.headers.get('set-cookie') || '';
   assert.match(browserSetCookie, /mbote_room_session=/);
   assert.match(browserSetCookie, /HttpOnly/i);
   assert.match(browserSetCookie, /SameSite=Lax/i);
   const browserCookie = browserSetCookie.split(';')[0];
+
+  const reusedBrowserOtp = await jsonRequest('/api/auth/login/otp', {
+    method: 'POST',
+    body: JSON.stringify({ challengeId: browserLogin.data.challengeId, code: browserOtp }),
+  });
+  assert.equal(reusedBrowserOtp.response.status, 400);
+  assert.equal(reusedBrowserOtp.data.code, 'OTP_EXPIRED');
 
   const browserMe = await jsonRequest('/api/auth/me', { headers: { Cookie: browserCookie } });
   assert.equal(browserMe.response.status, 200, JSON.stringify(browserMe.data));
@@ -366,16 +397,19 @@ try {
   assert.equal(browserMeAfterLogout.response.status, 401);
 
   const passwordResetUser = await register('Compte Réinitialisation', 'reset.integration@mbote.test');
+  const mailsBeforeReset = mailRelayRequests.length;
   const forgotPassword = await jsonRequest('/api/auth/forgot-password', {
     method: 'POST',
     body: JSON.stringify({ email: 'reset.integration@mbote.test' }),
   });
   assert.equal(forgotPassword.response.status, 200, JSON.stringify(forgotPassword.data));
   assert.equal(forgotPassword.data.success, true);
-  assert.equal(mailRelayRequests.length, 1);
-  assert.equal(mailRelayRequests[0].secret, 'integration-mail-secret');
-  assert.equal(mailRelayRequests[0].body.to, 'reset.integration@mbote.test');
-  const resetLink = String(mailRelayRequests[0].body.text || '').match(/https?:\/\/\S+/)?.[0];
+  assert.equal(mailRelayRequests.length, mailsBeforeReset + 1);
+  const resetMail = mailRelayRequests.at(-1);
+  assert.equal(resetMail.secret, 'integration-mail-secret');
+  assert.equal(resetMail.body.to, 'reset.integration@mbote.test');
+  assert.match(String(resetMail.body.subject || ''), /Réinitialisez votre mot de passe MBotéRoom/i);
+  const resetLink = String(resetMail.body.text || '').match(/https?:\/\/\S+/)?.[0];
   assert.ok(resetLink, 'Password reset email must contain a link');
   const resetUrl = new URL(resetLink);
   assert.equal(resetUrl.origin, baseUrl);
@@ -416,7 +450,18 @@ try {
     body: JSON.stringify({ email: 'reset.integration@mbote.test', password: 'NouveauPassword2026!' }),
   });
   assert.equal(newPasswordLogin.response.status, 200, JSON.stringify(newPasswordLogin.data));
-  assert.ok(newPasswordLogin.data.token);
+  assert.equal(newPasswordLogin.data.otpRequired, true);
+  assert.ok(newPasswordLogin.data.challengeId);
+  const resetLoginOtpMail = mailRelayRequests.at(-1);
+  const resetLoginOtp = String(resetLoginOtpMail?.body?.text || '').match(/\b\d{6}\b/)?.[0];
+  assert.ok(resetLoginOtp, 'Password login after reset must send an OTP');
+  const newPasswordOtpVerify = await jsonRequest('/api/auth/login/otp', {
+    method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+    body: JSON.stringify({ challengeId: newPasswordLogin.data.challengeId, code: resetLoginOtp }),
+  });
+  assert.equal(newPasswordOtpVerify.response.status, 200, JSON.stringify(newPasswordOtpVerify.data));
+  assert.ok(newPasswordOtpVerify.data.token);
 
   const resetUserOldSession = await jsonRequest('/api/auth/me', { headers: authHeaders(passwordResetUser.token) });
   assert.equal(resetUserOldSession.response.status, 401, 'Password reset must revoke existing sessions');
