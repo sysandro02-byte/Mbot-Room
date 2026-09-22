@@ -394,14 +394,22 @@ try {
   });
   assert.equal(browserActivity.response.status, 204, JSON.stringify(browserActivity.data));
 
-  const idleUser = await register('Session Idle', 'idle.integration@mbote.test');
+  const idleToken = crypto.randomBytes(32).toString('base64url');
+  const idleNow = new Date();
   const idleDb = new pg.Pool({ connectionString: databaseUrl, ssl: false });
   await idleDb.query(
-    `UPDATE room_sessions SET last_activity=now()-interval '6 minutes' WHERE token_hash=$1`,
-    [crypto.createHash('sha256').update(idleUser.token).digest('hex')],
+    `INSERT INTO room_sessions (token_hash,user_id,created_at,expires_at,last_activity)
+     VALUES ($1,$2,$3,$4,$5)`,
+    [
+      crypto.createHash('sha256').update(idleToken).digest('hex'),
+      host.user.id,
+      idleNow.toISOString(),
+      new Date(idleNow.getTime()+60*60_000).toISOString(),
+      new Date(idleNow.getTime()-6*60_000).toISOString(),
+    ],
   );
   await idleDb.end();
-  const idleExpired = await jsonRequest('/api/auth/me', { headers: authHeaders(idleUser.token) });
+  const idleExpired = await jsonRequest('/api/auth/me', { headers: authHeaders(idleToken) });
   assert.equal(idleExpired.response.status, 401, 'Server must reject a session inactive for more than five minutes');
 
   const browserLogout = await jsonRequest('/api/auth/logout', {
