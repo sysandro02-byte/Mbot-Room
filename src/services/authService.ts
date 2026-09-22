@@ -117,6 +117,28 @@ const postAuth = async (path: string, body: unknown): Promise<AuthResponse> => {
 };
 
 export const authService = {
+  async adminRegister(payload: { name: string; email: string; password: string; username?: string; phoneNumber?: string; organization?: string; jobTitle?: string }) {
+    const response = await fetchAuth(apiUrl('/api/auth/admin/register'), {
+      method: 'POST',
+      headers: authRequestHeaders(),
+      body: JSON.stringify(payload),
+      credentials: 'include',
+    });
+    const result = await readJson(response);
+    if (!response.ok) throw new Error(result.error || 'Création du compte administrateur impossible.');
+    const session = {
+      user: normalizeUser(result.user),
+      token: String(result.token || ''),
+      expiresAt: typeof result.expiresAt === 'string' ? result.expiresAt : undefined,
+    };
+    saveSession(session, true);
+    return {
+      ...session,
+      accountCreated: Boolean(result.accountCreated),
+      welcomeEmailSent: Boolean(result.welcomeEmailSent),
+    };
+  },
+
   async register(payload: { name: string; email: string; password: string; username?: string; phoneNumber?: string; organization?: string; jobTitle?: string }) {
     const response = await fetchAuth(apiUrl('/api/auth/register'), {
       method: 'POST',
