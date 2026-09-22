@@ -282,7 +282,9 @@
   .home-meeting-menu{position:fixed;left:12px;right:12px;top:auto;bottom:calc(82px + env(safe-area-inset-bottom));width:auto}
   .home-luna-actions{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:2px}
   .home-luna-actions button{min-width:190px;scroll-snap-align:start}
-  .home-quick-access{display:none}
+  .home-quick-access{display:block}
+  .home-quick-access>div:last-child{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .home-quick-access>div:last-child button{min-height:72px;font-size:10px}
   .home-recent-meetings{display:none}
   .home-feature-banner{display:none}
   .home-notification-callout{width:100%;box-sizing:border-box;text-align:center;border-radius:14px}
