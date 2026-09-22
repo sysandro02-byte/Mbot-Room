@@ -1063,11 +1063,7 @@ function AuthBrandPanel({
         )}
       </div>
       <button className="mbote-logo admin-entry" type="button" aria-label="Ouvrir la connexion administrateur" title="Administration" onClick={() => navigateToAdmin('/admin/login')}>
-        <span className="mbote-logo-icon">
-          <UsersRound size={30} aria-hidden="true" />
-          <Video size={18} className="mbote-logo-video" aria-hidden="true" />
-        </span>
-        <strong><span>MBoté</span><span>Room</span></strong>
+        <img className="mboteroom-wordmark" src="/icons/mboteroom-wordmark.png" alt="MBotéRoom" />
       </button>
 
       <div className="brand-panel-copy">
@@ -1120,7 +1116,7 @@ function MeetingIllustration() {
       </div>
       <div className="illustration-phone">
         <span className="phone-speaker" />
-        <span className="phone-logo"><UsersRound size={17} /></span>
+        <span className="phone-logo"><img src="/icons/mboteroom-symbol.png" alt="" /></span>
         <strong>MBotéRoom</strong>
       </div>
     </div>

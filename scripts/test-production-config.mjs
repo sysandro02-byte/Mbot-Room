@@ -170,14 +170,17 @@ for (const source of [appRoutes, sfuRoutes]) {
 
 const manifestPath = new URL('../public/manifest.webmanifest', import.meta.url);
 const serviceWorkerPath = new URL('../public/sw.js', import.meta.url);
-const icon192Path = new URL('../public/icons/mbote-room-192.png', import.meta.url);
-const icon512Path = new URL('../public/icons/mbote-room-512.png', import.meta.url);
-if (!fs.existsSync(manifestPath) || !fs.existsSync(serviceWorkerPath) || !fs.existsSync(icon192Path) || !fs.existsSync(icon512Path)) {
-  throw new Error('Installable PWA manifest, service worker and standard icons are required');
+if (!fs.existsSync(manifestPath) || !fs.existsSync(serviceWorkerPath)) {
+  throw new Error('Installable PWA manifest and service worker are required');
 }
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 if (!manifest.icons?.some((icon) => icon.sizes === '192x192') || !manifest.icons?.some((icon) => icon.sizes === '512x512')) {
   throw new Error('PWA manifest must expose 192x192 and 512x512 icons');
+}
+for (const icon of manifest.icons) {
+  if (!/^\/icons\/[a-z0-9-]+\.png$/.test(icon.src) || !fs.existsSync(new URL(`../public${icon.src}`, import.meta.url))) {
+    throw new Error(`PWA icon referenced by the manifest is missing: ${icon.src}`);
+  }
 }
 if (manifest.id !== '/app' || !String(manifest.start_url || '').startsWith('/app') || manifest.scope !== '/' || manifest.display !== 'standalone') {
   throw new Error('PWA manifest must use a stable app identity, an in-scope start URL and standalone display');

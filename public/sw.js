@@ -1,11 +1,13 @@
-const CACHE_VERSION = 'mboteroom-shell-v3';
+const CACHE_VERSION = 'mboteroom-shell-v4-brand';
 const SHELL = [
   '/',
   '/app',
   '/manifest.webmanifest',
-  '/icons/mbote-room.svg',
-  '/icons/mbote-room-192.png',
-  '/icons/mbote-room-512.png',
+  '/icons/mboteroom-favicon.png',
+  '/icons/mboteroom-maskable-512.png',
+  '/icons/mboteroom-apple-180.png',
+  '/icons/mboteroom-192.png',
+  '/icons/mboteroom-512.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -29,8 +31,8 @@ const isApiRequest = (url) =>
   url.pathname.startsWith('/socket.io/');
 
 const offlineDocument = () => new Response(`<!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#3156eb"><title>MBotéRoom hors connexion</title>
-<style>body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:24px;background:#f6f8ff;color:#17213c;font-family:system-ui,-apple-system,sans-serif}.c{max-width:420px;text-align:center;background:#fff;padding:28px;border:1px solid #dfe6f3;border-radius:22px;box-shadow:0 18px 50px rgba(20,34,76,.1)}h1{margin:12px 0 8px;font-size:25px}p{color:#68758e;line-height:1.6}button{border:0;border-radius:12px;background:#3156eb;color:#fff;padding:12px 18px;font-weight:800}.b{font-size:12px;color:#8994a8;margin-top:18px}</style></head>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0d3156"><title>MBotéRoom hors connexion</title>
+<style>body{margin:0;min-height:100dvh;display:grid;place-items:center;padding:24px;background:#f6f8ff;color:#17213c;font-family:system-ui,-apple-system,sans-serif}.c{max-width:420px;text-align:center;background:#fff;padding:28px;border:1px solid #dfe6f3;border-radius:22px;box-shadow:0 18px 50px rgba(20,34,76,.1)}h1{margin:12px 0 8px;font-size:25px}p{color:#68758e;line-height:1.6}button{border:0;border-radius:12px;background:#007e83;color:#fff;padding:12px 18px;font-weight:800}.b{font-size:12px;color:#8994a8;margin-top:18px}</style></head>
 <body><section class="c"><div style="font-size:36px">📶</div><h1>Vous êtes hors connexion</h1><p>MBotéRoom reste accessible pour les éléments déjà chargés. Reconnectez-vous pour rejoindre une réunion, synchroniser vos données ou recevoir les dernières mises à jour.</p><button onclick="location.reload()">Réessayer</button><div class="b">MBotéRoom · créée par LoukaTech</div></section></body></html>`, {
   headers: { 'Content-Type': 'text/html; charset=utf-8' },
 });
@@ -81,8 +83,8 @@ self.addEventListener('push', (event) => {
     body: 'Vous avez une nouvelle notification.',
     url: '/app/notifications',
     tag: 'mboteroom',
-    icon: '/icons/mbote-room-192.png',
-    badge: '/icons/mbote-room-192.png',
+    icon: '/icons/mboteroom-192.png',
+    badge: '/icons/mboteroom-192.png',
     data: {},
   };
   if (event.data) {
@@ -95,8 +97,8 @@ self.addEventListener('push', (event) => {
   const data = { ...(payload.data || {}), url: payload.url || payload.data?.url || '/app/notifications' };
   event.waitUntil(self.registration.showNotification(payload.title || 'MBotéRoom', {
     body: payload.body || '',
-    icon: payload.icon || '/icons/mbote-room-192.png',
-    badge: payload.badge || '/icons/mbote-room-192.png',
+    icon: payload.icon || '/icons/mboteroom-192.png',
+    badge: payload.badge || '/icons/mboteroom-192.png',
     tag: payload.tag || 'mboteroom',
     data,
     renotify: true,

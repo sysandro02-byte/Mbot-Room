@@ -463,10 +463,7 @@ export default function GuestWaitingRoomPage() {
     <main className="guest-waiting-page">
       <header className="waiting-header">
         <Link className="waiting-brand" to="/rejoindre-une-reunion" aria-label="Accueil MBotéRoom">
-          <span className="waiting-brand-logo">
-            <UsersRound size={27} aria-hidden="true" />
-            <Video className="waiting-brand-camera" size={15} aria-hidden="true" />
-          </span>
+          <span className="waiting-brand-logo"><img src="/icons/mboteroom-symbol.png" alt="" /></span>
           <strong>MBoté<span>Room</span></strong>
         </Link>
 

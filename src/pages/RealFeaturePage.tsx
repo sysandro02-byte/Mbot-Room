@@ -44,7 +44,7 @@ export default function RealFeaturePage({kind}:Props){
   const [whiteboards,setWhiteboards]=useState<Whiteboard[]>([]);
   const [activeWhiteboard,setActiveWhiteboard]=useState<Whiteboard|null>(null);
   const [strokes,setStrokes]=useState<WhiteboardStroke[]>([]);
-  const [brushColor,setBrushColor]=useState('#3156eb');
+  const [brushColor,setBrushColor]=useState('#007e83');
   const [profile,setProfile]=useState({name:currentUser?.name||'',username:currentUser?.username||'',avatar:currentUser?.avatar||'',phoneNumber:currentUser?.phoneNumber||'',organization:currentUser?.organization||'',jobTitle:currentUser?.jobTitle||''});
   const canvasRef=useRef<HTMLCanvasElement|null>(null);
   const drawingRef=useRef<WhiteboardStroke|null>(null);

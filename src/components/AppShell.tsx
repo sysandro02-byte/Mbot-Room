@@ -96,7 +96,7 @@ export default function AppShell({ children, title }: AppShellProps) {
           <X size={22} aria-hidden="true" />
         </button>
         <Link className="app-shell-logo" to="/app" onClick={() => setMenuOpen(false)}>
-          <span><UsersRound size={28} /><Video size={13} /></span>
+          <span><img src="/icons/mboteroom-symbol.png" alt="" /></span>
           <strong>MBoté<span>Room</span><small>Réunions sécurisées</small></strong>
         </Link>
         <nav className="app-shell-nav" aria-label="Navigation principale">

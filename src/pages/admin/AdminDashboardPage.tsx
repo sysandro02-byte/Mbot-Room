@@ -474,7 +474,7 @@ function AdminSidebar({ userName, open, onClose }: { userName: string; open: boo
     <aside className={`admin-sidebar ${open ? 'is-open' : ''}`}>
       <button className="admin-sidebar-close" type="button" aria-label="Fermer le menu" onClick={onClose}><X size={20} /></button>
       <Link className="admin-brand" to="/admin">
-        <span><UsersRound size={27} /><Video size={15} /></span>
+        <span><img src="/icons/mboteroom-symbol.png" alt="" /></span>
         <strong>MBoté<span>Room</span><small>Admin</small></strong>
       </Link>
       <nav className="admin-sidebar-nav" aria-label="Navigation administrateur">
@@ -687,7 +687,7 @@ function UsageStatisticsCard({ usage }: { usage: Array<{ label: string; meetings
       <header><h2>Statistiques d’utilisation</h2><span>7 derniers jours</span></header>
       <svg viewBox="0 0 620 230" role="img" aria-label="Courbes réunions et utilisateurs">
         <g className="admin-chart-grid">{[0, 1, 2, 3].map((line) => <line key={line} x1="34" x2="594" y1={30 + line * 48} y2={30 + line * 48} />)}</g>
-        <polyline points={meetingPoints} transform="translate(34 24)" fill="none" stroke="#2f5bea" strokeWidth="3" />
+        <polyline points={meetingPoints} transform="translate(34 24)" fill="none" stroke="#007e83" strokeWidth="3" />
         <polyline points={userPoints} transform="translate(34 24)" fill="none" stroke="#16a365" strokeWidth="3" />
       </svg>
       <div className="admin-usage-labels">{usage.slice(-7).map((item) => <span key={item.label}>{item.label}</span>)}</div>
@@ -699,7 +699,7 @@ function UserDistributionCard({ distribution }: { distribution: { active: number
   const total = distribution.active + distribution.guests + distribution.inactive + distribution.banned;
   const rows = [
     ['Utilisateurs actifs', distribution.active, '#16a365'],
-    ['Invités', distribution.guests, '#2f5bea'],
+    ['Invités', distribution.guests, '#007e83'],
     ['Inactifs', distribution.inactive, '#ff9f2f'],
     ['Bannis', distribution.banned, '#ef5350'],
   ] as const;

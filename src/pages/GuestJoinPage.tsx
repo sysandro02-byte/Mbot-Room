@@ -476,9 +476,7 @@ function GuestJoinHeader() {
   return (
     <header className="guest-join-header">
       <Link className="guest-brand" to="/app" aria-label="Accueil MBotéRoom">
-        <span className="guest-brand-icon">
-          <UsersRound size={28} aria-hidden="true" />
-        </span>
+        <span className="guest-brand-icon"><img src="/icons/mboteroom-symbol.png" alt="" /></span>
         <span className="guest-brand-copy">
           <strong><span>MBoté</span><span>Room</span></strong>
           <small>Réunions sécurisées</small>
@@ -597,7 +595,7 @@ function MeetingDevicesIllustration({ compact = false }: { compact?: boolean }) 
       </div>
       <div className="devices-phone">
         <span className="devices-speaker" />
-        <span className="devices-phone-logo"><UsersRound size={14} /></span>
+        <span className="devices-phone-logo"><img src="/icons/mboteroom-symbol.png" alt="" /></span>
         <strong>MBotéRoom</strong>
       </div>
     </div>

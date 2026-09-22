@@ -1,13 +1,13 @@
 :root {
-  --guest-primary: #214cff;
-  --guest-primary-dark: #101b40;
+  --guest-primary: #007e83;
+  --guest-primary-dark: #0d3156;
   --guest-text: #182346;
   --guest-muted: #617096;
   --guest-border: #dce3f0;
   --guest-success: #159447;
   --guest-success-soft: #eef9f1;
   --guest-danger: #d63e4a;
-  --guest-soft-blue: #eef2ff;
+  --guest-soft-blue: #e6f5f3;
   --guest-white: #ffffff;
 }
 
@@ -16,7 +16,7 @@
   overflow-x: hidden;
   color: var(--guest-text);
   background:
-    radial-gradient(circle at 18% 16%, rgba(33, 76, 255, 0.045), transparent 28%),
+    radial-gradient(circle at 18% 16%, rgba(0, 126, 131, 0.045), transparent 28%),
     #ffffff;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -50,8 +50,8 @@
   place-items: center;
   border-radius: 12px;
   color: #ffffff;
-  background: linear-gradient(145deg, #315ff5, #284cff 65%, #5438f0);
-  box-shadow: 0 8px 20px rgba(33, 76, 255, 0.22);
+  background: linear-gradient(145deg, #007e83, #008b8d 65%, #0d5663);
+  box-shadow: 0 8px 20px rgba(0, 126, 131, 0.22);
 }
 
 .guest-brand-copy strong {
@@ -90,7 +90,7 @@
   gap: 9px;
   padding: 0 20px;
   border-radius: 10px;
-  color: #1744f5;
+  color: #007e83;
   background: #e9edff;
   font-weight: 800;
 }
@@ -115,7 +115,7 @@
   border-radius: 10px;
   color: #ffffff;
   background: linear-gradient(100deg, #204cff, #244df1);
-  box-shadow: 0 12px 22px rgba(33, 76, 255, 0.18);
+  box-shadow: 0 12px 22px rgba(0, 126, 131, 0.18);
 }
 
 .guest-join-layout {
@@ -216,7 +216,7 @@
 
 .guest-input input:focus {
   border-color: var(--guest-primary);
-  box-shadow: 0 0 0 4px rgba(33, 76, 255, 0.1);
+  box-shadow: 0 0 0 4px rgba(0, 126, 131, 0.1);
 }
 
 .guest-input.has-error input {
@@ -284,8 +284,8 @@
   border: 0;
   border-radius: 8px;
   color: #ffffff;
-  background: linear-gradient(100deg, #1e48ff, #214cff);
-  box-shadow: 0 12px 24px rgba(33, 76, 255, 0.16);
+  background: linear-gradient(100deg, #1e48ff, #007e83);
+  box-shadow: 0 12px 24px rgba(0, 126, 131, 0.16);
   cursor: pointer;
   font-size: 17px;
   font-weight: 850;
@@ -294,7 +294,7 @@
 
 .guest-join-submit:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 16px 28px rgba(33, 76, 255, 0.22);
+  box-shadow: 0 16px 28px rgba(0, 126, 131, 0.22);
 }
 
 .guest-join-submit:disabled {
@@ -335,7 +335,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #0d44ff;
+  color: #007e83;
   text-decoration: none;
   font-weight: 850;
 }
@@ -428,7 +428,7 @@
   display: block;
   margin: 10px auto 0;
   border: 0;
-  color: #0d44ff;
+  color: #007e83;
   background: transparent;
   cursor: pointer;
   font-weight: 850;
@@ -482,7 +482,7 @@
 
 .information-card-icon.is-blue {
   color: #2451ff;
-  background: #edf2ff;
+  background: #e6f5f3;
 }
 
 .information-card-icon.is-soft {
@@ -495,7 +495,7 @@
   align-items: center;
   gap: 5px;
   margin-top: 13px;
-  color: #0d44ff;
+  color: #007e83;
   text-decoration: none;
   font-weight: 850;
 }
@@ -522,7 +522,7 @@
   padding: 0 12px;
   border: 1px solid #dce3ef;
   border-radius: 999px;
-  color: #1744f5;
+  color: #007e83;
   background: #ffffff;
   cursor: pointer;
   font-size: 12px;
@@ -530,7 +530,7 @@
 }
 
 .equipment-card-header button:hover {
-  background: #eef2ff;
+  background: #e6f5f3;
 }
 
 .equipment-list {
@@ -784,7 +784,7 @@
 .guest-join-page button:focus-visible,
 .guest-join-page a:focus-visible,
 .guest-join-page input:focus-visible {
-  outline: 3px solid rgba(33, 76, 255, 0.23);
+  outline: 3px solid rgba(0, 126, 131, 0.23);
   outline-offset: 2px;
 }
 
@@ -1009,22 +1009,22 @@
 .guest-access-image { width: 100%; max-width: 320px; max-height: 150px; object-fit: contain; justify-self: center; }
 .guest-access-controls { position: absolute; right: 18px; bottom: 14px; display: flex; align-items: center; gap: 6px; }
 .guest-access-controls button { width: 26px; height: 26px; padding: 0; border: 1px solid #c9d7f4; border-radius: 50%; background: #fff; color: #2452c8; cursor: pointer; }
-.guest-access-controls button.is-active { width: 8px; height: 8px; border: 0; background: #2f5bea; font-size: 0; }
+.guest-access-controls button.is-active { width: 8px; height: 8px; border: 0; background: #007e83; font-size: 0; }
 
 /* 2026 guest experience polish */
 .guest-join-page{background:radial-gradient(circle at 12% 12%,rgba(33,76,255,.075),transparent 27%),radial-gradient(circle at 88% 18%,rgba(95,65,246,.07),transparent 25%),linear-gradient(180deg,#fbfcff 0%,#f6f8fe 100%)}
 .guest-join-header{border:0;border-bottom:1px solid #e3e9f5;border-radius:0;box-shadow:0 8px 28px rgba(25,42,83,.04)}
 .guest-join-card,.recent-meetings-card,.guest-side-card{border-color:#dfe6f2;box-shadow:0 18px 45px rgba(20,38,84,.07)}
 .guest-join-card{position:relative;overflow:hidden}
-.guest-join-card::before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#214cff,#6250f5,#3a7bff)}
+.guest-join-card::before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#007e83,#6250f5,#3a7bff)}
 .guest-trust-strip{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 24px;padding:0 2px}
-.guest-trust-strip span{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid #dfe6f5;border-radius:999px;background:#f8faff;color:#516285;font-size:11px;font-weight:800}
-.guest-trust-strip svg{color:#214cff}
+.guest-trust-strip span{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid #dfe6f5;border-radius:999px;background:#f3faf9;color:#516285;font-size:11px;font-weight:800}
+.guest-trust-strip svg{color:#007e83}
 .guest-input{transition:border-color .16s ease,box-shadow .16s ease,background-color .16s ease}
 .guest-input:focus-within{border-color:#6d87ff;box-shadow:0 0 0 4px rgba(33,76,255,.10);background:#fff}
 .guest-join-submit{box-shadow:0 12px 28px rgba(33,76,255,.24);transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
 .guest-join-submit:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 16px 34px rgba(33,76,255,.29);filter:saturate(1.08)}
-.waiting-room-note{border:1px solid #dce5ff;background:linear-gradient(135deg,#f4f7ff,#fafbff)}
+.waiting-room-note{border:1px solid #dce5ff;background:linear-gradient(135deg,#eef9f7,#fafbff)}
 .guest-access-card{overflow:hidden;background:linear-gradient(145deg,#18264f,#2f50dc 67%,#6545ef);color:white}
 .guest-access-card h2,.guest-access-card p{color:white}
 .guest-access-card p{opacity:.82}

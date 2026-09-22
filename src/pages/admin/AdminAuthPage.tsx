@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Navigate, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Eye, EyeOff, KeyRound, LockKeyhole, Mail, ShieldCheck, UserRound, UsersRound, Video } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, KeyRound, LockKeyhole, Mail, ShieldCheck, UserRound } from 'lucide-react';
 import { authService } from '../../services/authService';
 import './AdminAuthPage.css';
 
@@ -90,7 +90,7 @@ export default function AdminAuthPage({mode='login'}:{mode?:Mode}){
   return <main className="admin-auth-page">
     <section className="admin-auth-visual">
       <Link to="/login" className="admin-auth-back"><ArrowLeft size={17}/> Connexion utilisateur</Link>
-      <div className="admin-auth-brand"><span><UsersRound size={30}/><Video size={16}/></span><strong>MBoté<span>Room</span><small>Backoffice</small></strong></div>
+      <div className="admin-auth-brand"><span><img src="/icons/mboteroom-symbol.png" alt="" /></span><strong>MBoté<span>Room</span><small>Backoffice</small></strong></div>
       <div className="admin-auth-copy"><span className="admin-auth-kicker"><ShieldCheck size={16}/> Espace réservé</span><h1>Pilotez MBotéRoom depuis un seul espace.</h1><p>Utilisateurs, réunions, contenus, accès et réglages généraux sont regroupés dans le backoffice.</p></div>
       <div className="admin-auth-points"><span>Gestion des utilisateurs</span><span>Contrôle des fonctions</span><span>Supervision des réunions</span><span>Contenus de l’application</span></div>
     </section>

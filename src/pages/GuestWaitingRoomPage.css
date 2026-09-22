@@ -1,12 +1,12 @@
 :root {
-  --waiting-primary: #304cf4;
+  --waiting-primary: #007e83;
   --waiting-dark: #111a39;
   --waiting-text: #1b2546;
   --waiting-muted: #687596;
   --waiting-border: #dfe5f1;
   --waiting-success: #159754;
   --waiting-danger: #e4464c;
-  --waiting-soft: #eef0ff;
+  --waiting-soft: #e6f5f3;
   --waiting-control: #101a2e;
 }
 
@@ -48,7 +48,7 @@
   place-items: center;
   border-radius: 10px;
   color: #fff;
-  background: linear-gradient(145deg, #315ff5, #284cff 65%, #5438f0);
+  background: linear-gradient(145deg, #007e83, #008b8d 65%, #0d5663);
 }
 
 .waiting-brand-camera {
@@ -57,7 +57,7 @@
   bottom: 12px;
   padding: 1px;
   border-radius: 4px;
-  background: #304cf4;
+  background: #007e83;
 }
 
 .waiting-brand strong {
@@ -118,7 +118,7 @@
 .waiting-create-account {
   min-width: 194px;
   color: #fff;
-  background: linear-gradient(100deg, #304cf4, #2546e6);
+  background: linear-gradient(100deg, #007e83, #2546e6);
 }
 
 .waiting-leave-button {
@@ -165,7 +165,7 @@
   place-items: center;
   border-radius: 50%;
   color: #fff;
-  background: linear-gradient(145deg, #435cf4, #304cf4);
+  background: linear-gradient(145deg, #435cf4, #007e83);
 }
 
 .waiting-spark {
@@ -255,7 +255,7 @@
 }
 
 .waiting-video-preview.background-gradient::before {
-  background: linear-gradient(135deg, #65c6ff, #304cf4 58%, #17224d);
+  background: linear-gradient(135deg, #65c6ff, #007e83 58%, #17224d);
 }
 
 .waiting-video-preview.background-custom::before {
@@ -388,7 +388,7 @@
   place-items: center;
   border-radius: 10px;
   color: var(--waiting-primary);
-  background: #eef0ff;
+  background: #e6f5f3;
 }
 
 .device-setting-title button {
@@ -849,7 +849,7 @@
 
 .device-settings-close:hover {
   border-color: #b9c7ee;
-  color: #315cf5;
+  color: #007e83;
   background: #f6f8ff;
 }
 
@@ -922,8 +922,8 @@
   margin: 0 auto 16px;
   place-items: center;
   border-radius: 50%;
-  background: #eef2ff;
-  color: #315cf5;
+  background: #e6f5f3;
+  color: #007e83;
 }
 
 .waiting-settings-modal h2 {
@@ -971,7 +971,7 @@
 
 .background-option-gradient {
   color: #fff;
-  background: linear-gradient(135deg, #65c6ff, #304cf4 62%, #17224d);
+  background: linear-gradient(135deg, #65c6ff, #007e83 62%, #17224d);
 }
 
 .background-option-blur {

@@ -1,13 +1,13 @@
 :root {
-  --mbote-blue: #2f5bea;
-  --mbote-blue-strong: #2448d8;
-  --mbote-indigo: #5237f4;
-  --mbote-dark: #101b3c;
+  --mbote-blue: #007e83;
+  --mbote-blue-strong: #006970;
+  --mbote-indigo: #0d5663;
+  --mbote-dark: #0d3156;
   --mbote-text: #172346;
   --mbote-muted: #63708f;
   --mbote-border: #dce2ef;
   --mbote-surface: #ffffff;
-  --mbote-page: #f7f9ff;
+  --mbote-page: #f3faf9;
   --mbote-success: #15965b;
   --mbote-success-soft: #effbf5;
   --mbote-danger: #d84040;
@@ -19,7 +19,7 @@
   --mbote-radius-lg: 16px;
   --mbote-shadow-soft: 0 14px 34px rgba(16, 27, 60, .07);
   --mbote-shadow-popover: 0 18px 44px rgba(16, 27, 60, .16);
-  --mbote-focus: 0 0 0 4px rgba(47, 91, 234, .16);
+  --mbote-focus: 0 0 0 4px rgba(0, 126, 131, .16);
   --mbote-button-height: 46px;
   --mbote-control-height: 44px;
   --mbote-ease: 180ms ease;
@@ -90,7 +90,7 @@ textarea:focus-visible {
 
 .dashboard-sidebar,
 .admin-sidebar {
-  background: radial-gradient(circle at 30% 0%, rgba(47, 91, 234, .22), transparent 30%), linear-gradient(180deg, var(--mbote-sidebar), var(--mbote-sidebar-2)) !important;
+  background: radial-gradient(circle at 30% 0%, rgba(0, 126, 131, .22), transparent 30%), linear-gradient(180deg, var(--mbote-sidebar), var(--mbote-sidebar-2)) !important;
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, .08);
 }
 
@@ -102,7 +102,7 @@ textarea:focus-visible {
 .waiting-brand-icon {
   border-radius: 12px !important;
   background: linear-gradient(135deg, var(--mbote-blue), var(--mbote-indigo)) !important;
-  box-shadow: 0 10px 22px rgba(47, 91, 234, .22) !important;
+  box-shadow: 0 10px 22px rgba(0, 126, 131, .22) !important;
 }
 
 .dashboard-sidebar-nav a,
@@ -176,7 +176,7 @@ textarea:focus-visible {
   border-radius: var(--mbote-radius-sm) !important;
   background: linear-gradient(135deg, var(--mbote-blue), var(--mbote-indigo)) !important;
   color: #fff !important;
-  box-shadow: 0 12px 24px rgba(47, 91, 234, .18) !important;
+  box-shadow: 0 12px 24px rgba(0, 126, 131, .18) !important;
 }
 
 .google-login-button,
@@ -294,7 +294,7 @@ textarea:focus-visible {
 .guest-tile-dropdown button:hover,
 .language-menu button:hover,
 .language-menu button.is-selected {
-  background: #eef3ff !important;
+  background: #e6f5f3 !important;
   color: var(--mbote-blue) !important;
 }
 
@@ -337,7 +337,7 @@ textarea,
 .waiting-controls,
 .meeting-room-controls {
   border-radius: var(--mbote-radius-lg) !important;
-  background: linear-gradient(180deg, #101b3c, #071226) !important;
+  background: linear-gradient(180deg, #0d3156, #071226) !important;
   box-shadow: 0 18px 42px rgba(5, 13, 30, .22) !important;
 }
 
@@ -379,7 +379,7 @@ textarea,
   border-radius: 12px !important;
   background: linear-gradient(135deg, var(--mbote-blue), var(--mbote-indigo)) !important;
   color: #fff !important;
-  box-shadow: 0 10px 22px rgba(47, 91, 234, .22) !important;
+  box-shadow: 0 10px 22px rgba(0, 126, 131, .22) !important;
 }
 
 .waiting-create-account,
@@ -412,7 +412,7 @@ textarea,
   border: 1px solid transparent !important;
   background: linear-gradient(135deg, var(--mbote-blue), var(--mbote-indigo)) !important;
   color: #fff !important;
-  box-shadow: 0 12px 24px rgba(47, 91, 234, .18) !important;
+  box-shadow: 0 12px 24px rgba(0, 126, 131, .18) !important;
 }
 
 .join-direct-btn,
@@ -531,7 +531,7 @@ textarea,
 .background-option.is-active,
 .background-option:focus-visible {
   border-color: var(--mbote-blue) !important;
-  background: #eef3ff !important;
+  background: #e6f5f3 !important;
   color: var(--mbote-blue) !important;
 }
 

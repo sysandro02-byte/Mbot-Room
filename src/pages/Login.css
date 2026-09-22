@@ -1,9 +1,9 @@
 :root {
-  --login-primary: #2f5bea;
-  --login-primary-dark: #101b3c;
+  --login-primary: #007e83;
+  --login-primary-dark: #0d3156;
   --login-text-muted: #63708f;
   --login-border: #dce2ef;
-  --login-background: #f7f9ff;
+  --login-background: #f3faf9;
   --login-success: #15965b;
   --login-success-soft: #effbf5;
   --login-danger: #d84040;
@@ -17,7 +17,7 @@
   overflow-x: hidden;
   color: var(--login-primary-dark);
   background:
-    radial-gradient(circle at 82% 16%, rgba(47, 91, 234, 0.05), transparent 27%),
+    radial-gradient(circle at 82% 16%, rgba(0, 126, 131, 0.05), transparent 27%),
     #ffffff;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -36,7 +36,7 @@
   border-right: 1px solid #edf0f8;
   background:
     radial-gradient(circle at 15% 8%, rgba(121, 113, 255, 0.08), transparent 33%),
-    linear-gradient(145deg, #ffffff 0%, #f9f9ff 47%, #f1f4ff 100%);
+    linear-gradient(145deg, #ffffff 0%, #f9f9ff 47%, #e6f5f3 100%);
 }
 
 .brand-panel::after {
@@ -58,7 +58,7 @@
   width: 93px;
   height: 93px;
   opacity: 0.55;
-  background-image: radial-gradient(circle, #cad5ff 2px, transparent 2.5px);
+  background-image: radial-gradient(circle, #b4dfda 2px, transparent 2.5px);
   background-size: 21px 21px;
 }
 
@@ -84,7 +84,7 @@
   place-items: center;
   border-radius: 13px;
   color: #ffffff;
-  background: linear-gradient(145deg, #315cec, #3d5bfa 60%, #543cf4);
+  background: linear-gradient(145deg, #007e83, #3d5bfa 60%, #0d5663);
   box-shadow: 0 10px 24px rgba(43, 76, 227, 0.25);
 }
 
@@ -94,7 +94,7 @@
   right: -9px;
   padding: 2px;
   border-radius: 4px;
-  background: #3154e9;
+  background: #007e83;
 }
 
 .mbote-logo strong {
@@ -392,7 +392,7 @@
 
 .language-selector > button:focus-visible,
 .language-menu button:focus-visible {
-  outline: 3px solid rgba(47, 91, 234, 0.22);
+  outline: 3px solid rgba(0, 126, 131, 0.22);
   outline-offset: 2px;
 }
 
@@ -438,7 +438,7 @@
 .language-menu button:hover,
 .language-menu button.is-selected {
   color: var(--login-blue);
-  background: #eef3ff;
+  background: #e6f5f3;
 }
 
 .language-selector svg:last-child {
@@ -717,13 +717,13 @@
 
 .mbote-auth-button {
   border-color: #cfd8ff;
-  color: #101b3c;
-  background: linear-gradient(180deg, #ffffff, #f7f9ff);
+  color: #0d3156;
+  background: linear-gradient(180deg, #ffffff, #f3faf9);
 }
 
 .mbote-auth-button:hover:not(:disabled) {
-  border-color: #2f5bea;
-  background: #f3f6ff;
+  border-color: #007e83;
+  background: #eef9f7;
 }
 
 .mbote-auth-button:disabled {
@@ -733,7 +733,7 @@
 
 .mbote-auth-spinner {
   flex: 0 0 auto;
-  color: #315cec;
+  color: #007e83;
   animation: mbote-auth-spin 800ms linear infinite;
 }
 
@@ -752,8 +752,8 @@
   place-items: center;
   border-radius: 8px;
   color: #ffffff;
-  background: linear-gradient(145deg, #315cec, #563cf4);
-  box-shadow: 0 7px 14px rgba(47, 91, 234, 0.18);
+  background: linear-gradient(145deg, #007e83, #563cf4);
+  box-shadow: 0 7px 14px rgba(0, 126, 131, 0.18);
 }
 
 .mbote-auth-icon svg:last-child {
@@ -762,7 +762,7 @@
   bottom: 7px;
   padding: 1px;
   border-radius: 3px;
-  background: #2f5bea;
+  background: #007e83;
 }
 
 .google-icon {
@@ -1155,14 +1155,14 @@
 .auth-modal-icon { display: grid; width: 54px; height: 54px; margin: 0 auto 18px; place-items: center; border-radius: 50%; background: #fff1f2; color: #dc2626; font-size: 30px; font-weight: 800; }
 .auth-modal h2 { margin: 0; color: #17213c; font-size: 22px; }
 .auth-modal p { margin: 12px 0 24px; color: #64748b; line-height: 1.6; }
-.auth-modal button { width: 100%; min-height: 46px; border: 0; border-radius: 12px; background: linear-gradient(135deg, #315cf5, #5437f5); color: #fff; font: inherit; font-weight: 750; cursor: pointer; }
+.auth-modal button { width: 100%; min-height: 46px; border: 0; border-radius: 12px; background: linear-gradient(135deg, #007e83, #0d5663); color: #fff; font: inherit; font-weight: 750; cursor: pointer; }
 .auth-modal button:focus-visible { outline: 3px solid rgba(49, 92, 245, .3); outline-offset: 3px; }
 
 .mbote-auth-flow { width: min(460px, calc(100vw - 32px)); text-align: left; }
 .mbote-credentials-form { display: grid; gap: 9px; }
 .mbote-credentials-form label { color: #52617f; font-size: 13px; font-weight: 800; }
 .mbote-credentials-form input { min-height: 46px; padding: 0 13px; border: 1px solid #d7dfed; border-radius: 10px; color: #172346; font: inherit; }
-.mbote-credentials-form input:focus { border-color: #2f5bea; outline: 3px solid rgba(47, 91, 234, .14); }
+.mbote-credentials-form input:focus { border-color: #007e83; outline: 3px solid rgba(0, 126, 131, .14); }
 .auth-modal-secondary-button { width: 100%; min-height: 46px; margin-top: 10px; border: 1px solid #dce2ef; border-radius: 10px; background: #fff; color: #52617f; cursor: pointer; font: inherit; font-weight: 800; }
 .mbote-consent-profile { display: flex; align-items: center; gap: 12px; margin: 18px 0; padding: 12px; border: 1px solid #dfe6f2; border-radius: 12px; }
 .mbote-consent-profile img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; }
@@ -1171,24 +1171,24 @@
 .mbote-consent-list { display: grid; gap: 9px; margin: 0 0 18px; padding: 14px 18px 14px 34px; border: 1px solid #dfe6f2; border-radius: 12px; color: #233253; }
 
 /* 2026 auth polish */
-.auth-side{position:relative;background:radial-gradient(circle at 78% 10%,rgba(49,86,235,.08),transparent 30%),linear-gradient(180deg,#fbfcff 0%,#f7f9ff 100%)}
+.auth-side{position:relative;background:radial-gradient(circle at 78% 10%,rgba(0,126,131,.08),transparent 30%),linear-gradient(180deg,#fbfcff 0%,#f3faf9 100%)}
 .login-card{position:relative;overflow:hidden;border-color:#dfe5f1;box-shadow:0 26px 70px rgba(27,42,85,.11),0 3px 12px rgba(27,42,85,.04)}
-.login-card::before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#3156eb,#6850f5,#4c7bff)}
-.auth-card-kicker{display:inline-flex;align-items:center;justify-content:center;margin:0 auto 10px;padding:6px 10px;border-radius:999px;background:#eef3ff;color:#3156eb;font-size:11px;font-weight:850;letter-spacing:.04em;text-transform:uppercase}
+.login-card::before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#007e83,#6850f5,#4c7bff)}
+.auth-card-kicker{display:inline-flex;align-items:center;justify-content:center;margin:0 auto 10px;padding:6px 10px;border-radius:999px;background:#e6f5f3;color:#007e83;font-size:11px;font-weight:850;letter-spacing:.04em;text-transform:uppercase}
 .auth-security-badges{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin-top:17px}
 .auth-security-badges span{display:inline-flex;align-items:center;gap:5px;padding:7px 9px;border:1px solid #e0e6f3;border-radius:999px;background:#fafcff;color:#5a6885;font-size:11px;font-weight:750}
-.primary-login-button{box-shadow:0 11px 25px rgba(49,86,235,.2);transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
-.primary-login-button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 15px 30px rgba(49,86,235,.26);filter:saturate(1.08)}
-.join-meeting-card{border:1px solid #dfe6f5!important;background:linear-gradient(135deg,#f8faff,#f1f4ff)!important}
-.join-meeting-card:hover{border-color:#c9d6ff!important;box-shadow:0 12px 28px rgba(49,86,235,.09)}
+.primary-login-button{box-shadow:0 11px 25px rgba(0,126,131,.2);transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
+.primary-login-button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 15px 30px rgba(0,126,131,.26);filter:saturate(1.08)}
+.join-meeting-card{border:1px solid #dfe6f5!important;background:linear-gradient(135deg,#f3faf9,#e6f5f3)!important}
+.join-meeting-card:hover{border-color:#c9d6ff!important;box-shadow:0 12px 28px rgba(0,126,131,.09)}
 .account-created-modal,.otp-login-modal{width:min(100%,500px);padding:34px;text-align:left}
 .account-created-modal .auth-modal-icon,.otp-login-modal .auth-modal-icon{margin-left:0}
 .auth-modal-icon.success{background:#eaf9f0;color:#13834a}
-.auth-modal-icon.otp{background:#edf2ff;color:#3156eb}
+.auth-modal-icon.otp{background:#e6f5f3;color:#007e83}
 .account-created-modal h2,.otp-login-modal h2{font-size:25px}
 .account-created-summary{display:grid;gap:9px;margin:20px 0}
 .account-created-summary span{display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid #e2e7f1;border-radius:11px;background:#fbfcff;color:#26365a}
-.account-created-summary svg{color:#3156eb;flex:0 0 auto}
+.account-created-summary svg{color:#007e83;flex:0 0 auto}
 .account-created-summary b{font-size:13px;overflow-wrap:anywhere}
 .account-created-mail{margin:14px 0;padding:11px 13px;border-radius:10px;font-size:13px;font-weight:750}
 .account-created-mail.sent{background:#edf9f2;color:#17673b;border:1px solid #d0efdc}
@@ -1197,7 +1197,7 @@
 .otp-login-form{display:grid;gap:10px}
 .otp-login-form label{font-size:13px;color:#53617b;font-weight:800}
 .otp-login-form>input{height:62px;padding:0 16px;border:1px solid #cfd8e8;border-radius:13px;outline:0;background:#fbfcff;color:#17213c;text-align:center;font-size:31px;font-weight:900;letter-spacing:10px;font-variant-numeric:tabular-nums}
-.otp-login-form>input:focus{border-color:#3156eb;box-shadow:0 0 0 4px rgba(49,86,235,.12)}
+.otp-login-form>input:focus{border-color:#007e83;box-shadow:0 0 0 4px rgba(0,126,131,.12)}
 .otp-login-form>small{color:#748098;text-align:center;font-size:12px}
 .otp-login-form .primary-login-button,.otp-login-form .auth-modal-secondary-button{margin-top:5px}
 .otp-error{margin:2px 0!important}

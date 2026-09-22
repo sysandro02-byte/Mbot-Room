@@ -1,0 +1,14 @@
+/* MBotéRoom brand assets derived from the supplied logo. */
+:root { --brand-navy: #0d3156; --brand-teal: #007e83; --brand-coral: #f8644d; --brand-pale: #f2faf9; }
+.mbote-logo .mboteroom-wordmark { display:block; width:clamp(205px,21vw,322px); max-width:100%; height:auto; }
+.app-shell-logo > span, .admin-brand > span, .admin-auth-brand > span,
+.guest-brand-icon, .waiting-brand-logo { background:var(--brand-pale) !important; box-shadow:0 10px 25px rgba(13,49,86,.14) !important; padding:3px; }
+.app-shell-logo > span img, .admin-brand > span img, .admin-auth-brand > span img,
+.guest-brand-icon img, .waiting-brand-logo img { width:100%; height:100%; object-fit:contain; }
+.app-shell-logo strong span, .admin-brand strong span { color:#75ded4; }
+.guest-brand-copy strong span:last-child, .waiting-brand strong span { color:var(--brand-teal); }
+.admin-auth-brand strong > span { color:#8be1d8; }
+@media (max-width:560px) { .mbote-logo .mboteroom-wordmark { width:min(70vw,255px); } }
+
+.phone-logo img, .devices-phone-logo img { display:block; width:100%; height:100%; object-fit:contain; }
+.real-join-brand > img { width:42px; height:42px; object-fit:contain; background:var(--brand-pale); border-radius:10px; padding:2px; }
