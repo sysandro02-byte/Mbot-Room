@@ -94,7 +94,7 @@ export default function AppMessageModal() {
   useEffect(() => {
     if (!message) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMessage(null);
+      if (event.key === 'Escape') lastMessageRef.current = ''; setMessage(null);
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
@@ -106,7 +106,7 @@ export default function AppMessageModal() {
 
   return (
     <div className="app-message-backdrop" data-app-message-modal="true" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) setMessage(null);
+      if (event.target === event.currentTarget) lastMessageRef.current = ''; setMessage(null);
     }}>
       <section className={`app-message-modal is-${tone}`} role="dialog" aria-modal="true" aria-labelledby="app-message-title" aria-describedby="app-message-text">
         <button className="app-message-close" type="button" aria-label="Fermer" onClick={() => setMessage(null)}><X size={19}/></button>
