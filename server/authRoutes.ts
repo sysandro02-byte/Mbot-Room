@@ -215,6 +215,31 @@ const sendLoginOtpEmail = async (email: string, name: string, code: string, expi
 
 const createOtpCode = () => String(crypto.randomInt(100000, 1000000));
 
+const issueLoginOtp = async (user: any, rememberMe = false) => {
+  await query('DELETE FROM room_login_otps WHERE user_id=$1 OR expires_at<=now() OR consumed_at IS NOT NULL', [user.id]);
+  const challengeId = createId();
+  const code = createOtpCode();
+  const expiresMinutes = 10;
+  await query(
+    `INSERT INTO room_login_otps (challenge_id,user_id,code_hash,remember_me,expires_at)
+     VALUES ($1,$2,$3,$4,now()+interval '10 minutes')`,
+    [challengeId, user.id, hashToken(code), rememberMe],
+  );
+  const delivered = await sendLoginOtpEmail(
+    String(user.email),
+    String(user.name || user.username || 'Utilisateur'),
+    code,
+    expiresMinutes,
+  ).catch(() => false);
+  if (!delivered) {
+    await query('DELETE FROM room_login_otps WHERE challenge_id=$1', [challengeId]);
+    return null;
+  }
+  const [local, domain] = String(user.email).split('@');
+  const emailHint = local && domain ? local.slice(0, 2)+'***@'+domain : 'votre adresse e-mail';
+  return { otpRequired: true as const, challengeId, emailHint, expiresInSeconds: expiresMinutes * 60 };
+};
+
 export const registerAuthRoutes = (app: express.Express) => {
   app.post('/api/auth/register', requireDatabase, async (request, response, next) => {
     try {
@@ -484,8 +509,9 @@ export const registerAuthRoutes = (app: express.Express) => {
       challenges.delete(challengeId);
       if (!challenge || Date.now() - challenge.createdAt > 10 * 60_000) return sendApiError(response, 400, 'EXTERNAL_AUTH_STATE_INVALID', 'Autorisation MBoté expirée.');
       const user = await upsertExternalUser(challenge.profile);
-      const session = await createSession(Number(user.id), true);
-      respondWithSession(request, response, session);
+      const otp = await issueLoginOtp(user, true);
+      if (!otp) return sendApiError(response, 503, 'OTP_DELIVERY_FAILED', 'Impossible d’envoyer le code de connexion. Réessayez dans quelques instants.');
+      response.json(otp);
     } catch (error) { next(error); }
   });
 
@@ -533,11 +559,16 @@ export const registerAuthRoutes = (app: express.Express) => {
       if (!profileResponse.ok) return sendApiError(response, 502, 'EXTERNAL_AUTH_PROFILE_UNAVAILABLE', 'Profil MBoté indisponible.');
       const profile = normalizeExternalProfile(await profileResponse.json());
       const user = await upsertExternalUser(profile);
-      const session = await createSession(Number(user.id), true);
-      attachSessionCookie(response, session);
+      const otp = await issueLoginOtp(user, true);
+      if (!otp) {
+        const failure = new URLSearchParams({ externalAuth: 'failed', reason: 'Impossible d’envoyer le code OTP de connexion.' });
+        response.redirect(`${stored.clientOrigin}/login?${failure.toString()}`);
+        return;
+      }
       const hash = new URLSearchParams({
-        mboteUser: JSON.stringify(session.user),
-        expiresAt: session.expiresAt,
+        otpChallengeId: otp.challengeId,
+        otpEmailHint: otp.emailHint,
+        otpExpiresInSeconds: String(otp.expiresInSeconds),
         redirect: stored.redirectTo,
       });
       response.redirect(`${stored.clientOrigin}/login#${hash.toString()}`);
