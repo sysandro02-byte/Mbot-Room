@@ -80,6 +80,9 @@ export const registerRealtime = (io: Server) => {
         const meetingId = Number(payload?.meetingId);
         const meeting = await getMeetingById(meetingId);
         if (!meeting) return callback?.(fail('REALTIME_MEETING_INVALID', 'Réunion invalide.'));
+        if (meeting.status === 'ended' || meeting.status === 'cancelled') {
+          return callback?.(fail('REALTIME_MEETING_ENDED', 'Cette réunion est terminée ou annulée.'));
+        }
         const banned = await query('SELECT 1 FROM room_meeting_bans WHERE meeting_id=$1 AND user_id=$2 LIMIT 1', [meetingId, user.id]);
         if (banned.rows[0]) return callback?.(fail('REALTIME_MEETING_BANNED', 'Vous avez été exclu de cette réunion.'));
         if (!(await hasMeetingAccess(meetingId, user))) return callback?.(fail('REALTIME_MEETING_ACCESS_DENIED', 'Accès non autorisé à cette réunion.'));
@@ -158,6 +161,16 @@ export const registerRealtime = (io: Server) => {
         video: (moderator || meeting.settings.participantVideo !== false) ? requestedMedia.video : false,
         screen: (moderator || meeting.settings.screenShare !== false) ? requestedMedia.screen : false,
       };
+      if (participant.media.audio || participant.media.video) {
+        await query(
+          `UPDATE room_meeting_members
+              SET muted_by_host=CASE WHEN $3 THEN false ELSE muted_by_host END,
+                  camera_disabled_by_host=CASE WHEN $4 THEN false ELSE camera_disabled_by_host END,
+                  updated_at=now()
+            WHERE meeting_id=$1 AND user_id=$2`,
+          [meetingId, user.id, participant.media.audio, participant.media.video],
+        ).catch(() => undefined);
+      }
       socket.to(mediaRoomName(meetingId, participant.breakoutRoomId)).emit('meeting:participant-media-updated', participant);
       callback?.({ ok: true, media: participant.media });
     });
