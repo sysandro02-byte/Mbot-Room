@@ -187,6 +187,27 @@ const dedupeMessages = (items: MeetingMessage[]) => {
   return [...map.values()].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 };
 
+const normalizeMediaRequest = (payload: any): MeetingMediaRequest | null => {
+  const id = String(payload?.id || '');
+  const meetingId = Number(payload?.meetingId ?? payload?.meeting_id ?? 0);
+  const targetUserId = Number(payload?.targetUserId ?? payload?.target_user_id ?? 0);
+  const requestedBy = Number(payload?.requestedBy ?? payload?.requested_by ?? 0);
+  const kind = payload?.kind === 'camera' ? 'camera' : payload?.kind === 'mic' ? 'mic' : null;
+  const status = ['pending','accepted','rejected'].includes(payload?.status) ? payload.status : 'pending';
+  if (!id || !meetingId || !targetUserId || !requestedBy || !kind) return null;
+  return {
+    id,
+    meetingId,
+    targetUserId,
+    requestedBy,
+    requestedByName: String(payload?.requestedByName ?? payload?.requested_by_name ?? ''),
+    kind,
+    status,
+    createdAt: String(payload?.createdAt ?? payload?.created_at ?? new Date().toISOString()),
+    respondedAt: payload?.respondedAt ?? payload?.responded_at ?? undefined,
+  };
+};
+
 export default function MeetingRoomV2() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -489,6 +510,22 @@ export default function MeetingRoomV2() {
   }, [meeting?.id]);
 
   useEffect(() => {
+    if (!meeting?.id || isModerator) {
+      setPendingMediaRequest(null);
+      return;
+    }
+    void meetingService.getMediaRequests(meeting.id)
+      .then((requests) => {
+        const pending = requests.find((request) =>
+          request.status === 'pending'
+          && Number(request.targetUserId) === Number(currentUser?.id || 0)
+        ) || null;
+        setPendingMediaRequest(pending);
+      })
+      .catch(() => undefined);
+  }, [currentUser?.id, isModerator, meeting?.id]);
+
+  useEffect(() => {
     if (!meeting?.id) return;
     const id = meeting.id;
     const onChat = (message: MeetingMessage) => setMessages((current) => dedupeMessages([...current, message]));
@@ -539,6 +576,15 @@ export default function MeetingRoomV2() {
       setMeeting((current) => current ? { ...current, settings: { ...(current.settings || {}), locked: Boolean(payload.locked) } } : current);
       setNotice(payload.locked ? 'La réunion a été verrouillée par l’hôte.' : 'La réunion a été déverrouillée.');
     };
+    const onMeetingUpdated = (payload: Meeting) => {
+      if (Number(payload?.id) !== id) return;
+      setMeeting((current) => current ? { ...current, ...payload, settings: { ...(current.settings || {}), ...(payload.settings || {}) } } : payload);
+    };
+    const onMediaRequest = (payload: any) => {
+      const request = normalizeMediaRequest(payload);
+      if (!request || request.meetingId !== id || request.targetUserId !== Number(currentUser?.id || 0) || request.status !== 'pending') return;
+      setPendingMediaRequest(request);
+    };
     const onModeration = (payload: { meetingId:number; mutedByHost?:boolean; cameraDisabledByHost?:boolean; role?:string }) => {
       if (Number(payload.meetingId) !== id) return;
       if (payload.mutedByHost === true) {
@@ -576,6 +622,8 @@ export default function MeetingRoomV2() {
     socket.on('meeting:breakouts-opened', onBreakoutsUpdated);
     socket.on('meeting:breakouts-closed', onBreakoutsUpdated);
     socket.on('meeting:locked', onLocked);
+    socket.on('meeting:updated', onMeetingUpdated);
+    socket.on('meeting:media-request', onMediaRequest);
     socket.on('meeting:moderation', onModeration);
     socket.on('meeting:ended', onEnded);
     socket.on('meeting:removed', onRemoved);
@@ -594,6 +642,8 @@ export default function MeetingRoomV2() {
       socket.off('meeting:breakouts-opened', onBreakoutsUpdated);
       socket.off('meeting:breakouts-closed', onBreakoutsUpdated);
       socket.off('meeting:locked', onLocked);
+      socket.off('meeting:updated', onMeetingUpdated);
+      socket.off('meeting:media-request', onMediaRequest);
       socket.off('meeting:moderation', onModeration);
       reactionTimersRef.current.forEach((timer) => clearTimeout(timer));
       reactionTimersRef.current.clear();
@@ -602,7 +652,7 @@ export default function MeetingRoomV2() {
       socket.off('meeting:banned', onBanned);
       socket.off('meeting:moved-to-lobby', onMoved);
     };
-  }, [location.state, meeting?.id, navigate, refreshBreakouts, refreshLobby, refreshParticipants]);
+  }, [currentUser?.id, location.state, meeting?.id, navigate, refreshBreakouts, refreshLobby, refreshParticipants]);
 
   const requestMissingMediaTrack = useCallback(async (kind: 'audio' | 'video') => {
     if (!navigator.mediaDevices?.getUserMedia) return false;
