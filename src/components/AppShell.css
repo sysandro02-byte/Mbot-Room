@@ -317,3 +317,33 @@
   .app-shell-header{padding-top:max(10px,env(safe-area-inset-top))}
   .app-shell-bottom-nav{padding-bottom:max(9px,env(safe-area-inset-bottom))}
 }
+
+
+.app-shell-header-actions{justify-self:end;display:flex;align-items:center;gap:12px;min-width:0}
+.app-shell-profile-menu{position:relative}
+.app-shell-header-avatar{display:flex;align-items:center;gap:9px;min-height:46px;padding:4px 8px 4px 5px;border:1px solid #dfe5f1;border-radius:14px;background:#fff;color:#25324d;cursor:pointer;box-shadow:0 5px 16px rgba(22,34,70,.04);transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease}
+.app-shell-header-avatar:hover,.app-shell-header-avatar:focus-visible{border-color:#c8d4f6;box-shadow:0 9px 22px rgba(49,86,235,.09);outline:none}
+.app-shell-header-avatar-image{position:relative;width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;border-radius:11px;overflow:visible;background:linear-gradient(145deg,#3156eb,#6848f3);color:#fff;font-size:11px}
+.app-shell-header-avatar-image img{width:100%;height:100%;border-radius:11px;object-fit:cover}
+.app-shell-header-avatar-image b{font-size:11px}
+.app-shell-header-avatar-image i{position:absolute;right:-2px;bottom:-2px;width:10px;height:10px;border:2px solid #fff;border-radius:999px;background:#18a05e}
+.app-shell-header-avatar-image i.is-offline{background:#9aa3b3}
+.app-shell-header-user{display:grid;text-align:left;min-width:0;max-width:170px}
+.app-shell-header-user strong,.app-shell-header-user small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app-shell-header-user strong{font-size:11px;color:#293651}.app-shell-header-user small{font-size:9px;color:#8792a4;margin-top:2px}
+.app-shell-profile-dropdown{position:absolute;right:0;top:calc(100% + 10px);z-index:80;width:min(330px,calc(100vw - 24px));padding:9px;border:1px solid #dfe6f2;border-radius:18px;background:rgba(255,255,255,.98);box-shadow:0 24px 65px rgba(15,28,65,.18);backdrop-filter:blur(18px);transform-origin:top right;animation:profile-menu-in .16s ease-out}
+.app-shell-profile-dropdown-head{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:center;padding:9px 9px 12px;border-bottom:1px solid #edf0f5}
+.app-shell-profile-dropdown-head>span{width:44px;height:44px;border-radius:13px;overflow:hidden;display:grid;place-items:center;background:linear-gradient(145deg,#3156eb,#6848f3);color:#fff;font-weight:900}
+.app-shell-profile-dropdown-head>span img{width:100%;height:100%;object-fit:cover}
+.app-shell-profile-dropdown-head strong,.app-shell-profile-dropdown-head small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app-shell-profile-dropdown-head strong{font-size:12px;color:#27334d}.app-shell-profile-dropdown-head small{margin-top:3px;font-size:10px;color:#8792a4}
+.app-shell-profile-dropdown>button{width:100%;display:grid;grid-template-columns:30px minmax(0,1fr);align-items:center;gap:8px;margin-top:4px;padding:9px;border:0;border-radius:11px;background:transparent;color:#52607a;text-align:left;cursor:pointer}
+.app-shell-profile-dropdown>button:hover{background:#f4f7fd;color:#3156eb}
+.app-shell-profile-dropdown>button>span strong,.app-shell-profile-dropdown>button>span small{display:block}.app-shell-profile-dropdown>button>span strong{font-size:11px;color:#34415a}.app-shell-profile-dropdown>button>span small{font-size:9px;color:#8994a6;margin-top:2px}
+.app-shell-profile-dropdown>button.is-danger{margin-top:6px;border-top:1px solid #edf0f5;border-radius:0 0 10px 10px;color:#b12d3f}.app-shell-profile-dropdown>button.is-danger span strong{color:#b12d3f}
+.app-shell-profile-dropdown-brand{padding:8px 9px 5px;color:#909aaa;font-size:9px;text-align:center}
+.app-shell-offline-status{display:flex;gap:8px;align-items:flex-start;margin:8px 6px 4px;padding:9px;border-radius:10px;background:#fff7e8;color:#745715;font-size:9px;line-height:1.45}
+.app-shell-offline-status svg{flex:0 0 auto;margin-top:1px}
+@keyframes profile-menu-in{from{opacity:0;transform:translateY(-5px) scale(.98)}to{opacity:1;transform:none}}
+@media(max-width:1024px){.app-shell-header-actions{gap:7px}.app-shell-header-user{display:none}.app-shell-header-avatar{padding-right:6px}.app-shell-header-title{display:none}}
+@media(max-width:720px){.app-shell-header-actions{position:absolute;right:12px;top:max(10px,env(safe-area-inset-top))}.app-shell-profile-dropdown{position:fixed;right:10px;top:calc(max(10px,env(safe-area-inset-top)) + 56px);width:min(340px,calc(100vw - 20px))}}
