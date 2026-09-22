@@ -120,6 +120,8 @@ const runCase = async ({ name, browserType, device, session }) => {
     assert.ok(Math.max(dropdownMetrics.root, dropdownMetrics.body) <= dropdownMetrics.viewport + 2, `${name}: profile menu caused horizontal overflow`);
   }
 
+  assert.deepEqual(errors, [], `${name}: browser errors before the network outage: ${errors.join(' | ')}`);
+
   await context.setOffline(true);
   const offlineFailed = await page.evaluate(async () => {
     try {
@@ -143,7 +145,12 @@ const runCase = async ({ name, browserType, device, session }) => {
     return false;
   });
   assert.equal(recovered, true, `${name}: application did not recover after reconnect`);
-  assert.deepEqual(errors, [], `${name}: browser errors: ${errors.join(' | ')}`);
+  // WebKit reports requests interrupted by Playwright's deliberate offline switch as page errors.
+  // Treat only those localhost API cancellations as expected; errors before the switch still fail above.
+  const unexpectedErrors = errors.filter((message) =>
+    !/^\/127\.0\.0\.1:\d+\/api\/[^ ]+ due to access control checks\.$/.test(message)
+  );
+  assert.deepEqual(unexpectedErrors, [], `${name}: browser errors after reconnect: ${unexpectedErrors.join(' | ')}`);
 
   await context.close();
   await browser.close();
