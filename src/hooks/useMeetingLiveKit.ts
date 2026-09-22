@@ -148,7 +148,7 @@ export function useMeetingLiveKit({
       setStatus('connecting');
       try {
         const session = await mediaTransportService.getMeetingSession(meetingId, breakoutRoomId);
-        if (session.mode !== 'livekit') throw new Error('Le serveur SFU n’est pas configuré pour cette réunion.');
+        if (session.mode !== 'livekit') throw new Error('La connexion vidéo avancée n’est pas disponible pour cette réunion.');
 
         const sdk = await loadLiveKitClient();
         if (cancelled) return;
@@ -170,7 +170,7 @@ export function useMeetingLiveKit({
           if (cancelled) return;
           setStatus('failed');
           setNetworkQuality({ level: 'offline', rttMs: null, packetLossPct: null, connectedPeers: 0, totalPeers: 0 });
-          onFailure?.('Connexion SFU interrompue. Retour automatique au mode WebRTC direct.');
+          onFailure?.('La connexion de la réunion a changé automatiquement pour rester active.');
         };
         const handleReconnecting = () => {
           if (!cancelled) {
