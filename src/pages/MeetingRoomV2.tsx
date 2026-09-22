@@ -824,6 +824,52 @@ export default function MeetingRoomV2() {
     }
   };
 
+  const respondToPendingMediaRequest = async (status: 'accepted' | 'rejected') => {
+    const request = pendingMediaRequest;
+    if (!meeting?.id || !request) return;
+    let finalStatus = status;
+    try {
+      if (status === 'accepted') {
+        if (request.kind === 'mic') {
+          if (!canUseMic) {
+            finalStatus = 'rejected';
+            setNotice('Le microphone est désactivé par les paramètres de la réunion.');
+          } else {
+            const tracks = cameraStreamRef.current?.getAudioTracks().filter((track) => track.readyState === 'live') || [];
+            const enabled = tracks.length ? true : await requestMissingMediaTrack('audio');
+            if (!enabled) finalStatus = 'rejected';
+            else {
+              cameraStreamRef.current?.getAudioTracks().forEach((track) => { track.enabled = true; });
+              setMicEnabled(true);
+            }
+          }
+        } else {
+          if (!canUseCamera) {
+            finalStatus = 'rejected';
+            setNotice('La caméra est désactivée par les paramètres de la réunion.');
+          } else {
+            const tracks = cameraStreamRef.current?.getVideoTracks().filter((track) => track.readyState === 'live') || [];
+            const enabled = tracks.length ? true : await requestMissingMediaTrack('video');
+            if (!enabled) finalStatus = 'rejected';
+            else {
+              cameraStreamRef.current?.getVideoTracks().forEach((track) => { track.enabled = true; });
+              setCameraEnabled(true);
+            }
+          }
+        }
+      }
+      await meetingService.respondToMediaRequest(meeting.id, request.id, finalStatus);
+      setPendingMediaRequest(null);
+      if (finalStatus === 'accepted') {
+        setNotice(request.kind === 'mic' ? 'Microphone activé à votre demande.' : 'Caméra activée à votre demande.');
+      } else if (status === 'rejected') {
+        setNotice('Demande de l’hôte refusée.');
+      }
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Impossible de répondre à la demande média.');
+    }
+  };
+
   const stopLocalRecording = useCallback(() => {
     const recorder = recorderRef.current;
     if (recorder && recorder.state !== 'inactive') recorder.stop();
@@ -1006,12 +1052,20 @@ export default function MeetingRoomV2() {
     }
   };
 
-  const moderateParticipant = async (userId: number, action: 'mute' | 'camera' | 'remove' | 'ban' | 'lobby' | 'cohost' | 'participant') => {
+  const moderateParticipant = async (userId: number, action: 'mute' | 'camera' | 'request-mic' | 'request-camera' | 'remove' | 'ban' | 'lobby' | 'cohost' | 'participant') => {
     if (!meeting?.id) return;
     setMenuUserId(null);
     try {
       if (action === 'mute') await collaborationService.updateParticipant(meeting.id, userId, { mutedByHost: true });
       if (action === 'camera') await collaborationService.updateParticipant(meeting.id, userId, { cameraDisabledByHost: true });
+      if (action === 'request-mic') {
+        await meetingService.requestMediaControl(meeting.id, userId, 'mic');
+        setNotice('Demande d’activation du microphone envoyée.');
+      }
+      if (action === 'request-camera') {
+        await meetingService.requestMediaControl(meeting.id, userId, 'camera');
+        setNotice('Demande d’activation de la caméra envoyée.');
+      }
       if (action === 'cohost') await collaborationService.updateParticipant(meeting.id, userId, { role: 'cohost' });
       if (action === 'participant') await collaborationService.updateParticipant(meeting.id, userId, { role: 'participant' });
       if (action === 'remove') await collaborationService.removeParticipant(meeting.id, userId);
@@ -1298,8 +1352,16 @@ export default function MeetingRoomV2() {
                           <button type="button" onClick={() => setMenuUserId(menuUserId === member.userId ? null : member.userId)}><MoreVertical size={18}/></button>
                           {menuUserId === member.userId ? (
                             <div className="room-v2-person-menu">
-                              <button onClick={() => void moderateParticipant(member.userId, 'mute')}>Couper le micro</button>
-                              <button onClick={() => void moderateParticipant(member.userId, 'camera')}>Couper la caméra</button>
+                              {remote ? (
+                                <>
+                                  {remote.media.audio
+                                    ? <button onClick={() => void moderateParticipant(member.userId, 'mute')}>Couper le micro</button>
+                                    : <button onClick={() => void moderateParticipant(member.userId, 'request-mic')}>Demander d’activer le micro</button>}
+                                  {remote.media.video
+                                    ? <button onClick={() => void moderateParticipant(member.userId, 'camera')}>Couper la caméra</button>
+                                    : <button onClick={() => void moderateParticipant(member.userId, 'request-camera')}>Demander d’activer la caméra</button>}
+                                </>
+                              ) : <span className="room-v2-person-offline">Participant hors ligne</span>}
                               {isHost && member.role !== 'cohost' ? <button onClick={() => void moderateParticipant(member.userId, 'cohost')}>Nommer co-hôte</button> : null}
                               {isHost && member.role === 'cohost' ? <button onClick={() => void moderateParticipant(member.userId, 'participant')}>Retirer le rôle co-hôte</button> : null}
                               <button onClick={() => void moderateParticipant(member.userId, 'lobby')}>Mettre en salle d’attente</button>
@@ -1406,6 +1468,19 @@ export default function MeetingRoomV2() {
           </aside>
         ) : null}
       </section>
+
+      {pendingMediaRequest ? (
+        <section className="room-v2-media-request" role="dialog" aria-live="assertive" aria-label="Demande média de l’hôte">
+          <div>
+            <strong>{pendingMediaRequest.requestedByName || 'L’hôte'} vous demande d’activer {pendingMediaRequest.kind === 'mic' ? 'votre microphone' : 'votre caméra'}.</strong>
+            <span>Vous gardez le contrôle : vous pouvez accepter ou refuser.</span>
+          </div>
+          <div>
+            <button type="button" className="accept" onClick={() => void respondToPendingMediaRequest('accepted')}>Accepter</button>
+            <button type="button" onClick={() => void respondToPendingMediaRequest('rejected')}>Refuser</button>
+          </div>
+        </section>
+      ) : null}
 
       {captionsEnabled && liveCaptions.captions.length ? (
         <div
