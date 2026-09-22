@@ -39,6 +39,14 @@ const navItems = [
   { label: 'Paramètres', icon: Settings, to: '/app/settings' },
 ];
 
+const mobileNavItems = [
+  { label: 'Accueil', icon: Home, to: '/app' },
+  { label: 'Réunions', icon: CalendarDays, to: '/app/meetings' },
+  { label: 'Rejoindre', icon: SquareArrowOutUpRight, to: '/join', primary: true },
+  { label: 'Messages', icon: MessageCircle, to: '/app/messages' },
+  { label: 'Alertes', icon: Bell, to: '/app/notifications' },
+];
+
 export default function AppShell({ children, title }: AppShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -69,6 +77,7 @@ export default function AppShell({ children, title }: AppShellProps) {
             );
           })}
         </nav>
+        <div className="app-shell-creator">MBotéRoom · créée par <strong>LoukaTech</strong></div>
         <section className="app-shell-profile">
           <b>{userName.slice(0, 2).toUpperCase()}</b>
           <div>
@@ -103,6 +112,18 @@ export default function AppShell({ children, title }: AppShellProps) {
           <div className="app-shell-header-title">{title}</div>
         </header>
         <div className="app-shell-content">{children}</div>
+        <nav className="app-shell-bottom-nav" aria-label="Navigation mobile">
+          {mobileNavItems.map((item) => {
+            const Icon = item.icon;
+            const active = location.pathname === item.to || (item.to !== '/app' && location.pathname.startsWith(item.to));
+            return (
+              <Link className={`${active ? 'is-active' : ''} ${item.primary ? 'is-primary' : ''}`.trim()} to={item.to} key={item.to}>
+                <span><Icon size={item.primary ? 24 : 21} aria-hidden="true" /></span>
+                <small>{item.label}</small>
+              </Link>
+            );
+          })}
+        </nav>
       </section>
     </main>
   );
