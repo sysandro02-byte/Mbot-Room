@@ -20,28 +20,41 @@ export default function SessionSecurity(){
   const location=useLocation();
   const navigate=useNavigate();
   const [secondsLeft,setSecondsLeft]=useState<number|null>(null);
+  const [authenticated,setAuthenticated]=useState(authService.isAuthenticated());
   const lastPingRef=useRef(0);
   const loggingOutRef=useRef(false);
 
   useEffect(()=>{
-    if(!authService.isAuthenticated())return;
+    const syncAuth=()=>{
+      const next=authService.isAuthenticated();
+      setAuthenticated(next);
+      if(next)loggingOutRef.current=false;
+    };
+    window.addEventListener('mbote-room-auth-changed',syncAuth);
+    window.addEventListener('storage',syncAuth);
+    return()=>{window.removeEventListener('mbote-room-auth-changed',syncAuth);window.removeEventListener('storage',syncAuth);};
+  },[]);
+
+  useEffect(()=>{
+    if(!authenticated)return;
+    if(isStandalone()&&sessionStorage.getItem(RESUME_DONE_KEY)!=='1'&&(location.pathname==='/'||location.pathname==='/app'))return;
     const candidate=location.pathname+location.search;
     if(!routeContainsSensitiveData(candidate) && !authService.getCurrentUser()?.isGuest){
       localStorage.setItem(LAST_ROUTE_KEY,sanitizeInternalPath(candidate));
     }
-  },[location.pathname,location.search]);
+  },[authenticated,location.pathname,location.search]);
 
   useEffect(()=>{
-    if(!authService.isAuthenticated()||!isStandalone())return;
+    if(!authenticated||!isStandalone())return;
     if(sessionStorage.getItem(RESUME_DONE_KEY)==='1')return;
     sessionStorage.setItem(RESUME_DONE_KEY,'1');
     const current=sanitizeInternalPath(location.pathname+location.search);
     const saved=sanitizeInternalPath(localStorage.getItem(LAST_ROUTE_KEY)||'/app');
     if((current==='/'||current==='/app')&&saved!==current)navigate(saved,{replace:true});
-  },[location.pathname,location.search,navigate]);
+  },[authenticated,location.pathname,location.search,navigate]);
 
   useEffect(()=>{
-    if(!authService.isAuthenticated())return;
+    if(!authenticated)return;
     if(!localStorage.getItem(LAST_ACTIVITY_KEY))localStorage.setItem(LAST_ACTIVITY_KEY,String(Date.now()));
 
     const touch=()=>{
@@ -85,7 +98,7 @@ export default function SessionSecurity(){
       document.removeEventListener('visibilitychange',visibility);
       window.clearInterval(timer);
     };
-  },[navigate]);
+  },[authenticated,navigate]);
 
   if(secondsLeft===null)return null;
   return <aside className="session-idle-warning" role="alertdialog" aria-live="assertive" aria-label="Session bientôt expirée">
