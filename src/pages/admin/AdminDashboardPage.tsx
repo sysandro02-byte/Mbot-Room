@@ -32,6 +32,7 @@ import {
   AdminDashboardPayload,
   AdminDashboardStat,
   GuestAccessSlide,
+  HomeSlide,
   adminDashboardService,
 } from '../../services/adminDashboardService';
 import { DashboardTip, getMeetingAccessCode, Meeting } from '../../services/meetingService';
@@ -42,6 +43,17 @@ import './AdminDashboardPage.css';
 type ActivityTone = 'green' | 'blue' | 'orange' | 'red' | 'violet';
 
 type DashboardTipDraft = Pick<DashboardTip, 'title' | 'body' | 'actionLabel' | 'actionPath' | 'isActive'>;
+
+type HomeSlideDraft = Omit<HomeSlide, 'slot' | 'updatedAt'>;
+
+const defaultHomeSlideDraft = (slot: HomeSlide['slot']): HomeSlideDraft => ({
+  title: slot === 1 ? 'Réunions simples, professionnelles et sécurisées' : slot === 2 ? 'Retrouvez votre équipe en quelques secondes' : 'Collaborez avec Luna IA',
+  body: slot === 1 ? 'Créez, planifiez et animez vos réunions depuis un espace pensé pour vos équipes.' : slot === 2 ? 'Rejoignez une réunion par ID ou par lien, avec salle d’attente et contrôles de sécurité.' : 'Retrouvez les décisions, points clés, messages et actions importantes de vos réunions.',
+  imageUrl: slot === 1 ? '/images/meeting-black-team.svg' : '',
+  actionLabel: slot === 1 ? 'Créer une réunion' : slot === 2 ? 'Rejoindre une réunion' : 'Découvrir mes réunions',
+  actionPath: slot === 2 ? '/join' : '/app/meetings',
+  isActive: true,
+});
 
 const statIcons: Record<AdminDashboardStat['id'], ReactNode> = {
   users: <UsersRound size={29} />,
@@ -141,6 +153,10 @@ export default function AdminDashboardPage() {
   const [guestSlides, setGuestSlides] = useState<GuestAccessSlide[]>([]);
   const [guestDraft, setGuestDraft] = useState({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true });
   const [editingGuestSlideId, setEditingGuestSlideId] = useState<string | null>(null);
+  const [homeSlides, setHomeSlides] = useState<HomeSlide[]>([]);
+  const [selectedHomeSlot, setSelectedHomeSlot] = useState<HomeSlide['slot']>(1);
+  const [homeSlideDraft, setHomeSlideDraft] = useState<HomeSlideDraft>(() => defaultHomeSlideDraft(1));
+  const [isSavingHomeSlide, setIsSavingHomeSlide] = useState(false);
   const [toast, setToast] = useState('');
   const abortRef = useRef<AbortController | null>(null);
 
@@ -172,6 +188,72 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     void loadDashboardTips();
   }, []);
+
+  const loadManagedSlides = async () => {
+    try {
+      const [guestRows, homeRows] = await Promise.all([
+        adminDashboardService.getGuestAccessSlides().catch(() => []),
+        adminDashboardService.getHomeSlides(),
+      ]);
+      setGuestSlides(guestRows);
+      setHomeSlides(homeRows);
+      const first = homeRows.find((slide) => slide.slot === selectedHomeSlot) || homeRows.find((slide) => slide.slot === 1);
+      if (first) {
+        setSelectedHomeSlot(first.slot);
+        setHomeSlideDraft({
+          title: first.title,
+          body: first.body,
+          imageUrl: first.imageUrl,
+          actionLabel: first.actionLabel,
+          actionPath: first.actionPath,
+          isActive: first.isActive,
+        });
+      }
+    } catch (slideError) {
+      setToast(slideError instanceof Error ? slideError.message : 'Slides indisponibles.');
+    }
+  };
+
+  useEffect(() => {
+    void loadManagedSlides();
+  }, []);
+
+  const selectHomeSlide = (slot: HomeSlide['slot']) => {
+    setSelectedHomeSlot(slot);
+    const slide = homeSlides.find((item) => item.slot === slot);
+    setHomeSlideDraft(slide ? {
+      title: slide.title,
+      body: slide.body,
+      imageUrl: slide.imageUrl,
+      actionLabel: slide.actionLabel,
+      actionPath: slide.actionPath,
+      isActive: slide.isActive,
+    } : defaultHomeSlideDraft(slot));
+  };
+
+  const saveHomeSlide = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSavingHomeSlide(true);
+    try {
+      await adminDashboardService.saveHomeSlide(selectedHomeSlot, homeSlideDraft);
+      const rows = await adminDashboardService.getHomeSlides();
+      setHomeSlides(rows);
+      const saved = rows.find((item) => item.slot === selectedHomeSlot);
+      if (saved) setHomeSlideDraft({
+        title: saved.title,
+        body: saved.body,
+        imageUrl: saved.imageUrl,
+        actionLabel: saved.actionLabel,
+        actionPath: saved.actionPath,
+        isActive: saved.isActive,
+      });
+      setToast(`Slide ${selectedHomeSlot} de l’accueil mis à jour.`);
+    } catch (slideError) {
+      setToast(slideError instanceof Error ? slideError.message : 'Enregistrement du slide impossible.');
+    } finally {
+      setIsSavingHomeSlide(false);
+    }
+  };
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => setDebouncedSearch(searchTerm.trim().toLowerCase()), 280);
@@ -419,6 +501,15 @@ export default function AdminDashboardPage() {
             />
             <RecentActivityCard activities={dashboard?.recentActivity || []} />
             <AdminControlCenter />
+            <HomeSlidesCard
+              slides={homeSlides}
+              selectedSlot={selectedHomeSlot}
+              draft={homeSlideDraft}
+              saving={isSavingHomeSlide}
+              onSelect={selectHomeSlide}
+              onDraftChange={setHomeSlideDraft}
+              onSubmit={saveHomeSlide}
+            />
             <GuestAccessSlidesCard slides={guestSlides} draft={guestDraft} editingId={editingGuestSlideId} onDraftChange={setGuestDraft} onEdit={(slide) => { setEditingGuestSlideId(slide.id); setGuestDraft({ title: slide.title, body: slide.body, imageUrl: slide.imageUrl, isActive: slide.isActive }); }} onCancel={() => { setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); }} onSubmit={async (event) => { event.preventDefault(); try { await adminDashboardService.saveGuestAccessSlide(guestDraft, editingGuestSlideId || undefined); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); setToast('Slide enregistre.'); } catch (saveError) { setToast(saveError instanceof Error ? saveError.message : 'Enregistrement impossible.'); } }} onDelete={async (id) => { try { await adminDashboardService.deleteGuestAccessSlide(id); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setToast('Slide supprime.'); } catch (deleteError) { setToast(deleteError instanceof Error ? deleteError.message : 'Suppression impossible.'); } }} />
             <DashboardTipsCard
               tips={dashboardTips}
@@ -460,6 +551,7 @@ function AdminSidebar({ userName, open, onClose }: { userName: string; open: boo
     { label: 'Tableau de bord', icon: Home, path: '/admin', active: true },
     { label: 'Réglages généraux', icon: Settings, path: '/admin#admin-controls' },
     { label: 'Utilisateurs', icon: UsersRound, path: '/admin#admin-users' },
+    { label: 'Slider accueil', icon: CirclePlay, path: '/admin#admin-home-slides' },
     { label: 'Accueil des invités', icon: Video, path: '/admin#admin-guest-slides' },
     { label: 'Conseils d’accueil', icon: CircleHelp, path: '/admin#admin-tips' },
     { label: 'Réunions', icon: CalendarDays, path: '/app/meetings' },
@@ -585,6 +677,47 @@ function RecentActivityCard({ activities }: { activities: AdminActivity[] }) {
           <time>{formatRelativeTime(activity.createdAt)}</time>
         </article>
       )) : <p className="admin-empty">Aucune activité récente.</p>}
+    </section>
+  );
+}
+
+function HomeSlidesCard({ slides, selectedSlot, draft, saving, onSelect, onDraftChange, onSubmit }: {
+  slides: HomeSlide[];
+  selectedSlot: HomeSlide['slot'];
+  draft: HomeSlideDraft;
+  saving: boolean;
+  onSelect: (slot: HomeSlide['slot']) => void;
+  onDraftChange: (draft: HomeSlideDraft) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <section className="admin-tips-card admin-home-slides-card" id="admin-home-slides">
+      <header>
+        <div>
+          <h2>Slider de l’accueil</h2>
+          <p>Pilotez les trois slides visibles sur la page d’accueil de tous les utilisateurs.</p>
+        </div>
+        <span>3 emplacements</span>
+      </header>
+      <div className="admin-home-slide-tabs" role="tablist" aria-label="Slides de l’accueil">
+        {([1,2,3] as HomeSlide['slot'][]).map((slot) => {
+          const item = slides.find((slide) => slide.slot === slot);
+          return <button key={slot} type="button" className={selectedSlot === slot ? 'is-active' : ''} onClick={() => onSelect(slot)}>
+            <strong>Slide {slot}</strong><small>{item?.isActive === false ? 'Masqué' : 'Actif'}</small>
+          </button>;
+        })}
+      </div>
+      <form className="admin-tip-form admin-home-slide-form" onSubmit={onSubmit}>
+        <label><span>Titre</span><input value={draft.title} maxLength={120} required onChange={(event) => onDraftChange({ ...draft, title: event.target.value })}/></label>
+        <label><span>Message</span><textarea value={draft.body} maxLength={420} rows={4} required onChange={(event) => onDraftChange({ ...draft, body: event.target.value })}/></label>
+        <label><span>URL de l’image</span><input value={draft.imageUrl} maxLength={1000} placeholder="/images/..." onChange={(event) => onDraftChange({ ...draft, imageUrl: event.target.value })}/></label>
+        <div className="admin-tip-form-grid">
+          <label><span>Texte du bouton</span><input value={draft.actionLabel} maxLength={50} onChange={(event) => onDraftChange({ ...draft, actionLabel: event.target.value })}/></label>
+          <label><span>Destination interne</span><input value={draft.actionPath} maxLength={300} placeholder="/app/meetings" onChange={(event) => onDraftChange({ ...draft, actionPath: event.target.value })}/></label>
+        </div>
+        <label className="admin-tip-toggle"><input type="checkbox" checked={draft.isActive} onChange={(event) => onDraftChange({ ...draft, isActive: event.target.checked })}/><span>Afficher ce slide</span></label>
+        <div className="admin-tip-actions"><button type="submit" disabled={saving}>{saving ? 'Enregistrement...' : `Enregistrer le slide ${selectedSlot}`}</button></div>
+      </form>
     </section>
   );
 }
