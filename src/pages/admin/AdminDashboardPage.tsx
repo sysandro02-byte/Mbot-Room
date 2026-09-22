@@ -231,7 +231,7 @@ export default function AdminDashboardPage() {
   const joinAsAdmin = async (meeting: Meeting) => {
     try {
       await adminDashboardService.joinMeeting(meeting.id);
-      navigate(`/reunions/${encodeURIComponent(String(meeting.id))}`, { state: { meeting } });
+      navigate(`/reunions/${encodeURIComponent(String(meeting.meeting_link))}`, { state: { meeting } });
     } catch (joinError) {
       setToast(joinError instanceof Error ? joinError.message : 'Accès à la réunion refusé.');
     }
