@@ -138,7 +138,7 @@ export function useMeetingCaptions({
         if (!disposed) {
           setServerUnavailable(true);
           setActive(false);
-          onNotice?.('La transcription serveur a été interrompue. Passage au mode navigateur.');
+          onNotice?.('Les sous-titres automatiques ont changé de mode pour continuer à fonctionner.');
         }
       };
       recorder.onstop = () => {
