@@ -23,6 +23,7 @@ const AdminAuthPage = lazy(() => import('./pages/admin/AdminAuthPage'));
 const GlobalSearchPage = lazy(() => import('./pages/GlobalSearchPage'));
 const HelpPage = lazy(() => import('./pages/HelpPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const FilesPage = lazy(() => import('./pages/FilesPage'));
 const Login = lazy(() => import('./pages/Login'));
 
 function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: boolean }) {
@@ -139,6 +140,8 @@ export default function App() {
     <Route path="/aide" element={<HelpPage />} />
     <Route path="/securite" element={<SimpleInfoPage title="Sécurité MBotéRoom" description="Les réunions utilisent les protections disponibles dans l'application." />} />
     <Route path="/fonctionnalites" element={<SimpleInfoPage title="Fonctionnalités MBotéRoom" description="Créez un compte pour retrouver l'historique, organiser vos réunions et gérer les invitations." />} />
+    <Route path="/confidentialite" element={<SimpleInfoPage title="Confidentialité" description="Consultez ici les informations de confidentialité applicables à votre espace MBotéRoom." />} />
+    <Route path="/conditions" element={<SimpleInfoPage title="Conditions d’utilisation" description="Consultez ici les conditions d’utilisation de MBotéRoom." />} />
     <Route path="/app/meetings" element={<ProtectedRoute><AppShell title="Réunions"><RealMeetingList /></AppShell></ProtectedRoute>} />
     <Route path="/app/search" element={<ProtectedRoute><GlobalSearchPage /></ProtectedRoute>} />
     <Route path="/app/calendar" element={<ProtectedRoute><RealFeaturePage kind="calendar" /></ProtectedRoute>} />
@@ -146,6 +149,7 @@ export default function App() {
     <Route path="/app/messages" element={<ProtectedRoute><RealFeaturePage kind="messages" /></ProtectedRoute>} />
     <Route path="/app/contacts" element={<ProtectedRoute><RealFeaturePage kind="contacts" /></ProtectedRoute>} />
     <Route path="/app/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+    <Route path="/app/files" element={<ProtectedRoute><AppShell title="Fichiers"><FilesPage /></AppShell></ProtectedRoute>} />
     <Route path="/app/whiteboard" element={<ProtectedRoute><RealFeaturePage kind="whiteboard" /></ProtectedRoute>} />
     <Route path="/app/polls" element={<ProtectedRoute><RealFeaturePage kind="polls" /></ProtectedRoute>} />
     <Route path="/app/settings" element={<ProtectedRoute><RealFeaturePage kind="settings" /></ProtectedRoute>} />
