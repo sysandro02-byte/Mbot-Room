@@ -254,13 +254,6 @@ const features = [
   },
 ] as const;
 
-const footerBenefitIcons = [
-  ShieldCheck,
-  Video,
-  Laptop,
-  Zap,
-] as const;
-
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
 export default function Login({ initialView = 'login' }: LoginProps) {
@@ -931,16 +924,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
         </section>
       </section>
 
-      <footer className="login-benefits" aria-label="Avantages MBotéRoom">
-        {copy.footerBenefits.map((label, index) => {
-          const Icon = footerBenefitIcons[index] || ShieldCheck;
-          return (
-            <div className="login-benefit" key={label}>
-              <Icon size={23} aria-hidden="true" />
-              <span>{label}</span>
-            </div>
-          );
-        })}
+      <footer className="login-benefits" aria-label="Créateur de MBotéRoom">
         <div className="login-created-by">MBotéRoom est une application créée par <strong>LoukaTech</strong>.</div>
       </footer>
 
@@ -1175,30 +1159,14 @@ function AuthBrandPanel({
 
 function MeetingIllustration() {
   return (
-    <div className="meeting-illustration" aria-hidden="true">
-      <div className="illustration-plant">
-        <span className="plant-leaf leaf-one" />
-        <span className="plant-leaf leaf-two" />
-        <span className="plant-leaf leaf-three" />
-        <span className="plant-leaf leaf-four" />
-        <span className="plant-stem" />
-        <span className="plant-pot" />
-      </div>
-      <div className="illustration-laptop">
-        <div className="laptop-screen">
-          <span className="participant participant-one"><User size={36} /></span>
-          <span className="participant participant-two"><User size={36} /></span>
-          <span className="participant participant-three"><User size={36} /></span>
-          <span className="participant participant-four"><User size={36} /></span>
-        </div>
-        <span className="laptop-base" />
-      </div>
-      <div className="illustration-phone">
-        <span className="phone-speaker" />
-        <span className="phone-logo"><img src="/icons/mboteroom-symbol.png" alt="" /></span>
-        <strong>MBotéRoom</strong>
-      </div>
-    </div>
+    <figure className="meeting-illustration">
+      <img
+        src="/images/meeting-black-team.svg"
+        alt="Participants en pleine réunion vidéo MBotéRoom"
+        loading="eager"
+        decoding="async"
+      />
+    </figure>
   );
 }
 
