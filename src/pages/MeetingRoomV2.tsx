@@ -445,40 +445,69 @@ export default function MeetingRoomV2() {
   }, [isModerator, meeting?.id]);
 
   useEffect(() => {
+    if (!meeting?.id) return undefined;
     setMediaReady(false);
+
+    const audioRequested = initialMic && (isModerator || meeting.settings?.participantAudio !== false);
+    const videoRequested = initialCamera && (isModerator || meeting.settings?.participantVideo !== false);
+
+    if (!audioRequested && !videoRequested) {
+      const emptyStream = new MediaStream();
+      cameraStreamRef.current = emptyStream;
+      setLocalStream(emptyStream);
+      setMicEnabled(false);
+      setCameraEnabled(false);
+      setMediaReady(true);
+      return () => {
+        cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+      };
+    }
+
     if (!navigator.mediaDevices?.getUserMedia) {
       setNotice('Votre navigateur ne permet pas l’accès à la caméra ou au microphone.');
       setMediaReady(true);
-      return;
+      return undefined;
     }
+
     let cancelled = false;
     const openMedia = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
+          audio: audioRequested ? {
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true,
             channelCount: { ideal: 1 },
-          },
-          video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } },
+          } : false,
+          video: videoRequested
+            ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } }
+            : false,
         });
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop());
           return;
         }
-        stream.getAudioTracks().forEach((track) => { track.enabled = initialMic; });
-        stream.getVideoTracks().forEach((track) => { track.enabled = initialCamera; });
+        stream.getAudioTracks().forEach((track) => { track.enabled = audioRequested; });
+        stream.getVideoTracks().forEach((track) => { track.enabled = videoRequested; });
         cameraStreamRef.current = stream;
         setLocalStream(stream);
+        setMicEnabled(audioRequested);
+        setCameraEnabled(videoRequested);
         setMediaReady(true);
         void refreshMediaDevices();
       } catch (cause) {
         const name = cause instanceof DOMException ? cause.name : '';
+        const requestedLabel = audioRequested && videoRequested ? 'la caméra et le microphone' : audioRequested ? 'le microphone' : 'la caméra';
         setNotice(name === 'NotAllowedError'
-          ? 'Autorisez la caméra et le microphone dans votre navigateur pour participer avec audio/vidéo.'
-          : 'Caméra ou microphone indisponible. Vous pouvez rester dans la réunion sans média local.');
-        if (!cancelled) setMediaReady(true);
+          ? `Autorisez ${requestedLabel} dans votre navigateur pour l’utiliser dans la réunion.`
+          : `${requestedLabel.charAt(0).toUpperCase() + requestedLabel.slice(1)} indisponible. Vous pouvez rester dans la réunion sans ce média.`);
+        if (!cancelled) {
+          cameraStreamRef.current = new MediaStream();
+          setLocalStream(cameraStreamRef.current);
+          setMicEnabled(false);
+          setCameraEnabled(false);
+          setMediaReady(true);
+        }
       }
     };
     void openMedia();
@@ -488,7 +517,7 @@ export default function MeetingRoomV2() {
       screenStreamRef.current?.getTracks().forEach((track) => track.stop());
       recorderRef.current?.state !== 'inactive' && recorderRef.current?.stop();
     };
-  }, [initialCamera, initialMic, refreshMediaDevices]);
+  }, [meeting?.id, initialCamera, initialMic, refreshMediaDevices]);
 
   useEffect(() => {
     if (!navigator.mediaDevices?.addEventListener) return undefined;
