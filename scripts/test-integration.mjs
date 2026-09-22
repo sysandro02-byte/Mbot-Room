@@ -832,6 +832,19 @@ try {
   assert.equal(messageList.response.status, 200);
   assert.ok(messageList.data.some((item) => item.text === 'Message réellement persisté.'));
 
+  const catchUp = await jsonRequest(`/api/meetings/${meeting.id}/luna/catch-up`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ minutes: 15 }),
+  });
+  assert.equal(catchUp.response.status, 200, JSON.stringify(catchUp.data));
+  assert.equal(catchUp.data.available, true);
+  assert.equal(catchUp.data.private, true);
+  assert.equal(catchUp.data.minutes, 15);
+  assert.ok(Array.isArray(catchUp.data.keyPoints));
+  assert.ok(catchUp.data.keyPoints.length > 0);
+  assert.ok(Number(catchUp.data.sources?.chat || 0) >= 1);
+
   const poll = await jsonRequest(`/api/meetings/${meeting.id}/polls`, {
     method: 'POST',
     headers: authHeaders(host.token),
