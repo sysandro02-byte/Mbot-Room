@@ -589,6 +589,14 @@ export default function MeetingRoomV2() {
       if (!request || request.meetingId !== id || request.targetUserId !== Number(currentUser?.id || 0) || request.status !== 'pending') return;
       setPendingMediaRequest(request);
     };
+    const onMediaRequestResponded = (payload: any) => {
+      const request = normalizeMediaRequest(payload);
+      if (!request || request.meetingId !== id || request.requestedBy !== Number(currentUser?.id || 0)) return;
+      setNotice(request.status === 'accepted'
+        ? `Le participant a accepté d’activer ${request.kind === 'mic' ? 'son microphone' : 'sa caméra'}.`
+        : `Le participant a refusé d’activer ${request.kind === 'mic' ? 'son microphone' : 'sa caméra'}.`);
+      void refreshParticipants();
+    };
     const onModeration = (payload: { meetingId:number; mutedByHost?:boolean; cameraDisabledByHost?:boolean; role?:string }) => {
       if (Number(payload.meetingId) !== id) return;
       if (payload.mutedByHost === true) {
@@ -628,6 +636,7 @@ export default function MeetingRoomV2() {
     socket.on('meeting:locked', onLocked);
     socket.on('meeting:updated', onMeetingUpdated);
     socket.on('meeting:media-request', onMediaRequest);
+    socket.on('meeting:media-request-responded', onMediaRequestResponded);
     socket.on('meeting:moderation', onModeration);
     socket.on('meeting:ended', onEnded);
     socket.on('meeting:removed', onRemoved);
@@ -648,6 +657,7 @@ export default function MeetingRoomV2() {
       socket.off('meeting:locked', onLocked);
       socket.off('meeting:updated', onMeetingUpdated);
       socket.off('meeting:media-request', onMediaRequest);
+      socket.off('meeting:media-request-responded', onMediaRequestResponded);
       socket.off('meeting:moderation', onModeration);
       reactionTimersRef.current.forEach((timer) => clearTimeout(timer));
       reactionTimersRef.current.clear();
