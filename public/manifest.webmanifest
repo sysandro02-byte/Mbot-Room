@@ -1,19 +1,44 @@
 {
   "name": "MBotéRoom",
   "short_name": "MBotéRoom",
-  "description": "Réunions sécurisées, collaboration en temps réel et assistant Luna IA.",
+  "description": "MBotéRoom, créée par LoukaTech : réunions sécurisées, collaboration en temps réel et assistant Luna IA.",
   "id": "/",
   "start_url": "/app",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "any",
-  "background_color": "#0b1020",
+  "background_color": "#f8faff",
   "theme_color": "#3156eb",
   "lang": "fr",
-  "categories": [
-    "business",
-    "productivity",
-    "social"
+  "dir": "ltr",
+  "categories": ["business", "productivity", "social"],
+  "prefer_related_applications": false,
+  "launch_handler": {
+    "client_mode": ["navigate-existing", "auto"]
+  },
+  "shortcuts": [
+    {
+      "name": "Nouvelle réunion",
+      "short_name": "Réunion",
+      "description": "Créer ou démarrer une réunion MBotéRoom",
+      "url": "/app/meetings",
+      "icons": [{"src": "/icons/mbote-room-192.png", "sizes": "192x192", "type": "image/png"}]
+    },
+    {
+      "name": "Rejoindre une réunion",
+      "short_name": "Rejoindre",
+      "description": "Rejoindre avec un ID ou un lien",
+      "url": "/join",
+      "icons": [{"src": "/icons/mbote-room-192.png", "sizes": "192x192", "type": "image/png"}]
+    },
+    {
+      "name": "Messages",
+      "short_name": "Messages",
+      "description": "Ouvrir les conversations MBotéRoom",
+      "url": "/app/messages",
+      "icons": [{"src": "/icons/mbote-room-192.png", "sizes": "192x192", "type": "image/png"}]
+    }
   ],
   "icons": [
     {
