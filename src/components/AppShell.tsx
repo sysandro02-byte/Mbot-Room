@@ -172,8 +172,8 @@ export default function AppShell({ children, title }: AppShellProps) {
                   {!online ? <div className="app-shell-offline-status"><WifiOff size={15}/><span>Vos données déjà chargées restent disponibles. La synchronisation reprendra automatiquement.</span></div> : null}
                   <button type="button" role="menuitem" onClick={() => goFromProfile('/app/profile')}><UserRound size={17}/><span><strong>Mon profil</strong><small>Identité, avatar et organisation</small></span></button>
                   <button type="button" role="menuitem" onClick={() => goFromProfile('/app/notifications')}><Bell size={17}/><span><strong>Notifications</strong><small>Alertes et activité</small></span></button>
-                  <button type="button" role="menuitem" onClick={() => goFromProfile('/app/settings')}><Settings size={17}/><span><strong>Paramètres</strong><small>Appareil, PWA et préférences</small></span></button>
-                  <button type="button" role="menuitem" onClick={() => goFromProfile('/securite')}><ShieldCheck size={17}/><span><strong>Sécurité</strong><small>OTP et protection du compte</small></span></button>
+                  <button type="button" role="menuitem" onClick={() => goFromProfile('/app/settings')}><Settings size={17}/><span><strong>Paramètres</strong><small>Appareil, application et préférences</small></span></button>
+                  <button type="button" role="menuitem" onClick={() => goFromProfile('/securite')}><ShieldCheck size={17}/><span><strong>Sécurité</strong><small>Code de sécurité et protection du compte</small></span></button>
                   <div className="app-shell-profile-dropdown-brand">MBotéRoom · créée par <b>LoukaTech</b></div>
                   <button className="is-danger" type="button" role="menuitem" onClick={() => void authService.logout()}><LogOut size={17}/><span><strong>Se déconnecter</strong></span></button>
                 </div>
