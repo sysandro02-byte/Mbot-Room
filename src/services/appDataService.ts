@@ -1,10 +1,42 @@
 import { apiFetch, apiUrl, getAuthHeaders } from '../lib/api';
+import { queueOfflineMutation } from '../lib/offline';
 import type { RoomUser } from './authService';
 
 const readJson = async <T>(response: Response): Promise<T> => {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(typeof data?.error === 'string' ? data.error : `Erreur API (${response.status})`);
   return data as T;
+};
+
+const safeOfflineMutation = async <T>(
+  url: string,
+  method: 'POST'|'PUT'|'DELETE',
+  payload: unknown,
+  optimistic: () => T,
+): Promise<T> => {
+  const body = method === 'DELETE' && payload == null ? '' : JSON.stringify(payload ?? {});
+  let response: Response;
+  try {
+    response = await apiFetch(url, {
+      method,
+      headers: getAuthHeaders(),
+      body: method === 'DELETE' && !body ? undefined : body,
+    });
+  } catch {
+    queueOfflineMutation(url, method, body);
+    window.dispatchEvent(new CustomEvent('mbote-room-offline-saved', { detail: { url, method } }));
+    return optimistic();
+  }
+  return readJson<T>(response);
+};
+
+const localStoredUser = (): RoomUser => {
+  try {
+    const raw = localStorage.getItem('user') || sessionStorage.getItem('user') || '{}';
+    return JSON.parse(raw) as RoomUser;
+  } catch {
+    return {} as RoomUser;
+  }
 };
 
 export type CalendarEvent = {
@@ -25,11 +57,23 @@ export const appDataService = {
     return readJson<CalendarEvent[]>(await apiFetch(apiUrl('/api/calendar/events'), { headers:getAuthHeaders() }));
   },
   async createCalendarEvent(payload:{title:string;description?:string;startsAt:string;endsAt:string;meetingId?:number}) {
-    return readJson<CalendarEvent>(await apiFetch(apiUrl('/api/calendar/events'), { method:'POST',headers:getAuthHeaders(),body:JSON.stringify(payload) }));
+    const url=apiUrl('/api/calendar/events');
+    return safeOfflineMutation<CalendarEvent>(url,'POST',payload,()=>({
+      id:`offline-${crypto.randomUUID()}`,user_id:Number(localStoredUser().id||0),meeting_id:payload.meetingId||null,
+      title:payload.title,description:payload.description||'',starts_at:payload.startsAt,ends_at:payload.endsAt,
+      created_at:new Date().toISOString(),updated_at:new Date().toISOString(),
+    }));
   },
   async deleteCalendarEvent(id:string) {
-    const response=await apiFetch(apiUrl(`/api/calendar/events/${encodeURIComponent(id)}`),{method:'DELETE',headers:getAuthHeaders()});
-    if(!response.ok) throw new Error((await response.json().catch(()=>({}))).error||'Suppression impossible.');
+    const url=apiUrl(`/api/calendar/events/${encodeURIComponent(id)}`);
+    try{
+      const response=await apiFetch(url,{method:'DELETE',headers:getAuthHeaders()});
+      if(!response.ok) throw new Error((await response.json().catch(()=>({}))).error||'Suppression impossible.');
+    }catch(error){
+      if(error instanceof Error && !/Impossible de joindre|met trop de temps/i.test(error.message)) throw error;
+      queueOfflineMutation(url,'DELETE','');
+      window.dispatchEvent(new CustomEvent('mbote-room-offline-saved',{detail:{url,method:'DELETE'}}));
+    }
   },
   async getContacts() {
     return readJson<Contact[]>(await apiFetch(apiUrl('/api/contacts'),{headers:getAuthHeaders()}));
@@ -41,25 +85,38 @@ export const appDataService = {
     return readJson<Preferences>(await apiFetch(apiUrl('/api/preferences'),{headers:getAuthHeaders()}));
   },
   async updatePreferences(payload:Preferences) {
-    return readJson<Preferences>(await apiFetch(apiUrl('/api/preferences'),{method:'PUT',headers:getAuthHeaders(),body:JSON.stringify(payload)}));
+    return safeOfflineMutation<Preferences>(apiUrl('/api/preferences'),'PUT',payload,()=>payload);
   },
   async getProfile() {
     return readJson<{user:RoomUser}>(await apiFetch(apiUrl('/api/profile'),{headers:getAuthHeaders()}));
   },
   async updateProfile(payload:Partial<Pick<RoomUser,'name'|'username'|'avatar'|'phoneNumber'|'organization'|'jobTitle'>>) {
-    return readJson<{user:RoomUser}>(await apiFetch(apiUrl('/api/profile'),{method:'PUT',headers:getAuthHeaders(),body:JSON.stringify(payload)}));
+    return safeOfflineMutation<{user:RoomUser}>(apiUrl('/api/profile'),'PUT',payload,()=>({user:{...localStoredUser(),...payload}}));
   },
   async getWhiteboards() {
     return readJson<Whiteboard[]>(await apiFetch(apiUrl('/api/whiteboards'),{headers:getAuthHeaders()}));
   },
   async createWhiteboard(payload:{title:string;document:{strokes:WhiteboardStroke[]};meetingId?:number}) {
-    return readJson<Whiteboard>(await apiFetch(apiUrl('/api/whiteboards'),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify(payload)}));
+    return safeOfflineMutation<Whiteboard>(apiUrl('/api/whiteboards'),'POST',payload,()=>({
+      id:`offline-${crypto.randomUUID()}`,owner_id:Number(localStoredUser().id||0),meeting_id:payload.meetingId||null,
+      title:payload.title,document:payload.document,created_at:new Date().toISOString(),updated_at:new Date().toISOString(),
+    }));
   },
   async updateWhiteboard(id:string,payload:{title:string;document:{strokes:WhiteboardStroke[]}}) {
-    return readJson<Whiteboard>(await apiFetch(apiUrl(`/api/whiteboards/${encodeURIComponent(id)}`),{method:'PUT',headers:getAuthHeaders(),body:JSON.stringify(payload)}));
+    return safeOfflineMutation<Whiteboard>(apiUrl(`/api/whiteboards/${encodeURIComponent(id)}`),'PUT',payload,()=>({
+      id,owner_id:Number(localStoredUser().id||0),title:payload.title,document:payload.document,
+      created_at:new Date().toISOString(),updated_at:new Date().toISOString(),
+    }));
   },
   async deleteWhiteboard(id:string) {
-    const response=await apiFetch(apiUrl(`/api/whiteboards/${encodeURIComponent(id)}`),{method:'DELETE',headers:getAuthHeaders()});
-    if(!response.ok) throw new Error((await response.json().catch(()=>({}))).error||'Suppression impossible.');
+    const url=apiUrl(`/api/whiteboards/${encodeURIComponent(id)}`);
+    try{
+      const response=await apiFetch(url,{method:'DELETE',headers:getAuthHeaders()});
+      if(!response.ok) throw new Error((await response.json().catch(()=>({}))).error||'Suppression impossible.');
+    }catch(error){
+      if(error instanceof Error && !/Impossible de joindre|met trop de temps/i.test(error.message)) throw error;
+      queueOfflineMutation(url,'DELETE','');
+      window.dispatchEvent(new CustomEvent('mbote-room-offline-saved',{detail:{url,method:'DELETE'}}));
+    }
   },
 };
