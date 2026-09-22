@@ -920,6 +920,57 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     try{const meeting=await getMeetingById(Number(request.params.meetingId));if(!meeting||!canModerateMeeting(meeting,request.user!))return sendApiError(response,403,'MEETING_HOST_REQUIRED','Seul l’hôte peut enregistrer un enregistrement serveur.');const url=String(request.body?.storageUrl||'').trim();if(!/^https:\/\//i.test(url))return sendApiError(response,400,'VALIDATION_ERROR','Une URL de stockage HTTPS réelle est requise.');const id=createId();const result=await query(`INSERT INTO room_recordings (id,meeting_id,created_by,storage_url,mime_type,size_bytes,duration_seconds) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,[id,meeting.id,request.user!.id,url,String(request.body?.mimeType||'video/webm'),Math.max(0,Number(request.body?.sizeBytes||0)),Math.max(0,Number(request.body?.durationSeconds||0))]);response.status(201).json(result.rows[0]);}catch(error){next(error);}
   });
 
+  app.post('/api/meetings/:meetingId/luna/catch-up', ...protectedApi, async (request:AuthedRequest,response,next)=>{
+    try{
+      const meetingId=Number(request.params.meetingId);
+      const minutes=Math.max(5,Math.min(45,Number(request.body?.minutes||15)));
+      if(!(await hasMeetingAccess(meetingId,request.user!)))return sendApiError(response,403,'LUNA_ACCESS_DENIED','Accès refusé.');
+      const meeting=await getMeetingById(meetingId);
+      if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');
+      if(meeting.settings.lunaSummary===false&&!canModerateMeeting(meeting,request.user!))return sendApiError(response,403,'LUNA_DISABLED','Luna est désactivée pour les participants de cette réunion.');
+      const since=new Date(Date.now()-minutes*60_000).toISOString();
+      const [messages,captions]=await Promise.all([
+        query(`SELECT sender,text,created_at FROM room_messages WHERE meeting_id=$1 AND deleted_at IS NULL AND created_at>=$2 ORDER BY created_at ASC LIMIT 250`,[meetingId,since]),
+        query(`SELECT speaker,text,created_at FROM room_captions WHERE meeting_id=$1 AND created_at>=$2 ORDER BY created_at ASC LIMIT 900`,[meetingId,since]),
+      ]);
+      const rows=[
+        ...messages.rows.map((row)=>({at:new Date(row.created_at).getTime(),line:`[Chat · ${row.sender}] ${row.text}`})),
+        ...captions.rows.map((row)=>({at:new Date(row.created_at).getTime(),line:`[Audio · ${row.speaker}] ${row.text}`})),
+      ].sort((a,b)=>a.at-b.at);
+      if(!rows.length){
+        response.json({available:false,minutes,reason:'Pas encore assez de contenu transcrit pour créer un rattrapage.',generatedAt:new Date().toISOString()});
+        return;
+      }
+      const transcript=rows.map((row)=>row.line).join('\n').slice(-48000);
+      const answer=await callGroq(
+        'Tu es Luna IA dans MBotéRoom. Tu crées un rattrapage PRIVÉ pour une personne qui rejoint une réunion en retard. Retourne UNIQUEMENT un JSON valide: {"headline":string,"brief":string,"keyPoints":string[],"decisions":string[],"actions":string[],"openQuestions":string[]}. Sois très concis, factuel, sans inventer, et ne révèle aucune information absente du transcript.',
+        `Réunion: ${meeting.title}\nFenêtre analysée: les ${minutes} dernières minutes.\nTranscript:\n${transcript}`,
+      );
+      let parsed:any=null;
+      if(answer){
+        try{
+          const match=answer.match(/\{[\s\S]*\}/);
+          parsed=JSON.parse(match?.[0]||answer);
+        }catch{}
+      }
+      const fallbackLines=rows.slice(-6).map((row)=>row.line.replace(/^\[[^\]]+\]\s*/, '').slice(0,220));
+      const payload={
+        available:true,
+        private:true,
+        minutes,
+        headline:String(parsed?.headline||'Rattrapage express'),
+        brief:String(parsed?.brief||'Voici les derniers éléments disponibles de la réunion.'),
+        keyPoints:Array.isArray(parsed?.keyPoints)?parsed.keyPoints.slice(0,5).map(String):fallbackLines.slice(-4),
+        decisions:Array.isArray(parsed?.decisions)?parsed.decisions.slice(0,4).map(String):[],
+        actions:Array.isArray(parsed?.actions)?parsed.actions.slice(0,4).map(String):[],
+        openQuestions:Array.isArray(parsed?.openQuestions)?parsed.openQuestions.slice(0,3).map(String):[],
+        sources:{chat:messages.rows.length,captions:captions.rows.length},
+        generatedAt:new Date().toISOString(),
+      };
+      response.json(payload);
+    }catch(error){next(error);}
+  });
+
   app.post('/api/ai/luna', ...protectedApi, async (request:AuthedRequest,response,next)=>{
     try{const meetingId=Number(request.body?.meetingId);const prompt=normalizeText(request.body?.prompt).slice(0,5000);if(!prompt)return sendApiError(response,400,'LUNA_PROMPT_REQUIRED','Message requis pour Luna IA.');if(!(await hasMeetingAccess(meetingId,request.user!)))return sendApiError(response,403,'LUNA_ACCESS_DENIED','Accès refusé.');const meeting=await getMeetingById(meetingId);if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');if(meeting.settings.lunaSummary===false&&!canModerateMeeting(meeting,request.user!))return sendApiError(response,403,'LUNA_DISABLED','Luna est désactivée pour les participants de cette réunion.');const answer=await callGroq(`Tu es Luna IA, assistante de réunion MBotéRoom. Réunion: ${meeting?.title||meetingId}. Réponds en français. Ne prétends pas avoir entendu ou vu du contenu qui ne t’a pas été fourni.`,prompt);if(!answer)return response.status(503).json({error:'Luna IA n’est pas configurée ou le fournisseur est indisponible.',code:'LUNA_NOT_CONFIGURED',configured:false});response.json({answer,configured:true});}catch(error){next(error);}
   });
