@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import './UtilityPages.css';
 
 const topics = [
-  { icon: Video, title: 'Créer ou rejoindre une réunion', text: 'Créez une réunion depuis Réunions, copiez son lien ou rejoignez-la avec son ID/lien et, si nécessaire, son mot de passe.', to: '/app/meetings' },
+  { icon: Video, title: 'Créer ou rejoindre une réunion', text: 'Créez une réunion depuis Réunions, copiez son lien ou rejoignez-la avec son code ou son lien et, si nécessaire, son mot de passe.', to: '/app/meetings' },
   { icon: UsersRound, title: 'Salle d’attente et participants', text: 'L’hôte peut admettre/refuser les demandes, couper des micros, retirer ou bannir un participant et utiliser les sous-salles.', to: '/app/meetings' },
   { icon: Captions, title: 'Sous-titres et Luna IA', text: 'Activez les sous-titres pendant la réunion. Luna peut ensuite vous aider à retrouver les points importants.', to: '/app/meetings' },
   { icon: CirclePlay, title: 'Enregistrements', text: 'Enregistrez une réunion lorsque cette option est autorisée, puis retrouvez les enregistrements disponibles depuis votre espace.', to: '/app/recordings' },
