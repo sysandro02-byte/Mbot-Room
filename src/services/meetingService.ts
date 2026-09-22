@@ -128,6 +128,17 @@ export interface DashboardTip {
   updatedAt: string;
 }
 
+export interface HomeSlide {
+  slot: 1 | 2 | 3;
+  title: string;
+  body: string;
+  imageUrl: string;
+  actionLabel: string;
+  actionPath: string;
+  isActive: boolean;
+  updatedAt: string;
+}
+
 export interface EndedMeetingParticipant {
   id: string;
   name: string;
@@ -177,6 +188,13 @@ export const meetingService = {
 
   async getDashboardTips(): Promise<DashboardTip[]> {
     const response = await apiFetch(apiUrl('/api/dashboard/tips'), { headers: getAuthHeaders() });
+    if (!response.ok) return [];
+    const data = await response.json().catch(() => []);
+    return Array.isArray(data) ? data : [];
+  },
+
+  async getHomeSlides(): Promise<HomeSlide[]> {
+    const response = await apiFetch(apiUrl('/api/dashboard/slides'), { headers: getAuthHeaders() });
     if (!response.ok) return [];
     const data = await response.json().catch(() => []);
     return Array.isArray(data) ? data : [];
