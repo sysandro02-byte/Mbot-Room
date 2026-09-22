@@ -10,6 +10,7 @@ import {
   requireDatabase,
   sendApiError,
 } from './core.js';
+import { isPlatformFeatureEnabled } from './platformSettings.js';
 
 type EgressInfo = Record<string, any>;
 
@@ -242,6 +243,9 @@ export const registerRecordingRoutes = (app: express.Express, io: Server) => {
 
   app.post('/api/meetings/:meetingId/recordings/start', ...protectedApi, async (request: AuthedRequest, response, next) => {
     try {
+      if (!(await isPlatformFeatureEnabled('recordingEnabled')) && request.user?.role !== 'admin') {
+        return sendApiError(response,403,'RECORDING_DISABLED','L’enregistrement est temporairement désactivé.');
+      }
       const meetingId = Number(request.params.meetingId);
       if (!meetingId || !(await canModerate(meetingId, request.user!.id, request.user!.role))) {
         return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte ou le co-hôte peut démarrer un enregistrement serveur.');
