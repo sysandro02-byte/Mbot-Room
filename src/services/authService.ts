@@ -10,6 +10,11 @@ export type RoomUser = {
   phoneNumber?: string;
   organization?: string;
   jobTitle?: string;
+  country?: string;
+  city?: string;
+  birthDate?: string;
+  birthPlace?: string;
+  address?: string;
   role?: 'admin' | 'user' | 'guest';
   permissions?: string[];
   isGuest?: boolean;
@@ -26,7 +31,7 @@ const USER_KEY = 'user';
 const TOKEN_KEY = 'token';
 const EXPIRY_KEY = 'sessionExpiresAt';
 
-type RawRoomUser = Partial<Record<keyof RoomUser | 'is_guest' | 'created_at' | 'phone_number' | 'job_title' | 'role' | 'permissions', unknown>>;
+type RawRoomUser = Partial<Record<keyof RoomUser | 'is_guest' | 'created_at' | 'phone_number' | 'job_title' | 'birth_date' | 'birth_place' | 'role' | 'permissions', unknown>>;
 
 const getStorage = (persist: boolean) => (persist ? localStorage : sessionStorage);
 
@@ -51,6 +56,11 @@ const normalizeUser = (user: RawRoomUser): RoomUser => ({
   phoneNumber: String(user.phoneNumber || user.phone_number || ''),
   organization: String(user.organization || ''),
   jobTitle: String(user.jobTitle || user.job_title || ''),
+  country: String(user.country || ''),
+  city: String(user.city || ''),
+  birthDate: String(user.birthDate || user.birth_date || ''),
+  birthPlace: String(user.birthPlace || user.birth_place || ''),
+  address: String(user.address || ''),
   role: user.role === 'admin' || user.role === 'guest' ? user.role : user.isGuest || user.is_guest ? 'guest' : 'user',
   permissions: Array.isArray(user.permissions) ? user.permissions.filter((item): item is string => typeof item === 'string') : [],
   isGuest: Boolean(user.isGuest || user.is_guest),
@@ -132,7 +142,7 @@ export const authService = {
     };
   },
 
-  async register(payload: { name: string; email: string; password: string; username?: string; phoneNumber?: string; organization?: string; jobTitle?: string }) {
+  async register(payload: { name: string; email: string; password: string; username?: string; phoneNumber?: string; organization?: string; jobTitle?: string; country?: string; city?: string; birthDate?: string; birthPlace?: string; address?: string }) {
     const response = await fetchAuth(apiUrl('/api/auth/register'), {
       method: 'POST',
       headers: authRequestHeaders(),
