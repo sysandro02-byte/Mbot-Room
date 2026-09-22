@@ -54,7 +54,9 @@ function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: bo
 
   if (checking) return <main className="route-loading" role="status">Vérification de la session…</main>;
   if (!isAuthenticated) {
-    return <Navigate to="/admin/login" replace />;
+    const redirect = sanitizeInternalPath(`${location.pathname}${location.search}`);
+    sessionStorage.setItem('mboteroom-login-redirect', redirect);
+    return <Navigate to="/login" replace />;
   }
   return children;
 }
@@ -102,9 +104,7 @@ function AdminRoute({ children }: { children: ReactNode }) {
 
   if (checking) return <main className="route-loading" role="status">Vérification de la session…</main>;
   if (!isAuthenticated) {
-    const redirect = sanitizeInternalPath(`${location.pathname}${location.search}`);
-    sessionStorage.setItem('mboteroom-login-redirect', redirect);
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/admin/login" replace />;
   }
   if (!isAdmin) return <Navigate to="/app" replace />;
   return children;
