@@ -854,6 +854,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
             </div>
           );
         })}
+        <div className="login-created-by">MBotéRoom est une application créée par <strong>LoukaTech</strong>.</div>
       </footer>
 
       {registrationSuccess && (
