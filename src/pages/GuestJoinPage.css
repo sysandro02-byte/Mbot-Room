@@ -1010,3 +1010,23 @@
 .guest-access-controls { position: absolute; right: 18px; bottom: 14px; display: flex; align-items: center; gap: 6px; }
 .guest-access-controls button { width: 26px; height: 26px; padding: 0; border: 1px solid #c9d7f4; border-radius: 50%; background: #fff; color: #2452c8; cursor: pointer; }
 .guest-access-controls button.is-active { width: 8px; height: 8px; border: 0; background: #2f5bea; font-size: 0; }
+
+/* 2026 guest experience polish */
+.guest-join-page{background:radial-gradient(circle at 12% 12%,rgba(33,76,255,.075),transparent 27%),radial-gradient(circle at 88% 18%,rgba(95,65,246,.07),transparent 25%),linear-gradient(180deg,#fbfcff 0%,#f6f8fe 100%)}
+.guest-join-header{border:0;border-bottom:1px solid #e3e9f5;border-radius:0;box-shadow:0 8px 28px rgba(25,42,83,.04)}
+.guest-join-card,.recent-meetings-card,.guest-side-card{border-color:#dfe6f2;box-shadow:0 18px 45px rgba(20,38,84,.07)}
+.guest-join-card{position:relative;overflow:hidden}
+.guest-join-card::before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#214cff,#6250f5,#3a7bff)}
+.guest-trust-strip{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 24px;padding:0 2px}
+.guest-trust-strip span{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid #dfe6f5;border-radius:999px;background:#f8faff;color:#516285;font-size:11px;font-weight:800}
+.guest-trust-strip svg{color:#214cff}
+.guest-input{transition:border-color .16s ease,box-shadow .16s ease,background-color .16s ease}
+.guest-input:focus-within{border-color:#6d87ff;box-shadow:0 0 0 4px rgba(33,76,255,.10);background:#fff}
+.guest-join-submit{box-shadow:0 12px 28px rgba(33,76,255,.24);transition:transform .16s ease,box-shadow .16s ease,filter .16s ease}
+.guest-join-submit:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 16px 34px rgba(33,76,255,.29);filter:saturate(1.08)}
+.waiting-room-note{border:1px solid #dce5ff;background:linear-gradient(135deg,#f4f7ff,#fafbff)}
+.guest-access-card{overflow:hidden;background:linear-gradient(145deg,#18264f,#2f50dc 67%,#6545ef);color:white}
+.guest-access-card h2,.guest-access-card p{color:white}
+.guest-access-card p{opacity:.82}
+.information-card{background:linear-gradient(180deg,#fff,#fbfcff)}
+@media(max-width:760px){.guest-trust-strip{gap:6px}.guest-trust-strip span{font-size:10px}.guest-join-layout{padding-top:14px}}
