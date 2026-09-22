@@ -8,6 +8,7 @@ import { authService } from '../services/authService';
 import { appDataService, CalendarEvent, Contact, Preferences, Recording, Whiteboard, WhiteboardStroke } from '../services/appDataService';
 import { collaborationService, MeetingMessage, MeetingPoll } from '../services/collaborationService';
 import { Meeting, meetingService } from '../services/meetingService';
+import { getAppLocale } from '../lib/appLanguage';
 import './RealFeaturePage.css';
 
 type FeatureKind = 'calendar' | 'recordings' | 'messages' | 'contacts' | 'whiteboard' | 'polls' | 'settings' | 'profile';
@@ -19,7 +20,7 @@ const titles: Record<FeatureKind,string> = {
 const icons: Record<FeatureKind,JSX.Element> = {
   calendar:<CalendarDays/>,recordings:<Download/>,messages:<MessageCircle/>,contacts:<UsersRound/>,whiteboard:<Eraser/>,polls:<Vote/>,settings:<Settings/>,profile:<UserRound/>,
 };
-const formatDate = (value:string) => new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
+const formatDate = (value:string) => new Intl.DateTimeFormat(getAppLocale(),{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
 const toLocalInput = (date:Date) => new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);
 
 export default function RealFeaturePage({kind}:Props){
