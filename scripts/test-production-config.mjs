@@ -43,6 +43,13 @@ if (!authService.includes("'X-MBote-Room-Session-Mode': 'bearer'")) {
 if (!authService.includes('storage.setItem(TOKEN_KEY, token)')) {
   throw new Error('Authentication must persist the Bearer token returned by the backend');
 }
+if (!authService.includes('response.status === 401 || response.status === 403')) {
+  throw new Error('Temporary auth API failures must not clear a still-valid local session');
+}
+const appSource = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+if ((appSource.match(/finally \{/g) || []).length < 2 || (appSource.match(/setChecking\(false\)/g) || []).length < 2) {
+  throw new Error('Protected routes must always finish session verification after API failures');
+}
 
 const apiClient = fs.readFileSync(new URL('../src/lib/api.ts', import.meta.url), 'utf8');
 if (!apiClient.includes('https://mbote-room-api.onrender.com')) {
@@ -102,6 +109,13 @@ if (!server.includes('MBOTE_ROOM_RELEASE_EMAIL_TEST_TO') || !server.includes('re
 const vercelConfig = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
 if (vercelConfig.buildCommand !== 'npm run build:frontend' || vercelConfig.outputDirectory !== 'dist') {
   throw new Error('Vercel must use the frontend-only production build');
+}
+if (!vercelConfig.rewrites?.some((rewrite) => rewrite.source === '/(.*)' && rewrite.destination === '/index.html')) {
+  throw new Error('Vercel must serve index.html for direct SPA routes');
+}
+const productionHealth = fs.readFileSync(new URL('../scripts/check-production-health.mjs', import.meta.url), 'utf8');
+if (!productionHealth.includes('getWithRetry') || !productionHealth.includes('attempts: 5') || !productionHealth.includes('45_000')) {
+  throw new Error('Production health monitoring must tolerate Render cold starts with retries and backoff');
 }
 const renderBlueprint = fs.readFileSync(new URL('../render.yaml', import.meta.url), 'utf8');
 if (!renderBlueprint.includes('openai/gpt-oss-120b,openai/gpt-oss-20b')) {

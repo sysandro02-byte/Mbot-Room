@@ -222,8 +222,12 @@ export const authService = {
       credentials: 'include',
     });
     if (!response.ok) {
-      await this.logout(false);
-      return null;
+      if (response.status === 401 || response.status === 403) {
+        await this.logout(false);
+        return null;
+      }
+      const result = await readJson(response);
+      throw new Error(result.error || 'La vérification de la session est temporairement indisponible.');
     }
     const result = await readJson(response);
     const user = normalizeUser(result.user);

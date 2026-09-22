@@ -26,10 +26,15 @@ function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: bo
   useEffect(() => {
     let active = true;
     const verify = async () => {
-      const user = await authService.refreshCurrentUser();
-      if (!active) return;
-      setIsAuthenticated(Boolean(user));
-      setChecking(false);
+      try {
+        const user = await authService.refreshCurrentUser();
+        if (active) setIsAuthenticated(Boolean(user));
+      } catch {
+        // Keep a still-valid local session during temporary API or network outages.
+        if (active) setIsAuthenticated(authService.isAuthenticated());
+      } finally {
+        if (active) setChecking(false);
+      }
     };
     const sync = () => setIsAuthenticated(authService.isAuthenticated());
     void verify();
@@ -64,11 +69,18 @@ function AdminRoute({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     const verify = async () => {
-      const user = await authService.refreshCurrentUser();
-      if (!active) return;
-      setIsAuthenticated(Boolean(user));
-      setIsAdmin(Boolean(user && authService.isAdmin()));
-      setChecking(false);
+      try {
+        const user = await authService.refreshCurrentUser();
+        if (!active) return;
+        setIsAuthenticated(Boolean(user));
+        setIsAdmin(Boolean(user && authService.isAdmin()));
+      } catch {
+        if (!active) return;
+        setIsAuthenticated(authService.isAuthenticated());
+        setIsAdmin(authService.isAdmin());
+      } finally {
+        if (active) setChecking(false);
+      }
     };
     const sync = () => {
       setIsAuthenticated(authService.isAuthenticated());
