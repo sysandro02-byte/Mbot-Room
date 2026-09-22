@@ -571,8 +571,14 @@ export default function Login({ initialView = 'login' }: LoginProps) {
           {initialView === 'login' && (
             <section className="login-card" aria-labelledby="login-title">
               <header className="login-card-header">
+                <span className="auth-card-kicker">Espace sécurisé MBotéRoom</span>
                 <h1 id="login-title">{copy.title}</h1>
                 <p>{copy.subtitle}</p>
+                <div className="auth-security-badges" aria-label="Sécurité de connexion">
+                  <span><ShieldCheck size={15}/> OTP par e-mail</span>
+                  <span><Video size={15}/> Réunions HD</span>
+                  <span><Sparkles size={15}/> Luna IA</span>
+                </div>
               </header>
 
               <form className="login-form" onSubmit={submitLogin} noValidate>
@@ -690,8 +696,8 @@ export default function Login({ initialView = 'login' }: LoginProps) {
 
           {initialView === 'register' && (
             <CompactAuthCard
-              title="Créer un compte"
-              subtitle="Créez votre accès MBotéRoom pour gérer vos réunions."
+              title="Créer votre espace MBotéRoom"
+              subtitle="Centralisez vos réunions, invitations, résumés Luna IA et outils de collaboration dans un espace sécurisé."
               error={formError}
               onSubmit={submitRegister}
               isLoading={isLoading}
