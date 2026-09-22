@@ -132,14 +132,15 @@ export const flushOfflineQueue = async () => {
     for (let index = 0; index < entries.length; index += 1) {
       const entry = entries[index];
       try {
+        const headers = new Headers();
+        headers.set('Content-Type', entry.contentType || 'application/json');
+        headers.set('X-MBoteRoom-Offline-Replay', '1');
+        const authHeaders = currentAuthHeaders();
+        if ('Authorization' in authHeaders && authHeaders.Authorization) headers.set('Authorization', authHeaders.Authorization);
         const response = await fetch(entry.url, {
           method: entry.method,
           credentials: 'include',
-          headers: {
-            'Content-Type': entry.contentType || 'application/json',
-            ...currentAuthHeaders(),
-            'X-MBoteRoom-Offline-Replay': '1',
-          },
+          headers,
           body: ['GET', 'HEAD'].includes(entry.method) ? undefined : entry.body,
         });
         if (response.ok || response.status === 404) {
