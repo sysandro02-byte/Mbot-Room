@@ -24,6 +24,7 @@ import {
 } from './core.js';
 import { getEmailDeliveryStatus, sendTransactionalEmail } from './emailDelivery.js';
 import { createNotificationAndPush } from './pushService.js';
+import { isPlatformFeatureEnabled } from './platformSettings.js';
 
 const findMeetingByValue = async (value: unknown): Promise<Meeting | null> => {
   const normalized = String(value || '').replace(/\s+/g, '').toLowerCase();
@@ -304,6 +305,9 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
 
   app.post('/api/meetings', ...protectedApi, async (request: AuthedRequest, response, next) => {
     try {
+      if (!(await isPlatformFeatureEnabled('meetingCreationEnabled')) && request.user?.role !== 'admin') {
+        return sendApiError(response,403,'MEETING_CREATION_DISABLED','La création de nouvelles réunions est temporairement désactivée.');
+      }
       const title = normalizeText(request.body?.title || 'Réunion MBoté').slice(0, 160);
       const description = normalizeText(request.body?.description).slice(0, 1500);
       const start = new Date(request.body?.startTime || request.body?.start_time || Date.now());
@@ -972,7 +976,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
   });
 
   app.post('/api/ai/luna', ...protectedApi, async (request:AuthedRequest,response,next)=>{
-    try{const meetingId=Number(request.body?.meetingId);const prompt=normalizeText(request.body?.prompt).slice(0,5000);if(!prompt)return sendApiError(response,400,'LUNA_PROMPT_REQUIRED','Message requis pour Luna IA.');if(!(await hasMeetingAccess(meetingId,request.user!)))return sendApiError(response,403,'LUNA_ACCESS_DENIED','Accès refusé.');const meeting=await getMeetingById(meetingId);if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');if(meeting.settings.lunaSummary===false&&!canModerateMeeting(meeting,request.user!))return sendApiError(response,403,'LUNA_DISABLED','Luna est désactivée pour les participants de cette réunion.');const answer=await callGroq(`Tu es Luna IA, assistante de réunion MBotéRoom. Réunion: ${meeting?.title||meetingId}. Réponds en français. Ne prétends pas avoir entendu ou vu du contenu qui ne t’a pas été fourni.`,prompt);if(!answer)return response.status(503).json({error:'Luna IA n’est pas configurée ou le fournisseur est indisponible.',code:'LUNA_NOT_CONFIGURED',configured:false});response.json({answer,configured:true});}catch(error){next(error);}
+    try{if(!(await isPlatformFeatureEnabled('lunaEnabled'))&&request.user?.role!=='admin')return sendApiError(response,403,'LUNA_DISABLED','Luna est temporairement indisponible.');const meetingId=Number(request.body?.meetingId);const prompt=normalizeText(request.body?.prompt).slice(0,5000);if(!prompt)return sendApiError(response,400,'LUNA_PROMPT_REQUIRED','Message requis pour Luna IA.');if(!(await hasMeetingAccess(meetingId,request.user!)))return sendApiError(response,403,'LUNA_ACCESS_DENIED','Accès refusé.');const meeting=await getMeetingById(meetingId);if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');if(meeting.settings.lunaSummary===false&&!canModerateMeeting(meeting,request.user!))return sendApiError(response,403,'LUNA_DISABLED','Luna est désactivée pour les participants de cette réunion.');const answer=await callGroq(`Tu es Luna IA, assistante de réunion MBotéRoom. Réunion: ${meeting?.title||meetingId}. Réponds en français. Ne prétends pas avoir entendu ou vu du contenu qui ne t’a pas été fourni.`,prompt);if(!answer)return response.status(503).json({error:'Luna IA n’est pas configurée ou le fournisseur est indisponible.',code:'LUNA_NOT_CONFIGURED',configured:false});response.json({answer,configured:true});}catch(error){next(error);}
   });
 
   app.post('/api/meetings/:meetingId/summary/generate', ...protectedApi, async (request:AuthedRequest,response,next)=>{
