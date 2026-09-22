@@ -21,13 +21,13 @@ export default function PushNotificationSettings(){
 
   const enable=async()=>{
     setAction('enable');setMessage('');
-    try{setState(await notificationService.enablePush());setMessage('Notifications push activées sur cet appareil.');}
+    try{setState(await notificationService.enablePush());setMessage('Notifications activées sur cet appareil.');}
     catch(error){setMessage(error instanceof Error?error.message:'Activation impossible.');}
     finally{setAction('');}
   };
   const disable=async()=>{
     setAction('disable');setMessage('');
-    try{setState(await notificationService.disablePush());setMessage('Notifications push désactivées sur cet appareil.');}
+    try{setState(await notificationService.disablePush());setMessage('Notifications désactivées sur cet appareil.');}
     catch(error){setMessage(error instanceof Error?error.message:'Désactivation impossible.');}
     finally{setAction('');}
   };
@@ -39,7 +39,7 @@ export default function PushNotificationSettings(){
   };
 
   const statusLabel=!state?.supported?'Non pris en charge'
-    :!state?.configured?'Serveur non configuré'
+    :!state?.configured?'Indisponibles'
     :state.subscribed?'Activées'
     :state.permission==='denied'?'Bloquées par le système':'Désactivées';
 
@@ -49,7 +49,7 @@ export default function PushNotificationSettings(){
       <div className="push-settings-heading">
         <div>
           <span>Notifications système</span>
-          <h3 id="push-settings-title">Notifications push</h3>
+          <h3 id="push-settings-title">Notifications</h3>
         </div>
         <span className={state?.subscribed?'push-status active':'push-status'}>{state?.subscribed?<CheckCircle2 size={14}/>:<XCircle size={14}/>} {loading?'Vérification…':statusLabel}</span>
       </div>
