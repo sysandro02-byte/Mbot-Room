@@ -113,7 +113,7 @@ ${passwordRow}
 </table>
 <p style="margin:28px 0 12px"><a href="${escapeHtml(joinUrl)}" style="display:inline-block;padding:13px 20px;border-radius:12px;background:#3156eb;color:#fff;text-decoration:none;font-weight:850">Rejoindre la réunion</a></p>
 <p style="margin:0;color:#7b8798;font-size:12px;line-height:1.6">Vous pouvez rejoindre depuis un ordinateur, un téléphone ou une tablette. L’hôte peut utiliser une salle d’attente avant de vous admettre.</p></td></tr>
-<tr><td style="padding:19px 34px;border-top:1px solid #edf1f7;background:#fafcff;color:#7a879d;font-size:12px;line-height:1.6">Ne transférez cette invitation qu’aux personnes autorisées à participer.<br>© LoukaTech · MBotéRoom</td></tr>
+<tr><td style="padding:19px 34px;border-top:1px solid #edf1f7;background:#fafcff;color:#7a879d;font-size:12px;line-height:1.6">Ne transférez cette invitation qu’aux personnes autorisées à participer.<br>MBotéRoom est une application créée par LoukaTech.<br>© LoukaTech · MBotéRoom</td></tr>
 </table></td></tr></table></body></html>`,
   })));
 
