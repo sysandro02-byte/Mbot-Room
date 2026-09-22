@@ -1030,3 +1030,5 @@
 .guest-access-card p{opacity:.82}
 .information-card{background:linear-gradient(180deg,#fff,#fbfcff)}
 @media(max-width:760px){.guest-trust-strip{gap:6px}.guest-trust-strip span{font-size:10px}.guest-join-layout{padding-top:14px}}
+
+.guest-created-by{grid-column:1/-1;width:100%;padding-top:6px;text-align:center;color:#8a95a9;font-size:10px;line-height:1.5}.guest-created-by strong{color:#5b6780}
