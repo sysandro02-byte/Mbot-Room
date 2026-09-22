@@ -134,6 +134,16 @@ const findMeeting = async (value: unknown) => {
   ) || null;
 };
 
+const meetingCapacity = (meeting: Awaited<ReturnType<typeof findMeeting>>) => {
+  const configured = Number(meeting?.settings?.participantCapacity || 100);
+  return Number.isFinite(configured) ? Math.max(2, Math.min(1000, Math.floor(configured))) : 100;
+};
+
+const acceptedMemberCount = async (meetingId: number) => {
+  const result = await query(`SELECT COUNT(*)::int AS count FROM room_meeting_members WHERE meeting_id=$1 AND status='accepted'`, [meetingId]);
+  return Number(result.rows[0]?.count || 0);
+};
+
 const sendResetEmail = async (email: string, resetUrl: string) => sendTransactionalEmail({
   to: email,
   subject: 'Réinitialisation de votre mot de passe MBotéRoom',
@@ -188,9 +198,27 @@ export const registerAuthRoutes = (app: express.Express) => {
       const meeting = await findMeeting(request.body?.meetingCode);
       if (!name) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Votre nom est requis.');
       if (!meeting) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
-      if (!validateMeetingPassword(meeting, request.body?.password)) return sendApiError(response, 403, 'MEETING_PASSWORD_INVALID', 'Mot de passe de réunion incorrect.');
-      const ban = await query('SELECT 1 FROM room_meeting_bans b JOIN room_users u ON u.id=b.user_id WHERE b.meeting_id=$1 AND lower(u.email)=lower($2) LIMIT 1', [meeting.id, normalizeEmail(request.body?.email || '')]);
-      if (ban.rows[0]) return sendApiError(response, 403, 'MEETING_BANNED', 'Accès à cette réunion refusé.');
+      if (meeting.status === 'ended' || meeting.status === 'cancelled') {
+        return sendApiError(response, 410, 'MEETING_ENDED', 'Cette réunion est terminée ou annulée.');
+      }
+      if (meeting.settings.externalAccess === false) {
+        return sendApiError(response, 403, 'MEETING_EXTERNAL_ACCESS_DISABLED', 'Les comptes invités ne sont pas autorisés dans cette réunion.');
+      }
+      if (meeting.settings.locked === true) {
+        return sendApiError(response, 423, 'MEETING_LOCKED', 'La réunion est verrouillée par l’hôte.');
+      }
+      if (!validateMeetingPassword(meeting, request.body?.password)) {
+        return sendApiError(response, 403, 'MEETING_PASSWORD_INVALID', 'Mot de passe de réunion incorrect.');
+      }
+
+      const hostHasStarted = meeting.is_active || meeting.status === 'live';
+      const blockedUntilHost = !hostHasStarted && meeting.settings.joinBeforeHost !== true;
+      const status = !blockedUntilHost && meeting.settings.waitingRoom === false ? 'accepted' : 'requested';
+
+      if (status === 'accepted' && await acceptedMemberCount(meeting.id) >= meetingCapacity(meeting)) {
+        return sendApiError(response, 409, 'MEETING_CAPACITY_REACHED', 'La capacité maximale de la réunion est atteinte.');
+      }
+
       const randomPassword = hashPassword(createToken());
       const guestEmail = `guest-${createId()}@guest.mbote.local`;
       const inserted = await query(
@@ -199,7 +227,7 @@ export const registerAuthRoutes = (app: express.Express) => {
         [name, `guest-${createId().slice(0, 8)}`, guestEmail, createAvatar(name), randomPassword.hash, randomPassword.salt, new Date().toISOString()],
       );
       const user = toPublicUser(inserted.rows[0]);
-      const status = meeting.settings.waitingRoom === false ? 'accepted' : 'requested';
+
       await query(
         `INSERT INTO room_lobby (meeting_id,user_id,status,name,avatar)
          VALUES ($1,$2,$3,$4,$5)
@@ -210,10 +238,11 @@ export const registerAuthRoutes = (app: express.Express) => {
         await query(
           `INSERT INTO room_meeting_members (meeting_id,user_id,role,status,joined_at)
            VALUES ($1,$2,'participant','accepted',now())
-           ON CONFLICT (meeting_id,user_id) DO UPDATE SET status='accepted',joined_at=COALESCE(room_meeting_members.joined_at,now()),updated_at=now()`,
+           ON CONFLICT (meeting_id,user_id) DO UPDATE SET role='participant',status='accepted',joined_at=COALESCE(room_meeting_members.joined_at,now()),left_at=NULL,updated_at=now()`,
           [meeting.id, user.id],
         );
       }
+
       const session = await createSession(user.id, false);
       attachSessionCookie(response, session);
       response.status(201).json({
