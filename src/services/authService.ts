@@ -90,9 +90,9 @@ const fetchAuth = async (input: RequestInfo | URL, init: RequestInit = {}) => {
     return await fetch(input, { ...init, signal: init.signal || controller.signal });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('Le serveur MBotéRoom met trop de temps à répondre. Réessayez.');
+      throw new Error('MBotéRoom met trop de temps à répondre. Réessayez.');
     }
-    throw new Error('Impossible de joindre le serveur MBotéRoom. Vérifiez votre connexion puis réessayez.');
+    throw new Error('MBotéRoom est momentanément indisponible. Vérifiez votre connexion puis réessayez.');
   } finally {
     window.clearTimeout(timeout);
   }
@@ -182,7 +182,7 @@ export const authService = {
       credentials: 'include',
     });
     const result = await readJson(response);
-    if (!response.ok) throw new Error(result.error || 'Code OTP invalide.');
+    if (!response.ok) throw new Error(result.error || 'Code de sécurité invalide.');
     const session = {
       user: normalizeUser(result.user),
       token: String(result.token || ''),
