@@ -1,0 +1,18 @@
+[data-app-message-captured="true"]{display:none!important}
+.app-message-backdrop{position:fixed;inset:0;z-index:5000;display:grid;place-items:center;padding:24px;background:rgba(7,20,39,.56);backdrop-filter:blur(8px);animation:app-message-fade .16s ease-out}
+.app-message-modal{position:relative;width:min(100%,460px);padding:28px;border:1px solid rgba(220,228,242,.95);border-radius:24px;background:#fff;box-shadow:0 30px 90px rgba(8,22,48,.28);text-align:left;animation:app-message-in .18s ease-out}
+.app-message-close{position:absolute;top:14px;right:14px;display:grid;width:36px;height:36px;place-items:center;border:0;border-radius:11px;background:#f3f6fa;color:#66758c;cursor:pointer}
+.app-message-icon{display:grid;width:58px;height:58px;place-items:center;border-radius:18px;background:#e8f6f5;color:#007e83;box-shadow:inset 0 0 0 1px rgba(0,126,131,.08)}
+.app-message-modal.is-success .app-message-icon{background:#eaf9f0;color:#16834b}
+.app-message-modal.is-warning .app-message-icon{background:#fff5df;color:#a96b05}
+.app-message-modal.is-error .app-message-icon{background:#fff0f1;color:#c93b4a}
+.app-message-copy{margin-top:18px}
+.app-message-kicker{display:inline-block;margin-bottom:5px;color:#007e83;font-size:10px;font-weight:900;letter-spacing:.11em;text-transform:uppercase}
+.app-message-copy h2{margin:0;color:#17213c;font-size:23px;letter-spacing:-.02em}
+.app-message-copy p{margin:10px 0 0;color:#65738c;font-size:14px;line-height:1.65;overflow-wrap:anywhere}
+.app-message-confirm{width:100%;min-height:47px;margin-top:24px;border:0;border-radius:13px;background:linear-gradient(135deg,#007e83,#0d5663);color:#fff;font:inherit;font-weight:850;cursor:pointer;box-shadow:0 12px 26px rgba(0,126,131,.2)}
+.app-message-confirm:focus-visible,.app-message-close:focus-visible{outline:3px solid rgba(0,126,131,.22);outline-offset:2px}
+@keyframes app-message-fade{from{opacity:0}to{opacity:1}}
+@keyframes app-message-in{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+@media(max-width:560px){.app-message-backdrop{align-items:end;padding:0}.app-message-modal{width:100%;border-radius:24px 24px 0 0;padding:25px 20px max(24px,calc(env(safe-area-inset-bottom) + 18px))}.app-message-copy h2{font-size:21px}}
+@media(prefers-reduced-motion:reduce){.app-message-backdrop,.app-message-modal{animation:none}}
