@@ -263,6 +263,7 @@ export const getUserByRawToken = async (rawToken: string): Promise<PublicUser | 
        JOIN room_users u ON u.id = s.user_id
       WHERE s.token_hash = $1
         AND s.expires_at::timestamptz > now()
+        AND COALESCE(u.is_suspended,false)=false
         AND COALESCE(s.last_activity, s.created_at::timestamptz) > $2::timestamptz
       LIMIT 1`,
     [hashToken(rawToken), idleCutoff],
@@ -365,6 +366,7 @@ export const runMigrations = async () => {
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS job_title text NOT NULL DEFAULT '';
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS mbote_user_id text NOT NULL DEFAULT '';
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'user';
+    ALTER TABLE room_users ADD COLUMN IF NOT EXISTS is_suspended boolean NOT NULL DEFAULT false;
 
     CREATE TABLE IF NOT EXISTS room_sessions (
       token_hash text PRIMARY KEY,
