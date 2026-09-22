@@ -48,7 +48,9 @@ export default function PwaExperience(){
     window.addEventListener('online',online);
     window.addEventListener('offline',offlineHandler);
     window.addEventListener('mbote-room-offline-queue-changed',queueChanged);
+    const installRequested=()=>{setShowInstall(true);setShowHelp(false);};
     window.addEventListener('mbote-room-offline-synced',synced);
+    window.addEventListener('mboteroom-install-request',installRequested);
 
     if(!standalone){
       const onBeforeInstall=(event:Event)=>{
@@ -75,6 +77,7 @@ export default function PwaExperience(){
         window.removeEventListener('offline',offlineHandler);
         window.removeEventListener('mbote-room-offline-queue-changed',queueChanged);
         window.removeEventListener('mbote-room-offline-synced',synced);
+        window.removeEventListener('mboteroom-install-request',installRequested);
       };
     }
     return()=>{
@@ -83,6 +86,7 @@ export default function PwaExperience(){
       window.removeEventListener('offline',offlineHandler);
       window.removeEventListener('mbote-room-offline-queue-changed',queueChanged);
       window.removeEventListener('mbote-room-offline-synced',synced);
+      window.removeEventListener('mboteroom-install-request',installRequested);
     };
   },[device]);
 
