@@ -246,8 +246,8 @@ export default function GuestJoinPage() {
         password: form.password,
       });
       setForm((currentForm) => ({ ...currentForm, password: '' }));
-      const target = result.meeting?.id
-        ? `/reunions/${encodeURIComponent(String(result.meeting.id))}/salle-attente`
+      const target = result.meeting?.meeting_link
+        ? `/reunions/${encodeURIComponent(String(result.meeting.meeting_link))}/salle-attente`
         : '/join';
       navigate(target, {
         replace: true,
