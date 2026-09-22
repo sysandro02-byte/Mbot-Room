@@ -148,7 +148,7 @@ export default function App() {
     <Route path="/reunions/:meetingId/luna" element={<ProtectedRoute><MeetingRoomV2 /></ProtectedRoute>} />
     <Route path="/reunions/:meetingId" element={<ProtectedRoute><MeetingRoomV2 /></ProtectedRoute>} />
     <Route path="/" element={<Navigate to="/app" replace />} />
-    <Route path="/app" element={<ProtectedRoute showAccountBar={false}><RealDashboardPage /></ProtectedRoute>} />
+    <Route path="/app" element={<ProtectedRoute showAccountBar={false}><AppShell title="Accueil"><RealDashboardPage /></AppShell></ProtectedRoute>} />
     <Route path="/join" element={<ProtectedRoute><AppShell title="Rejoindre"><RealJoinPage /></AppShell></ProtectedRoute>} />
     <Route path="/join/:meetingLink" element={<ProtectedRoute><AppShell title="Rejoindre"><RealJoinPage /></AppShell></ProtectedRoute>} />
     <Route path="*" element={<Navigate to="/app" replace />} />
