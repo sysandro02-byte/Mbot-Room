@@ -272,6 +272,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [externalAuthModalMessage, setExternalAuthModalMessage] = useState('');
   const [otpChallengeId, setOtpChallengeId] = useState('');
   const [otpEmailHint, setOtpEmailHint] = useState('');
+  const [otpRedirectTo, setOtpRedirectTo] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [otpSecondsLeft, setOtpSecondsLeft] = useState(0);
   const [isOtpResending, setIsOtpResending] = useState(false);
@@ -289,8 +290,17 @@ export default function Login({ initialView = 'login' }: LoginProps) {
 
   useEffect(() => {
     try {
-      const callbackRedirect = authService.consumeMboteAuthCallback();
-      if (callbackRedirect) navigate(callbackRedirect, { replace: true });
+      const callback = authService.consumeMboteAuthCallback();
+      if (callback?.type === 'session') {
+        navigate(callback.redirectTo, { replace: true });
+        return;
+      }
+      if (callback?.type === 'otp') {
+        setOtpChallengeId(callback.challengeId);
+        setOtpEmailHint(callback.emailHint);
+        setOtpSecondsLeft(callback.expiresInSeconds || 600);
+        setOtpRedirectTo(callback.redirectTo);
+      }
     } catch (error) {
       setExternalAuthModalMessage(error instanceof Error ? error.message : "La connexion avec MBoté n'a pas abouti.");
     }
@@ -341,6 +351,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       setOtpChallengeId(result.challengeId);
       setOtpEmailHint(result.emailHint);
       setOtpSecondsLeft(result.expiresInSeconds || 600);
+      setOtpRedirectTo(redirectTo);
       setOtpCode('');
     } catch (submitError) {
       setFormError(submitError instanceof Error ? submitError.message : 'Connexion impossible pour le moment.');
@@ -363,7 +374,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       await authService.verifyLoginOtp(otpChallengeId, code, rememberMe);
       setOtpChallengeId('');
       setOtpCode('');
-      navigate(redirectTo, { replace: true });
+      navigate(otpRedirectTo || redirectTo, { replace: true });
     } catch (submitError) {
       setFormError(submitError instanceof Error ? submitError.message : 'Validation du code impossible.');
     } finally {
@@ -483,8 +494,13 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     setIsMboteLoading(true);
     setFormError('');
     try {
-      await authService.authorizeMbote(mboteChallengeId, redirectTo);
-      navigate(redirectTo, { replace: true });
+      const result = await authService.authorizeMbote(mboteChallengeId, redirectTo);
+      setMboteStep(null);
+      setOtpChallengeId(result.challengeId);
+      setOtpEmailHint(result.emailHint);
+      setOtpSecondsLeft(result.expiresInSeconds || 600);
+      setOtpRedirectTo(result.redirectTo);
+      setOtpCode('');
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Autorisation MBoté impossible.');
       setMboteStep('credentials');
@@ -885,7 +901,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
               {formError && <p className="auth-error otp-error" role="alert">{formError}</p>}
               <button className="primary-login-button" type="submit" disabled={isLoading || otpCode.length !== 6}>{isLoading ? 'Vérification...' : 'Confirmer et se connecter'}</button>
               <button className="auth-modal-secondary-button" type="button" onClick={() => void resendLoginOtp()} disabled={isOtpResending}>{isOtpResending ? 'Envoi...' : 'Renvoyer le code'}</button>
-              <button className="otp-cancel-button" type="button" onClick={() => { setOtpChallengeId(''); setOtpCode(''); setFormError(''); }}>Changer de compte</button>
+              <button className="otp-cancel-button" type="button" onClick={() => { setOtpChallengeId(''); setOtpRedirectTo(''); setOtpCode(''); setFormError(''); }}>Changer de compte</button>
             </form>
           </section>
         </div>
