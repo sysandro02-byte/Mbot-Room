@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './index.css';
 import './styles/ui-unified.css';
+import './styles/responsive-hardening.css';
 import { registerPwa } from './lib/pwa';
 import { initOfflineMode } from './lib/offline';
 
