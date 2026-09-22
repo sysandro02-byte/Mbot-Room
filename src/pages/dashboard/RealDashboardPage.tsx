@@ -19,9 +19,10 @@ import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { Meeting, meetingService } from '../../services/meetingService';
 import { notificationService, RoomNotification } from '../../services/notificationService';
+import { getAppLocale } from '../../lib/appLanguage';
 import './RealDashboardPage.css';
 
-const formatDate=(value:string)=>new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
+const formatDate=(value:string)=>new Intl.DateTimeFormat(getAppLocale(),{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
 
 export default function RealDashboardPage(){
   const navigate=useNavigate();
