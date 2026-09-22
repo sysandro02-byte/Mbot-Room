@@ -313,8 +313,8 @@ export const createSession = async (userId: number, rememberMe = false) => {
   const expiresAt = new Date(createdAt.getTime() + (rememberMe ? 30 : 0.5) * 24 * 60 * 60 * 1000);
   await query(
     `INSERT INTO room_sessions (token_hash, user_id, created_at, expires_at, last_activity)
-     VALUES ($1, $2, $3, $4, $3::timestamptz)`,
-    [hashToken(token), userId, createdAt.toISOString(), expiresAt.toISOString()],
+     VALUES ($1, $2, $3, $4, $5)`,
+    [hashToken(token), userId, createdAt.toISOString(), expiresAt.toISOString(), createdAt.toISOString()],
   );
   const userResult = await query('SELECT * FROM room_users WHERE id = $1', [userId]);
   return { token, expiresAt: expiresAt.toISOString(), user: toPublicUser(userResult.rows[0]) };
