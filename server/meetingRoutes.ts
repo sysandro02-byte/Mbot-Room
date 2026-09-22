@@ -300,7 +300,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       await query(`INSERT INTO room_meeting_members (meeting_id,user_id,role,status) VALUES ($1,$2,'host','accepted') ON CONFLICT DO NOTHING`, [meeting.id, request.user!.id]);
       if (meeting.co_host_id) await query(`INSERT INTO room_meeting_members (meeting_id,user_id,role,status) VALUES ($1,$2,'cohost','accepted') ON CONFLICT DO NOTHING`, [meeting.id, meeting.co_host_id]);
       const invitations = await sendInvitations(meeting, invitationEmails, plainPassword, request);
-      io.emit('meeting:created', { ...meeting, settings: sanitizeMeetingSettings(meeting.settings) });
+      io.to('admins').emit('meeting:created', { ...meeting, settings: sanitizeMeetingSettings(meeting.settings) });
       response.status(201).json({ ...meeting, settings: sanitizeMeetingSettings(meeting.settings), invitations });
     } catch (error) { next(error); }
   });
@@ -400,8 +400,10 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const meeting = await getMeetingById(Number(request.params.meetingId));
       if (!meeting) return response.status(204).end();
       if (meeting.host_id !== request.user!.id && request.user!.role !== 'admin') return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte principal peut annuler cette réunion.');
+      if (meeting.status === 'live' || meeting.is_active) return sendApiError(response, 409, 'MEETING_ALREADY_LIVE', 'Une réunion en direct doit être terminée avec « Terminer pour tous ».');
       await query(`UPDATE room_meetings SET status='cancelled',is_active=false,ended_at=COALESCE(ended_at,now()),updated_at=now() WHERE id=$1`, [meeting.id]);
-      io.emit('meeting:cancelled', { meetingId: meeting.id });
+      io.to(`meeting:${meeting.id}`).emit('meeting:cancelled', { meetingId: meeting.id });
+      io.to('admins').emit('meeting:cancelled', { meetingId: meeting.id });
       response.status(204).end();
     } catch (error) { next(error); }
   });
@@ -549,7 +551,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       }
       const members = await query(`SELECT COUNT(*)::int AS count FROM room_meeting_members WHERE meeting_id=$1 AND user_id<>$2`, [meeting.id, request.user!.id]);
       const value = publicMeeting(updated.rows[0]);
-      io.emit('meeting:started', value);
+      io.to(`meeting:${meeting.id}`).emit('meeting:started', value);
+      io.to('admins').emit('meeting:started', value);
       response.json({ success: true, notifiedCount: Number(members.rows[0]?.count || 0), meeting: value });
     } catch (error) { next(error); }
   });
