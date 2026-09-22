@@ -641,6 +641,10 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
          WHERE meeting_id=$1 AND user_id=$2 RETURNING *`, [meeting.id,userId,role,muted,cameraDisabled],
       );
       io.to(`user:${userId}`).emit('meeting:moderation', { meetingId: meeting.id, mutedByHost: updated.rows[0].muted_by_host, cameraDisabledByHost: updated.rows[0].camera_disabled_by_host, role: updated.rows[0].role });
+      if (role) {
+        const refreshedMeeting = await getMeetingById(meeting.id);
+        if (refreshedMeeting) io.to(`meeting:${meeting.id}`).emit('meeting:updated', { ...refreshedMeeting, settings: sanitizeMeetingSettings(refreshedMeeting.settings) });
+      }
       io.to(`meeting:${meeting.id}`).emit('meeting:presence', { meetingId: meeting.id, roleChangedUserId: role ? userId : undefined });
       response.json(updated.rows[0]);
     } catch (error) { next(error); }
@@ -659,6 +663,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       if (Number(meeting.co_host_id || 0) === userId) {
         await query('UPDATE room_meetings SET co_host_id=NULL,updated_at=now() WHERE id=$1', [meeting.id]);
         io.in(`user:${userId}`).socketsLeave(`meeting:${meeting.id}:moderators`);
+        const refreshedMeeting = await getMeetingById(meeting.id);
+        if (refreshedMeeting) io.to(`meeting:${meeting.id}`).emit('meeting:updated', { ...refreshedMeeting, settings: sanitizeMeetingSettings(refreshedMeeting.settings) });
       }
       await query(`UPDATE room_meeting_members SET role='participant',status='removed',left_at=now(),updated_at=now() WHERE meeting_id=$1 AND user_id=$2`, [meeting.id,userId]);
       await query(`UPDATE room_lobby SET status='rejected' WHERE meeting_id=$1 AND user_id=$2`, [meeting.id,userId]);
@@ -681,6 +687,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       if (Number(meeting.co_host_id || 0) === userId) {
         await query('UPDATE room_meetings SET co_host_id=NULL,updated_at=now() WHERE id=$1', [meeting.id]);
         io.in(`user:${userId}`).socketsLeave(`meeting:${meeting.id}:moderators`);
+        const refreshedMeeting = await getMeetingById(meeting.id);
+        if (refreshedMeeting) io.to(`meeting:${meeting.id}`).emit('meeting:updated', { ...refreshedMeeting, settings: sanitizeMeetingSettings(refreshedMeeting.settings) });
       }
       await query(`INSERT INTO room_meeting_bans (meeting_id,user_id,banned_by,reason) VALUES ($1,$2,$3,$4) ON CONFLICT (meeting_id,user_id) DO UPDATE SET banned_by=excluded.banned_by,reason=excluded.reason,created_at=now()`, [meeting.id,userId,request.user!.id,normalizeText(request.body?.reason).slice(0,500)]);
       await query(`UPDATE room_meeting_members SET role='participant',status='removed',left_at=now(),updated_at=now() WHERE meeting_id=$1 AND user_id=$2`, [meeting.id,userId]);
@@ -702,6 +710,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       if (Number(meeting.co_host_id || 0) === userId) {
         await query('UPDATE room_meetings SET co_host_id=NULL,updated_at=now() WHERE id=$1', [meeting.id]);
         io.in(`user:${userId}`).socketsLeave(`meeting:${meeting.id}:moderators`);
+        const refreshedMeeting = await getMeetingById(meeting.id);
+        if (refreshedMeeting) io.to(`meeting:${meeting.id}`).emit('meeting:updated', { ...refreshedMeeting, settings: sanitizeMeetingSettings(refreshedMeeting.settings) });
       }
       const user = await query('SELECT name,avatar FROM room_users WHERE id=$1 LIMIT 1',[userId]);
       if (!user.rows[0]) return sendApiError(response,404,'PARTICIPANT_NOT_FOUND','Participant introuvable.');
