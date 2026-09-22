@@ -165,7 +165,7 @@ export const authService = {
     };
   },
 
-  async login(payload: { email: string; password: string; rememberMe?: boolean }) {
+  async login(payload: { email: string; password: string; rememberMe?: boolean; adminOnly?: boolean }) {
     const response = await fetchAuth(apiUrl('/api/auth/login'), {
       method: 'POST',
       headers: authRequestHeaders(),
