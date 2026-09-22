@@ -106,13 +106,19 @@ export const registerRealtime = (io: Server) => {
           if (!assignment.rows[0]) return callback?.(fail('REALTIME_BREAKOUT_ACCESS_DENIED', 'Accès non autorisé à cette sous-salle.'));
           breakoutRoomId = requestedBreakoutId;
         }
+        const requestedMedia = cleanMedia(payload?.media);
+        const allowedMedia: MediaState = {
+          audio: (moderator || meeting.settings.participantAudio !== false) ? requestedMedia.audio : false,
+          video: (moderator || meeting.settings.participantVideo !== false) ? requestedMedia.video : false,
+          screen: (moderator || meeting.settings.screenShare !== false) ? requestedMedia.screen : false,
+        };
         const participant: LiveParticipant = {
           socketId: socket.id,
           userId: user.id,
           name: user.name || user.email,
           avatar: user.avatar,
           role,
-          media: cleanMedia(payload?.media),
+          media: allowedMedia,
           breakoutRoomId,
         };
         const roomParticipants = meetings.get(meetingId) || new Map<string, LiveParticipant>();
@@ -138,14 +144,22 @@ export const registerRealtime = (io: Server) => {
       await removeSocketFromMeeting(io, socket);
     });
 
-    socket.on('meeting:media-updated', (payload: any, callback?: Ack) => {
+    socket.on('meeting:media-updated', async (payload: any, callback?: Ack) => {
       const meetingId = Number(socket.data.meetingId || 0);
       if (!meetingId || Number(payload?.meetingId || meetingId) !== meetingId) return callback?.(fail('REALTIME_NOT_JOINED', 'Vous devez rejoindre la réunion.'));
       const participant = participantForSocket(meetingId, socket.id);
       if (!participant) return callback?.(fail('REALTIME_NOT_JOINED', 'Participant introuvable.'));
-      participant.media = cleanMedia(payload?.media);
+      const meeting = await getMeetingById(meetingId);
+      if (!meeting) return callback?.(fail('REALTIME_MEETING_INVALID', 'Réunion invalide.'));
+      const moderator = canModerateMeeting(meeting, user);
+      const requestedMedia = cleanMedia(payload?.media);
+      participant.media = {
+        audio: (moderator || meeting.settings.participantAudio !== false) ? requestedMedia.audio : false,
+        video: (moderator || meeting.settings.participantVideo !== false) ? requestedMedia.video : false,
+        screen: (moderator || meeting.settings.screenShare !== false) ? requestedMedia.screen : false,
+      };
       socket.to(mediaRoomName(meetingId, participant.breakoutRoomId)).emit('meeting:participant-media-updated', participant);
-      callback?.({ ok: true });
+      callback?.({ ok: true, media: participant.media });
     });
 
     socket.on('meeting:chat-message', async (payload: any, callback?: Ack) => {
@@ -153,7 +167,7 @@ export const registerRealtime = (io: Server) => {
       try {
         if (!meetingId || Number(payload?.meetingId || meetingId) !== meetingId) return callback?.(fail('REALTIME_NOT_JOINED', 'Vous devez rejoindre la réunion.'));
         const meeting = await getMeetingById(meetingId);
-        if (!meeting?.settings.chat) return callback?.(fail('REALTIME_CHAT_DISABLED', 'Le chat est désactivé pour cette réunion.'));
+        if (meeting?.settings.chat === false) return callback?.(fail('REALTIME_CHAT_DISABLED', 'Le chat est désactivé pour cette réunion.'));
         const message = await insertChatMessage(meetingId, user, payload?.text);
         if (!message) return callback?.(fail('VALIDATION_ERROR', 'Message vide.'));
         io.to(`meeting:${meetingId}`).emit('meeting:chat-message', message);
@@ -171,9 +185,14 @@ export const registerRealtime = (io: Server) => {
       callback?.({ ok: true });
     });
 
-    socket.on('meeting:reaction', (payload: any, callback?: Ack) => {
+    socket.on('meeting:reaction', async (payload: any, callback?: Ack) => {
       const meetingId = Number(socket.data.meetingId || 0);
       if (!meetingId) return callback?.(fail('REALTIME_NOT_JOINED', 'Vous devez rejoindre la réunion.'));
+      const meeting = await getMeetingById(meetingId);
+      if (!meeting) return callback?.(fail('REALTIME_MEETING_INVALID', 'Réunion invalide.'));
+      if (!canModerateMeeting(meeting, user) && meeting.settings.reactions === false) {
+        return callback?.(fail('REALTIME_REACTIONS_DISABLED', 'Les réactions sont désactivées pour cette réunion.'));
+      }
       const reaction = String(payload?.reaction || '').slice(0, 16);
       if (!reaction) return callback?.(fail('VALIDATION_ERROR', 'Réaction invalide.'));
       io.to(`meeting:${meetingId}`).emit('meeting:reaction', { meetingId, userId: user.id, name: user.name, reaction, at: new Date().toISOString() });
