@@ -4,7 +4,9 @@ import { isServerRecordingReady } from './recordingRoutes.js';
 import {
   AuthedRequest,
   authenticateToken,
+  canModerateMeeting,
   hasMeetingAccess,
+  mapMeeting,
   query,
   requireDatabase,
   sendApiError,
@@ -21,6 +23,7 @@ const signLiveKitToken = ({
   displayName,
   avatar,
   ttlSeconds,
+  canPublishSources,
 }: {
   apiKey: string;
   apiSecret: string;
@@ -30,6 +33,7 @@ const signLiveKitToken = ({
   displayName: string;
   avatar: string;
   ttlSeconds: number;
+  canPublishSources: string[];
 }) => {
   const now = Math.floor(Date.now() / 1000);
   const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
@@ -43,7 +47,8 @@ const signLiveKitToken = ({
     video: {
       room,
       roomJoin: true,
-      canPublish: true,
+      canPublish: canPublishSources.length > 0,
+      canPublishSources,
       canSubscribe: true,
       canPublishData: true,
     },
@@ -96,6 +101,25 @@ export const registerSfuRoutes = (app: express.Express) => {
         return;
       }
 
+      const meetingResult = await query('SELECT * FROM room_meetings WHERE id=$1 LIMIT 1', [meetingId]);
+      if (!meetingResult.rows[0]) {
+        sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
+        return;
+      }
+      const meeting = mapMeeting(meetingResult.rows[0]);
+      if (meeting.status === 'ended' || meeting.status === 'cancelled') {
+        sendApiError(response, 410, 'MEETING_ENDED', 'Cette réunion est terminée ou annulée.');
+        return;
+      }
+      const moderator = canModerateMeeting(meeting, user);
+      const canPublishSources = moderator
+        ? ['camera', 'microphone', 'screen_share', 'screen_share_audio']
+        : [
+            ...(meeting.settings.participantVideo !== false ? ['camera'] : []),
+            ...(meeting.settings.participantAudio !== false ? ['microphone'] : []),
+            ...(meeting.settings.screenShare !== false ? ['screen_share', 'screen_share_audio'] : []),
+          ];
+
       const mode = configuredMode();
       const config = liveKitConfig();
       const livekitReady = Boolean(config.serverUrl && config.apiKey && config.apiSecret);
@@ -124,15 +148,6 @@ export const registerSfuRoutes = (app: express.Express) => {
           return;
         }
 
-        const meetingResult = await query(
-          'SELECT host_id,co_host_id FROM room_meetings WHERE id=$1 LIMIT 1',
-          [meetingId],
-        );
-        const meeting = meetingResult.rows[0];
-        const moderator = user.role === 'admin'
-          || Number(meeting?.host_id || 0) === user.id
-          || Number(meeting?.co_host_id || 0) === user.id;
-
         if (!moderator) {
           const assignment = await query(
             'SELECT 1 FROM room_breakout_members WHERE breakout_room_id=$1 AND user_id=$2 LIMIT 1',
@@ -158,6 +173,7 @@ export const registerSfuRoutes = (app: express.Express) => {
         displayName: user.name || user.username || 'Participant',
         avatar: user.avatar || '',
         ttlSeconds,
+        canPublishSources,
       });
 
       response.setHeader('Cache-Control', 'no-store');
@@ -167,6 +183,7 @@ export const registerSfuRoutes = (app: express.Express) => {
         participantToken,
         roomName,
         identity,
+        permissions: { canPublishSources },
         expiresAt: new Date((Math.floor(Date.now() / 1000) + ttlSeconds) * 1000).toISOString(),
       });
     } catch (error) {
