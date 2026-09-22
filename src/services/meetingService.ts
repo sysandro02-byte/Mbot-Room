@@ -14,6 +14,7 @@ export interface Meeting {
   is_active: boolean;
   settings?: MeetingSettings;
   participant_count?: number;
+  status?: 'scheduled' | 'live' | 'ended' | 'cancelled';
 }
 
 export interface MeetingSettings {
@@ -115,7 +116,7 @@ export interface DashboardTip {
 export interface EndedMeetingParticipant {
   id: string;
   name: string;
-  role: 'Hôte' | 'Participant' | 'Invité';
+  role: 'Hôte' | 'Co-hôte' | 'Participant' | 'Invité';
   avatar?: string;
   online?: boolean;
 }
@@ -128,7 +129,7 @@ export interface EndedMeetingPayload {
   endedAt: string;
   durationMinutes: number;
   timezone: string;
-  userRole: 'host' | 'participant' | 'guest';
+  userRole: 'host' | 'cohost' | 'participant' | 'guest';
   participants: EndedMeetingParticipant[];
   summary: {
     bullets: string[];
