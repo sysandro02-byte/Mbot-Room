@@ -5,9 +5,11 @@ export const registerPwa = () => {
   const hadController = Boolean(navigator.serviceWorker.controller);
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
       .then((registration) => {
         registration.update().catch(() => undefined);
+        window.dispatchEvent(new CustomEvent('mbote-room-pwa-ready', { detail: { registration } }));
+        window.setInterval(() => registration.update().catch(() => undefined), 60 * 60 * 1000);
 
         const notifyUpdate = (worker: ServiceWorker | null) => {
           if (!worker) return;
