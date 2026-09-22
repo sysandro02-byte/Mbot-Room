@@ -280,11 +280,32 @@ export const registerAuthRoutes = (app: express.Express) => {
         return sendApiError(response, 403, 'ADMIN_REGISTRATION_REQUIRED', 'Utilisez l’espace administrateur pour créer ce compte.');
       }
       const role = 'user';
+      const birthDate = normalizeText(request.body?.birthDate).slice(0, 10);
+      if (birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
+        return sendApiError(response, 400, 'INVALID_BIRTH_DATE', 'La date de naissance est invalide.');
+      }
       const inserted = await query(
         `INSERT INTO room_users
-          (name,username,email,avatar,password_hash,password_salt,is_guest,created_at,phone_number,organization,job_title,role)
-         VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8,$9,$10,$11) RETURNING *`,
-        [name, username, email, createAvatar(name), passwordData.hash, passwordData.salt, new Date().toISOString(), normalizeText(request.body?.phoneNumber).slice(0, 40), normalizeText(request.body?.organization).slice(0, 120), normalizeText(request.body?.jobTitle).slice(0, 120), role],
+          (name,username,email,avatar,password_hash,password_salt,is_guest,created_at,phone_number,organization,job_title,country,city,birth_date,birth_place,address,role)
+         VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+        [
+          name,
+          username,
+          email,
+          createAvatar(name),
+          passwordData.hash,
+          passwordData.salt,
+          new Date().toISOString(),
+          normalizeText(request.body?.phoneNumber).slice(0, 40),
+          normalizeText(request.body?.organization).slice(0, 120),
+          normalizeText(request.body?.jobTitle).slice(0, 120),
+          normalizeText(request.body?.country).slice(0, 120),
+          normalizeText(request.body?.city).slice(0, 120),
+          birthDate,
+          normalizeText(request.body?.birthPlace).slice(0, 160),
+          normalizeText(request.body?.address).slice(0, 240),
+          role,
+        ],
       );
       const session = await createSession(Number(inserted.rows[0].id), true);
       const appUrl = String(process.env.MBOTE_ROOM_APP_URL || resolveAllowedClientOrigin(request.headers.origin, getOrigin(request))).replace(/\/+$/, '');
