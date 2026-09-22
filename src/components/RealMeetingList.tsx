@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { CalendarPlus, Clock3, Copy, CopyPlus, ExternalLink, Link2, Lock, MoreVertical, Pencil, Play, Plus, RefreshCw, Share2, Trash2, UsersRound, Video, X } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../services/authService';
-import { getMeetingAccessCode, getMeetingJoinUrl, Meeting, meetingService } from '../services/meetingService';
+import { getMeetingAccessCode, getMeetingJoinUrl, Meeting, type MeetingSettings, meetingService } from '../services/meetingService';
 import { getAppLocale } from '../lib/appLanguage';
 import './RealMeetingList.css';
 
@@ -108,7 +108,7 @@ export default function RealMeetingList(){
     event.preventDefault();setError('');setBusyId(editingMeeting.id);
     try{
       const participants=form.participants.split(/[;,\n]+/).map((value)=>value.trim().toLowerCase()).filter(Boolean);
-      const settings:any={
+      const settings: MeetingSettings & { password?: string } = {
         participants,
         waitingRoom:form.waitingRoom,
         joinBeforeHost:form.joinBeforeHost,
