@@ -16,6 +16,42 @@ const password = 'MboteRoom-Smoke-2026!';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const waitForFrontendPwa = async () => {
+  const deadline = Date.now() + 5 * 60_000;
+  let last = '';
+  while (Date.now() < deadline) {
+    try {
+      const [manifestResponse, workerResponse] = await Promise.all([
+        fetch(`${frontendUrl}/manifest.webmanifest`, { cache: 'no-store' }),
+        fetch(`${frontendUrl}/sw.js`, { cache: 'no-store' }),
+      ]);
+      const manifest = await manifestResponse.json().catch(() => null);
+      const worker = await workerResponse.text().catch(() => '');
+      last = JSON.stringify({
+        manifestStatus: manifestResponse.status,
+        workerStatus: workerResponse.status,
+        display: manifest?.display,
+        description: manifest?.description,
+        workerLength: worker.length,
+      });
+      if (
+        manifestResponse.ok
+        && workerResponse.ok
+        && manifest?.display === 'standalone'
+        && Array.isArray(manifest?.shortcuts)
+        && manifest.shortcuts.length >= 3
+        && /LoukaTech/i.test(String(manifest?.description || ''))
+        && /addEventListener\(['"]push['"]/i.test(worker)
+        && /notificationclick/i.test(worker)
+      ) {
+        return { manifest, workerResponse };
+      }
+    } catch {}
+    await sleep(5_000);
+  }
+  throw new Error(`Production frontend PWA did not reach the expected manifest/service worker. Last state: ${last || 'unavailable'}`);
+};
+
 const waitForProductionCommit = async () => {
   const expected = String(process.env.GITHUB_SHA || '').trim();
   if (!expected) return;
@@ -139,6 +175,8 @@ try {
   const frontend = await fetch(frontendUrl, { redirect: 'follow' });
   assert.equal(frontend.ok, true, `Frontend HTTP ${frontend.status}`);
   assert.match(await frontend.text(), /MBot[eé]Room|MBot[eé] Room/i);
+  const pwa = await waitForFrontendPwa();
+  assert.match(String(pwa.workerResponse.headers.get('cache-control') || ''), /no-cache|no-store|max-age=0/i);
 
   const health = await api('/api/health');
   assert.equal(health.response.status, 200, JSON.stringify(health.data));
@@ -149,6 +187,7 @@ try {
   assert.equal(health.data.readiness?.integrations?.turn, true);
   assert.equal(health.data.readiness?.integrations?.groq, true);
   assert.equal(health.data.readiness?.integrations?.email, true);
+  assert.equal(health.data.readiness?.integrations?.push, true);
 
   const authPreflight = await fetch(`${backendUrl}/api/auth/login`, {
     method: 'OPTIONS',
@@ -207,6 +246,33 @@ try {
   assert.equal(register.response.status, 201, JSON.stringify(register.data));
   assert.ok(register.data.token);
   host = register.data;
+
+  const pushConfig = await api('/api/push/config', {}, host.token);
+  assert.equal(pushConfig.response.status, 200, JSON.stringify(pushConfig.data));
+  assert.equal(pushConfig.data.configured, true);
+  assert.ok(String(pushConfig.data.publicKey || '').length > 40);
+
+  const fakeEndpoint = `https://push.invalid/${runSuffix}`;
+  const subscribe = await api('/api/push/subscribe', {
+    method: 'POST',
+    body: JSON.stringify({
+      endpoint: fakeEndpoint,
+      expirationTime: null,
+      keys: {
+        p256dh: 'BHVz0gL-lqNhWjE1mY9zMxhUGzxwXxPlQ-bq6mYE7hehzU4SJt0PqY1tv-fake-smoke-key',
+        auth: 'c21va2UtYXV0aC1rZXk',
+      },
+      platform: 'production-smoke',
+    }),
+  }, host.token);
+  assert.equal(subscribe.response.status, 201, JSON.stringify(subscribe.data));
+  const pushTest = await api('/api/push/test', { method: 'POST' }, host.token);
+  assert.equal(pushTest.response.status, 200, JSON.stringify(pushTest.data));
+  const unsubscribe = await api('/api/push/subscribe', {
+    method: 'DELETE',
+    body: JSON.stringify({ endpoint: fakeEndpoint }),
+  }, host.token);
+  assert.equal(unsubscribe.response.status, 200, JSON.stringify(unsubscribe.data));
 
   const created = await api('/api/meetings', {
     method: 'POST',
@@ -364,6 +430,8 @@ try {
     relayDiagnostics,
     lunaConfigured: true,
     summaryGenerated: true,
+    pushConfigured: true,
+    pwaVerified: true,
     meetingEnded: true,
   }));
 } finally {
