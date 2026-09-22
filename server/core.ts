@@ -15,6 +15,11 @@ export type PublicUser = {
   phoneNumber?: string;
   organization?: string;
   jobTitle?: string;
+  country?: string;
+  city?: string;
+  birthDate?: string;
+  birthPlace?: string;
+  address?: string;
   mboteUserId?: string;
   isGuest: boolean;
   role: UserRole;
@@ -168,6 +173,11 @@ export const toPublicUser = (row: any): PublicUser => {
     phoneNumber: String(row.phone_number || ''),
     organization: String(row.organization || ''),
     jobTitle: String(row.job_title || ''),
+    country: String(row.country || ''),
+    city: String(row.city || ''),
+    birthDate: String(row.birth_date || ''),
+    birthPlace: String(row.birth_place || ''),
+    address: String(row.address || ''),
     mboteUserId: String(row.mbote_user_id || ''),
     isGuest: Boolean(row.is_guest),
     role,
@@ -364,6 +374,11 @@ export const runMigrations = async () => {
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS phone_number text NOT NULL DEFAULT '';
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS organization text NOT NULL DEFAULT '';
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS job_title text NOT NULL DEFAULT '';
+    ALTER TABLE room_users ADD COLUMN IF NOT EXISTS country text NOT NULL DEFAULT '';
+    ALTER TABLE room_users ADD COLUMN IF NOT EXISTS city text NOT NULL DEFAULT '';
+    ALTER TABLE room_users ADD COLUMN IF NOT EXISTS birth_date text NOT NULL DEFAULT '';
+    ALTER TABLE room_users ADD COLUMN IF NOT EXISTS birth_place text NOT NULL DEFAULT '';
+    ALTER TABLE room_users ADD COLUMN IF NOT EXISTS address text NOT NULL DEFAULT '';
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS mbote_user_id text NOT NULL DEFAULT '';
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'user';
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS is_suspended boolean NOT NULL DEFAULT false;
