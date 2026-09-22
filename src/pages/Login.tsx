@@ -9,6 +9,8 @@ import {
   Globe2,
   Laptop,
   Lock,
+  KeyRound,
+  CheckCircle2,
   LoaderCircle,
   LogIn,
   Mail,
@@ -268,6 +270,12 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [isMboteLoading, setIsMboteLoading] = useState(false);
   const [formError, setFormError] = useState('');
   const [externalAuthModalMessage, setExternalAuthModalMessage] = useState('');
+  const [otpChallengeId, setOtpChallengeId] = useState('');
+  const [otpEmailHint, setOtpEmailHint] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSecondsLeft, setOtpSecondsLeft] = useState(0);
+  const [isOtpResending, setIsOtpResending] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState<{ email: string; welcomeEmailSent: boolean } | null>(null);
   const [mboteStep, setMboteStep] = useState<'credentials' | 'consent' | null>(null);
   const [mboteIdentifier, setMboteIdentifier] = useState('');
   const [mbotePassword, setMbotePassword] = useState('');
@@ -298,7 +306,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/app';
   }, [searchParams]);
 
-  if (initialView !== 'forgot' && authService.isAuthenticated()) {
+  if (initialView !== 'forgot' && authService.isAuthenticated() && !registrationSuccess) {
     return <Navigate to={redirectTo} replace />;
   }
 
@@ -322,15 +330,61 @@ export default function Login({ initialView = 'login' }: LoginProps) {
 
     setIsLoading(true);
     try {
-      await authService.login({ email: email.trim(), password, rememberMe });
+      const result = await authService.login({ email: email.trim(), password, rememberMe });
       setPassword('');
-      navigate(redirectTo, { replace: true });
+      setOtpChallengeId(result.challengeId);
+      setOtpEmailHint(result.emailHint);
+      setOtpSecondsLeft(result.expiresInSeconds || 600);
+      setOtpCode('');
     } catch (submitError) {
       setFormError(submitError instanceof Error ? submitError.message : 'Connexion impossible pour le moment.');
     } finally {
       setIsLoading(false);
     }
   };
+
+  const submitLoginOtp = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isLoading || !otpChallengeId) return;
+    const code = otpCode.replace(/\D/g, '').slice(0, 6);
+    if (code.length !== 6) {
+      setFormError('Saisissez le code à 6 chiffres reçu par e-mail.');
+      return;
+    }
+    setIsLoading(true);
+    setFormError('');
+    try {
+      await authService.verifyLoginOtp(otpChallengeId, code, rememberMe);
+      setOtpChallengeId('');
+      setOtpCode('');
+      navigate(redirectTo, { replace: true });
+    } catch (submitError) {
+      setFormError(submitError instanceof Error ? submitError.message : 'Validation du code impossible.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const resendLoginOtp = async () => {
+    if (!otpChallengeId || isOtpResending) return;
+    setIsOtpResending(true);
+    setFormError('');
+    try {
+      const result = await authService.resendLoginOtp(otpChallengeId);
+      setOtpSecondsLeft(result.expiresInSeconds || 600);
+      setOtpCode('');
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Impossible de renvoyer le code.');
+    } finally {
+      setIsOtpResending(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!otpChallengeId || otpSecondsLeft <= 0) return undefined;
+    const timer = window.setInterval(() => setOtpSecondsLeft((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [otpChallengeId, otpSecondsLeft]);
 
   const submitRegister = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -350,7 +404,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
 
     setIsLoading(true);
     try {
-      await authService.register({
+      const result = await authService.register({
         name: name.trim(),
         email: email.trim(),
         password,
@@ -359,7 +413,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
         jobTitle: jobTitle.trim(),
       });
       setPassword('');
-      navigate(redirectTo, { replace: true });
+      setRegistrationSuccess({ email: email.trim(), welcomeEmailSent: result.welcomeEmailSent });
     } catch (submitError) {
       setFormError(submitError instanceof Error ? submitError.message : 'Création de compte impossible.');
     } finally {
@@ -779,6 +833,57 @@ export default function Login({ initialView = 'login' }: LoginProps) {
           );
         })}
       </footer>
+
+      {registrationSuccess && (
+        <div className="auth-modal-backdrop" role="presentation">
+          <section className="auth-modal account-created-modal" role="dialog" aria-modal="true" aria-labelledby="account-created-title">
+            <span className="auth-modal-icon success" aria-hidden="true"><CheckCircle2 size={28} /></span>
+            <h2 id="account-created-title">Votre compte est prêt</h2>
+            <p>Bienvenue sur MBotéRoom. Votre espace professionnel vient d’être créé.</p>
+            <div className="account-created-summary">
+              <span><Mail size={18}/><b>${registrationSuccess.email}</b></span>
+              <span><ShieldCheck size={18}/><b>OTP obligatoire à chaque connexion</b></span>
+              <span><Sparkles size={18}/><b>Luna IA, réunions HD et collaboration</b></span>
+            </div>
+            <div className={registrationSuccess.welcomeEmailSent ? 'account-created-mail sent' : 'account-created-mail warning'}>
+              {registrationSuccess.welcomeEmailSent ? '✓ Le mail de bienvenue a été envoyé.' : 'Le compte est créé, mais le mail de bienvenue n’a pas pu être confirmé.'}
+            </div>
+            <p className="account-created-security">Pour votre sécurité, votre mot de passe n’est jamais envoyé en clair par e-mail.</p>
+            <button type="button" onClick={() => { setRegistrationSuccess(null); navigate(redirectTo, { replace: true }); }} autoFocus>
+              Accéder à mon espace
+            </button>
+          </section>
+        </div>
+      )}
+
+      {otpChallengeId && (
+        <div className="auth-modal-backdrop" role="presentation">
+          <section className="auth-modal otp-login-modal" role="dialog" aria-modal="true" aria-labelledby="otp-login-title">
+            <span className="auth-modal-icon otp" aria-hidden="true"><KeyRound size={27}/></span>
+            <h2 id="otp-login-title">Vérifiez votre connexion</h2>
+            <p>Un code à 6 chiffres a été envoyé à <strong>{otpEmailHint}</strong>.</p>
+            <form onSubmit={submitLoginOtp} className="otp-login-form">
+              <label htmlFor="login-otp">Code de sécurité</label>
+              <input
+                id="login-otp"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={otpCode}
+                placeholder="000000"
+                onChange={(event) => { setOtpCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setFormError(''); }}
+                autoFocus
+              />
+              <small>{otpSecondsLeft > 0 ? `Expire dans ${Math.floor(otpSecondsLeft / 60)}:${String(otpSecondsLeft % 60).padStart(2, '0')}` : 'Code expiré — demandez-en un nouveau.'}</small>
+              {formError && <p className="auth-error otp-error" role="alert">{formError}</p>}
+              <button className="primary-login-button" type="submit" disabled={isLoading || otpCode.length !== 6}>{isLoading ? 'Vérification...' : 'Confirmer et se connecter'}</button>
+              <button className="auth-modal-secondary-button" type="button" onClick={() => void resendLoginOtp()} disabled={isOtpResending}>{isOtpResending ? 'Envoi...' : 'Renvoyer le code'}</button>
+              <button className="otp-cancel-button" type="button" onClick={() => { setOtpChallengeId(''); setOtpCode(''); setFormError(''); }}>Changer de compte</button>
+            </form>
+          </section>
+        </div>
+      )}
 
       {mboteStep && (
         <div className="auth-modal-backdrop" role="presentation" onMouseDown={closeMboteAuth}>
