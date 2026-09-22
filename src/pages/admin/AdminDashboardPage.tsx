@@ -1,5 +1,6 @@
 import { CSSProperties, FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { getAppLocale } from '../../lib/appLanguage';
 import {
   Activity,
   Ban,
@@ -80,7 +81,7 @@ const periodOptions = [
   { value: 'month', label: 'Mois en cours' },
 ];
 
-const formatNumber = (value: number) => new Intl.NumberFormat('fr-FR').format(value);
+const formatNumber = (value: number) => new Intl.NumberFormat(getAppLocale()).format(value);
 
 const formatRelativeTime = (value: string) => {
   const date = new Date(value);
@@ -89,10 +90,10 @@ const formatRelativeTime = (value: string) => {
   if (minutes < 60) return `Il y a ${minutes} min`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `Il y a ${hours} h`;
-  return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(date);
+  return new Intl.DateTimeFormat(getAppLocale(), { dateStyle: 'medium' }).format(date);
 };
 
-const formatTime = (value: string) => new Intl.DateTimeFormat('fr-FR', {
+const formatTime = (value: string) => new Intl.DateTimeFormat(getAppLocale(), {
   hour: '2-digit',
   minute: '2-digit',
 }).format(new Date(value));
