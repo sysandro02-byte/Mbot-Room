@@ -14,6 +14,7 @@ import {
   toPublicUser,
 } from './core.js';
 import { createNotificationAndPush, getPushStatus } from './pushService.js';
+import { isPlatformFeatureEnabled } from './platformSettings.js';
 
 const safeImageUrl = (value: unknown, fallback = '') => {
   const raw=String(value||'').trim().slice(0,1000);
@@ -83,6 +84,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
 
   app.get('/api/public/meetings', requireDatabase, async (_request,response,next)=>{
     try {
+      if (!(await isPlatformFeatureEnabled('publicMeetingsEnabled'))) return response.json([]);
       const result=await query(`SELECT * FROM room_meetings WHERE status<>'cancelled' AND (settings->>'isPublic'='true' OR settings->>'visibility'='public') ORDER BY start_time ASC LIMIT 20`);
       response.json(result.rows.map(publicMeeting));
     } catch(error){next(error);}
