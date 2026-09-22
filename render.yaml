@@ -122,9 +122,3 @@ services:
         sync: false
       - key: LIVEKIT_EGRESS_S3_FORCE_PATH_STYLE
         value: "true"
-      - key: VITE_TURN_URLS
-        sync: false
-      - key: VITE_TURN_USERNAME
-        sync: false
-      - key: VITE_TURN_CREDENTIAL
-        sync: false
