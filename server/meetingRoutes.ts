@@ -508,7 +508,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     try {
       const meeting = await getMeetingById(Number(request.params.meetingId));
       if (!meeting) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
-      if (!canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte ou le co-hôte peut terminer la réunion.');
+      if (meeting.host_id !== request.user!.id && request.user!.role !== 'admin') return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte principal peut terminer la réunion pour tout le monde.');
       const updated = await query(`UPDATE room_meetings SET status='ended',is_active=false,ended_at=now(),updated_at=now() WHERE id=$1 RETURNING *`, [meeting.id]);
       if (meeting.settings.lunaSummary !== false) await generateSummary(mapMeeting(updated.rows[0])).catch(() => null);
       io.to(`meeting:${meeting.id}`).emit('meeting:ended', { meetingId: meeting.id, endedBy: request.user!.id });
@@ -535,9 +535,9 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const updated = await query(
         `UPDATE room_meeting_members
             SET muted_by_host=true, updated_at=now()
-          WHERE meeting_id=$1 AND user_id<>$2 AND status='accepted'
+          WHERE meeting_id=$1 AND status='accepted' AND role NOT IN ('host','cohost')
           RETURNING user_id`,
-        [meeting.id, meeting.host_id],
+        [meeting.id],
       );
       const userIds = updated.rows.map((row) => Number(row.user_id));
       for (const userId of userIds) {
@@ -553,16 +553,46 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const meeting = await getMeetingById(Number(request.params.meetingId));
       if (!meeting || !canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Action réservée à l’hôte ou au co-hôte.');
       const userId = Number(request.params.userId);
+      const actorIsPrimaryHost = meeting.host_id === request.user!.id || request.user!.role === 'admin';
+      const target = await query(
+        `SELECT role,status FROM room_meeting_members WHERE meeting_id=$1 AND user_id=$2 LIMIT 1`,
+        [meeting.id, userId],
+      );
+      if (!target.rows[0]) return sendApiError(response, 404, 'PARTICIPANT_NOT_FOUND', 'Participant introuvable.');
+      if (target.rows[0].role === 'host') return sendApiError(response, 400, 'VALIDATION_ERROR', 'Le rôle de l’hôte principal ne peut pas être modifié.');
+      if (!actorIsPrimaryHost && target.rows[0].role === 'cohost') {
+        return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte principal peut gérer le rôle d’un co-hôte.');
+      }
+
       const role = ['cohost','participant'].includes(request.body?.role) ? request.body.role : null;
+      if (role && !actorIsPrimaryHost) {
+        return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte principal peut nommer ou retirer un co-hôte.');
+      }
+
       const muted = typeof request.body?.mutedByHost === 'boolean' ? request.body.mutedByHost : null;
       const cameraDisabled = typeof request.body?.cameraDisabledByHost === 'boolean' ? request.body.cameraDisabledByHost : null;
+
+      if (role === 'cohost') {
+        const previousCoHostId = Number(meeting.co_host_id || 0);
+        if (previousCoHostId && previousCoHostId !== userId) {
+          await query(
+            `UPDATE room_meeting_members SET role='participant',updated_at=now() WHERE meeting_id=$1 AND user_id=$2 AND role='cohost'`,
+            [meeting.id, previousCoHostId],
+          );
+          io.to(`user:${previousCoHostId}`).emit('meeting:moderation', { meetingId: meeting.id, role: 'participant' });
+        }
+        await query('UPDATE room_meetings SET co_host_id=$2,updated_at=now() WHERE id=$1', [meeting.id, userId]);
+      } else if (role === 'participant' && Number(meeting.co_host_id || 0) === userId) {
+        await query('UPDATE room_meetings SET co_host_id=NULL,updated_at=now() WHERE id=$1', [meeting.id]);
+      }
+
       const updated = await query(
         `UPDATE room_meeting_members SET
           role=COALESCE($3,role), muted_by_host=COALESCE($4,muted_by_host), camera_disabled_by_host=COALESCE($5,camera_disabled_by_host), updated_at=now()
          WHERE meeting_id=$1 AND user_id=$2 RETURNING *`, [meeting.id,userId,role,muted,cameraDisabled],
       );
-      if (!updated.rows[0]) return sendApiError(response, 404, 'PARTICIPANT_NOT_FOUND', 'Participant introuvable.');
       io.to(`user:${userId}`).emit('meeting:moderation', { meetingId: meeting.id, mutedByHost: updated.rows[0].muted_by_host, cameraDisabledByHost: updated.rows[0].camera_disabled_by_host, role: updated.rows[0].role });
+      io.to(`meeting:${meeting.id}`).emit('meeting:presence', { meetingId: meeting.id, roleChangedUserId: role ? userId : undefined });
       response.json(updated.rows[0]);
     } catch (error) { next(error); }
   });
@@ -653,7 +683,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
   app.post('/api/meetings/:meetingId/polls', ...protectedApi, async (request:AuthedRequest,response,next)=>{
     try{
       const meetingId=Number(request.params.meetingId);
-      if(!(await hasMeetingAccess(meetingId,request.user!))) return sendApiError(response,403,'MEETING_ACCESS_DENIED','Accès refusé.');
+      const meeting=await getMeetingById(meetingId);
+      if(!meeting||!canModerateMeeting(meeting,request.user!)) return sendApiError(response,403,'MEETING_HOST_REQUIRED','Seul l’hôte ou le co-hôte peut créer un sondage.');
       const question=normalizeText(request.body?.question).slice(0,300);
       const options=Array.isArray(request.body?.options)?request.body.options.map((x:unknown)=>normalizeText(x).slice(0,120)).filter(Boolean).slice(0,10):[];
       if(!question||options.length<2) return sendApiError(response,400,'VALIDATION_ERROR','Une question et au moins deux options sont requises.');
