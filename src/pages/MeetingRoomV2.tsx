@@ -45,6 +45,7 @@ import {
 import { getMeetingAccessCode, LobbyParticipant, LunaCatchUpResponse, Meeting, MeetingMediaRequest, meetingService } from '../services/meetingService';
 import { mediaTransportService, type MediaTransportStatus } from '../services/mediaTransportService';
 import { createCompositeMeetingRecording, type CompositeRecordingSession } from '../lib/meetingRecording';
+import { getAppLocale } from '../lib/appLanguage';
 import './MeetingRoomV2.css';
 
 type Panel = 'participants' | 'chat' | 'polls' | 'luna' | 'breakouts' | null;
@@ -214,7 +215,7 @@ function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, l
 const formatTime = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date);
+  return new Intl.DateTimeFormat(getAppLocale(), { hour: '2-digit', minute: '2-digit' }).format(date);
 };
 
 const dedupeMessages = (items: MeetingMessage[]) => {
@@ -399,7 +400,7 @@ export default function MeetingRoomV2() {
     enabled: captionsEnabled && Boolean(meeting?.id),
     audioStream: cameraStreamRef.current || localStream,
     breakoutRoomId,
-    language: 'fr-FR',
+    language: getAppLocale(),
     onNotice: setNotice,
   });
 
