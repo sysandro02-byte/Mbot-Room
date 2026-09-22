@@ -93,8 +93,12 @@ export default function AppMessageModal() {
 
   useEffect(() => {
     if (!message) return;
+    const closeMessage = () => {
+      lastMessageRef.current = '';
+      setMessage(null);
+    };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') lastMessageRef.current = ''; setMessage(null);
+      if (event.key === 'Escape') closeMessage();
     };
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
@@ -106,10 +110,13 @@ export default function AppMessageModal() {
 
   return (
     <div className="app-message-backdrop" data-app-message-modal="true" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) lastMessageRef.current = ''; setMessage(null);
+      if (event.target === event.currentTarget) {
+        lastMessageRef.current = '';
+        setMessage(null);
+      }
     }}>
       <section className={`app-message-modal is-${tone}`} role="dialog" aria-modal="true" aria-labelledby="app-message-title" aria-describedby="app-message-text">
-        <button className="app-message-close" type="button" aria-label="Fermer" onClick={() => setMessage(null)}><X size={19}/></button>
+        <button className="app-message-close" type="button" aria-label="Fermer" onClick={() => { lastMessageRef.current = ''; setMessage(null); }}><X size={19}/></button>
         <span className="app-message-icon"><Icon size={29}/></span>
         <div className="app-message-copy">
           <span className="app-message-kicker">MBotéRoom</span>
