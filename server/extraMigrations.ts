@@ -37,6 +37,22 @@ export const runExtraMigrations = async () => {
       updated_at timestamptz NOT NULL DEFAULT now()
     );
 
+    CREATE TABLE IF NOT EXISTS room_home_slides (
+      slot smallint PRIMARY KEY CHECK (slot BETWEEN 1 AND 3),
+      title text NOT NULL,
+      body text NOT NULL,
+      image_url text NOT NULL DEFAULT '',
+      action_label text NOT NULL DEFAULT '',
+      action_path text NOT NULL DEFAULT '',
+      is_active boolean NOT NULL DEFAULT true,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    INSERT INTO room_home_slides (slot,title,body,image_url,action_label,action_path,is_active) VALUES
+      (1,'Réunions simples, professionnelles et sécurisées','Créez, planifiez et animez vos réunions depuis un espace pensé pour vos équipes.','/images/meeting-black-team.svg','Créer une réunion','/app/meetings',true),
+      (2,'Retrouvez votre équipe en quelques secondes','Rejoignez une réunion par ID ou par lien, avec salle d’attente et contrôles de sécurité.','','Rejoindre une réunion','/join',true),
+      (3,'Collaborez avec Luna IA','Retrouvez les décisions, points clés, messages et actions importantes de vos réunions.','','Découvrir mes réunions','/app/meetings',true)
+    ON CONFLICT (slot) DO NOTHING;
+
     CREATE TABLE IF NOT EXISTS room_platform_settings (
       key text PRIMARY KEY,
       enabled boolean NOT NULL DEFAULT true,
