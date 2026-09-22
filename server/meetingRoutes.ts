@@ -625,6 +625,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
             `UPDATE room_meeting_members SET role='participant',updated_at=now() WHERE meeting_id=$1 AND user_id=$2 AND role='cohost'`,
             [meeting.id, previousCoHostId],
           );
+          io.in(`user:${previousCoHostId}`).socketsLeave(`meeting:${meeting.id}:moderators`);
           io.to(`user:${previousCoHostId}`).emit('meeting:moderation', { meetingId: meeting.id, role: 'participant' });
         }
         await query('UPDATE room_meetings SET co_host_id=$2,updated_at=now() WHERE id=$1', [meeting.id, userId]);
@@ -817,7 +818,9 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     try{
       const status=request.body?.status==='accepted'?'accepted':'rejected'; const result=await query(`UPDATE room_media_requests SET status=$4,responded_at=now() WHERE id=$1 AND meeting_id=$2 AND target_user_id=$3 AND status='pending' RETURNING *`,[request.params.requestId,Number(request.params.meetingId),request.user!.id,status]);
       if(!result.rows[0]) return sendApiError(response,404,'MEDIA_REQUEST_NOT_FOUND','Demande introuvable.');
-      io.to(`user:${result.rows[0].requested_by}`).emit('meeting:media-request-responded',result.rows[0]); response.json(result.rows[0]);
+      const row=result.rows[0];
+      const payload={id:row.id,meetingId:Number(row.meeting_id),targetUserId:Number(row.target_user_id),requestedBy:Number(row.requested_by),requestedByName:row.requested_by_name,kind:row.kind,status:row.status,createdAt:new Date(row.created_at).toISOString(),respondedAt:row.responded_at?new Date(row.responded_at).toISOString():undefined};
+      io.to(`user:${row.requested_by}`).emit('meeting:media-request-responded',payload); response.json(payload);
     }catch(error){next(error);}
   });
 
