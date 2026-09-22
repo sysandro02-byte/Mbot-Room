@@ -1205,3 +1205,15 @@
 @media(max-width:700px){.account-created-modal,.otp-login-modal{padding:24px}.auth-security-badges{justify-content:flex-start}.login-card-header{text-align:left}.auth-card-kicker{margin-left:0}.otp-login-form>input{font-size:27px;letter-spacing:8px}}
 
 .login-created-by{grid-column:1/-1;width:100%;margin-top:8px;text-align:center;color:#8792a6;font-size:10px;line-height:1.5}.login-created-by strong{color:#53617b}
+
+
+/* OTP modal mobile/tablet hardening */
+.auth-modal-backdrop{max-width:100vw;max-height:100dvh;overflow:auto;overscroll-behavior:contain;padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+.otp-login-modal{width:min(500px,100%);max-width:100%;max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:contain}
+.otp-login-form{min-width:0}
+.otp-login-form>input{width:100%;min-width:0;max-width:100%;font-size:clamp(24px,7vw,31px);letter-spacing:clamp(5px,2.5vw,10px);padding-inline:clamp(10px,4vw,16px)}
+.otp-login-modal p,.otp-login-modal strong,.otp-login-form label,.otp-login-form small{overflow-wrap:anywhere}
+@media(max-width:900px){.auth-modal-backdrop{place-items:end center}.otp-login-modal{width:min(560px,100%);border-radius:24px 24px 16px 16px;padding:26px 22px calc(24px + env(safe-area-inset-bottom));text-align:left}.otp-login-modal .auth-modal-icon{margin:0 0 14px}.otp-login-modal h2{font-size:clamp(22px,5vw,26px)}}
+@media(max-width:600px){.auth-modal-backdrop{padding:0;align-items:end}.otp-login-modal{width:100%;max-width:none;max-height:min(88dvh,720px);border-radius:24px 24px 0 0;padding:22px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -18px 55px rgba(15,23,42,.25)}.otp-login-form>input{height:58px;font-size:26px;letter-spacing:clamp(4px,2.3vw,7px)}.otp-login-form .primary-login-button,.otp-login-form .auth-modal-secondary-button{min-height:48px}.otp-cancel-button{min-height:40px!important}}
+@media(max-width:360px){.otp-login-modal{padding-left:12px;padding-right:12px}.otp-login-form>input{font-size:23px;letter-spacing:4px;padding-inline:8px}}
+@media(max-height:620px) and (max-width:900px){.otp-login-modal{max-height:96dvh;padding-top:14px}.otp-login-modal .auth-modal-icon{width:44px;height:44px;margin-bottom:8px}.otp-login-modal p{margin:8px 0 12px}.otp-login-form{gap:7px}.otp-login-form>input{height:52px}}
