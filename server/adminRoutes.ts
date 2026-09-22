@@ -13,6 +13,7 @@ import {
   requireDatabase,
   sendApiError,
 } from './core.js';
+import { getPlatformSettings, updatePlatformSettings } from './platformSettings.js';
 
 const rowToTip = (row: any) => ({
   id: String(row.id),
@@ -63,6 +64,95 @@ const realSparkline = async (days: number) => {
 
 export const registerAdminRoutes = (app: express.Express, io: Server) => {
   const adminApi = [requireDatabase, authenticateToken, requireAdmin] as const;
+
+  app.get('/api/admin/settings', ...adminApi, async (_request, response, next) => {
+    try {
+      response.json(await getPlatformSettings());
+    } catch (error) { next(error); }
+  });
+
+  app.put('/api/admin/settings', ...adminApi, async (request, response, next) => {
+    try {
+      const settings = await updatePlatformSettings({
+        registrationEnabled: typeof request.body?.registrationEnabled === 'boolean' ? request.body.registrationEnabled : undefined,
+        guestAccessEnabled: typeof request.body?.guestAccessEnabled === 'boolean' ? request.body.guestAccessEnabled : undefined,
+        meetingCreationEnabled: typeof request.body?.meetingCreationEnabled === 'boolean' ? request.body.meetingCreationEnabled : undefined,
+        lunaEnabled: typeof request.body?.lunaEnabled === 'boolean' ? request.body.lunaEnabled : undefined,
+        recordingEnabled: typeof request.body?.recordingEnabled === 'boolean' ? request.body.recordingEnabled : undefined,
+        publicMeetingsEnabled: typeof request.body?.publicMeetingsEnabled === 'boolean' ? request.body.publicMeetingsEnabled : undefined,
+      });
+      io.emit('admin:settings-updated', settings);
+      response.json(settings);
+    } catch (error) { next(error); }
+  });
+
+  app.get('/api/admin/users', ...adminApi, async (request, response, next) => {
+    try {
+      const search = normalizeText(request.query.q).toLowerCase().slice(0,120);
+      const term = search ? `%${search}%` : '%';
+      const result = await query(
+        `SELECT id,name,username,email,phone_number,organization,job_title,role,is_guest,is_suspended,created_at
+           FROM room_users
+          WHERE (lower(name) LIKE $1 OR lower(email) LIKE $1 OR lower(username) LIKE $1)
+          ORDER BY is_guest ASC, created_at::timestamptz DESC
+          LIMIT 250`,
+        [term],
+      );
+      response.json(result.rows.map((row)=>({
+        id:Number(row.id),
+        name:String(row.name||''),
+        username:String(row.username||''),
+        email:String(row.email||''),
+        phoneNumber:String(row.phone_number||''),
+        organization:String(row.organization||''),
+        jobTitle:String(row.job_title||''),
+        role:String(row.role||'user'),
+        isGuest:Boolean(row.is_guest),
+        isSuspended:Boolean(row.is_suspended),
+        createdAt:new Date(row.created_at).toISOString(),
+      })));
+    } catch (error) { next(error); }
+  });
+
+  app.put('/api/admin/users/:userId', ...adminApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const userId = Number(request.params.userId);
+      if (!Number.isFinite(userId) || userId <= 0) return sendApiError(response,400,'USER_INVALID','Utilisateur invalide.');
+      const current = await query('SELECT * FROM room_users WHERE id=$1 LIMIT 1',[userId]);
+      const row = current.rows[0];
+      if (!row) return sendApiError(response,404,'USER_NOT_FOUND','Utilisateur introuvable.');
+      const requestedSuspended = typeof request.body?.isSuspended === 'boolean' ? request.body.isSuspended : Boolean(row.is_suspended);
+      if (userId === request.user!.id && requestedSuspended) {
+        return sendApiError(response,400,'ADMIN_SELF_SUSPEND_FORBIDDEN','Vous ne pouvez pas suspendre votre propre compte.');
+      }
+      const name = normalizeText(request.body?.name ?? row.name).slice(0,120) || String(row.name);
+      const organization = normalizeText(request.body?.organization ?? row.organization).slice(0,120);
+      const jobTitle = normalizeText(request.body?.jobTitle ?? row.job_title).slice(0,120);
+      const phoneNumber = normalizeText(request.body?.phoneNumber ?? row.phone_number).slice(0,40);
+      const updated = await query(
+        `UPDATE room_users
+            SET name=$2,organization=$3,job_title=$4,phone_number=$5,is_suspended=$6
+          WHERE id=$1
+          RETURNING id,name,username,email,phone_number,organization,job_title,role,is_guest,is_suspended,created_at`,
+        [userId,name,organization,jobTitle,phoneNumber,requestedSuspended],
+      );
+      if (requestedSuspended) await query('DELETE FROM room_sessions WHERE user_id=$1',[userId]);
+      io.emit('admin:user-updated',{userId,isSuspended:requestedSuspended});
+      response.json({
+        id:Number(updated.rows[0].id),
+        name:String(updated.rows[0].name||''),
+        username:String(updated.rows[0].username||''),
+        email:String(updated.rows[0].email||''),
+        phoneNumber:String(updated.rows[0].phone_number||''),
+        organization:String(updated.rows[0].organization||''),
+        jobTitle:String(updated.rows[0].job_title||''),
+        role:String(updated.rows[0].role||'user'),
+        isGuest:Boolean(updated.rows[0].is_guest),
+        isSuspended:Boolean(updated.rows[0].is_suspended),
+        createdAt:new Date(updated.rows[0].created_at).toISOString(),
+      });
+    } catch (error) { next(error); }
+  });
 
   app.get('/api/admin/dashboard', ...adminApi, async (request, response, next) => {
     try {
