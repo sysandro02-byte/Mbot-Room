@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, stat } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 import pg from 'pg';
 import { chromium } from '@playwright/test';
 
@@ -17,6 +18,18 @@ const pool = new pg.Pool({ connectionString: databaseUrl, ssl: false });
 await pool.query('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
 await pool.end();
 
+const mailRelayPort = port + 5;
+const mailRelayRequests = [];
+const mockMailRelayServer = createServer(async (request, response) => {
+  let rawBody = '';
+  for await (const chunk of request) rawBody += chunk.toString();
+  mailRelayRequests.push({ path: request.url, body: rawBody ? JSON.parse(rawBody) : {} });
+  response.statusCode = 202;
+  response.setHeader('Content-Type', 'application/json');
+  response.end(JSON.stringify({ success: true }));
+});
+await new Promise((resolve) => mockMailRelayServer.listen(mailRelayPort, '127.0.0.1', resolve));
+
 const server = spawn(process.execPath, ['dist/server.js'], {
   cwd: process.cwd(),
   env: {
@@ -27,6 +40,9 @@ const server = spawn(process.execPath, ['dist/server.js'], {
     MBOTE_ROOM_ALLOWED_ORIGINS: baseUrl,
     MBOTE_ROOM_APP_URL: baseUrl,
     ADMIN_EMAILS: '',
+    MBOTE_MAIL_RELAY_URL: `http://127.0.0.1:${mailRelayPort}/email`,
+    MBOTE_ROOM_MAIL_SECRET: 'video-test-mail-secret',
+    BREVO_API_KEY: '',
     RESEND_API_KEY: '',
     GROQ_API_KEY: '',
     MEDIA_TRANSPORT: 'livekit',
@@ -411,7 +427,20 @@ try {
   await loginPage.goto(`${baseUrl}/login`, { waitUntil: 'domcontentloaded' });
   await loginPage.locator('#login-email').fill('host.video@mbote.test');
   await loginPage.locator('#login-password').fill('Password2026!');
+  const mailCountBeforeLogin = mailRelayRequests.length;
   await loginPage.locator('.primary-login-button').click();
+  await loginPage.locator('#login-otp').waitFor({ state: 'visible', timeout: 10_000 });
+  await loginPage.waitForFunction(
+    (expectedCount) => document.querySelector('#login-otp') !== null,
+    mailCountBeforeLogin + 1,
+    { timeout: 5_000 },
+  );
+  const otpMail = mailRelayRequests.at(-1);
+  assert.ok(mailRelayRequests.length > mailCountBeforeLogin, 'Web login must send an OTP email');
+  const loginOtp = String(otpMail?.body?.text || '').match(/\b\d{6}\b/)?.[0];
+  assert.ok(loginOtp, 'OTP email must contain a six-digit code');
+  await loginPage.locator('#login-otp').fill(loginOtp);
+  await loginPage.locator('.otp-login-form .primary-login-button').click();
   await loginPage.waitForURL(/\/app(?:\?|$)/, { timeout: 20_000 });
   const browserStorage = await loginPage.evaluate(() => ({
     localToken: localStorage.getItem('token'),
@@ -634,4 +663,5 @@ try {
     new Promise((resolve) => server.once('exit', resolve)),
     sleep(5_000),
   ]);
+  await new Promise((resolve) => mockMailRelayServer.close(() => resolve()));
 }
