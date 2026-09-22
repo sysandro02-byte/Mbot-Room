@@ -76,6 +76,12 @@ services:
         sync: false
       - key: MEETING_INVITE_FROM
         sync: false
+      - key: WEB_PUSH_VAPID_PUBLIC_KEY
+        sync: false
+      - key: WEB_PUSH_VAPID_PRIVATE_KEY
+        sync: false
+      - key: WEB_PUSH_VAPID_SUBJECT
+        value: mailto:contacts@loukatech.com
       - key: STUN_URLS
         value: stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302
       - key: TURN_URLS
