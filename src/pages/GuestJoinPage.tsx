@@ -296,6 +296,12 @@ export default function GuestJoinPage() {
               </div>
             </header>
 
+            <div className="guest-trust-strip" aria-label="Avantages de l'accès invité">
+              <span><ShieldCheck size={16}/> Accès sécurisé</span>
+              <span><MonitorSmartphone size={16}/> Tous appareils</span>
+              <span><Video size={16}/> Prévisualisation avant entrée</span>
+            </div>
+
             <form className="guest-join-form" onSubmit={submitJoin} noValidate>
               <JoinField
                 id="guest-name"
@@ -383,7 +389,7 @@ export default function GuestJoinPage() {
 
               <div className="waiting-room-note">
                 <Info size={21} aria-hidden="true" />
-                <span>Vous serez placé dans la salle d'attente jusqu'à validation de l'hôte.</span>
+                <span>Selon les règles définies par l’hôte, vous pourrez être placé dans la salle d’attente avant d’entrer.</span>
               </div>
 
               <div className="guest-auth-links">
