@@ -38,6 +38,24 @@ const rowToSlide = (row: any) => ({
   updatedAt: new Date(row.updated_at).toISOString(),
 });
 
+const rowToHomeSlide = (row: any) => ({
+  slot: Number(row.slot),
+  title: String(row.title || ''),
+  body: String(row.body || ''),
+  imageUrl: String(row.image_url || ''),
+  actionLabel: String(row.action_label || ''),
+  actionPath: String(row.action_path || ''),
+  isActive: Boolean(row.is_active),
+  updatedAt: new Date(row.updated_at).toISOString(),
+});
+
+const safeHomeSlidePath = (value: unknown) => {
+  const path = String(value || '').trim().slice(0, 300);
+  if (!path) return '';
+  if (!path.startsWith('/') || path.startsWith('//') || path.includes('\\')) return '';
+  return path;
+};
+
 const periodDays = (period: unknown) => {
   const value = String(period || '30d');
   if (value === '7d') return 7;
@@ -248,6 +266,51 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
     try{const result=await query(`UPDATE room_dashboard_tips SET title=$2,body=$3,action_label=$4,action_path=$5,is_active=$6,updated_at=now() WHERE id=$1 RETURNING *`,[request.params.tipId,normalizeText(request.body?.title).slice(0,160),normalizeText(request.body?.body).slice(0,1000),normalizeText(request.body?.actionLabel).slice(0,80),String(request.body?.actionPath||'').slice(0,300),request.body?.isActive!==false]);if(!result.rows[0])return sendApiError(response,404,'TIP_NOT_FOUND','Astuce introuvable.');const tip=rowToTip(result.rows[0]);io.emit('dashboard:tips-updated',tip);response.json(tip);}catch(error){next(error);}
   });
   app.delete('/api/admin/dashboard-tips/:tipId', ...adminApi, async (request,response,next)=>{try{await query('DELETE FROM room_dashboard_tips WHERE id=$1',[request.params.tipId]);io.emit('dashboard:tips-updated');response.status(204).end();}catch(error){next(error);}});
+
+  app.get('/api/dashboard/slides', requireDatabase, authenticateToken, async (_request,response,next)=>{
+    try {
+      const result = await query('SELECT * FROM room_home_slides WHERE is_active=true ORDER BY slot ASC');
+      response.json(result.rows.map(rowToHomeSlide));
+    } catch (error) { next(error); }
+  });
+
+  app.get('/api/admin/home-slides', ...adminApi, async (_request,response,next)=>{
+    try {
+      const result = await query('SELECT * FROM room_home_slides ORDER BY slot ASC');
+      response.json(result.rows.map(rowToHomeSlide));
+    } catch (error) { next(error); }
+  });
+
+  app.put('/api/admin/home-slides/:slot', ...adminApi, async (request,response,next)=>{
+    try {
+      const slot = Number(request.params.slot);
+      if (!Number.isInteger(slot) || slot < 1 || slot > 3) return sendApiError(response,400,'HOME_SLIDE_SLOT_INVALID','Le numéro du slide doit être compris entre 1 et 3.');
+      const title = normalizeText(request.body?.title).slice(0,120);
+      const body = normalizeText(request.body?.body).slice(0,420);
+      const actionLabel = normalizeText(request.body?.actionLabel).slice(0,50);
+      const actionPath = safeHomeSlidePath(request.body?.actionPath);
+      const imageUrl = String(request.body?.imageUrl || '').trim().slice(0,1000);
+      if (!title || !body) return sendApiError(response,400,'HOME_SLIDE_CONTENT_REQUIRED','Le titre et le message du slide sont requis.');
+      if (request.body?.actionPath && !actionPath) return sendApiError(response,400,'HOME_SLIDE_PATH_INVALID','La destination du bouton doit être une route interne valide.');
+      const result = await query(
+        `INSERT INTO room_home_slides (slot,title,body,image_url,action_label,action_path,is_active,updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,now())
+         ON CONFLICT (slot) DO UPDATE SET
+           title=excluded.title,
+           body=excluded.body,
+           image_url=excluded.image_url,
+           action_label=excluded.action_label,
+           action_path=excluded.action_path,
+           is_active=excluded.is_active,
+           updated_at=now()
+         RETURNING *`,
+        [slot,title,body,imageUrl,actionLabel,actionPath,request.body?.isActive!==false],
+      );
+      const slide = rowToHomeSlide(result.rows[0]);
+      io.emit('dashboard:slides-updated', slide);
+      response.json(slide);
+    } catch (error) { next(error); }
+  });
 
   app.get('/api/public/guest-access-slides', requireDatabase, async (_request,response,next)=>{try{const result=await query('SELECT * FROM room_guest_access_slides WHERE is_active=true ORDER BY created_at ASC');response.json(result.rows.map(rowToSlide));}catch(error){next(error);}});
   app.get('/api/admin/guest-access-slides', ...adminApi, async (_request,response,next)=>{try{const result=await query('SELECT * FROM room_guest_access_slides ORDER BY updated_at DESC');response.json(result.rows.map(rowToSlide));}catch(error){next(error);}});
