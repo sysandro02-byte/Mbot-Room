@@ -17,6 +17,7 @@ const RealMeetingEndedPage = lazy(() => import('./pages/RealMeetingEndedPage'));
 const RealFeaturePage = lazy(() => import('./pages/RealFeaturePage'));
 const RealDashboardPage = lazy(() => import('./pages/dashboard/RealDashboardPage'));
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
+const AdminAuthPage = lazy(() => import('./pages/admin/AdminAuthPage'));
 const GlobalSearchPage = lazy(() => import('./pages/GlobalSearchPage'));
 const HelpPage = lazy(() => import('./pages/HelpPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
@@ -53,9 +54,7 @@ function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: bo
 
   if (checking) return <main className="route-loading" role="status">Vérification de la session…</main>;
   if (!isAuthenticated) {
-    const redirect = sanitizeInternalPath(`${location.pathname}${location.search}`);
-    sessionStorage.setItem('mboteroom-login-redirect', redirect);
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/admin/login" replace />;
   }
   return children;
 }
@@ -130,6 +129,9 @@ export default function App() {
     <Route path="/mot-de-passe-oublie" element={<Login initialView="forgot" />} />
     <Route path="/rejoindre-une-reunion" element={<GuestJoinPage />} />
     <Route path="/dashboard" element={<Navigate to="/app" replace />} />
+    <Route path="/admin/login" element={<AdminAuthPage mode="login" />} />
+    <Route path="/admin/inscription" element={<AdminAuthPage mode="register" />} />
+    <Route path="/admin/mot-de-passe-oublie" element={<AdminAuthPage mode="forgot" />} />
     <Route path="/admin" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
     <Route path="/reunions/recentes" element={<Navigate to="/app?tab=reunions" replace />} />
     <Route path="/aide" element={<HelpPage />} />
