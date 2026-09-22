@@ -113,6 +113,9 @@ if (vercelConfig.buildCommand !== 'npm run build:frontend' || vercelConfig.outpu
 if (!vercelConfig.rewrites?.some((rewrite) => rewrite.source === '/(.*)' && rewrite.destination === '/index.html')) {
   throw new Error('Vercel must serve index.html for direct SPA routes');
 }
+if (vercelConfig.cleanUrls) {
+  throw new Error('Vercel cleanUrls conflicts with the SPA index.html fallback');
+}
 const productionHealth = fs.readFileSync(new URL('../scripts/check-production-health.mjs', import.meta.url), 'utf8');
 if (!productionHealth.includes('getWithRetry') || !productionHealth.includes('attempts: 5') || !productionHealth.includes('45_000')) {
   throw new Error('Production health monitoring must tolerate Render cold starts with retries and backoff');
