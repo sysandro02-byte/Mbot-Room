@@ -127,7 +127,7 @@ export function useMeetingCaptions({
       } catch {
         setServerUnavailable(true);
         setActive(false);
-        onNotice?.('La capture audio pour les sous-titres serveur est indisponible. Passage au mode navigateur.');
+        onNotice?.('Les sous-titres automatiques sont momentanément limités. Une autre méthode est utilisée.');
         return;
       }
       recorderRef.current = recorder;
