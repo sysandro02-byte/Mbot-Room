@@ -3,6 +3,7 @@ import { CalendarPlus, Clock3, Copy, Link2, Lock, Play, Plus, RefreshCw, Trash2,
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { getMeetingAccessCode, getMeetingJoinUrl, Meeting, meetingService } from '../services/meetingService';
+import { getAppLocale } from '../lib/appLanguage';
 import './RealMeetingList.css';
 
 type MeetingForm = {
@@ -14,7 +15,7 @@ const defaultForm=():MeetingForm=>{
   const start=new Date(Date.now()+30*60_000);start.setSeconds(0,0);
   return{title:'',description:'',startTime:new Date(start.getTime()-start.getTimezoneOffset()*60000).toISOString().slice(0,16),duration:60,password:'',participants:'',waitingRoom:true,joinBeforeHost:false,participantAudio:true,participantVideo:true,screenShare:true,chat:true,reactions:true,lunaSummary:true,isPublic:false};
 };
-const formatDate=(value:string)=>new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
+const formatDate=(value:string)=>new Intl.DateTimeFormat(getAppLocale(),{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
 
 export default function RealMeetingList(){
   const navigate=useNavigate();
