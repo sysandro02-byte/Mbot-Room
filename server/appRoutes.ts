@@ -15,6 +15,17 @@ import {
 } from './core.js';
 import { createNotificationAndPush, getPushStatus } from './pushService.js';
 
+const safeImageUrl = (value: unknown, fallback = '') => {
+  const raw=String(value||'').trim().slice(0,1000);
+  if(!raw)return fallback;
+  if(raw.startsWith('/')&&!raw.startsWith('//'))return raw;
+  if(/^data:image\/(?:png|jpeg|jpg|webp|gif);base64,[a-z0-9+/=]+$/i.test(raw))return raw;
+  try{
+    const url=new URL(raw);
+    return url.protocol==='https:'?url.href:fallback;
+  }catch{return fallback;}
+};
+
 const parseDate = (value: unknown) => {
   const date = new Date(String(value || ''));
   return Number.isNaN(date.getTime()) ? null : date;
@@ -50,10 +61,8 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
         },
         readiness:getRuntimeReadiness(databaseType),
         deployment:{
-          commit:String(process.env.RENDER_GIT_COMMIT||''),
-          branch:String(process.env.RENDER_GIT_BRANCH||''),
-          serviceId:String(process.env.RENDER_SERVICE_ID||''),
-          instanceId:String(process.env.RENDER_INSTANCE_ID||''),
+          commit:String(process.env.RENDER_GIT_COMMIT||'').slice(0,12),
+          branch:String(process.env.RENDER_GIT_BRANCH||'').slice(0,80),
         },
         serverTime:result.rows[0].now,
       });
@@ -64,12 +73,10 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
         database:{configured:true,connected:false,type:databaseType},
         readiness:getRuntimeReadiness(databaseType),
         deployment:{
-          commit:String(process.env.RENDER_GIT_COMMIT||''),
-          branch:String(process.env.RENDER_GIT_BRANCH||''),
-          serviceId:String(process.env.RENDER_SERVICE_ID||''),
-          instanceId:String(process.env.RENDER_INSTANCE_ID||''),
+          commit:String(process.env.RENDER_GIT_COMMIT||'').slice(0,12),
+          branch:String(process.env.RENDER_GIT_BRANCH||'').slice(0,80),
         },
-        error:error instanceof Error?error.message:'Database unavailable',
+        error:process.env.NODE_ENV==='production'?'Database unavailable':error instanceof Error?error.message:'Database unavailable',
       });
     }
   });
@@ -89,7 +96,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
     try{
       const name=String(request.body?.name||request.user!.name).trim().slice(0,120);
       const username=String(request.body?.username||request.user!.username).trim().toLowerCase().replace(/\s+/g,'').slice(0,80);
-      const avatar=String(request.body?.avatar??request.user!.avatar).trim().slice(0,1000);
+      const avatar=safeImageUrl(request.body?.avatar,request.user!.avatar);
       const phoneNumber=String(request.body?.phoneNumber??request.user!.phoneNumber??'').trim().slice(0,40);
       const organization=String(request.body?.organization??request.user!.organization??'').trim().slice(0,120);
       const jobTitle=String(request.body?.jobTitle??request.user!.jobTitle??'').trim().slice(0,120);
