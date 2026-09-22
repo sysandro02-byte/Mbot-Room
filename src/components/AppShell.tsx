@@ -111,7 +111,7 @@ export default function AppShell({ children, title }: AppShellProps) {
             );
           })}
         </nav>
-        <div className="app-shell-creator">MBotéRoom application créée par <strong>LoukaTech</strong></div>
+        <div className="app-shell-creator">MBotéRoom application créée par <strong>LoukaTech</strong>.</div>
         <section className="app-shell-profile">
           <b>{userName.slice(0, 2).toUpperCase()}</b>
           <div>
