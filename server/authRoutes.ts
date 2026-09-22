@@ -438,9 +438,12 @@ export const registerAuthRoutes = (app: express.Express) => {
     try {
       const challengeId = String(request.body?.challengeId || '');
       const result = await query(
-        `SELECT o.*,u.email,u.name,u.username FROM room_login_otps o
+        `SELECT o.*,u.email,u.name,u.username,u.role,u.is_suspended FROM room_login_otps o
          JOIN room_users u ON u.id=o.user_id
-         WHERE o.challenge_id=$1 AND o.consumed_at IS NULL LIMIT 1`,
+         WHERE o.challenge_id=$1
+           AND o.consumed_at IS NULL
+           AND (COALESCE(u.is_suspended,false)=false OR (o.purpose='admin_register' AND u.role='admin'))
+         LIMIT 1`,
         [challengeId],
       );
       const challenge = result.rows[0];
