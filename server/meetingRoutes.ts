@@ -320,6 +320,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     try {
       const meeting = await findMeetingByValue(request.body?.value);
       if (!meeting || meeting.status === 'cancelled') return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
+      if (meeting.status === 'ended') return sendApiError(response, 410, 'MEETING_ENDED', 'Cette réunion est terminée.');
       if (!validateMeetingPassword(meeting, request.body?.password)) return sendApiError(response, 403, 'MEETING_PASSWORD_INVALID', 'Mot de passe de réunion incorrect.');
       const ban = await query('SELECT 1 FROM room_meeting_bans WHERE meeting_id=$1 AND user_id=$2 LIMIT 1', [meeting.id, request.user!.id]);
       if (ban.rows[0]) return sendApiError(response, 403, 'MEETING_BANNED', 'Vous avez été exclu de cette réunion.');
@@ -418,6 +419,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     try {
       const meeting = await getMeetingById(Number(request.params.meetingId));
       if (!meeting) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
+      if (meeting.status === 'ended' || meeting.status === 'cancelled') return sendApiError(response, 410, 'MEETING_ENDED', 'Cette réunion est terminée ou annulée.');
       if (!validateMeetingPassword(meeting, request.body?.password)) return sendApiError(response, 403, 'MEETING_PASSWORD_INVALID', 'Mot de passe de réunion incorrect.');
       const ban = await query('SELECT 1 FROM room_meeting_bans WHERE meeting_id=$1 AND user_id=$2 LIMIT 1', [meeting.id, request.user!.id]);
       if (ban.rows[0]) return sendApiError(response, 403, 'MEETING_BANNED', 'Vous avez été exclu de cette réunion.');
@@ -523,7 +525,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     try {
       const meeting = await getMeetingById(Number(request.params.meetingId));
       if (!meeting) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
-      if (!canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte peut démarrer la réunion.');
+      if (meeting.status === 'ended' || meeting.status === 'cancelled') return sendApiError(response, 409, 'MEETING_ALREADY_ENDED', 'Cette réunion est déjà terminée ou annulée.');
+      if (!canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte ou le co-hôte peut démarrer la réunion.');
       const updated = await query(`UPDATE room_meetings SET status='live',is_active=true,started_at=COALESCE(started_at,now()),ended_at=NULL,updated_at=now() WHERE id=$1 RETURNING *`, [meeting.id]);
       if (meeting.settings.waitingRoom === false) {
         const pending = await query(`SELECT user_id FROM room_lobby WHERE meeting_id=$1 AND status='requested' ORDER BY user_id`, [meeting.id]);
