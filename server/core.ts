@@ -153,7 +153,7 @@ export const getConfiguredAdminEmails = () => String(process.env.ADMIN_EMAILS ||
 
 const resolveRole = (row: any): UserRole => {
   if (row.is_guest) return 'guest';
-  if (row.role === 'admin' || getConfiguredAdminEmails().includes(normalizeEmail(row.email))) return 'admin';
+  if (row.role === 'admin') return 'admin';
   return 'user';
 };
 

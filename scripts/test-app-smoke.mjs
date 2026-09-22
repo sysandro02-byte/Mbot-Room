@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 import pg from 'pg';
 import { chromium } from 'playwright';
 
@@ -12,6 +13,16 @@ if (!databaseUrl) throw new Error('DATABASE_URL is required');
 
 const port = Number(process.env.MBOTE_ROOM_APP_SMOKE_PORT || 4335);
 const baseUrl = `http://127.0.0.1:${port}`;
+const mailRelayPort = port + 1;
+const sentEmails = [];
+const mailRelay = createServer(async (request, response) => {
+  let raw = '';
+  for await (const chunk of request) raw += chunk.toString();
+  sentEmails.push(JSON.parse(raw));
+  response.statusCode = 202;
+  response.end(JSON.stringify({ success: true }));
+});
+await new Promise((resolve) => mailRelay.listen(mailRelayPort, '127.0.0.1', resolve));
 
 const pool = new pg.Pool({ connectionString: databaseUrl, ssl: false });
 await pool.query('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
@@ -27,6 +38,8 @@ const server = spawn(process.execPath, ['dist/server.js'], {
     MBOTE_ROOM_ALLOWED_ORIGINS: baseUrl,
     MBOTE_ROOM_APP_URL: baseUrl,
     ADMIN_EMAILS: 'admin.smoke@mbote.test',
+    MBOTE_MAIL_RELAY_URL: `http://127.0.0.1:${mailRelayPort}/email`,
+    MBOTE_ROOM_MAIL_SECRET: 'smoke-mail-secret',
     RESEND_API_KEY: '',
     GROQ_API_KEY: '',
     GROQ_TRANSCRIPTION_API_KEY: '',
@@ -99,10 +112,19 @@ try {
     }),
   });
   assert.equal(register.response.status, 201, JSON.stringify(register.data));
-  assert.ok(register.data.token);
-  assert.equal(register.data.user?.role, 'admin');
+  assert.equal(register.response.headers.get('set-cookie'), null);
+  const otp = sentEmails.at(-1)?.text?.match(/est (\d{6})\./)?.[1];
+  assert.ok(otp, 'Admin registration must send a verification code');
+  const verified = await jsonRequest('/api/auth/login/otp', {
+    method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+    body: JSON.stringify({ challengeId: register.data.challengeId, code: otp }),
+  });
+  assert.equal(verified.response.status, 200, JSON.stringify(verified.data));
+  assert.ok(verified.data.token);
+  assert.equal(verified.data.user?.role, 'admin');
 
-  const setCookie = register.response.headers.get('set-cookie') || '';
+  const setCookie = verified.response.headers.get('set-cookie') || '';
   assert.match(setCookie, /mbote_room_session=/);
   assert.match(setCookie, /HttpOnly/i);
   const cookiePair = setCookie.split(';')[0];
@@ -113,7 +135,7 @@ try {
 
   const createMeeting = await jsonRequest('/api/meetings', {
     method: 'POST',
-    headers: authHeaders(register.data.token),
+    headers: authHeaders(verified.data.token),
     body: JSON.stringify({
       title: 'Réunion smoke écrans',
       description: 'Validation navigation complète',
@@ -150,8 +172,8 @@ try {
     localStorage.removeItem('token');
     sessionStorage.removeItem('token');
   }, {
-    user: register.data.user,
-    expiresAt: register.data.expiresAt || '',
+    user: verified.data.user,
+    expiresAt: verified.data.expiresAt || '',
   });
 
   const page = await context.newPage();
@@ -221,6 +243,7 @@ try {
   await context?.close().catch(() => undefined);
   await browser?.close().catch(() => undefined);
   if (!server.killed) server.kill('SIGTERM');
+  await new Promise((resolve) => mailRelay.close(resolve));
   await Promise.race([
     new Promise((resolve) => server.once('exit', resolve)),
     sleep(5_000),

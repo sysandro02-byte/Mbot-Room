@@ -64,11 +64,13 @@ export const runProductMigrations = async () => {
       user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
       code_hash text NOT NULL,
       remember_me boolean NOT NULL DEFAULT false,
+      purpose text NOT NULL DEFAULT 'login',
       attempts integer NOT NULL DEFAULT 0,
       expires_at timestamptz NOT NULL,
       consumed_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now()
     );
+    ALTER TABLE room_login_otps ADD COLUMN IF NOT EXISTS purpose text NOT NULL DEFAULT 'login';
     CREATE INDEX IF NOT EXISTS room_login_otps_user_created_idx ON room_login_otps(user_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS room_login_otps_expires_idx ON room_login_otps(expires_at);
 

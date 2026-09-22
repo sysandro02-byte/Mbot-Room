@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Ban, CheckCircle2, LockKeyhole, RefreshCw, Save, Search, Settings2, ShieldCheck, UserCog, UsersRound } from 'lucide-react';
+import { Ban, CheckCircle2, LockKeyhole, LogOut, RefreshCw, Save, Search, Settings2, ShieldCheck, UserCog, UsersRound } from 'lucide-react';
 import {
   AdminManagedUser,
   AdminPlatformSettings,
@@ -90,6 +90,14 @@ export default function AdminControlCenter(){
     finally{setBusy(false);}
   };
 
+  const revokeSessions=async(user:AdminManagedUser)=>{
+    if(!window.confirm(`Déconnecter ${user.name} de tous ses appareils ?`))return;
+    setBusy(true);setError('');setMessage('');
+    try{await adminDashboardService.revokeUserSessions(user.id);setMessage(`${user.name} a été déconnecté de tous ses appareils.`);}
+    catch(cause){setError(cause instanceof Error?cause.message:'Déconnexion impossible.');}
+    finally{setBusy(false);}
+  };
+
   return <>
     <section className="admin-control-card" id="admin-controls">
       <header><div><span className="admin-control-icon"><Settings2 size={20}/></span><div><h2>Réglages généraux</h2><p>Activez ou bloquez les fonctions principales pour tous les utilisateurs.</p></div></div><button type="button" onClick={()=>void load()} disabled={busy}><RefreshCw size={16}/> Actualiser</button></header>
@@ -99,7 +107,7 @@ export default function AdminControlCenter(){
         {labels.map(item=><article key={item.key} className={settings[item.key]?'is-enabled':'is-disabled'}>
           <span>{settings[item.key]?<CheckCircle2 size={19}/>:<LockKeyhole size={19}/>}</span>
           <div><strong>{item.title}</strong><small>{item.description}</small></div>
-          <button type="button" role="switch" aria-checked={settings[item.key]} onClick={()=>void toggle(item.key)} disabled={busy}><i/></button>
+          <button type="button" role="switch" aria-label={item.title} aria-checked={settings[item.key]} onClick={()=>void toggle(item.key)} disabled={busy}><i/></button>
         </article>)}
       </div>
       <div className="admin-control-note"><ShieldCheck size={17}/><span>Ces réglages sont appliqués côté application et côté serveur : ils ne sont pas seulement visuels.</span></div>
@@ -115,7 +123,7 @@ export default function AdminControlCenter(){
             <td><strong>{user.organization||'—'}</strong><small>{user.jobTitle||''}</small></td>
             <td><span className={'admin-role-badge is-'+user.role}>{user.role==='admin'?'Administrateur':user.isGuest?'Invité':'Utilisateur'}</span></td>
             <td><span className={user.isSuspended?'admin-state-badge is-suspended':'admin-state-badge is-active'}>{user.isSuspended?'Suspendu':'Actif'}</span></td>
-            <td><div className="admin-user-actions"><button type="button" onClick={()=>startEdit(user)}><UserCog size={15}/> Modifier</button><button type="button" className={user.isSuspended?'is-restore':'is-danger'} onClick={()=>void toggleSuspension(user)} disabled={busy||String(user.id)===String(current?.id)}>{user.isSuspended?<><CheckCircle2 size={15}/> Réactiver</>:<><Ban size={15}/> Suspendre</>}</button></div></td>
+            <td><div className="admin-user-actions"><button type="button" onClick={()=>startEdit(user)}><UserCog size={15}/> Modifier</button><button type="button" className={user.isSuspended?'is-restore':'is-danger'} onClick={()=>void toggleSuspension(user)} disabled={busy||String(user.id)===String(current?.id)}>{user.isSuspended?<><CheckCircle2 size={15}/> Réactiver</>:<><Ban size={15}/> Suspendre</>}</button><button type="button" onClick={()=>void revokeSessions(user)} disabled={busy||String(user.id)===String(current?.id)} title="Fermer toutes les sessions de ce compte"><LogOut size={15}/> Déconnecter</button></div></td>
           </tr>)}</tbody></table>
       </div>
       {!filtered.length&&<p className="admin-control-empty">Aucun compte ne correspond à cette recherche.</p>}

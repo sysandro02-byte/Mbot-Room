@@ -65,7 +65,7 @@ if (!apiClient.includes('https://mbote-room-api.onrender.com')) {
 if (!apiClient.includes("parsed.hostname.endsWith('.invalid')")) {
   throw new Error('Invalid placeholder API hosts must be rejected in production');
 }
-if (!apiClient.includes('export const apiFetch') || !apiClient.includes('Impossible de joindre le serveur MBotéRoom')) {
+if (!apiClient.includes('export const apiFetch') || !apiClient.includes('MBotéRoom est momentanément indisponible. Vérifiez votre connexion puis réessayez.')) {
   throw new Error('Frontend API requests must use centralized network timeout/error handling');
 }
 const resilientClientFiles = [

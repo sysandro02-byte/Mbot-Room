@@ -136,7 +136,10 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
           RETURNING id,name,username,email,phone_number,organization,job_title,role,is_guest,is_suspended,created_at`,
         [userId,name,organization,jobTitle,phoneNumber,requestedSuspended],
       );
-      if (requestedSuspended) await query('DELETE FROM room_sessions WHERE user_id=$1',[userId]);
+      if (requestedSuspended) {
+        await query('DELETE FROM room_sessions WHERE user_id=$1',[userId]);
+        io.in(`user:${userId}`).disconnectSockets(true);
+      }
       io.emit('admin:user-updated',{userId,isSuspended:requestedSuspended});
       response.json({
         id:Number(updated.rows[0].id),
@@ -151,6 +154,20 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
         isSuspended:Boolean(updated.rows[0].is_suspended),
         createdAt:new Date(updated.rows[0].created_at).toISOString(),
       });
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/admin/users/:userId/revoke-sessions', ...adminApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const userId = Number(request.params.userId);
+      if (!Number.isSafeInteger(userId) || userId <= 0) return sendApiError(response, 400, 'USER_INVALID', 'Utilisateur invalide.');
+      if (userId === request.user!.id) return sendApiError(response, 400, 'ADMIN_SELF_REVOKE_FORBIDDEN', 'Utilisez la déconnexion pour fermer votre session.');
+      const user = await query('SELECT id FROM room_users WHERE id=$1 LIMIT 1', [userId]);
+      if (!user.rows[0]) return sendApiError(response, 404, 'USER_NOT_FOUND', 'Utilisateur introuvable.');
+      await query('DELETE FROM room_sessions WHERE user_id=$1', [userId]);
+      io.in(`user:${userId}`).disconnectSockets(true);
+      io.emit('admin:user-updated', { userId, sessionsRevoked: true });
+      response.json({ success: true });
     } catch (error) { next(error); }
   });
 

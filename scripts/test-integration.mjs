@@ -210,13 +210,26 @@ const register = async (name, email, admin = false) => {
     body: JSON.stringify({ name, email, password: 'Password2026!' }),
   });
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
-  assert.ok(result.data.token);
-  assert.ok(result.data.user?.id);
-  const setCookie = result.response.headers.get('set-cookie') || '';
+  let session = result;
+  if (admin) {
+    assert.equal(result.response.headers.get('set-cookie'), null, 'Admin registration must not create a session before email verification');
+    assert.ok(result.data.challengeId);
+    const mail = mailRelayRequests.at(-1);
+    const code = String(mail?.body?.text || '').match(/est (\d{6})\./)?.[1];
+    assert.ok(code, 'Admin registration must send a verification code');
+    session = await jsonRequest('/api/auth/login/otp', {
+      method: 'POST', headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+      body: JSON.stringify({ challengeId: result.data.challengeId, code }),
+    });
+    assert.equal(session.response.status, 200, JSON.stringify(session.data));
+  }
+  assert.ok(session.data.token);
+  assert.ok(session.data.user?.id);
+  const setCookie = session.response.headers.get('set-cookie') || '';
   assert.match(setCookie, /mbote_room_session=/);
   assert.match(setCookie, /HttpOnly/i);
   return {
-    ...result.data,
+    ...session.data,
     cookie: setCookie.split(';')[0],
   };
 };

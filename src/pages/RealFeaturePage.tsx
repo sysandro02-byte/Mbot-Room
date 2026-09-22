@@ -117,7 +117,7 @@ export default function RealFeaturePage({kind}:Props){
 
   return <AppShell title={titles[kind]}>
     <section className="real-feature-page">
-      <header className="real-feature-hero"><span>{icons[kind]}</span><div><h1>{titles[kind]}</h1><p>Données synchronisées avec le serveur MBotéRoom.</p></div></header>
+      <header className="real-feature-hero"><span>{icons[kind]}</span><div><h1>{titles[kind]}</h1><p>Retrouvez ici vos informations MBotéRoom.</p></div></header>
       {notice?<div className="real-feature-notice">{notice}</div>:null}{error?<div className="real-feature-error">{error}</div>:null}
       {loading?<p className="real-feature-loading">Chargement…</p>:null}
 

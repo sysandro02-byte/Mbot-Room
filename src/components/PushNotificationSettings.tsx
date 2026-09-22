@@ -13,7 +13,7 @@ export default function PushNotificationSettings(){
     setLoading(true);
     setMessage('');
     try{setState(await notificationService.getPushState());}
-    catch(error){setMessage(error instanceof Error?error.message:'Impossible de vérifier les notifications push.');}
+    catch(error){setMessage(error instanceof Error?error.message:'Impossible de vérifier les notifications.');}
     finally{setLoading(false);}
   };
 
@@ -34,7 +34,7 @@ export default function PushNotificationSettings(){
   const test=async()=>{
     setAction('test');setMessage('');
     try{await notificationService.sendPushTest();setMessage('Notification de test envoyée.');}
-    catch(error){setMessage(error instanceof Error?error.message:'Test push impossible.');}
+    catch(error){setMessage(error instanceof Error?error.message:'Impossible d’envoyer la notification de test.');}
     finally{setAction('');}
   };
 

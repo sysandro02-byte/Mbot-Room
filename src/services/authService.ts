@@ -126,16 +126,9 @@ export const authService = {
     });
     const result = await readJson(response);
     if (!response.ok) throw new Error(result.error || 'Création du compte administrateur impossible.');
-    const session = {
-      user: normalizeUser(result.user),
-      token: String(result.token || ''),
-      expiresAt: typeof result.expiresAt === 'string' ? result.expiresAt : undefined,
-    };
-    saveSession(session, true);
     return {
-      ...session,
-      accountCreated: Boolean(result.accountCreated),
-      welcomeEmailSent: Boolean(result.welcomeEmailSent),
+      challengeId: String(result.challengeId || ''),
+      emailHint: String(result.emailHint || ''),
     };
   },
 

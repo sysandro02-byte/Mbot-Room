@@ -457,6 +457,10 @@ function AdminSidebar({ userName, open, onClose }: { userName: string; open: boo
     count?: number;
   }> = [
     { label: 'Tableau de bord', icon: Home, path: '/admin', active: true },
+    { label: 'Réglages généraux', icon: Settings, path: '/admin#admin-controls' },
+    { label: 'Utilisateurs', icon: UsersRound, path: '/admin#admin-users' },
+    { label: 'Accueil des invités', icon: Video, path: '/admin#admin-guest-slides' },
+    { label: 'Conseils d’accueil', icon: CircleHelp, path: '/admin#admin-tips' },
     { label: 'Réunions', icon: CalendarDays, path: '/app/meetings' },
     { label: 'Enregistrements', icon: CirclePlay, path: '/app/recordings' },
     { label: 'Messages', icon: MessageCircle, path: '/app/messages' },
@@ -477,7 +481,7 @@ function AdminSidebar({ userName, open, onClose }: { userName: string; open: boo
         {menuItems.map((item) => {
           const Icon = item.icon;
           return (
-            <Link className={item.active ? 'is-active' : ''} to={item.path} key={item.label} onClick={onClose}>
+            <Link className={item.active ? 'is-active' : ''} to={item.path} key={item.label} onClick={() => { onClose(); if (item.path.startsWith('/admin#')) requestAnimationFrame(() => document.getElementById(item.path.split('#')[1])?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>
               <Icon size={20} aria-hidden="true" />
               <span>{item.label}</span>
               {item.live && <b className="admin-live-badge">LIVE</b>}
@@ -589,7 +593,7 @@ function GuestAccessSlidesCard({ slides, draft, editingId, onDraftChange, onEdit
   onDraftChange: (draft: Pick<GuestAccessSlide, 'title' | 'body' | 'imageUrl' | 'isActive'>) => void;
   onEdit: (slide: GuestAccessSlide) => void; onCancel: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onDelete: (id: string) => void;
 }) {
-  return <section className="admin-tips-card"><header><div><h2>Slider accès invité</h2><p>Contenu affiché sur la page de participation sans compte.</p></div><span>{slides.filter((slide) => slide.isActive).length} active(s)</span></header>
+  return <section className="admin-tips-card" id="admin-guest-slides"><header><div><h2>Slider accès invité</h2><p>Contenu affiché sur la page de participation sans compte.</p></div><span>{slides.filter((slide) => slide.isActive).length} active(s)</span></header>
     <form className="admin-tip-form" onSubmit={onSubmit}><label><span>Titre</span><input value={draft.title} maxLength={80} required onChange={(event) => onDraftChange({ ...draft, title: event.target.value })} /></label><label><span>Message</span><textarea value={draft.body} maxLength={280} rows={3} required onChange={(event) => onDraftChange({ ...draft, body: event.target.value })} /></label><label><span>URL de l'image</span><input value={draft.imageUrl} maxLength={500} onChange={(event) => onDraftChange({ ...draft, imageUrl: event.target.value })} /></label><label className="admin-tip-toggle"><input type="checkbox" checked={draft.isActive} onChange={(event) => onDraftChange({ ...draft, isActive: event.target.checked })} /><span>Slide active</span></label><div className="admin-tip-actions">{editingId && <button type="button" onClick={onCancel}>Annuler</button>}<button type="submit">{editingId ? 'Mettre à jour' : 'Publier'}</button></div></form>
     <div className="admin-tip-list">{slides.map((slide) => <article key={slide.id} className={slide.isActive ? 'is-active' : ''}><div><strong>{slide.title}</strong><p>{slide.body}</p><small>{slide.imageUrl}</small></div><div><button type="button" onClick={() => onEdit(slide)}>Modifier</button><button type="button" className="is-danger" onClick={() => onDelete(slide.id)}>Supprimer</button></div></article>)}</div>
   </section>;
@@ -618,7 +622,7 @@ function DashboardTipsCard({
   onCancel: () => void;
 }) {
   return (
-    <section className="admin-tips-card">
+    <section className="admin-tips-card" id="admin-tips">
       <header>
         <div>
           <h2>Astuces du jour</h2>

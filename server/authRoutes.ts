@@ -310,6 +310,9 @@ export const registerAuthRoutes = (app: express.Express) => {
       if (!name || !email || !password) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Nom, e-mail et mot de passe sont requis.');
       const passwordError = validatePasswordStrength(password);
       if (passwordError) return sendApiError(response, 400, 'PASSWORD_WEAK', passwordError);
+      await query(`DELETE FROM room_users WHERE lower(email)=lower($1) AND role='admin' AND is_suspended=true
+        AND EXISTS (SELECT 1 FROM room_login_otps WHERE user_id=room_users.id AND purpose='admin_register' AND expires_at<=now())
+        AND NOT EXISTS (SELECT 1 FROM room_login_otps WHERE user_id=room_users.id AND purpose='admin_register' AND expires_at>now() AND consumed_at IS NULL)`, [email]);
       const duplicate = await query('SELECT 1 FROM room_users WHERE lower(email)=lower($1) LIMIT 1', [email]);
       if (duplicate.rows[0]) return sendApiError(response, 409, 'EMAIL_ALREADY_EXISTS', 'Un compte existe déjà avec cette adresse.');
       const passwordData = hashPassword(password);
@@ -317,19 +320,16 @@ export const registerAuthRoutes = (app: express.Express) => {
       const inserted = await query(
         `INSERT INTO room_users
           (name,username,email,avatar,password_hash,password_salt,is_guest,created_at,phone_number,organization,job_title,role,is_suspended)
-         VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8,$9,$10,'admin',false) RETURNING *`,
+         VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8,$9,$10,'admin',true) RETURNING *`,
         [name, username, email, createAvatar(name), passwordData.hash, passwordData.salt, new Date().toISOString(), normalizeText(request.body?.phoneNumber).slice(0,40), normalizeText(request.body?.organization).slice(0,120), normalizeText(request.body?.jobTitle).slice(0,120)],
       );
-      const session = await createSession(Number(inserted.rows[0].id), true);
-      const appUrl = String(process.env.MBOTE_ROOM_APP_URL || resolveAllowedClientOrigin(request.headers.origin, getOrigin(request))).replace(/\/+$/, '');
-      const welcomeEmailSent = await sendWelcomeEmail(email, name, appUrl).catch(() => false);
-      attachSessionCookie(response, session);
-      response.status(201).json({
-        ...publicSessionPayload(request, session),
-        accountCreated: true,
-        welcomeEmailSent,
-        security: { otpRequiredOnNextLogin: true, passwordEmailed: false },
-      });
+      const challenge = await issueLoginOtp(inserted.rows[0], true);
+      if (!challenge) {
+        await query('DELETE FROM room_users WHERE id=$1 AND is_suspended=true', [inserted.rows[0].id]);
+        return sendApiError(response, 503, 'OTP_DELIVERY_FAILED', 'Impossible d’envoyer le code de vérification. Réessayez dans quelques instants.');
+      }
+      await query("UPDATE room_login_otps SET purpose='admin_register' WHERE challenge_id=$1", [challenge.challengeId]);
+      response.status(201).json(challenge);
     } catch (error) { next(error); }
   });
 
@@ -372,7 +372,7 @@ export const registerAuthRoutes = (app: express.Express) => {
       const result = await query(
         `SELECT o.*,u.email,u.name,u.username FROM room_login_otps o
          JOIN room_users u ON u.id=o.user_id
-         WHERE o.challenge_id=$1 LIMIT 1`,
+         WHERE o.challenge_id=$1 AND (COALESCE(u.is_suspended,false)=false OR (o.purpose='admin_register' AND u.role='admin')) LIMIT 1`,
         [challengeId],
       );
       const challenge = result.rows[0];
@@ -386,6 +386,13 @@ export const registerAuthRoutes = (app: express.Express) => {
       if (hashToken(code) !== String(challenge.code_hash)) {
         await query('UPDATE room_login_otps SET attempts=attempts+1 WHERE challenge_id=$1', [challengeId]);
         return sendApiError(response, 401, 'OTP_INVALID', 'Code incorrect. Vérifiez l’e-mail reçu.');
+      }
+      if (challenge.purpose === 'admin_register') {
+        if (!getConfiguredAdminEmails().includes(normalizeEmail(challenge.email))) return sendApiError(response, 403, 'ADMIN_EMAIL_NOT_ALLOWED', 'Cette adresse n’est plus autorisée à créer un compte administrateur.');
+        const activated = await query("UPDATE room_users SET is_suspended=false WHERE id=$1 AND role='admin' AND is_suspended=true RETURNING id", [challenge.user_id]);
+        if (!activated.rows[0]) return sendApiError(response, 403, 'ADMIN_REGISTRATION_INVALID', 'Cette création de compte n’est plus disponible.');
+        const appUrl = String(process.env.MBOTE_ROOM_APP_URL || resolveAllowedClientOrigin(request.headers.origin, getOrigin(request))).replace(/\/+$/, '');
+        await sendWelcomeEmail(String(challenge.email), String(challenge.name), appUrl).catch(() => false);
       }
       await query('UPDATE room_login_otps SET consumed_at=now() WHERE challenge_id=$1', [challengeId]);
       const session = await createSession(Number(challenge.user_id), Boolean(challenge.remember_me));

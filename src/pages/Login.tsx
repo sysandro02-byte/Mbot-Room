@@ -53,14 +53,14 @@ const translations = {
     heroTitle: 'Réunions sécurisées\npour tous',
     heroDescription: 'Organisez, rejoignez et collaborez\nen toute simplicité avec MBotéRoom.',
     features: [
-      ['Sécurisé', 'Vos réunions sont protégées avec un chiffrement de bout en bout.'],
+      ['Sécurisé', 'Vos réunions sont protégées par des contrôles d’accès.'],
       ['Facile à utiliser', 'Interface intuitive pour créer et rejoindre vos réunions en un clic.'],
-      ['Audio et vidéo HD', "Profitez d'une qualité audio et vidéo exceptionnelle."],
+      ['Audio et vidéo de qualité', "Profitez d'une qualité audio et vidéo exceptionnelle."],
       ['Accessible partout', "Utilisable sur tous vos appareils, n'importe où, n'importe quand."],
     ],
     footerBenefits: [
-      'Sécurité de bout en bout',
-      'Audio et vidéo HD',
+      'Accès protégés',
+      'Audio et vidéo de qualité',
       'Accessible sur tous vos appareils',
       'Aucune installation requise',
     ],
@@ -89,14 +89,14 @@ const translations = {
     heroTitle: 'Secure meetings\nfor everyone',
     heroDescription: 'Host, join, and collaborate\nwith MBotéRoom in total simplicity.',
     features: [
-      ['Secure', 'Your meetings are protected with end-to-end encryption.'],
+      ['Secure', 'Your meetings are protected by access controls.'],
       ['Easy to use', 'An intuitive interface to create and join meetings in one click.'],
-      ['HD audio and video', 'Enjoy outstanding audio and video quality.'],
+      ['Quality audio and video', 'Enjoy outstanding audio and video quality.'],
       ['Available everywhere', 'Use it on all your devices, anywhere, anytime.'],
     ],
     footerBenefits: [
-      'End-to-end security',
-      'HD audio and video',
+      'Protected access',
+      'Quality audio and video',
       'Available on all your devices',
       'No installation required',
     ],
@@ -125,14 +125,14 @@ const translations = {
     heroTitle: 'Masolo ya libateli\nmpo na bato nyonso',
     heroDescription: 'Bongisa, kota mpe sala elongo\nna MBotéRoom na pete.',
     features: [
-      ['Ebatelami', 'Masolo na yo ebatelami na chiffrement ya suka na suka.'],
+      ['Ebatelami', 'Masolo na yo ebatelami mpo na bato oyo babengami.'],
       ['Pete kosalela', 'Interface ya pete mpo na kosala mpe kokota na réunion na clic moko.'],
-      ['Audio mpe video HD', 'Sepela na qualité ya malamu mpo na mongongo mpe video.'],
+      ['Audio mpe video ya malamu', 'Sepela na qualité ya malamu mpo na mongongo mpe video.'],
       ['Ezali bisika nyonso', 'Salela yango na ba appareils nyonso, bisika nyonso, ntango nyonso.'],
     ],
     footerBenefits: [
-      'Libateli ya suka na suka',
-      'Audio mpe video HD',
+      'Masolo ebatelami',
+      'Audio mpe video ya malamu',
       'Ezali na ba appareils nyonso',
       'Installation esengeli te',
     ],
@@ -161,14 +161,14 @@ const translations = {
     heroTitle: 'Secure meetings\nfor everyone',
     heroDescription: 'Host, join, and collaborate\nwith MBot\u00e9Room in total simplicity.',
     features: [
-      ['Secure', 'Your meetings are protected with end-to-end encryption.'],
+      ['Secure', 'Your meetings are protected by access controls.'],
       ['Easy to use', 'An intuitive interface to create and join meetings in one click.'],
-      ['HD audio and video', 'Enjoy outstanding audio and video quality.'],
+      ['Quality audio and video', 'Enjoy outstanding audio and video quality.'],
       ['Available everywhere', 'Use it on all your devices, anywhere, anytime.'],
     ],
     footerBenefits: [
-      'End-to-end security',
-      'HD audio and video',
+      'Protected access',
+      'Quality audio and video',
       'Available on all your devices',
       'No installation required',
     ],
@@ -227,7 +227,7 @@ const languageOptions: Array<{ value: Language; label: string }> = [
 const features = [
   {
     title: 'Sécurisé',
-    description: 'Vos réunions sont protégées avec un chiffrement de bout en bout.',
+    description: 'Vos réunions sont protégées par des contrôles d’accès.',
     icon: ShieldCheck,
     tone: 'blue',
   },
@@ -238,7 +238,7 @@ const features = [
     tone: 'green',
   },
   {
-    title: 'Audio et vidéo HD',
+    title: 'Audio et vidéo de qualité',
     description: "Profitez d'une qualité audio et vidéo exceptionnelle.",
     icon: Monitor,
     tone: 'orange',
@@ -628,7 +628,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                 <p>{copy.subtitle}</p>
                 <div className="auth-security-badges" aria-label="Sécurité de connexion">
                   <span><ShieldCheck size={15}/> Code de sécurité par e-mail</span>
-                  <span><Video size={15}/> Réunions HD</span>
+                  <span><Video size={15}/> Réunions de qualité</span>
                   <span><Sparkles size={15}/> Luna IA</span>
                 </div>
               </header>
@@ -773,7 +773,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                 <input id="register-job-title" value={jobTitle} placeholder="Ex : Chef de projet" autoComplete="organization-title" onChange={(event) => { setJobTitle(event.target.value); clearErrors(); }} />
               </FormField>
               <FormField id="register-password" label="Mot de passe" icon={<Lock size={21} aria-hidden="true" />} error={fieldErrors.password}>
-                <input id="register-password" type="password" value={password} placeholder="8 caractères minimum" autoComplete="new-password" onChange={(event) => { setPassword(event.target.value); clearErrors(); }} />
+                <input id="register-password" type="password" value={password} placeholder="10 caractères minimum" autoComplete="new-password" onChange={(event) => { setPassword(event.target.value); clearErrors(); }} />
               </FormField>
             </CompactAuthCard>
           )}
@@ -831,7 +831,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                         id="reset-password"
                         type={showPassword ? 'text' : 'password'}
                         value={password}
-                        placeholder="Au moins 8 caractères"
+                        placeholder="Au moins 10 caractères"
                         autoComplete="new-password"
                         aria-invalid={Boolean(fieldErrors.password)}
                         aria-describedby={fieldErrors.password ? 'reset-password-error' : undefined}
@@ -902,7 +902,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
             <div className="account-created-summary">
               <span><Mail size={18}/><b>{registrationSuccess.email}</b></span>
               <span><ShieldCheck size={18}/><b>Code de sécurité demandé à chaque connexion</b></span>
-              <span><Sparkles size={18}/><b>Luna IA, réunions HD et collaboration</b></span>
+              <span><Sparkles size={18}/><b>Luna IA, réunions de qualité et collaboration</b></span>
             </div>
             <div className={registrationSuccess.welcomeEmailSent ? 'account-created-mail sent' : 'account-created-mail warning'}>
               {registrationSuccess.welcomeEmailSent ? '✓ Le mail de bienvenue a été envoyé.' : 'Le compte est créé, mais le mail de bienvenue n’a pas pu être confirmé.'}

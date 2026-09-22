@@ -115,6 +115,13 @@ export const adminDashboardService = {
     return readJson<AdminManagedUser>(response);
   },
 
+  async revokeUserSessions(userId: number): Promise<void> {
+    const response = await apiFetch(apiUrl(`/api/admin/users/${userId}/revoke-sessions`), {
+      method: 'POST', headers: getAuthHeaders(),
+    });
+    await readJson<{ success: boolean }>(response);
+  },
+
   async getDashboard(period: string): Promise<AdminDashboardPayload> {
     const response = await apiFetch(apiUrl(`/api/admin/dashboard?period=${encodeURIComponent(period)}`), {
       headers: getAuthHeaders(),

@@ -57,12 +57,12 @@ type PublicMeetingResponse = {
 
 const footerAdvantages = [
   {
-    title: 'Sécurité de bout en bout',
+    title: 'Accès protégés',
     description: 'Vos données sont protégées',
     icon: ShieldCheck,
   },
   {
-    title: 'Audio et vidéo HD',
+    title: 'Audio et vidéo de qualité',
     description: 'Qualité optimale pour vos réunions',
     icon: Video,
   },

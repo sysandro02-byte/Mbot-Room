@@ -1012,10 +1012,10 @@ export default function MeetingRoomV2() {
         setServerRecordingId(serverRecording.id);
         setRecordingMode('server');
         setRecording(true);
-        setNotice('Enregistrement serveur MP4 démarré.');
+        setNotice('Enregistrement démarré.');
         return;
       } catch (cause) {
-        setNotice(`${cause instanceof Error ? cause.message : 'Enregistrement serveur indisponible.'} Bascule vers l’enregistrement local.`);
+        setNotice(`${cause instanceof Error ? cause.message : 'Enregistrement indisponible.'} L’enregistrement continue sur cet appareil.`);
       }
     }
 
@@ -1252,7 +1252,7 @@ export default function MeetingRoomV2() {
             data-testid="media-transport-status"
             data-transport={liveKitMedia.connected ? 'livekit' : 'mesh'}
             title={liveKitMedia.connected
-              ? 'Transport média SFU LiveKit actif.'
+              ? 'Connexion audio et vidéo active.'
               : liveKitDesired
                 ? 'Optimisation de la connexion en cours.'
                 : liveKitFailed
@@ -1260,7 +1260,7 @@ export default function MeetingRoomV2() {
                   : 'Connexion de la réunion active.'}
           >
             {liveKitMedia.connected ? 'Connexion optimisée' : liveKitDesired ? 'Optimisation…' : 'Connexion active'}
-            {!liveKitMedia.connected && mediaTransportStatus?.livekitReady && !liveKitFailed ? <small> · SFU prêt</small> : null}
+            {!liveKitMedia.connected && mediaTransportStatus?.livekitReady && !liveKitFailed ? <small> · Connexion prête</small> : null}
             {liveKitFailed ? <small> · secours</small> : null}
             {mediaTransportStatus?.serverRecordingReady ? <small> · Enregistrement disponible</small> : null}
           </span>
@@ -1268,7 +1268,7 @@ export default function MeetingRoomV2() {
             className={`room-v2-network ${networkQuality.level}`}
             data-testid="network-quality"
             data-level={networkQuality.level}
-            title={`${liveKitMedia.connected ? 'SFU' : 'Pairs'} ${networkQuality.connectedPeers}/${networkQuality.totalPeers} · Latence ${networkQuality.rttMs ?? '—'} ms · Pertes ${networkQuality.packetLossPct ?? '—'} %`}
+            title={`${networkQuality.connectedPeers} participant(s) connecté(s) · Qualité du réseau ${networkQuality.level === 'excellent' ? 'excellente' : networkQuality.level === 'good' ? 'correcte' : 'faible'}`}
           >
             {networkQuality.level === 'offline' ? <WifiOff size={15} /> : <Wifi size={15} />}
             {networkQuality.level === 'excellent' ? 'Réseau excellent' : networkQuality.level === 'good' ? 'Réseau correct' : networkQuality.level === 'poor' ? 'Réseau faible' : 'Hors ligne'}

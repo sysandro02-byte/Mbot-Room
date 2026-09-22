@@ -58,8 +58,7 @@ export default function AdminAuthPage({mode='login'}:{mode?:Mode}){
         const passwordError=passwordMessage(password);
         if(passwordError)throw new Error(passwordError);
         const session=await authService.adminRegister({name:name.trim(),email:email.trim(),password});
-        if(session.user.role!=='admin'){await authService.logout(true);throw new Error('Ce compte n’a pas les droits administrateur.');}
-        navigate('/admin',{replace:true});
+        setChallengeId(session.challengeId);setEmailHint(session.emailHint);setPassword('');
         return;
       }
       if(!email.trim()||!password)throw new Error('Adresse e-mail et mot de passe requis.');
@@ -119,10 +118,12 @@ export default function AdminAuthPage({mode='login'}:{mode?:Mode}){
 
     {challengeId&&<div className="admin-otp-backdrop">
       <form className="admin-otp-card" onSubmit={verifyOtp}>
-        <span><KeyRound size={25}/></span><h2>Vérification</h2><p>Entrez le code à 6 chiffres envoyé à <strong>{emailHint}</strong>.</p>
-        <input value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,'').slice(0,6))} inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" autoFocus/>
+        <span><KeyRound size={25}/></span><h2>{mode==='register'?'Confirmer le compte administrateur':'Vérification'}</h2><p>Entrez le code à 6 chiffres envoyé à <strong>{emailHint}</strong>.</p>
+        <input value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,'').slice(0,6))} inputMode="numeric" autoComplete="one-time-code" aria-label="Code de vérification à six chiffres" maxLength={6} placeholder="000000" autoFocus/>
         {error&&<div className="admin-auth-error" role="alert">{error}</div>}
         <button className="admin-auth-primary" disabled={busy||otp.length!==6}>{busy?'Vérification…':'Ouvrir le backoffice'}</button>
+        <button type="button" className="admin-auth-secondary" disabled={busy} onClick={async()=>{setBusy(true);setError('');try{await authService.resendLoginOtp(challengeId);setMessage('Un nouveau code a été envoyé.');}catch(cause){setError(cause instanceof Error?cause.message:'Impossible de renvoyer le code.');}finally{setBusy(false);}}}>Renvoyer le code</button>
+        {message&&<div className="admin-auth-message" role="status">{message}</div>}
         <button type="button" className="admin-auth-secondary" onClick={()=>{setChallengeId('');setOtp('');setError('');}}>Changer de compte</button>
       </form>
     </div>}
