@@ -37,6 +37,9 @@ const clearStoredSession = () => {
   sessionStorage.removeItem(USER_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(EXPIRY_KEY);
+  localStorage.removeItem('mboteroom-last-activity-at');
+  localStorage.removeItem('mboteroom-last-safe-route');
+  sessionStorage.removeItem('mboteroom-pwa-resume-done');
 };
 
 const normalizeUser = (user: RawRoomUser): RoomUser => ({
