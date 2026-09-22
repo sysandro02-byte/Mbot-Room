@@ -100,6 +100,22 @@ const mockTranscriptionServer = createServer(async (request, response) => {
 });
 await new Promise((resolve) => mockTranscriptionServer.listen(transcriptionPort, '127.0.0.1', resolve));
 
+const mailRelayPort = port + 3;
+const mailRelayRequests = [];
+const mockMailRelayServer = createServer(async (request, response) => {
+  let rawBody = '';
+  for await (const chunk of request) rawBody += chunk.toString();
+  mailRelayRequests.push({
+    path: request.url,
+    secret: request.headers['x-mbote-room-mail-secret'] || '',
+    body: rawBody ? JSON.parse(rawBody) : {},
+  });
+  response.statusCode = 202;
+  response.setHeader('Content-Type', 'application/json');
+  response.end(JSON.stringify({ success: true }));
+});
+await new Promise((resolve) => mockMailRelayServer.listen(mailRelayPort, '127.0.0.1', resolve));
+
 const pool = new pg.Pool({ connectionString: databaseUrl, ssl: false });
 
 await pool.query('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
@@ -115,6 +131,9 @@ const server = spawn(process.execPath, ['dist/server.js'], {
     MBOTE_ROOM_ALLOWED_ORIGINS: baseUrl,
     MBOTE_ROOM_ALLOWED_ORIGIN_PATTERNS: 'https://mbote-room-*.vercel.app',
     MBOTE_ROOM_APP_URL: baseUrl,
+    MBOTE_MAIL_RELAY_URL: `http://127.0.0.1:${mailRelayPort}/email`,
+    MBOTE_ROOM_MAIL_SECRET: 'integration-mail-secret',
+    BREVO_API_KEY: '',
     ADMIN_EMAILS: '',
     RESEND_API_KEY: '',
     GROQ_API_KEY: '',
@@ -345,6 +364,62 @@ try {
   assert.equal(browserLogout.response.status, 204);
   const browserMeAfterLogout = await jsonRequest('/api/auth/me', { headers: { Cookie: browserCookie } });
   assert.equal(browserMeAfterLogout.response.status, 401);
+
+  const passwordResetUser = await register('Compte Réinitialisation', 'reset.integration@mbote.test');
+  const forgotPassword = await jsonRequest('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email: 'reset.integration@mbote.test' }),
+  });
+  assert.equal(forgotPassword.response.status, 200, JSON.stringify(forgotPassword.data));
+  assert.equal(forgotPassword.data.success, true);
+  assert.equal(mailRelayRequests.length, 1);
+  assert.equal(mailRelayRequests[0].secret, 'integration-mail-secret');
+  assert.equal(mailRelayRequests[0].body.to, 'reset.integration@mbote.test');
+  const resetLink = String(mailRelayRequests[0].body.text || '').match(/https?:\/\/\S+/)?.[0];
+  assert.ok(resetLink, 'Password reset email must contain a link');
+  const resetUrl = new URL(resetLink);
+  assert.equal(resetUrl.origin, baseUrl);
+  assert.equal(resetUrl.pathname, '/mot-de-passe-oublie');
+  const resetToken = resetUrl.searchParams.get('token');
+  assert.ok(resetToken, 'Password reset link must contain a token');
+
+  const shortResetPassword = await jsonRequest('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token: resetToken, password: 'court' }),
+  });
+  assert.equal(shortResetPassword.response.status, 400);
+  assert.equal(shortResetPassword.data.code, 'PASSWORD_TOO_SHORT');
+
+  const resetPassword = await jsonRequest('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token: resetToken, password: 'NouveauPassword2026!' }),
+  });
+  assert.equal(resetPassword.response.status, 200, JSON.stringify(resetPassword.data));
+  assert.equal(resetPassword.data.success, true);
+
+  const reusedResetToken = await jsonRequest('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token: resetToken, password: 'EncorePassword2026!' }),
+  });
+  assert.equal(reusedResetToken.response.status, 400);
+  assert.equal(reusedResetToken.data.code, 'PASSWORD_RESET_INVALID');
+
+  const oldPasswordLogin = await jsonRequest('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email: 'reset.integration@mbote.test', password: 'Password2026!' }),
+  });
+  assert.equal(oldPasswordLogin.response.status, 401);
+
+  const newPasswordLogin = await jsonRequest('/api/auth/login', {
+    method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+    body: JSON.stringify({ email: 'reset.integration@mbote.test', password: 'NouveauPassword2026!' }),
+  });
+  assert.equal(newPasswordLogin.response.status, 200, JSON.stringify(newPasswordLogin.data));
+  assert.ok(newPasswordLogin.data.token);
+
+  const resetUserOldSession = await jsonRequest('/api/auth/me', { headers: authHeaders(passwordResetUser.token) });
+  assert.equal(resetUserOldSession.response.status, 401, 'Password reset must revoke existing sessions');
 
   const participant = await register('Participant Integration', 'participant.integration@mbote.test');
   assert.equal(participant.user.role, 'user');
@@ -745,4 +820,5 @@ try {
   ]);
   await new Promise((resolve) => mockEgressServer.close(() => resolve()));
   await new Promise((resolve) => mockTranscriptionServer.close(() => resolve()));
+  await new Promise((resolve) => mockMailRelayServer.close(() => resolve()));
 }

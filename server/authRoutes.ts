@@ -240,15 +240,22 @@ export const registerAuthRoutes = (app: express.Express) => {
   app.post('/api/auth/forgot-password', requireDatabase, async (request, response, next) => {
     try {
       const email = normalizeEmail(request.body?.email);
-      const userResult = await query(`SELECT * FROM room_users WHERE lower(email)=lower($1) AND is_guest=false LIMIT 1`, [email]);
+      const userResult = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+        ? await query(`SELECT * FROM room_users WHERE lower(email)=lower($1) AND is_guest=false LIMIT 1`, [email])
+        : { rows: [] };
       if (userResult.rows[0]) {
         const rawToken = createToken();
+        await query('DELETE FROM room_password_resets WHERE user_id=$1 OR expires_at<=now()', [userResult.rows[0].id]);
         await query(
           `INSERT INTO room_password_resets (token_hash,user_id,expires_at) VALUES ($1,$2,now()+interval '30 minutes')`,
           [hashToken(rawToken), userResult.rows[0].id],
         );
         const appUrl = String(process.env.MBOTE_ROOM_APP_URL || getOrigin(request)).replace(/\/+$/, '');
-        await sendResetEmail(email, `${appUrl}/mot-de-passe-oublie?token=${encodeURIComponent(rawToken)}`);
+        const delivered = await sendResetEmail(email, `${appUrl}/mot-de-passe-oublie?token=${encodeURIComponent(rawToken)}`);
+        if (!delivered) {
+          await query('DELETE FROM room_password_resets WHERE token_hash=$1', [hashToken(rawToken)]);
+          console.warn('MBotéRoom password reset email delivery failed');
+        }
       }
       response.json({ success: true, message: 'Si ce compte existe, un lien de réinitialisation a été envoyé.' });
     } catch (error) { next(error); }
@@ -258,6 +265,7 @@ export const registerAuthRoutes = (app: express.Express) => {
     try {
       const token = String(request.body?.token || '');
       const password = String(request.body?.password || '');
+      if (!token) return sendApiError(response, 400, 'PASSWORD_RESET_INVALID', 'Lien de réinitialisation invalide ou expiré.');
       if (password.length < 8) return sendApiError(response, 400, 'PASSWORD_TOO_SHORT', 'Le mot de passe doit contenir au moins 8 caractères.');
       const reset = await query(`SELECT * FROM room_password_resets WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now() LIMIT 1`, [hashToken(token)]);
       if (!reset.rows[0]) return sendApiError(response, 400, 'PASSWORD_RESET_INVALID', 'Lien de réinitialisation invalide ou expiré.');
@@ -265,7 +273,7 @@ export const registerAuthRoutes = (app: express.Express) => {
       await query('UPDATE room_users SET password_hash=$2,password_salt=$3 WHERE id=$1', [reset.rows[0].user_id, passwordData.hash, passwordData.salt]);
       await query('UPDATE room_password_resets SET used_at=now() WHERE token_hash=$1', [hashToken(token)]);
       await query('DELETE FROM room_sessions WHERE user_id=$1', [reset.rows[0].user_id]);
-      response.json({ success: true });
+      response.json({ success: true, message: 'Votre mot de passe a été modifié. Vous pouvez maintenant vous connecter.' });
     } catch (error) { next(error); }
   });
 

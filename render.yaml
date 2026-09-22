@@ -27,7 +27,7 @@ services:
       - key: ADMIN_EMAILS
         sync: false
       - key: MBOTE_ROOM_APP_URL
-        value: https://mbote-room.vercel.app
+        value: https://mboteroom.loukatech.com
       - key: MBOTE_ROOM_ALLOWED_ORIGINS
         value: https://mbote-room-api.onrender.com,https://mbote-room.vercel.app,https://mboteroom.loukatech.com
       - key: MBOTE_ROOM_ALLOWED_ORIGIN_PATTERNS

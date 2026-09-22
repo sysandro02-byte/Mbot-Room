@@ -46,9 +46,16 @@ if (!authService.includes('storage.setItem(TOKEN_KEY, token)')) {
 if (!authService.includes('response.status === 401 || response.status === 403')) {
   throw new Error('Temporary auth API failures must not clear a still-valid local session');
 }
+if (!authService.includes("apiUrl('/api/auth/reset-password')")) {
+  throw new Error('Frontend authentication service must support password reset tokens');
+}
 const appSource = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
 if ((appSource.match(/finally \{/g) || []).length < 2 || (appSource.match(/setChecking\(false\)/g) || []).length < 2) {
   throw new Error('Protected routes must always finish session verification after API failures');
+}
+const loginSource = fs.readFileSync(new URL('../src/pages/Login.tsx', import.meta.url), 'utf8');
+if (!loginSource.includes("searchParams.get('token')") || !loginSource.includes('submitResetPassword')) {
+  throw new Error('Forgot-password page must render and submit the password reset form');
 }
 
 const apiClient = fs.readFileSync(new URL('../src/lib/api.ts', import.meta.url), 'utf8');
@@ -136,6 +143,9 @@ if (!renderBlueprint.includes('https://mbote-room.vercel.app')) {
 }
 if (!renderBlueprint.includes('https://mboteroom.loukatech.com')) {
   throw new Error('Render CORS configuration must be ready for the official MBotéRoom domain');
+}
+if (!renderBlueprint.includes('value: https://mboteroom.loukatech.com')) {
+  throw new Error('Password reset emails must use the official MBotéRoom domain');
 }
 if (!renderBlueprint.includes('MBOTE_ROOM_ALLOWED_ORIGIN_PATTERNS') || !renderBlueprint.includes('https://mbote-room-*.vercel.app')) {
   throw new Error('Render CORS configuration must allow only MBotéRoom Vercel preview origins');

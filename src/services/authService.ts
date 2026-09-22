@@ -216,6 +216,20 @@ export const authService = {
     return result as { success: boolean; message?: string; resetUrl?: string };
   },
 
+  async resetPassword(token: string, password: string) {
+    const response = await fetchAuth(apiUrl('/api/auth/reset-password'), {
+      method: 'POST',
+      headers: authRequestHeaders(),
+      body: JSON.stringify({ token, password }),
+      credentials: 'include',
+    });
+    const result = await readJson(response);
+    if (!response.ok) {
+      throw new Error(result.error || 'Réinitialisation du mot de passe impossible.');
+    }
+    return result as { success: boolean; message?: string };
+  },
+
   async refreshCurrentUser() {
     const response = await fetchAuth(apiUrl('/api/auth/me'), {
       headers: getAuthHeaders(),

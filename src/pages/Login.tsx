@@ -31,7 +31,7 @@ type LoginProps = {
   initialView?: AuthView;
 };
 
-type FieldErrors = Partial<Record<'name' | 'email' | 'password' | 'phoneNumber' | 'organization' | 'jobTitle' | 'meetingCode' | 'meetingPassword', string>>;
+type FieldErrors = Partial<Record<'name' | 'email' | 'password' | 'confirmPassword' | 'phoneNumber' | 'organization' | 'jobTitle' | 'meetingCode' | 'meetingPassword', string>>;
 
 const translations = {
   fr: {
@@ -253,10 +253,12 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [organization, setOrganization] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [forgotMessage, setForgotMessage] = useState('');
+  const [resetComplete, setResetComplete] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [guestName, setGuestName] = useState('');
   const [meetingCode, setMeetingCode] = useState('');
@@ -275,6 +277,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const copy = translations[language];
+  const resetToken = searchParams.get('token')?.trim() || '';
 
   useEffect(() => {
     try {
@@ -460,6 +463,35 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     try {
       const result = await authService.forgotPassword(email.trim());
       setForgotMessage(result.resetUrl ? `${result.message || 'Lien généré.'} ${result.resetUrl}` : result.message || 'Demande envoyée.');
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Réinitialisation impossible pour le moment.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const submitResetPassword = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isLoading || resetComplete) return;
+
+    const nextErrors: FieldErrors = {};
+    if (!password) nextErrors.password = 'Le nouveau mot de passe est obligatoire.';
+    else if (password.length < 8) nextErrors.password = 'Le mot de passe doit contenir au moins 8 caractères.';
+    if (!confirmPassword) nextErrors.confirmPassword = 'Confirmez le nouveau mot de passe.';
+    else if (confirmPassword !== password) nextErrors.confirmPassword = 'Les mots de passe ne correspondent pas.';
+
+    setFieldErrors(nextErrors);
+    setFormError('');
+    setForgotMessage('');
+    if (Object.keys(nextErrors).length) return;
+
+    setIsLoading(true);
+    try {
+      const result = await authService.resetPassword(resetToken, password);
+      setPassword('');
+      setConfirmPassword('');
+      setResetComplete(true);
+      setForgotMessage(result.message || 'Votre mot de passe a été modifié. Vous pouvez maintenant vous connecter.');
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Réinitialisation impossible pour le moment.');
     } finally {
@@ -660,29 +692,75 @@ export default function Login({ initialView = 'login' }: LoginProps) {
           {initialView === 'forgot' && (
             <section className="login-card compact-auth-card" aria-labelledby="forgot-title">
               <header className="login-card-header">
-                <h1 id="forgot-title">Mot de passe oublié</h1>
-                <p>Entrez votre adresse e-mail pour recevoir un lien de réinitialisation.</p>
+                <h1 id="forgot-title">{resetToken ? 'Nouveau mot de passe' : 'Mot de passe oublié'}</h1>
+                <p>{resetToken ? 'Choisissez un nouveau mot de passe sécurisé pour votre compte.' : 'Entrez votre adresse e-mail pour recevoir un lien de réinitialisation.'}</p>
               </header>
-              <form className="login-form" onSubmit={submitForgotPassword} noValidate>
-                <FormField id="forgot-email" label="Adresse e-mail" icon={<Mail size={21} aria-hidden="true" />} error={fieldErrors.email}>
-                  <input
-                    id="forgot-email"
-                    type="email"
-                    value={email}
-                    placeholder="exemple@mail.com"
-                    autoComplete="email"
-                    onChange={(event) => {
-                      setEmail(event.target.value);
-                      clearErrors();
-                      setForgotMessage('');
-                    }}
-                  />
-                </FormField>
+              <form className="login-form" onSubmit={resetToken ? submitResetPassword : submitForgotPassword} noValidate>
+                {!resetToken && (
+                  <FormField id="forgot-email" label="Adresse e-mail" icon={<Mail size={21} aria-hidden="true" />} error={fieldErrors.email}>
+                    <input
+                      id="forgot-email"
+                      type="email"
+                      value={email}
+                      placeholder="exemple@mail.com"
+                      autoComplete="email"
+                      onChange={(event) => {
+                        setEmail(event.target.value);
+                        clearErrors();
+                        setForgotMessage('');
+                      }}
+                    />
+                  </FormField>
+                )}
+                {resetToken && !resetComplete && (
+                  <>
+                    <FormField id="reset-password" label="Nouveau mot de passe" icon={<Lock size={21} aria-hidden="true" />} error={fieldErrors.password}>
+                      <input
+                        id="reset-password"
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        placeholder="Au moins 8 caractères"
+                        autoComplete="new-password"
+                        aria-invalid={Boolean(fieldErrors.password)}
+                        aria-describedby={fieldErrors.password ? 'reset-password-error' : undefined}
+                        onChange={(event) => {
+                          setPassword(event.target.value);
+                          clearErrors();
+                        }}
+                      />
+                      <button
+                        className="password-toggle"
+                        type="button"
+                        aria-label={showPassword ? 'Masquer les mots de passe' : 'Afficher les mots de passe'}
+                        onClick={() => setShowPassword((current) => !current)}
+                      >
+                        {showPassword ? <EyeOff size={21} aria-hidden="true" /> : <Eye size={21} aria-hidden="true" />}
+                      </button>
+                    </FormField>
+                    <FormField id="reset-password-confirm" label="Confirmer le mot de passe" icon={<ShieldCheck size={21} aria-hidden="true" />} error={fieldErrors.confirmPassword}>
+                      <input
+                        id="reset-password-confirm"
+                        type={showPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        placeholder="Saisissez-le une seconde fois"
+                        autoComplete="new-password"
+                        aria-invalid={Boolean(fieldErrors.confirmPassword)}
+                        aria-describedby={fieldErrors.confirmPassword ? 'reset-password-confirm-error' : undefined}
+                        onChange={(event) => {
+                          setConfirmPassword(event.target.value);
+                          clearErrors();
+                        }}
+                      />
+                    </FormField>
+                  </>
+                )}
                 {formError && <p className="auth-error" role="alert">{formError}</p>}
                 {forgotMessage && <p className="auth-success" role="status">{forgotMessage}</p>}
-                <button className="primary-login-button" type="submit" disabled={isLoading}>
-                  {isLoading ? 'Envoi en cours...' : 'Envoyer le lien'}
-                </button>
+                {!resetComplete && (
+                  <button className="primary-login-button" type="submit" disabled={isLoading}>
+                    {isLoading ? (resetToken ? 'Modification en cours...' : 'Envoi en cours...') : (resetToken ? 'Modifier le mot de passe' : 'Envoyer le lien')}
+                  </button>
+                )}
                 <AuthFooterAction label="Vous connaissez votre mot de passe ?" action="Se connecter" onClick={() => navigate('/connexion')} />
               </form>
             </section>
