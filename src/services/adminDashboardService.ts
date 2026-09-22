@@ -3,6 +3,17 @@ import { DashboardTip, Meeting } from './meetingService';
 
 export type GuestAccessSlide = { id: string; title: string; body: string; imageUrl: string; isActive: boolean; createdAt: string; updatedAt: string };
 
+export type HomeSlide = {
+  slot: 1 | 2 | 3;
+  title: string;
+  body: string;
+  imageUrl: string;
+  actionLabel: string;
+  actionPath: string;
+  isActive: boolean;
+  updatedAt: string;
+};
+
 export type AdminPlatformSettings = {
   registrationEnabled: boolean;
   guestAccessEnabled: boolean;
@@ -167,6 +178,20 @@ export const adminDashboardService = {
       body: JSON.stringify(payload),
     });
     return readJson<DashboardTip>(response);
+  },
+
+  async getHomeSlides(): Promise<HomeSlide[]> {
+    const response = await apiFetch(apiUrl('/api/admin/home-slides'), { headers: getAuthHeaders() });
+    return readJson<HomeSlide[]>(response);
+  },
+
+  async saveHomeSlide(slot: HomeSlide['slot'], payload: Omit<HomeSlide, 'slot' | 'updatedAt'>): Promise<HomeSlide> {
+    const response = await apiFetch(apiUrl(`/api/admin/home-slides/${slot}`), {
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return readJson<HomeSlide>(response);
   },
 
   async getGuestAccessSlides() {
