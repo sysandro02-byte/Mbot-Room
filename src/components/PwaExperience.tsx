@@ -12,6 +12,7 @@ const PROMPT_DELAY_MS=3*60*1000;
 const DISMISS_COOLDOWN_MS=7*24*60*60*1000;
 
 const isStandalone=()=>window.matchMedia?.('(display-mode: standalone)').matches
+  || window.matchMedia?.('(display-mode: fullscreen)').matches
   || Boolean((navigator as Navigator & {standalone?:boolean}).standalone);
 
 const platform=()=>{
@@ -112,7 +113,7 @@ export default function PwaExperience(){
         <p>Profitez d’une ouverture plein écran, d’une navigation mobile plus fluide, du démarrage depuis l’écran d’accueil et des notifications push.</p>
         {showHelp?<div className="pwa-install-help">
           {device==='ios'?<><strong><Share size={17}/> Sur iPhone/iPad</strong><span>Dans Safari, touchez <b>Partager</b>, puis <b>Sur l’écran d’accueil</b> et confirmez <b>Ajouter</b>.</span></>
-          :<><strong><MoreVertical size={17}/> Sur Android</strong><span>Ouvrez le menu du navigateur, puis choisissez <b>Installer l’application</b> ou <b>Ajouter à l’écran d’accueil</b>.</span></>}
+          :<><strong><MoreVertical size={17}/> Sur Android</strong><span>Utilisez Chrome ou Edge, ouvrez le menu, puis choisissez <b>Installer l’application</b>. Si le navigateur propose seulement un raccourci, rechargez la page puis utilisez le bouton d’installation MBotéRoom.</span></>}
         </div>:null}
         <div className="pwa-install-actions">
           <button type="button" className="primary" onClick={()=>void install()}><Download size={18}/>{deferredPrompt?'Installer maintenant':showHelp?'Voir les étapes':'Installer l’application'}</button>

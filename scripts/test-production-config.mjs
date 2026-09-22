@@ -99,12 +99,8 @@ if (!liveSmoke.includes('MBOTE_ROOM_SMOKE_APP_URL') || !liveSmoke.includes("|| b
   throw new Error('Full production meeting smoke must target the exact Render frontend commit while Vercel is validated separately');
 }
 
-if (!String(packageJson.scripts?.start || '').includes('wait-for-ci-gate.mjs')) {
-  throw new Error('Production start must wait for the CI release gate');
-}
-const releaseGate = fs.readFileSync(new URL('../scripts/wait-for-ci-gate.mjs', import.meta.url), 'utf8');
-if (!releaseGate.includes('RENDER_GIT_COMMIT') || !releaseGate.includes('MBoteRoom CI') || !releaseGate.includes("run.conclusion === 'success'")) {
-  throw new Error('Render release gate must verify the exact deployed commit has a successful MBoteRoom CI run');
+if (String(packageJson.scripts?.start || '').includes('wait-for-ci-gate.mjs')) {
+  throw new Error('Production start must not duplicate the provider checksPass deploy gate at runtime');
 }
 const deviceMatrix = fs.readFileSync(new URL('../scripts/test-device-matrix.mjs', import.meta.url), 'utf8');
 if (!deviceMatrix.includes('PC Chromium') || !deviceMatrix.includes('Android Pixel 7') || !deviceMatrix.includes('iPhone 15 WebKit') || !deviceMatrix.includes('setOffline')) {
@@ -157,8 +153,8 @@ if (!originPolicy.includes('configuredOriginPatterns') || !originPolicy.includes
 if (!renderBlueprint.includes('autoDeployTrigger: checksPass')) {
   throw new Error('Render production deploys must wait for CI checks to pass');
 }
-if (!renderBlueprint.includes('MBOTE_ROOM_REQUIRE_CI_GATE') || !renderBlueprint.includes('MBOTE_ROOM_REQUIRED_WORKFLOW')) {
-  throw new Error('Render blueprint must enable the runtime CI release gate');
+if (renderBlueprint.includes('MBOTE_ROOM_REQUIRE_CI_GATE') || renderBlueprint.includes('MBOTE_ROOM_REQUIRED_WORKFLOW')) {
+  throw new Error('Render blueprint must rely on checksPass instead of a second runtime CI gate');
 }
 if (!readiness.includes('MBOTE_ROOM_REQUIRE_LIVEKIT') || !readiness.includes('MBOTE_ROOM_REQUIRE_SERVER_RECORDING')) {
   throw new Error('Readiness must support enforcing LiveKit and server recording when V1 credentials are enabled');
@@ -182,6 +178,12 @@ if (!fs.existsSync(manifestPath) || !fs.existsSync(serviceWorkerPath) || !fs.exi
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 if (!manifest.icons?.some((icon) => icon.sizes === '192x192') || !manifest.icons?.some((icon) => icon.sizes === '512x512')) {
   throw new Error('PWA manifest must expose 192x192 and 512x512 icons');
+}
+if (manifest.id !== '/app' || !String(manifest.start_url || '').startsWith('/app') || manifest.scope !== '/' || manifest.display !== 'standalone') {
+  throw new Error('PWA manifest must use a stable app identity, an in-scope start URL and standalone display');
+}
+if (manifest.prefer_related_applications !== false || !manifest.icons?.some((icon) => String(icon.purpose || '').includes('maskable'))) {
+  throw new Error('PWA manifest must prefer web installation and expose a maskable application icon');
 }
 const serviceWorker = fs.readFileSync(serviceWorkerPath, 'utf8');
 if (!serviceWorker.includes("url.pathname.startsWith('/api/')") || !serviceWorker.includes("url.pathname.startsWith('/socket.io/')")) {
