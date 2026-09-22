@@ -3,6 +3,29 @@ import { DashboardTip, Meeting } from './meetingService';
 
 export type GuestAccessSlide = { id: string; title: string; body: string; imageUrl: string; isActive: boolean; createdAt: string; updatedAt: string };
 
+export type AdminPlatformSettings = {
+  registrationEnabled: boolean;
+  guestAccessEnabled: boolean;
+  meetingCreationEnabled: boolean;
+  lunaEnabled: boolean;
+  recordingEnabled: boolean;
+  publicMeetingsEnabled: boolean;
+};
+
+export type AdminManagedUser = {
+  id: number;
+  name: string;
+  username: string;
+  email: string;
+  phoneNumber: string;
+  organization: string;
+  jobTitle: string;
+  role: 'admin'|'user'|'guest';
+  isGuest: boolean;
+  isSuspended: boolean;
+  createdAt: string;
+};
+
 export type AdminDashboardStat = {
   id: 'users' | 'meetings' | 'live' | 'hours' | 'recordings';
   label: string;
@@ -62,6 +85,36 @@ const readJson = async <T>(response: Response): Promise<T> => {
 };
 
 export const adminDashboardService = {
+  async getPlatformSettings(): Promise<AdminPlatformSettings> {
+    const response = await apiFetch(apiUrl('/api/admin/settings'), { headers: getAuthHeaders() });
+    return readJson<AdminPlatformSettings>(response);
+  },
+
+  async updatePlatformSettings(payload: Partial<AdminPlatformSettings>): Promise<AdminPlatformSettings> {
+    const response = await apiFetch(apiUrl('/api/admin/settings'), {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return readJson<AdminPlatformSettings>(response);
+  },
+
+  async getUsers(query = ''): Promise<AdminManagedUser[]> {
+    const response = await apiFetch(apiUrl(`/api/admin/users?q=${encodeURIComponent(query)}`), {
+      headers: getAuthHeaders(),
+    });
+    return readJson<AdminManagedUser[]>(response);
+  },
+
+  async updateUser(userId: number, payload: Partial<Pick<AdminManagedUser,'name'|'phoneNumber'|'organization'|'jobTitle'|'isSuspended'>>): Promise<AdminManagedUser> {
+    const response = await apiFetch(apiUrl(`/api/admin/users/${userId}`), {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return readJson<AdminManagedUser>(response);
+  },
+
   async getDashboard(period: string): Promise<AdminDashboardPayload> {
     const response = await apiFetch(apiUrl(`/api/admin/dashboard?period=${encodeURIComponent(period)}`), {
       headers: getAuthHeaders(),
