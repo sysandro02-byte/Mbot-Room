@@ -17,6 +17,8 @@ import {
   requireDatabase,
   SESSION_COOKIE_NAME,
   getRawSessionTokenFromRequest,
+  getConfiguredAdminEmails,
+  touchSessionActivity,
   sendApiError,
   toPublicUser,
   validateMeetingPassword,
@@ -145,6 +147,15 @@ const acceptedMemberCount = async (meetingId: number) => {
   return Number(result.rows[0]?.count || 0);
 };
 
+const validatePasswordStrength = (password: string) => {
+  if (password.length < 10) return 'Le mot de passe doit contenir au moins 10 caractères.';
+  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+    return 'Utilisez au moins une majuscule, une minuscule, un chiffre et un caractère spécial.';
+  }
+  if (/\s/.test(password)) return 'Le mot de passe ne doit pas contenir d’espace.';
+  return '';
+};
+
 const escapeEmailHtml = (value: unknown) => String(value ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
@@ -249,12 +260,12 @@ export const registerAuthRoutes = (app: express.Express) => {
       const username = normalizeText(request.body?.username || email.split('@')[0]).toLowerCase().slice(0, 80);
       if (!name || !email || !password) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Nom, email et mot de passe sont requis.');
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendApiError(response, 400, 'INVALID_EMAIL', 'Email invalide.');
-      if (password.length < 8) return sendApiError(response, 400, 'PASSWORD_TOO_SHORT', 'Le mot de passe doit contenir au moins 8 caractères.');
+      const passwordError = validatePasswordStrength(password);
+      if (passwordError) return sendApiError(response, 400, 'PASSWORD_WEAK', passwordError);
       const duplicate = await query('SELECT 1 FROM room_users WHERE lower(email) = lower($1) LIMIT 1', [email]);
       if (duplicate.rows[0]) return sendApiError(response, 409, 'EMAIL_ALREADY_EXISTS', 'Un compte existe déjà avec cet email.');
-      const userCount = await query(`SELECT COUNT(*)::int AS count FROM room_users WHERE is_guest = false`);
       const passwordData = hashPassword(password);
-      const role = Number(userCount.rows[0]?.count || 0) === 0 ? 'admin' : 'user';
+      const role = getConfiguredAdminEmails().includes(email) ? 'admin' : 'user';
       const inserted = await query(
         `INSERT INTO room_users
           (name,username,email,avatar,password_hash,password_salt,is_guest,created_at,phone_number,organization,job_title,role)
@@ -425,7 +436,18 @@ export const registerAuthRoutes = (app: express.Express) => {
   });
 
   app.get('/api/auth/me', requireDatabase, authenticateToken, (request: AuthedRequest, response) => {
+    response.setHeader('Cache-Control', 'no-store');
     response.json({ user: request.user });
+  });
+
+  app.post('/api/auth/activity', requireDatabase, async (request, response, next) => {
+    try {
+      const rawToken = getRawSessionTokenFromRequest(request);
+      const touched = await touchSessionActivity(rawToken);
+      if (!touched) return sendApiError(response, 401, 'SESSION_IDLE_EXPIRED', 'Votre session a expiré après 5 minutes d’inactivité.');
+      response.setHeader('Cache-Control', 'no-store');
+      response.status(204).end();
+    } catch (error) { next(error); }
   });
 
   app.post('/api/auth/logout', requireDatabase, async (request, response, next) => {
@@ -451,7 +473,7 @@ export const registerAuthRoutes = (app: express.Express) => {
           [hashToken(rawToken), userResult.rows[0].id],
         );
         const appUrl = String(process.env.MBOTE_ROOM_APP_URL || getOrigin(request)).replace(/\/+$/, '');
-        const delivered = await sendResetEmail(email, `${appUrl}/mot-de-passe-oublie?token=${encodeURIComponent(rawToken)}`);
+        const delivered = await sendResetEmail(email, `${appUrl}/mot-de-passe-oublie#reset=${encodeURIComponent(rawToken)}`);
         if (!delivered) {
           await query('DELETE FROM room_password_resets WHERE token_hash=$1', [hashToken(rawToken)]);
           console.warn('MBotéRoom password reset email delivery failed');
@@ -466,7 +488,8 @@ export const registerAuthRoutes = (app: express.Express) => {
       const token = String(request.body?.token || '');
       const password = String(request.body?.password || '');
       if (!token) return sendApiError(response, 400, 'PASSWORD_RESET_INVALID', 'Lien de réinitialisation invalide ou expiré.');
-      if (password.length < 8) return sendApiError(response, 400, 'PASSWORD_TOO_SHORT', 'Le mot de passe doit contenir au moins 8 caractères.');
+      const passwordError = validatePasswordStrength(password);
+      if (passwordError) return sendApiError(response, 400, 'PASSWORD_WEAK', passwordError);
       const reset = await query(`SELECT * FROM room_password_resets WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now() LIMIT 1`, [hashToken(token)]);
       if (!reset.rows[0]) return sendApiError(response, 400, 'PASSWORD_RESET_INVALID', 'Lien de réinitialisation invalide ou expiré.');
       const passwordData = hashPassword(password);
