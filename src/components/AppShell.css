@@ -289,7 +289,7 @@
 .app-shell-creator{padding:4px 12px 0;color:rgba(255,255,255,.48);font-size:10px;line-height:1.5;text-align:center}.app-shell-creator strong{color:rgba(255,255,255,.76)}
 .app-shell-bottom-nav{display:none}
 
-@media (max-width:900px){
+@media (max-width:1024px){
   .app-shell-header{min-height:64px;padding-top:max(8px,env(safe-area-inset-top))}
   .app-shell-sidebar{padding-top:max(18px,calc(env(safe-area-inset-top) + 10px));padding-bottom:max(18px,env(safe-area-inset-bottom))}
   .app-shell-content{padding-bottom:calc(98px + env(safe-area-inset-bottom))}
@@ -313,7 +313,7 @@
   .app-shell-content{padding:14px 12px calc(94px + env(safe-area-inset-bottom))}
 }
 
-@media (display-mode:standalone) and (max-width:900px){
+@media (display-mode:standalone) and (max-width:1024px){
   .app-shell-header{padding-top:max(10px,env(safe-area-inset-top))}
   .app-shell-bottom-nav{padding-bottom:max(9px,env(safe-area-inset-bottom))}
 }
