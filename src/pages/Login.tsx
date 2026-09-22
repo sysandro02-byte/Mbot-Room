@@ -24,6 +24,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { authService } from '../services/authService';
+import { sanitizeInternalPath } from '../lib/navigationSecurity';
 import './Login.css';
 
 type AuthView = 'login' | 'register' | 'guest' | 'forgot';
@@ -34,6 +35,15 @@ type LoginProps = {
 };
 
 type FieldErrors = Partial<Record<'name' | 'email' | 'password' | 'confirmPassword' | 'phoneNumber' | 'organization' | 'jobTitle' | 'meetingCode' | 'meetingPassword', string>>;
+
+const passwordStrengthError = (password: string) => {
+  if (password.length < 10) return 'Le mot de passe doit contenir au moins 10 caractères.';
+  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+    return 'Ajoutez une majuscule, une minuscule, un chiffre et un caractère spécial.';
+  }
+  if (/\s/.test(password)) return 'Le mot de passe ne doit pas contenir d’espace.';
+  return '';
+};
 
 const translations = {
   fr: {
@@ -286,7 +296,17 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const copy = translations[language];
-  const resetToken = searchParams.get('token')?.trim() || '';
+  const [resetToken] = useState(() => {
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    return (hash.get('reset') || searchParams.get('token') || '').trim();
+  });
+
+  useEffect(() => {
+    if (!resetToken) return;
+    const current = new URL(window.location.href);
+    current.searchParams.delete('token');
+    window.history.replaceState(null, '', current.pathname + (current.search ? current.search : ''));
+  }, [resetToken]);
 
   useEffect(() => {
     try {
@@ -312,8 +332,16 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   }, [searchParams]);
 
   const redirectTo = useMemo(() => {
-    const raw = searchParams.get('redirect') || '/app';
-    return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/app';
+    const legacy = searchParams.get('redirect') || '';
+    const stored = sessionStorage.getItem('mboteroom-login-redirect') || '';
+    const target = sanitizeInternalPath(stored || legacy || '/app');
+    if (legacy) {
+      sessionStorage.setItem('mboteroom-login-redirect', target);
+      const clean = new URL(window.location.href);
+      clean.searchParams.delete('redirect');
+      window.history.replaceState(null, '', clean.pathname + (clean.search ? clean.search : ''));
+    }
+    return target;
   }, [searchParams]);
 
   useEffect(() => {
@@ -374,7 +402,9 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       await authService.verifyLoginOtp(otpChallengeId, code, rememberMe);
       setOtpChallengeId('');
       setOtpCode('');
-      navigate(otpRedirectTo || redirectTo, { replace: true });
+      const target = sanitizeInternalPath(otpRedirectTo || redirectTo);
+      sessionStorage.removeItem('mboteroom-login-redirect');
+      navigate(target, { replace: true });
     } catch (submitError) {
       setFormError(submitError instanceof Error ? submitError.message : 'Validation du code impossible.');
     } finally {
@@ -406,7 +436,10 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     if (!email.trim()) nextErrors.email = "L'adresse e-mail est obligatoire.";
     else if (!isValidEmail(email)) nextErrors.email = "L'adresse e-mail est invalide.";
     if (!password) nextErrors.password = 'Le mot de passe est obligatoire.';
-    else if (password.length < 8) nextErrors.password = 'Le mot de passe doit contenir au moins 8 caractères.';
+    else {
+      const passwordError = passwordStrengthError(password);
+      if (passwordError) nextErrors.password = passwordError;
+    }
     if (phoneNumber.trim() && phoneNumber.trim().length < 6) nextErrors.phoneNumber = 'Le numéro de téléphone est trop court.';
 
     setFieldErrors(nextErrors);
@@ -546,7 +579,10 @@ export default function Login({ initialView = 'login' }: LoginProps) {
 
     const nextErrors: FieldErrors = {};
     if (!password) nextErrors.password = 'Le nouveau mot de passe est obligatoire.';
-    else if (password.length < 8) nextErrors.password = 'Le mot de passe doit contenir au moins 8 caractères.';
+    else {
+      const passwordError = passwordStrengthError(password);
+      if (passwordError) nextErrors.password = passwordError;
+    }
     if (!confirmPassword) nextErrors.confirmPassword = 'Confirmez le nouveau mot de passe.';
     else if (confirmPassword !== password) nextErrors.confirmPassword = 'Les mots de passe ne correspondent pas.';
 
@@ -872,7 +908,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
               {registrationSuccess.welcomeEmailSent ? '✓ Le mail de bienvenue a été envoyé.' : 'Le compte est créé, mais le mail de bienvenue n’a pas pu être confirmé.'}
             </div>
             <p className="account-created-security">Pour votre sécurité, votre mot de passe n’est jamais envoyé en clair par e-mail.</p>
-            <button type="button" onClick={() => { setRegistrationSuccess(null); navigate(redirectTo, { replace: true }); }} autoFocus>
+            <button type="button" onClick={() => { setRegistrationSuccess(null); sessionStorage.removeItem('mboteroom-login-redirect'); navigate(sanitizeInternalPath(redirectTo), { replace: true }); }} autoFocus>
               Accéder à mon espace
             </button>
           </section>
