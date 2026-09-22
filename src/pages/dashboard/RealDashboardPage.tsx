@@ -144,7 +144,7 @@ export default function RealDashboardPage(){
     <section className="dashboard-security-card">
       <div className="dashboard-security-icon"><ShieldCheck/></div>
       <div>
-        <strong>Connexion renforcée par OTP</strong>
+        <strong>Connexion renforcée</strong>
         <p>À chaque connexion avec votre mot de passe, MBotéRoom envoie un code de sécurité à votre adresse e-mail.</p>
       </div>
       <button onClick={()=>navigate('/app/settings')}><Settings size={16}/> Paramètres</button>
