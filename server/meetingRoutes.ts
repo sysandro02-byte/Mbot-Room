@@ -487,7 +487,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
             type:'MEETING_LOBBY_REQUEST',
             title:'Participant en salle d’attente',
             body:`${request.user!.name || 'Un participant'} souhaite rejoindre « ${meeting.title} ».`,
-            url:`/reunions/${meeting.id}`,
+            url:`/reunions/${meeting.meeting_link}`,
             tag:`meeting-lobby-${meeting.id}`,
             data:{meetingId:meeting.id,userId:request.user!.id},
           });
@@ -555,7 +555,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
             type:'MEETING_LOBBY_ACCEPTED',
             title:'Vous pouvez rejoindre la réunion',
             body:`L’hôte vous a admis dans « ${meeting.title} ».`,
-            url:`/reunions/${meeting.id}`,
+            url:`/reunions/${meeting.meeting_link}`,
             tag:`meeting-lobby-result-${meeting.id}`,
             data:{meetingId:meeting.id,status:'accepted'},
           }).catch(()=>null);
@@ -618,7 +618,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
           type:'MEETING_STARTED',
           title:'La réunion a commencé',
           body:`« ${meeting.title} » est maintenant en direct.`,
-          url:`/reunions/${meeting.id}`,
+          url:`/reunions/${meeting.meeting_link}`,
           tag:`meeting-started-${meeting.id}`,
           data:{meetingId:meeting.id},
         }).catch(()=>null);
