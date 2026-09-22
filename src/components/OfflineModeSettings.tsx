@@ -48,11 +48,11 @@ export default function OfflineModeSettings(){
         <div><span>Continuité de service</span><h3 id="offline-mode-title">Mode hors ligne robuste</h3></div>
         <span className={online?'offline-state online':'offline-state'}>{online?<CheckCircle2 size={14}/>:<CloudOff size={14}/>} {online?'Connecté':'Hors connexion'}</span>
       </div>
-      <p>MBotéRoom conserve localement les données déjà consultées et protège les modifications sûres jusqu’au retour de la connexion.</p>
+      <p>MBotéRoom garde certaines informations utiles sur votre appareil afin de rester pratique lorsque la connexion est faible ou absente.</p>
       <div className="offline-capabilities">
-        <span><ShieldCheck size={15}/><b>Cache privé par compte</b><small>Les données mises en cache sont isolées par utilisateur et supprimées à la déconnexion.</small></span>
-        <span><RefreshCw size={15}/><b>Synchronisation automatique</b><small>Profil, préférences, calendrier et tableaux blancs repartent automatiquement vers le serveur.</small></span>
-        <span><CloudOff size={15}/><b>Lecture dégradée</b><small>Les pages déjà chargées restent consultables jusqu’à 7 jours. Les appels et réunions vidéo nécessitent Internet.</small></span>
+        <span><ShieldCheck size={15}/><b>Données privées</b><small>Les informations conservées sur l’appareil restent séparées pour chaque compte et sont supprimées à la déconnexion.</small></span>
+        <span><RefreshCw size={15}/><b>Synchronisation automatique</b><small>Vos modifications sont envoyées automatiquement dès que la connexion revient.</small></span>
+        <span><CloudOff size={15}/><b>Consultation hors connexion</b><small>Les pages déjà chargées restent consultables jusqu’à 7 jours. Les appels et réunions vidéo nécessitent Internet.</small></span>
       </div>
       <div className="offline-settings-footer">
         <span>{pending ? String(pending)+' modification'+(pending>1?'s':'')+' en attente de synchronisation' : 'Aucune modification en attente'}</span>
