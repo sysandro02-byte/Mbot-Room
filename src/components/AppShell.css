@@ -309,7 +309,7 @@
   .app-shell{background:#f4f6fb}
   .app-shell-header{grid-template-columns:44px minmax(0,1fr);min-height:62px;padding-left:12px;padding-right:12px;border-bottom-color:#e5eaf3;background:rgba(255,255,255,.95)}
   .app-shell-menu-button{width:42px;height:42px;border-radius:13px}
-  .app-shell-search{min-height:42px;border-radius:13px;background:#f6f8fc}
+  .app-shell-search{min-height:42px;margin-right:48px;border-radius:13px;background:#f6f8fc}
   .app-shell-content{padding:14px 12px calc(94px + env(safe-area-inset-bottom))}
 }
 
