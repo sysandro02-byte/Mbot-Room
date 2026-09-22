@@ -466,6 +466,7 @@ export default function GuestJoinPage() {
             </div>
           );
         })}
+        <div className="guest-created-by">MBotéRoom est une application créée par <strong>LoukaTech</strong>.</div>
       </footer>
     </main>
   );
