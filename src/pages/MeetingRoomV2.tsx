@@ -618,6 +618,7 @@ export default function MeetingRoomV2() {
       navigate(`/reunions/${id}/terminee`, { replace: true });
     };
     const onEnded = () => leaveByHost('La réunion a été terminée par l’hôte.');
+    const onCancelled = () => leaveByHost('La réunion a été annulée par l’hôte.');
     const onRemoved = () => leaveByHost('Vous avez été retiré de la réunion.');
     const onBanned = () => leaveByHost('Vous avez été exclu de cette réunion.');
     const onMoved = () => navigate(`/reunions/${id}/salle-attente`, { replace: true, state: location.state });
@@ -639,6 +640,7 @@ export default function MeetingRoomV2() {
     socket.on('meeting:media-request-responded', onMediaRequestResponded);
     socket.on('meeting:moderation', onModeration);
     socket.on('meeting:ended', onEnded);
+    socket.on('meeting:cancelled', onCancelled);
     socket.on('meeting:removed', onRemoved);
     socket.on('meeting:banned', onBanned);
     socket.on('meeting:moved-to-lobby', onMoved);
@@ -662,6 +664,7 @@ export default function MeetingRoomV2() {
       reactionTimersRef.current.forEach((timer) => clearTimeout(timer));
       reactionTimersRef.current.clear();
       socket.off('meeting:ended', onEnded);
+      socket.off('meeting:cancelled', onCancelled);
       socket.off('meeting:removed', onRemoved);
       socket.off('meeting:banned', onBanned);
       socket.off('meeting:moved-to-lobby', onMoved);
