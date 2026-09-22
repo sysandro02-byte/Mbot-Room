@@ -54,6 +54,39 @@ type MeetingLocationState = {
   meeting?: Partial<Meeting>;
 };
 
+type DisplayCaptureMediaDevices = MediaDevices & {
+  getDisplayMedia?: (options?: DisplayMediaStreamOptions) => Promise<MediaStream>;
+};
+
+type DisplayCaptureNavigator = Navigator & {
+  getDisplayMedia?: (options?: DisplayMediaStreamOptions) => Promise<MediaStream>;
+};
+
+const requestDisplayCapture = async () => {
+  const mediaDevices = navigator.mediaDevices as DisplayCaptureMediaDevices | undefined;
+  const legacyNavigator = navigator as DisplayCaptureNavigator;
+  const capture = mediaDevices?.getDisplayMedia
+    ? mediaDevices.getDisplayMedia.bind(mediaDevices)
+    : legacyNavigator.getDisplayMedia?.bind(legacyNavigator);
+
+  if (!capture) {
+    throw new DOMException('Screen capture is not supported by this browser.', 'NotSupportedError');
+  }
+
+  const touchDevice = navigator.maxTouchPoints > 0 || window.matchMedia?.('(pointer: coarse)').matches;
+  const options: DisplayMediaStreamOptions = touchDevice
+    ? { video: true, audio: false }
+    : { video: { frameRate: { ideal: 15, max: 30 } }, audio: true };
+
+  try {
+    return await capture(options);
+  } catch (error) {
+    const errorName = error instanceof DOMException ? error.name : '';
+    if (touchDevice || errorName === 'NotAllowedError' || errorName === 'AbortError') throw error;
+    return capture({ video: true, audio: false });
+  }
+};
+
 type VideoTileProps = {
   name: string;
   stream: MediaStream | null;
@@ -852,23 +885,37 @@ export default function MeetingRoomV2() {
       stopScreenShare();
       return;
     }
-    if (!canShareScreen || !navigator.mediaDevices?.getDisplayMedia) {
-      setNotice(!canShareScreen ? 'Le partage d’écran est désactivé pour les participants.' : 'Le partage d’écran est indisponible dans ce navigateur.');
+    if (!canShareScreen) {
+      setNotice('Le partage d’écran est désactivé pour les participants.');
       return;
     }
     try {
-      const display = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 15, max: 30 } }, audio: true });
+      const display = await requestDisplayCapture();
+      const videoTrack = display.getVideoTracks()[0];
+      if (!videoTrack) {
+        display.getTracks().forEach((track) => track.stop());
+        setNotice('Aucun écran n’a été sélectionné.');
+        return;
+      }
       const combined = new MediaStream();
       display.getVideoTracks().forEach((track) => combined.addTrack(track));
       const displayAudio = display.getAudioTracks().filter((track) => track.readyState === 'live');
       const micAudio = canUseMic ? (cameraStreamRef.current?.getAudioTracks().filter((track) => track.readyState === 'live') || []) : [];
       [...micAudio, ...displayAudio].forEach((track) => combined.addTrack(track));
-      display.getVideoTracks()[0]?.addEventListener('ended', stopScreenShare, { once: true });
+      videoTrack.addEventListener('ended', stopScreenShare, { once: true });
       screenStreamRef.current = display;
       setScreenSharing(true);
       setLocalStream(combined);
-    } catch {
-      setNotice('Partage d’écran annulé.');
+      setNotice(navigator.maxTouchPoints > 0 ? 'Partage d’écran démarré sur votre appareil.' : 'Partage d’écran démarré.');
+    } catch (error) {
+      const errorName = error instanceof DOMException ? error.name : '';
+      if (errorName === 'NotAllowedError' || errorName === 'AbortError') {
+        setNotice('Partage d’écran annulé.');
+      } else if (errorName === 'NotSupportedError') {
+        setNotice('Ce navigateur ne permet pas encore le partage d’écran sur cet appareil.');
+      } else {
+        setNotice('Impossible de démarrer le partage d’écran sur cet appareil.');
+      }
     }
   };
 
