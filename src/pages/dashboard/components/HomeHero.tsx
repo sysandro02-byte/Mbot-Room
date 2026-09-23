@@ -24,7 +24,7 @@ export default function HomeHero({ firstName, slides, activeSlide, onSlideChange
     <section className="home-hero" aria-roledescription="carousel" aria-label="Présentation MBotéRoom">
       <div className="home-hero-copy">
         <span className="home-hero-mobile-greeting">Bonjour <b>{firstName}</b> ! <span aria-hidden="true">👋</span></span>
-        <span className="home-hero-kicker">{slide?.title || 'Bienvenue sur'}</span>
+        <span className="home-hero-kicker">Bienvenue sur</span>
         <h1><span className="home-hero-desktop-title">Bienvenue sur</span><span className="home-hero-brand"><img src="/icons/mboteroom-symbol.png" alt="" />MBoté<span>Room</span></span></h1>
         <p>{slide?.body || fallbackBody}</p>
         <div className="home-hero-actions">
@@ -39,7 +39,8 @@ export default function HomeHero({ firstName, slides, activeSlide, onSlideChange
       </div>
 
       <div className="home-hero-visual">
-        <img src={imageUrl} alt="" loading="eager" decoding="async" />
+        <img src={imageUrl} alt="Personnes participant à une réunion vidéo MBotéRoom" loading="eager" decoding="async" />
+        {slide?.title ? <span className="home-hero-slide-note">{slide.title}</span> : null}
         <span className="home-hero-slogan">Se réunir<br/>sans limites !</span>
       </div>
 
