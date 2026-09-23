@@ -3,7 +3,6 @@ import {
   Building2,
   CalendarDays,
   Clock3,
-  Heart,
   Mail,
   MapPin,
   MessageCircle,
@@ -18,7 +17,6 @@ import {
   X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { authService } from '../services/authService';
 import { conversationService, type DirectoryContact } from '../services/conversationService';
 import { meetingService, type Meeting } from '../services/meetingService';
 import { workspaceService, type WorkGroup } from '../services/workspaceService';
@@ -32,7 +30,6 @@ const localDateValue=(date=new Date(Date.now()+3600_000))=>new Date(date.getTime
 
 export default function ContactsPage(){
   const navigate=useNavigate();
-  const currentUser=authService.getCurrentUser();
   const [contacts,setContacts]=useState<DirectoryContact[]>([]);
   const [groups,setGroups]=useState<WorkGroup[]>([]);
   const [meetings,setMeetings]=useState<Meeting[]>([]);
