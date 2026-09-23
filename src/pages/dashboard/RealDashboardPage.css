@@ -141,6 +141,10 @@
 .home-meeting-menu{position:absolute;right:0;top:calc(100% + 7px);z-index:25;width:210px;padding:7px;border:1px solid #dfe8ec;border-radius:14px;background:#fff;box-shadow:0 20px 55px rgba(6,31,50,.15)}
 .home-meeting-menu button{width:100%;min-height:38px;padding:7px 9px;border:0;border-radius:9px;background:transparent;color:#33485f;text-align:left;display:flex;align-items:center;gap:8px}
 .home-meeting-menu button:hover{background:#eff8f7;color:var(--home-teal-dark)}
+.home-meeting-menu-link{width:100%;min-height:38px;box-sizing:border-box;padding:7px 9px;border-radius:9px;color:#33485f;text-decoration:none;display:flex;align-items:center;gap:8px;font-size:12px}
+.home-meeting-menu-link:hover{background:#eff8f7;color:var(--home-teal-dark)}
+.home-recent-menu{top:calc(100% + 5px)}
+
 .home-empty-state{min-height:170px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#728094}
 .home-empty-state.compact{min-height:100px}
 .home-empty-state p{margin:5px 0 0;font-size:12px}
