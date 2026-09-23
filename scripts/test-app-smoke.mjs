@@ -154,6 +154,68 @@ try {
   });
   assert.equal(createMeeting.response.status, 201, JSON.stringify(createMeeting.data));
 
+  const updateProfile = await jsonRequest('/api/profile', {
+    method: 'PUT',
+    headers: authHeaders(verified.data.token),
+    body: JSON.stringify({
+      name: 'Admin Smoke',
+      username: 'admin.smoke',
+      organization: 'LoukaTech Smoke',
+      jobTitle: 'Validation',
+      city: 'Brazzaville',
+      country: 'Congo',
+      address: 'Brazzaville, Congo',
+      bio: 'Profil utilisé pour valider MBotéRoom.',
+      profileVisible: true,
+    }),
+  });
+  assert.equal(updateProfile.response.status, 200, JSON.stringify(updateProfile.data));
+  assert.equal(updateProfile.data.user?.bio, 'Profil utilisé pour valider MBotéRoom.');
+  assert.equal(updateProfile.data.user?.profileVisible, true);
+
+  const updatePreferences = await jsonRequest('/api/preferences', {
+    method: 'PUT',
+    headers: authHeaders(verified.data.token),
+    body: JSON.stringify({ language: 'fr', timezone: 'Africa/Brazzaville' }),
+  });
+  assert.equal(updatePreferences.response.status, 200, JSON.stringify(updatePreferences.data));
+  assert.equal(updatePreferences.data.timezone, 'Africa/Brazzaville');
+
+  const createRecording = await jsonRequest(`/api/meetings/${createMeeting.data.id}/recordings`, {
+    method: 'POST',
+    headers: authHeaders(verified.data.token),
+    body: JSON.stringify({
+      storageUrl: 'https://media.example.test/mboteroom-smoke.mp4',
+      mimeType: 'video/mp4',
+      sizeBytes: 1048576,
+      durationSeconds: 125,
+    }),
+  });
+  assert.equal(createRecording.response.status, 201, JSON.stringify(createRecording.data));
+  assert.ok(createRecording.data.id);
+
+  const recordingStats = await jsonRequest('/api/recordings/stats', {
+    headers: authHeaders(verified.data.token),
+  });
+  assert.equal(recordingStats.response.status, 200, JSON.stringify(recordingStats.data));
+  assert.ok(recordingStats.data.count >= 1);
+  assert.ok(recordingStats.data.durationSeconds >= 125);
+  assert.ok(recordingStats.data.sizeBytes >= 1048576);
+
+  const favoriteRecording = await jsonRequest(`/api/recordings/${createRecording.data.id}`, {
+    method: 'PATCH',
+    headers: authHeaders(verified.data.token),
+    body: JSON.stringify({ favorite: true }),
+  });
+  assert.equal(favoriteRecording.response.status, 200, JSON.stringify(favoriteRecording.data));
+  assert.equal(favoriteRecording.data.favorite, true);
+
+  const recordingAccess = await jsonRequest(`/api/recordings/${createRecording.data.id}/access`, {
+    headers: authHeaders(verified.data.token),
+  });
+  assert.equal(recordingAccess.response.status, 200, JSON.stringify(recordingAccess.data));
+  assert.equal(recordingAccess.data.url, 'https://media.example.test/mboteroom-smoke.mp4');
+
   const googleStatus = await jsonRequest('/api/calendar/google/status', {
     headers: authHeaders(verified.data.token),
   });
@@ -202,6 +264,13 @@ try {
   assert.equal(groupDetail.response.status, 200, JSON.stringify(groupDetail.data));
   assert.ok(groupDetail.data.files.some((item) => item.id === uploadedPdf.id));
   assert.ok(groupDetail.data.calls.some((item) => Number(item.meetingId) === Number(createMeeting.data.id)));
+
+  const profileStats = await jsonRequest('/api/profile/stats', {
+    headers: authHeaders(verified.data.token),
+  });
+  assert.equal(profileStats.response.status, 200, JSON.stringify(profileStats.data));
+  assert.ok(profileStats.data.meetings >= 1);
+  assert.ok(profileStats.data.files >= 1);
 
   browser = await chromium.launch({
     headless: true,
@@ -292,7 +361,7 @@ try {
   });
   assert.equal(deleteGroup.response.status, 204);
 
-  console.log('Authenticated multi-page application smoke checks passed, including work groups and file upload.');
+  console.log('Authenticated multi-page application smoke checks passed, including profile, recordings, work groups and file upload.');
 } catch (error) {
   console.error(`APP_SMOKE_SERVER_OUTPUT\n${serverOutput}`);
   throw error;
