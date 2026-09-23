@@ -48,8 +48,34 @@ export type Recording = { id:string; meeting_id:number; title:string; start_time
 export type WhiteboardStroke = { id:string; color:string; width:number; points:Array<{x:number;y:number}> };
 export type Whiteboard = { id:string; owner_id:number; meeting_id?:number|null; title:string; document:{strokes:WhiteboardStroke[]}; created_at:string; updated_at:string };
 export type Preferences = {
-  language?:string; theme?:string; notifications?:boolean; audio?:boolean; video?:boolean;
-  defaultMic?:boolean; defaultCamera?:boolean; background?:string; timezone?:string; accessibility?:Record<string,unknown>;
+  language?: string;
+  theme?: string;
+  notifications?: boolean;
+  audio?: boolean;
+  video?: boolean;
+  defaultMic?: boolean;
+  defaultCamera?: boolean;
+  background?: string;
+  timezone?: string;
+  accessibility?: Record<string, unknown>;
+  textSize?: 'small' | 'normal' | 'large';
+  notificationSounds?: boolean;
+  vibration?: boolean;
+  lockScreenPreview?: boolean;
+  autoArchiveDays?: number;
+  mediaDownload?: 'wifi' | 'always' | 'never';
+  chatBackground?: 'default' | 'soft' | 'dark';
+  noiseReduction?: boolean;
+  hdVideo?: boolean;
+  lunaAutoSummary?: boolean;
+  lunaRealtimeTranslation?: boolean;
+  lunaActionSuggestions?: boolean;
+  dataSaver?: boolean;
+  waitingRoomDefault?: boolean;
+  meetingLockDefault?: boolean;
+  participantAudioAllowed?: boolean;
+  participantVideoAllowed?: boolean;
+  screenShareAllowed?: boolean;
 };
 
 export const appDataService = {
