@@ -78,10 +78,20 @@ type RecentProps = {
   recordings: Recording[];
   onOpen: (meeting: Meeting) => void;
   onManage: (meeting: Meeting) => void;
+  canManage: (meeting: Meeting) => boolean;
   onAll: () => void;
 };
 
-export function RecentMeetings({ meetings, recordings, onOpen, onManage, onAll }: RecentProps) {
+export function RecentMeetings({ meetings, recordings, onOpen, onManage, canManage, onAll }: RecentProps) {
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+
+  const share = async (meeting: Meeting) => {
+    const url = getMeetingJoinUrl(meeting);
+    if (navigator.share) await navigator.share({ title: meeting.title, url }).catch(() => undefined);
+    else await navigator.clipboard.writeText(url);
+    setOpenMenuId(null);
+  };
+
   return (
     <section className="home-card home-recent-meetings">
       <div className="home-section-head"><h2>Réunions récentes</h2><button type="button" onClick={onAll}>Tout voir</button></div>
@@ -92,7 +102,16 @@ export function RecentMeetings({ meetings, recordings, onOpen, onManage, onAll }
             <span className="home-recent-thumb">{meeting.host_avatar ? <img src={meeting.host_avatar} alt="" /> : <Video size={18}/>}</span>
             <div><strong>{meeting.title}</strong><small>{formatDate(meeting.start_time)} · {meeting.duration} min</small></div>
             {recording?.storage_url ? <a href={recording.storage_url} target="_blank" rel="noreferrer" aria-label={`Ouvrir l'enregistrement de ${meeting.title}`}><Play size={16}/></a> : <button type="button" aria-label={`Voir le résumé de ${meeting.title}`} onClick={() => onOpen(meeting)}><Play size={16}/></button>}
-            <button className="home-row-more" type="button" aria-label={`Gérer ${meeting.title}`} onClick={() => onManage(meeting)}><EllipsisVertical size={17}/></button>
+            <div className="home-meeting-menu-wrap">
+              <button className="home-row-more" type="button" aria-label={`Options pour ${meeting.title}`} aria-expanded={openMenuId===meeting.id} onClick={() => setOpenMenuId((current)=>current===meeting.id?null:meeting.id)}><EllipsisVertical size={17}/></button>
+              {openMenuId===meeting.id?<div className="home-meeting-menu home-recent-menu" role="menu">
+                <button type="button" onClick={() => { setOpenMenuId(null); onOpen(meeting); }}><ExternalLink size={16}/> Voir les détails</button>
+                <button type="button" onClick={() => { setOpenMenuId(null); onOpen(meeting); }}><Play size={16}/> Résumé Luna</button>
+                {recording?.storage_url ? <a className="home-meeting-menu-link" href={recording.storage_url} target="_blank" rel="noreferrer" onClick={() => setOpenMenuId(null)}><Video size={16}/> Voir l’enregistrement</a> : null}
+                <button type="button" onClick={() => void share(meeting)}><Share2 size={16}/> Partager</button>
+                {canManage(meeting)?<button type="button" onClick={() => { setOpenMenuId(null); onManage(meeting); }}><EllipsisVertical size={16}/> Gérer / supprimer</button>:null}
+              </div>:null}
+            </div>
           </article>;
         })}
       </div> : <div className="home-empty-state compact"><strong>Aucune réunion récente.</strong></div>}
