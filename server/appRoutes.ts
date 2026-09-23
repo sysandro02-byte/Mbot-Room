@@ -15,6 +15,7 @@ import {
 } from './core.js';
 import { createNotificationAndPush, getPushStatus } from './pushService.js';
 import { isPlatformFeatureEnabled } from './platformSettings.js';
+import { deleteCalendarEventFromGoogle, syncCalendarEventToGoogle } from './workspaceRoutes.js';
 
 const safeImageUrl = (value: unknown, fallback = '') => {
   const raw=String(value||'').trim().slice(0,1000);
@@ -137,16 +138,29 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
     try{
       const startsAt=parseDate(request.body?.startsAt);const endsAt=parseDate(request.body?.endsAt);const title=String(request.body?.title||'').trim().slice(0,200);
       if(!title||!startsAt||!endsAt||endsAt<=startsAt)return sendApiError(response,400,'VALIDATION_ERROR','Titre et horaires valides requis.');
-      const id=createId();const result=await query(`INSERT INTO room_calendar_events (id,user_id,meeting_id,title,description,starts_at,ends_at) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,[id,request.user!.id,request.body?.meetingId?Number(request.body.meetingId):null,title,String(request.body?.description||'').trim().slice(0,1000),startsAt.toISOString(),endsAt.toISOString()]);io.to(`user:${request.user!.id}`).emit('calendar:event-updated',result.rows[0]);response.status(201).json(result.rows[0]);
+      const id=createId();const result=await query(`INSERT INTO room_calendar_events (id,user_id,meeting_id,title,description,starts_at,ends_at) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,[id,request.user!.id,request.body?.meetingId?Number(request.body.meetingId):null,title,String(request.body?.description||'').trim().slice(0,1000),startsAt.toISOString(),endsAt.toISOString()]);
+      const synced=await syncCalendarEventToGoogle(request.user!.id,result.rows[0]);
+      io.to(`user:${request.user!.id}`).emit('calendar:event-updated',synced);
+      response.status(201).json(synced);
     }catch(error){next(error);}
   });
   app.put('/api/calendar/events/:eventId', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
       const startsAt=parseDate(request.body?.startsAt);const endsAt=parseDate(request.body?.endsAt);if(!startsAt||!endsAt||endsAt<=startsAt)return sendApiError(response,400,'VALIDATION_ERROR','Horaires invalides.');
-      const result=await query(`UPDATE room_calendar_events SET title=$3,description=$4,starts_at=$5,ends_at=$6,updated_at=now() WHERE id=$1 AND user_id=$2 RETURNING *`,[request.params.eventId,request.user!.id,String(request.body?.title||'').trim().slice(0,200),String(request.body?.description||'').trim().slice(0,1000),startsAt.toISOString(),endsAt.toISOString()]);if(!result.rows[0])return sendApiError(response,404,'CALENDAR_EVENT_NOT_FOUND','Événement introuvable.');io.to(`user:${request.user!.id}`).emit('calendar:event-updated',result.rows[0]);response.json(result.rows[0]);
+      const result=await query(`UPDATE room_calendar_events SET title=$3,description=$4,starts_at=$5,ends_at=$6,updated_at=now() WHERE id=$1 AND user_id=$2 RETURNING *`,[request.params.eventId,request.user!.id,String(request.body?.title||'').trim().slice(0,200),String(request.body?.description||'').trim().slice(0,1000),startsAt.toISOString(),endsAt.toISOString()]);
+      if(!result.rows[0])return sendApiError(response,404,'CALENDAR_EVENT_NOT_FOUND','Événement introuvable.');
+      const synced=await syncCalendarEventToGoogle(request.user!.id,result.rows[0]);
+      io.to(`user:${request.user!.id}`).emit('calendar:event-updated',synced);
+      response.json(synced);
     }catch(error){next(error);}
   });
-  app.delete('/api/calendar/events/:eventId', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{try{await query('DELETE FROM room_calendar_events WHERE id=$1 AND user_id=$2',[request.params.eventId,request.user!.id]);io.to(`user:${request.user!.id}`).emit('calendar:event-updated',{id:request.params.eventId,deleted:true});response.status(204).end();}catch(error){next(error);}});
+  app.delete('/api/calendar/events/:eventId', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{try{
+    const existing=await query('SELECT google_event_id FROM room_calendar_events WHERE id=$1 AND user_id=$2 LIMIT 1',[request.params.eventId,request.user!.id]);
+    if(existing.rows[0])await deleteCalendarEventFromGoogle(request.user!.id,existing.rows[0].google_event_id);
+    await query('DELETE FROM room_calendar_events WHERE id=$1 AND user_id=$2',[request.params.eventId,request.user!.id]);
+    io.to(`user:${request.user!.id}`).emit('calendar:event-updated',{id:request.params.eventId,deleted:true});
+    response.status(204).end();
+  }catch(error){next(error);}});
 
   app.get('/api/push/config', requireDatabase, authenticateToken, (_request:AuthedRequest,response)=>{
     response.json(getPushStatus());
