@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronRight, FileText, FolderOpen, Headphones, Languages, ListChecks, MessageCircle, MonitorUp, PanelsTopLeft, Sparkles, UsersRound, Video, WandSparkles } from 'lucide-react';
+import { CalendarDays, ChevronRight, FileText, FolderOpen, Headphones, Languages, ListChecks, MessageCircle, MonitorUp, Presentation, Sparkles, UsersRound, Video, WandSparkles } from 'lucide-react';
 import type { Meeting } from '../../../services/meetingService';
 import { getStoredLanguage, persistAppLanguage, type AppLanguage } from '../../../lib/appLanguage';
 
@@ -45,7 +45,7 @@ export function HomeQuickAccess({ onMessages, onContacts, onCalendar, onFiles, o
       <button type="button" onClick={onCalendar}><CalendarDays/><span>Calendrier</span></button>
       <button type="button" onClick={onFiles}><FolderOpen/><span>Fichiers</span></button>
       <button type="button" onClick={onPolls}><ListChecks/><span>Sondages</span></button>
-      <button type="button" onClick={onWhiteboard}><PanelsTopLeft/><span>Tableau blanc</span></button>
+      <button type="button" onClick={onWhiteboard}><Presentation/><span>Tableau blanc</span></button>
     </div>
   </section>;
 }
