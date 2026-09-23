@@ -24,6 +24,8 @@ const AdminAuthPage = lazy(() => import('./pages/admin/AdminAuthPage'));
 const GlobalSearchPage = lazy(() => import('./pages/GlobalSearchPage'));
 const HelpPage = lazy(() => import('./pages/HelpPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const MessagesPage = lazy(() => import('./pages/MessagesPage'));
+const ContactsPage = lazy(() => import('./pages/ContactsPage'));
 const FilesPage = lazy(() => import('./pages/FilesPage'));
 const WorkGroupsPage = lazy(() => import('./pages/WorkGroupsPage'));
 const Login = lazy(() => import('./pages/Login'));
@@ -148,8 +150,8 @@ export default function App() {
     <Route path="/app/search" element={<ProtectedRoute><AppShell title="Recherche"><GlobalSearchPage /></AppShell></ProtectedRoute>} />
     <Route path="/app/calendar" element={<ProtectedRoute><RealFeaturePage kind="calendar" /></ProtectedRoute>} />
     <Route path="/app/recordings" element={<ProtectedRoute><RealFeaturePage kind="recordings" /></ProtectedRoute>} />
-    <Route path="/app/messages" element={<ProtectedRoute><RealFeaturePage kind="messages" /></ProtectedRoute>} />
-    <Route path="/app/contacts" element={<ProtectedRoute><RealFeaturePage kind="contacts" /></ProtectedRoute>} />
+    <Route path="/app/messages" element={<ProtectedRoute><AppShell title="Messages"><MessagesPage /></AppShell></ProtectedRoute>} />
+    <Route path="/app/contacts" element={<ProtectedRoute><AppShell title="Contacts"><ContactsPage /></AppShell></ProtectedRoute>} />
     <Route path="/app/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
     <Route path="/app/files" element={<ProtectedRoute><AppShell title="Fichiers"><FilesPage /></AppShell></ProtectedRoute>} />
     <Route path="/app/groups" element={<ProtectedRoute><AppShell title="Groupes de travail"><WorkGroupsPage /></AppShell></ProtectedRoute>} />
