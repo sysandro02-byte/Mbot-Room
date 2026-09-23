@@ -11,6 +11,7 @@ import { registerAuthRoutes } from './server/authRoutes.js';
 import { registerMeetingRoutes } from './server/meetingRoutes.js';
 import { registerAdminRoutes } from './server/adminRoutes.js';
 import { registerAppRoutes } from './server/appRoutes.js';
+import { registerWorkspaceRoutes } from './server/workspaceRoutes.js';
 import { registerRealtime } from './server/realtime.js';
 import { registerRtcRoutes } from './server/rtcRoutes.js';
 import { registerSfuRoutes } from './server/sfuRoutes.js';
@@ -50,7 +51,7 @@ app.use((request, response, next) => {
     response.setHeader('Access-Control-Allow-Credentials', 'true');
     response.setHeader('Vary', 'Origin');
   }
-  response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-MBote-Room-Session-Mode');
+  response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-MBote-Room-Session-Mode, X-File-Name, X-Work-Group-Id');
   response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   response.setHeader('X-Content-Type-Options', 'nosniff');
   response.setHeader('X-Frame-Options', 'DENY');
@@ -138,6 +139,7 @@ registerAuthRoutes(app);
 registerMeetingRoutes(app, io);
 registerAdminRoutes(app, io);
 registerAppRoutes(app, io);
+registerWorkspaceRoutes(app, io);
 registerRtcRoutes(app);
 registerSfuRoutes(app);
 registerRecordingRoutes(app, io);
