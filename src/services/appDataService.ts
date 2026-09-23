@@ -46,7 +46,13 @@ export type CalendarEvent = {
   google_event_id?:string|null; source?:string;
 };
 export type Contact = { id:number; name:string; username:string; email:string; avatar:string; is_guest:boolean };
-export type Recording = { id:string; meeting_id:number; title:string; start_time:string; storage_url:string; mime_type:string; size_bytes:number; duration_seconds:number; created_at:string };
+export type Recording = {
+  id:string; meeting_id:number; title:string; description:string; start_time:string; storage_url:string;
+  mime_type:string; size_bytes:number; duration_seconds:number; created_at:string; status?:string;
+  provider?:string; host_name?:string; participant_count?:number; favorite?:boolean; metadata?:Record<string,unknown>;
+};
+export type RecordingStats = { count:number; durationSeconds:number; sizeBytes:number; latestAt:string|null; quotaBytes:number };
+export type ProfileStats = { meetings:number; participants:number; files:number; meetingMinutes:number };
 export type WhiteboardStroke = { id:string; color:string; width:number; points:Array<{x:number;y:number}> };
 export type Whiteboard = { id:string; owner_id:number; meeting_id?:number|null; title:string; document:{strokes:WhiteboardStroke[]}; created_at:string; updated_at:string };
 export type ConnectedSession = { id:string; current:boolean; createdAt:string; expiresAt:string; lastActivity:string; label:string };
@@ -109,7 +115,24 @@ export const appDataService = {
     return readJson<Contact[]>(await apiFetch(apiUrl('/api/contacts'),{headers:getAuthHeaders()}));
   },
   async getRecordings() {
-    return readJson<Recording[]>(await apiFetch(apiUrl('/api/recordings'),{headers:getAuthHeaders()}));
+    return readJson<Recording[]>(await apiFetch(apiUrl('/api/recordings'),{headers:getAuthHeaders(),cache:'no-store'}));
+  },
+  async getRecordingStats() {
+    return readJson<RecordingStats>(await apiFetch(apiUrl('/api/recordings/stats'),{headers:getAuthHeaders(),cache:'no-store'}));
+  },
+  async setRecordingFavorite(id:string,favorite:boolean) {
+    return readJson<{success:boolean;favorite:boolean}>(await apiFetch(apiUrl(`/api/recordings/${encodeURIComponent(id)}`),{
+      method:'PATCH',headers:getAuthHeaders(),body:JSON.stringify({favorite}),
+    }));
+  },
+  async hideRecording(id:string) {
+    const response=await apiFetch(apiUrl(`/api/recordings/${encodeURIComponent(id)}`),{method:'DELETE',headers:getAuthHeaders()});
+    if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||'Impossible de retirer cet enregistrement.');}
+  },
+  async getRecordingAccess(id:string) {
+    return readJson<{url:string;status:string;mimeType:string}>(await apiFetch(apiUrl(`/api/recordings/${encodeURIComponent(id)}/access`),{
+      headers:getAuthHeaders(),cache:'no-store',
+    }));
   },
   async getPreferences() {
     try {
@@ -138,9 +161,12 @@ export const appDataService = {
     return readJson<{success:boolean;revoked:number}>(await apiFetch(apiUrl('/api/security/sessions/revoke-others'),{method:'POST',headers:getAuthHeaders()}));
   },
   async getProfile() {
-    return readJson<{user:RoomUser}>(await apiFetch(apiUrl('/api/profile'),{headers:getAuthHeaders()}));
+    return readJson<{user:RoomUser}>(await apiFetch(apiUrl('/api/profile'),{headers:getAuthHeaders(),cache:'no-store'}));
   },
-  async updateProfile(payload:Partial<Pick<RoomUser,'name'|'username'|'avatar'|'phoneNumber'|'organization'|'jobTitle'>>) {
+  async getProfileStats() {
+    return readJson<ProfileStats>(await apiFetch(apiUrl('/api/profile/stats'),{headers:getAuthHeaders(),cache:'no-store'}));
+  },
+  async updateProfile(payload:Partial<Pick<RoomUser,'name'|'username'|'avatar'|'phoneNumber'|'organization'|'jobTitle'|'country'|'city'|'address'|'bio'|'profileVisible'>>) {
     return safeOfflineMutation<{user:RoomUser}>(apiUrl('/api/profile'),'PUT',payload,()=>({user:{...localStoredUser(),...payload}}));
   },
   async getWhiteboards() {
