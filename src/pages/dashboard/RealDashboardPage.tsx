@@ -194,6 +194,7 @@ export default function RealDashboardPage() {
           recordings={recordings}
           onOpen={openLunaTarget}
           onManage={manageMeeting}
+          canManage={(meeting) => canManage(meeting)}
           onAll={() => navigate('/app/meetings')}
         />
       </div>
