@@ -15,6 +15,8 @@ export type RoomUser = {
   birthDate?: string;
   birthPlace?: string;
   address?: string;
+  bio?: string;
+  profileVisible?: boolean;
   role?: 'admin' | 'user' | 'guest';
   permissions?: string[];
   isGuest?: boolean;
@@ -61,6 +63,8 @@ const normalizeUser = (user: RawRoomUser): RoomUser => ({
   birthDate: String(user.birthDate || user.birth_date || ''),
   birthPlace: String(user.birthPlace || user.birth_place || ''),
   address: String(user.address || ''),
+  bio: String(user.bio || ''),
+  profileVisible: user.profileVisible === undefined ? true : Boolean(user.profileVisible),
   role: user.role === 'admin' || user.role === 'guest' ? user.role : user.isGuest || user.is_guest ? 'guest' : 'user',
   permissions: Array.isArray(user.permissions) ? user.permissions.filter((item): item is string => typeof item === 'string') : [],
   isGuest: Boolean(user.isGuest || user.is_guest),
