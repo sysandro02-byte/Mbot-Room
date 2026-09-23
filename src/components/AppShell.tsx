@@ -1,7 +1,6 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  BarChart3,
   Bell,
   CalendarDays,
   CircleHelp,
@@ -19,7 +18,6 @@ import {
   MessageCircle,
   Search,
   Settings,
-  Sparkles,
   Download,
   MonitorSmartphone,
   Smartphone,
