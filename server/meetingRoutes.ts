@@ -25,6 +25,7 @@ import {
 import { getEmailDeliveryStatus, sendTransactionalEmail } from './emailDelivery.js';
 import { createNotificationAndPush } from './pushService.js';
 import { isPlatformFeatureEnabled } from './platformSettings.js';
+import { recordingStorageBucket, toSupabaseRecordingMarker } from './supabaseRecordingStorage.js';
 
 const findMeetingByValue = async (value: unknown): Promise<Meeting | null> => {
   const normalized = String(value || '').replace(/\s+/g, '').toLowerCase();
@@ -932,7 +933,47 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
   });
 
   app.post('/api/meetings/:meetingId/recordings', ...protectedApi, async (request:AuthedRequest,response,next)=>{
-    try{const meeting=await getMeetingById(Number(request.params.meetingId));if(!meeting||!canModerateMeeting(meeting,request.user!))return sendApiError(response,403,'MEETING_HOST_REQUIRED','Seul l’hôte peut enregistrer un enregistrement serveur.');const url=String(request.body?.storageUrl||'').trim();if(!/^https:\/\//i.test(url))return sendApiError(response,400,'VALIDATION_ERROR','Une URL de stockage HTTPS réelle est requise.');const id=createId();const result=await query(`INSERT INTO room_recordings (id,meeting_id,created_by,storage_url,mime_type,size_bytes,duration_seconds) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,[id,meeting.id,request.user!.id,url,String(request.body?.mimeType||'video/webm'),Math.max(0,Number(request.body?.sizeBytes||0)),Math.max(0,Number(request.body?.durationSeconds||0))]);response.status(201).json(result.rows[0]);}catch(error){next(error);}
+    try{
+      const meeting=await getMeetingById(Number(request.params.meetingId));
+      if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');
+      const canRecord=canModerateMeeting(meeting,request.user!)
+        || (meeting.settings.recording===true && await hasMeetingAccess(meeting.id,request.user!));
+      if(!canRecord)return sendApiError(response,403,'RECORDING_ACCESS_DENIED','Vous n’êtes pas autorisé à enregistrer cette réunion.');
+
+      const mimeType=String(request.body?.mimeType||'video/webm').split(';')[0].trim().toLowerCase();
+      const sizeBytes=Math.max(0,Number(request.body?.sizeBytes||0));
+      const durationSeconds=Math.max(0,Number(request.body?.durationSeconds||0));
+      const storagePath=String(request.body?.storagePath||'').trim().replace(/^\/+/, '');
+      const externalUrl=String(request.body?.storageUrl||'').trim();
+
+      let storageUrl='';
+      let provider='manual';
+      if(storagePath){
+        const expectedPrefix=`users/${request.user!.id}/meetings/${meeting.id}/`;
+        if(!storagePath.startsWith(expectedPrefix)||storagePath.includes('..')){
+          return sendApiError(response,400,'RECORDING_STORAGE_PATH_INVALID','Chemin Supabase invalide.');
+        }
+        storageUrl=toSupabaseRecordingMarker(recordingStorageBucket(),storagePath);
+        provider='supabase';
+      }else if(/^https:\/\//i.test(externalUrl)){
+        storageUrl=externalUrl;
+      }else{
+        return sendApiError(response,400,'VALIDATION_ERROR','Un enregistrement Supabase ou une URL HTTPS réelle est requis.');
+      }
+
+      const id=createId();
+      const result=await query(
+        `INSERT INTO room_recordings
+          (id,meeting_id,created_by,storage_url,mime_type,size_bytes,duration_seconds,provider,status,metadata)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'ready',$9::jsonb)
+         RETURNING *`,
+        [
+          id,meeting.id,request.user!.id,storageUrl,mimeType,sizeBytes,durationSeconds,provider,
+          JSON.stringify({storage:provider==='supabase'?'supabase':'external',storagePath:provider==='supabase'?storagePath:''}),
+        ],
+      );
+      response.status(201).json(result.rows[0]);
+    }catch(error){next(error);}
   });
 
   app.post('/api/meetings/:meetingId/luna/catch-up', ...protectedApi, async (request:AuthedRequest,response,next)=>{
