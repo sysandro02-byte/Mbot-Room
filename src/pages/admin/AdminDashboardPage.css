@@ -1167,7 +1167,7 @@
 }
 .admin-home-slide-tabs{
   display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-template-columns:repeat(4,minmax(0,1fr));
   gap:9px;
 }
 .admin-home-slide-tabs button{
@@ -1194,4 +1194,32 @@
 @media(max-width:620px){
   .admin-home-slide-tabs{grid-template-columns:1fr}
   .admin-tip-form-grid{grid-template-columns:1fr}
+}
+
+.admin-field-help{
+  display:block;
+  margin-top:6px;
+  color:#75839a;
+  font-size:11px;
+  line-height:1.4;
+}
+.admin-home-slide-preview{
+  overflow:hidden;
+  border:1px solid #dfe8ee;
+  border-radius:14px;
+  background:#f4faf9;
+  min-height:150px;
+}
+.admin-home-slide-preview img{
+  display:block;
+  width:100%;
+  height:220px;
+  object-fit:cover;
+}
+@media(max-width:900px){
+  .admin-home-slide-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:620px){
+  .admin-home-slide-tabs{grid-template-columns:1fr}
+  .admin-home-slide-preview img{height:180px}
 }
