@@ -178,6 +178,32 @@ try {
     session: sharedSession,
   });
 
+  const responsiveBrowser = await chromium.launch({ headless: true });
+  const responsiveContext = await responsiveBrowser.newContext();
+  await responsiveContext.addInitScript(({ user, token }) => {
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('token', token);
+  }, { user: sharedSession.user, token: sharedSession.token });
+  const responsivePage = await responsiveContext.newPage();
+  const responsiveWidths = [320, 360, 375, 390, 412, 430, 768, 1024, 1280, 1440, 1920];
+  for (const width of responsiveWidths) {
+    await responsivePage.setViewportSize({ width, height: width <= 430 ? 844 : 1000 });
+    await responsivePage.goto(`${baseUrl}/app`, { waitUntil: 'domcontentloaded' });
+    await responsivePage.waitForLoadState('networkidle');
+    const metrics = await responsivePage.evaluate(() => ({
+      viewport: window.innerWidth,
+      root: document.documentElement.scrollWidth,
+      body: document.body.scrollWidth,
+    }));
+    assert.ok(
+      Math.max(metrics.root, metrics.body) <= metrics.viewport + 2,
+      `Responsive ${width}px: horizontal overflow root=${metrics.root} body=${metrics.body} viewport=${metrics.viewport}`,
+    );
+  }
+  await responsiveContext.close();
+  await responsiveBrowser.close();
+  console.log(`RESPONSIVE_WIDTHS_OK ${responsiveWidths.join(',')}`);
+
   const resumeBrowser = await chromium.launch({ headless: true });
   const resumeContext = await resumeBrowser.newContext({ ...devices['Pixel 7'] });
   await resumeContext.addInitScript(({ user, token }) => {
@@ -196,7 +222,7 @@ try {
   await resumeContext.close();
   await resumeBrowser.close();
 
-  console.log('DEVICE_MATRIX_RESULT {"ok":true,"devices":4,"networkRecovery":true,"responsive":true,"pwaResume":true}');
+  console.log('DEVICE_MATRIX_RESULT {"ok":true,"devices":4,"responsiveWidths":11,"networkRecovery":true,"responsive":true,"pwaResume":true}');
 } finally {
   server.kill('SIGTERM');
 }
