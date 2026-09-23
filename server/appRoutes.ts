@@ -20,7 +20,7 @@ import { isPlatformFeatureEnabled } from './platformSettings.js';
 import { deleteCalendarEventFromGoogle, syncCalendarEventToGoogle } from './workspaceRoutes.js';
 
 const safeImageUrl = (value: unknown, fallback = '') => {
-  const raw=String(value||'').trim().slice(0,1000);
+  const raw=String(value||'').trim().slice(0,800000);
   if(!raw)return fallback;
   if(raw.startsWith('/')&&!raw.startsWith('//'))return raw;
   if(/^data:image\/(?:png|jpeg|jpg|webp|gif);base64,[a-z0-9+/=]+$/i.test(raw))return raw;
@@ -252,8 +252,42 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
     } catch(error){next(error);}
   });
 
-  app.get('/api/profile', requireDatabase, authenticateToken, (request:AuthedRequest,response)=>{
-    response.json({user:request.user});
+  app.get('/api/profile', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+    try{
+      const result=await query('SELECT * FROM room_users WHERE id=$1 LIMIT 1',[request.user!.id]);
+      if(!result.rows[0])return sendApiError(response,404,'PROFILE_NOT_FOUND','Profil introuvable.');
+      response.json({user:toPublicUser(result.rows[0])});
+    }catch(error){next(error);}
+  });
+
+  app.get('/api/profile/stats', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+    try{
+      const [meetings,participants,files,minutes]=await Promise.all([
+        query(`SELECT COUNT(DISTINCT m.id)::int AS count
+                 FROM room_meetings m
+                 LEFT JOIN room_meeting_members mm ON mm.meeting_id=m.id
+                WHERE m.host_id=$1 OR m.co_host_id=$1 OR mm.user_id=$1`,[request.user!.id]),
+        query(`SELECT COUNT(DISTINCT mm2.user_id)::int AS count
+                 FROM room_meeting_members mine
+                 JOIN room_meeting_members mm2 ON mm2.meeting_id=mine.meeting_id AND mm2.user_id<>mine.user_id
+                 JOIN room_users u ON u.id=mm2.user_id AND u.is_guest=false
+                WHERE mine.user_id=$1`,[request.user!.id]),
+        query('SELECT COUNT(*)::int AS count FROM room_files WHERE owner_id=$1',[request.user!.id]),
+        query(`SELECT COALESCE(SUM(
+                  EXTRACT(EPOCH FROM (COALESCE(m.ended_at,now())-COALESCE(m.started_at,m.start_time::timestamptz)))/60
+                ),0)::int AS minutes
+                 FROM room_meetings m
+                WHERE m.status='ended' AND (m.host_id=$1 OR m.co_host_id=$1 OR EXISTS(
+                  SELECT 1 FROM room_meeting_members mm WHERE mm.meeting_id=m.id AND mm.user_id=$1
+                ))`,[request.user!.id]),
+      ]);
+      response.json({
+        meetings:Number(meetings.rows[0]?.count||0),
+        participants:Number(participants.rows[0]?.count||0),
+        files:Number(files.rows[0]?.count||0),
+        meetingMinutes:Number(minutes.rows[0]?.minutes||0),
+      });
+    }catch(error){next(error);}
   });
 
   app.put('/api/profile', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
@@ -264,10 +298,21 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
       const phoneNumber=String(request.body?.phoneNumber??request.user!.phoneNumber??'').trim().slice(0,40);
       const organization=String(request.body?.organization??request.user!.organization??'').trim().slice(0,120);
       const jobTitle=String(request.body?.jobTitle??request.user!.jobTitle??'').trim().slice(0,120);
+      const country=String(request.body?.country??request.user!.country??'').trim().slice(0,120);
+      const city=String(request.body?.city??request.user!.city??'').trim().slice(0,120);
+      const address=String(request.body?.address??request.user!.address??'').trim().slice(0,240);
+      const bio=String(request.body?.bio??request.user!.bio??'').trim().slice(0,300);
+      const profileVisible=typeof request.body?.profileVisible==='boolean'?request.body.profileVisible:request.user!.profileVisible!==false;
       if(!name||!username)return sendApiError(response,400,'VALIDATION_ERROR','Nom et nom d’utilisateur requis.');
       const duplicate=await query('SELECT 1 FROM room_users WHERE lower(username)=lower($1) AND id<>$2 LIMIT 1',[username,request.user!.id]);
       if(duplicate.rows[0])return sendApiError(response,409,'USERNAME_ALREADY_EXISTS','Ce nom d’utilisateur est déjà utilisé.');
-      const result=await query(`UPDATE room_users SET name=$2,username=$3,avatar=$4,phone_number=$5,organization=$6,job_title=$7 WHERE id=$1 RETURNING *`,[request.user!.id,name,username,avatar,phoneNumber,organization,jobTitle]);
+      const result=await query(
+        `UPDATE room_users
+            SET name=$2,username=$3,avatar=$4,phone_number=$5,organization=$6,job_title=$7,
+                country=$8,city=$9,address=$10,bio=$11,profile_visible=$12
+          WHERE id=$1 RETURNING *`,
+        [request.user!.id,name,username,avatar,phoneNumber,organization,jobTitle,country,city,address,bio,profileVisible],
+      );
       const user=toPublicUser(result.rows[0]);
       io.to(`user:${user.id}`).emit('profile:updated',user);
       response.json({user});
@@ -716,8 +761,113 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
 
   app.get('/api/recordings', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
-      const result=await query(`SELECT r.*,m.title,m.start_time FROM room_recordings r JOIN room_meetings m ON m.id=r.meeting_id WHERE m.host_id=$1 OR m.co_host_id=$1 OR EXISTS(SELECT 1 FROM room_meeting_members mm WHERE mm.meeting_id=m.id AND mm.user_id=$1 AND mm.status='accepted') ORDER BY r.created_at DESC`,[request.user!.id]);
+      const result=await query(
+        `SELECT r.*,m.title,m.description,m.start_time,m.host_name,
+                COALESCE((SELECT COUNT(*)::int FROM room_meeting_members mm WHERE mm.meeting_id=m.id AND mm.status='accepted'),0) AS participant_count,
+                COALESCE(state.favorite,false) AS favorite
+           FROM room_recordings r
+           JOIN room_meetings m ON m.id=r.meeting_id
+           LEFT JOIN room_recording_user_state state ON state.recording_id=r.id AND state.user_id=$1
+          WHERE COALESCE(state.hidden,false)=false
+            AND (m.host_id=$1 OR m.co_host_id=$1 OR EXISTS(
+              SELECT 1 FROM room_meeting_members mm
+               WHERE mm.meeting_id=m.id AND mm.user_id=$1 AND mm.status='accepted'
+            ))
+          ORDER BY COALESCE(state.favorite,false) DESC,r.created_at DESC`,
+        [request.user!.id],
+      );
       response.json(result.rows);
+    }catch(error){next(error);}
+  });
+
+  app.get('/api/recordings/stats', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+    try{
+      const result=await query(
+        `SELECT COUNT(*)::int AS count,
+                COALESCE(SUM(r.duration_seconds),0)::bigint AS duration_seconds,
+                COALESCE(SUM(r.size_bytes),0)::bigint AS size_bytes,
+                MAX(r.created_at) AS latest_at
+           FROM room_recordings r
+           JOIN room_meetings m ON m.id=r.meeting_id
+           LEFT JOIN room_recording_user_state state ON state.recording_id=r.id AND state.user_id=$1
+          WHERE COALESCE(state.hidden,false)=false
+            AND (m.host_id=$1 OR m.co_host_id=$1 OR EXISTS(
+              SELECT 1 FROM room_meeting_members mm
+               WHERE mm.meeting_id=m.id AND mm.user_id=$1 AND mm.status='accepted'
+            ))`,
+        [request.user!.id],
+      );
+      const quotaBytes=Math.max(0,Number(process.env.MBOTE_RECORDING_STORAGE_QUOTA_BYTES||5368709120));
+      response.json({
+        count:Number(result.rows[0]?.count||0),
+        durationSeconds:Number(result.rows[0]?.duration_seconds||0),
+        sizeBytes:Number(result.rows[0]?.size_bytes||0),
+        latestAt:result.rows[0]?.latest_at?new Date(result.rows[0].latest_at).toISOString():null,
+        quotaBytes,
+      });
+    }catch(error){next(error);}
+  });
+
+  app.patch('/api/recordings/:recordingId', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+    try{
+      const recording=await query(
+        `SELECT r.id FROM room_recordings r
+           JOIN room_meetings m ON m.id=r.meeting_id
+          WHERE r.id=$1 AND (m.host_id=$2 OR m.co_host_id=$2 OR EXISTS(
+            SELECT 1 FROM room_meeting_members mm WHERE mm.meeting_id=m.id AND mm.user_id=$2 AND mm.status='accepted'
+          )) LIMIT 1`,
+        [request.params.recordingId,request.user!.id],
+      );
+      if(!recording.rows[0])return sendApiError(response,404,'RECORDING_NOT_FOUND','Enregistrement introuvable.');
+      const favorite=Boolean(request.body?.favorite);
+      const result=await query(
+        `INSERT INTO room_recording_user_state (recording_id,user_id,favorite,hidden)
+         VALUES ($1,$2,$3,false)
+         ON CONFLICT (recording_id,user_id) DO UPDATE SET favorite=excluded.favorite,hidden=false,updated_at=now()
+         RETURNING favorite,hidden`,
+        [request.params.recordingId,request.user!.id,favorite],
+      );
+      response.json({success:true,favorite:Boolean(result.rows[0]?.favorite)});
+    }catch(error){next(error);}
+  });
+
+  app.delete('/api/recordings/:recordingId', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+    try{
+      const recording=await query(
+        `SELECT r.id FROM room_recordings r
+           JOIN room_meetings m ON m.id=r.meeting_id
+          WHERE r.id=$1 AND (m.host_id=$2 OR m.co_host_id=$2 OR EXISTS(
+            SELECT 1 FROM room_meeting_members mm WHERE mm.meeting_id=m.id AND mm.user_id=$2 AND mm.status='accepted'
+          )) LIMIT 1`,
+        [request.params.recordingId,request.user!.id],
+      );
+      if(!recording.rows[0])return sendApiError(response,404,'RECORDING_NOT_FOUND','Enregistrement introuvable.');
+      await query(
+        `INSERT INTO room_recording_user_state (recording_id,user_id,favorite,hidden)
+         VALUES ($1,$2,false,true)
+         ON CONFLICT (recording_id,user_id) DO UPDATE SET hidden=true,favorite=false,updated_at=now()`,
+        [request.params.recordingId,request.user!.id],
+      );
+      response.status(204).end();
+    }catch(error){next(error);}
+  });
+
+  app.get('/api/recordings/:recordingId/access', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+    try{
+      const result=await query(
+        `SELECT r.storage_url,r.status,r.mime_type
+           FROM room_recordings r
+           JOIN room_meetings m ON m.id=r.meeting_id
+          WHERE r.id=$1 AND (m.host_id=$2 OR m.co_host_id=$2 OR EXISTS(
+            SELECT 1 FROM room_meeting_members mm WHERE mm.meeting_id=m.id AND mm.user_id=$2 AND mm.status='accepted'
+          )) LIMIT 1`,
+        [request.params.recordingId,request.user!.id],
+      );
+      const row=result.rows[0];
+      if(!row)return sendApiError(response,404,'RECORDING_NOT_FOUND','Enregistrement introuvable.');
+      const storageUrl=String(row.storage_url||'').trim();
+      if(!/^https:\/\//i.test(storageUrl))return sendApiError(response,409,'RECORDING_NOT_READY','Le fichier de cet enregistrement n’est pas encore disponible.');
+      response.json({url:storageUrl,status:String(row.status||'ready'),mimeType:String(row.mime_type||'video/mp4')});
     }catch(error){next(error);}
   });
 
