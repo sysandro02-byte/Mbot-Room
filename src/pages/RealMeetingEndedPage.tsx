@@ -171,14 +171,14 @@ export default function RealMeetingEndedPage(){
               <span className="real-ended-title-icon"><Bot size={19}/></span>
               <div><h2>Résumé Luna</h2><small>Compte rendu basé uniquement sur le contenu réellement enregistré</small></div>
             </div>
-            {summaryReady&&payload.permissions.canDownloadSummary?((
+            {summaryReady&&payload.permissions.canDownloadSummary?(
               <button onClick={()=>downloadText(`resume-mboteroom-${payload.meeting.id}.txt`,summaryText)}>
                 <Download size={16}/> Télécharger
               </button>
             ):null}
           </div>
 
-          {summaryReady?((
+          {summaryReady?(
             <div className="real-ended-summary-content">
               <section>
                 <h3><Sparkles size={15}/> Points clés</h3>
