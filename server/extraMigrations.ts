@@ -38,7 +38,7 @@ export const runExtraMigrations = async () => {
     );
 
     CREATE TABLE IF NOT EXISTS room_home_slides (
-      slot smallint PRIMARY KEY CHECK (slot BETWEEN 1 AND 3),
+      slot smallint PRIMARY KEY CHECK (slot BETWEEN 1 AND 4),
       title text NOT NULL,
       body text NOT NULL,
       image_url text NOT NULL DEFAULT '',
@@ -47,11 +47,19 @@ export const runExtraMigrations = async () => {
       is_active boolean NOT NULL DEFAULT true,
       updated_at timestamptz NOT NULL DEFAULT now()
     );
+    ALTER TABLE room_home_slides DROP CONSTRAINT IF EXISTS room_home_slides_slot_check;
+    ALTER TABLE room_home_slides ADD CONSTRAINT room_home_slides_slot_check CHECK (slot BETWEEN 1 AND 4);
+
     INSERT INTO room_home_slides (slot,title,body,image_url,action_label,action_path,is_active) VALUES
-      (1,'Réunions simples, professionnelles et sécurisées','Créez, planifiez et animez vos réunions depuis un espace pensé pour vos équipes.','/images/meeting-black-team.svg','Créer une réunion','/app/meetings',true),
+      (1,'Réunions simples, professionnelles et sécurisées','Créez, planifiez et animez vos réunions depuis un espace pensé pour vos équipes.','/images/mboteroom-home-hero.svg','Créer une réunion','/app/meetings',true),
       (2,'Retrouvez votre équipe en quelques secondes','Rejoignez une réunion par ID ou par lien, avec salle d’attente et contrôles de sécurité.','','Rejoindre une réunion','/join',true),
-      (3,'Collaborez avec Luna IA','Retrouvez les décisions, points clés, messages et actions importantes de vos réunions.','','Découvrir mes réunions','/app/meetings',true)
+      (3,'Collaborez avec Luna IA','Retrouvez les décisions, points clés, messages et actions importantes de vos réunions.','','Découvrir mes réunions','/app/meetings',true),
+      (4,'Des réunions plus humaines avec MBotéRoom','Collaborez, partagez, créez, où que vous soyez.','/images/mboteroom-home-banner.svg','Découvrir toutes les fonctionnalités','/fonctionnalites',true)
     ON CONFLICT (slot) DO NOTHING;
+
+    UPDATE room_home_slides
+       SET image_url='/images/mboteroom-home-hero.svg', updated_at=now()
+     WHERE slot=1 AND (image_url='' OR image_url='/images/meeting-black-team.svg');
 
     CREATE TABLE IF NOT EXISTS room_platform_settings (
       key text PRIMARY KEY,
