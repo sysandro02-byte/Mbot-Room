@@ -19,6 +19,7 @@ import {
   LockKeyhole,
   LogOut,
   MapPin,
+  Mail,
   MessageCircle,
   Mic,
   MonitorCog,
@@ -297,6 +298,9 @@ export default function SettingsWorkspace({
             <Switch checked={preferences.notifications !== false} label="Notifications dans l’application" disabled={savingKey==='notifications'} onChange={(value) => void update('notifications', { notifications: value })}/>
           </SettingRow>
           <PushNotificationSettings compact/>
+          <SettingRow icon={<Mail/>} label="Notifications par e-mail" description="Recevoir aussi les alertes importantes par e-mail">
+            <Switch checked={preferences.emailNotifications === true} label="Notifications par e-mail" disabled={savingKey==='emailNotifications'} onChange={(value) => void update('emailNotifications', { emailNotifications: value })}/>
+          </SettingRow>
           <SettingRow icon={<Volume2/>} label="Sons" description="Sons pour les nouvelles alertes">
             <Switch checked={preferences.notificationSounds !== false} label="Sons de notification" disabled={savingKey==='notificationSounds'} onChange={(value) => void update('notificationSounds', { notificationSounds: value })}/>
           </SettingRow>
