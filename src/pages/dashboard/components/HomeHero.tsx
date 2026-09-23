@@ -13,7 +13,7 @@ type Props = {
 export default function HomeHero({ firstName, slides, activeSlide, onSlideChange, onCreate, onJoin }: Props) {
   const slide = slides[activeSlide] || null;
   const fallbackBody = 'Des réunions simples, sécurisées et productives pour vous, votre équipe et votre organisation.';
-  const imageUrl = slide?.imageUrl || '/images/meeting-black-team.svg';
+  const imageUrl = slide?.imageUrl || '/images/mboteroom-home-hero.svg';
 
   const move = (direction: 1 | -1) => {
     if (!slides.length) return;
