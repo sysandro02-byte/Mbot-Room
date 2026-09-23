@@ -49,6 +49,8 @@ export type Contact = { id:number; name:string; username:string; email:string; a
 export type Recording = { id:string; meeting_id:number; title:string; start_time:string; storage_url:string; mime_type:string; size_bytes:number; duration_seconds:number; created_at:string };
 export type WhiteboardStroke = { id:string; color:string; width:number; points:Array<{x:number;y:number}> };
 export type Whiteboard = { id:string; owner_id:number; meeting_id?:number|null; title:string; document:{strokes:WhiteboardStroke[]}; created_at:string; updated_at:string };
+export type ConnectedSession = { id:string; current:boolean; createdAt:string; expiresAt:string; lastActivity:string; label:string };
+
 export type Preferences = {
   language?: string;
   theme?: string;
@@ -124,6 +126,16 @@ export const appDataService = {
     const saved = await safeOfflineMutation<Preferences>(apiUrl('/api/preferences'),'PUT',payload,()=>payload);
     publishPreferences(saved);
     return saved;
+  },
+  async getConnectedSessions() {
+    return readJson<ConnectedSession[]>(await apiFetch(apiUrl('/api/security/sessions'),{headers:getAuthHeaders()}));
+  },
+  async revokeConnectedSession(sessionId:string) {
+    const response=await apiFetch(apiUrl(`/api/security/sessions/${encodeURIComponent(sessionId)}`),{method:'DELETE',headers:getAuthHeaders()});
+    if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||'Impossible de fermer cette session.');}
+  },
+  async revokeOtherSessions() {
+    return readJson<{success:boolean;revoked:number}>(await apiFetch(apiUrl('/api/security/sessions/revoke-others'),{method:'POST',headers:getAuthHeaders()}));
   },
   async getProfile() {
     return readJson<{user:RoomUser}>(await apiFetch(apiUrl('/api/profile'),{headers:getAuthHeaders()}));
