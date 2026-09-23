@@ -284,7 +284,7 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
   app.put('/api/admin/home-slides/:slot', ...adminApi, async (request,response,next)=>{
     try {
       const slot = Number(request.params.slot);
-      if (!Number.isInteger(slot) || slot < 1 || slot > 3) return sendApiError(response,400,'HOME_SLIDE_SLOT_INVALID','Le numéro du slide doit être compris entre 1 et 3.');
+      if (!Number.isInteger(slot) || slot < 1 || slot > 4) return sendApiError(response,400,'HOME_SLIDE_SLOT_INVALID','L’emplacement doit être compris entre 1 et 4.');
       const title = normalizeText(request.body?.title).slice(0,120);
       const body = normalizeText(request.body?.body).slice(0,420);
       const actionLabel = normalizeText(request.body?.actionLabel).slice(0,50);
