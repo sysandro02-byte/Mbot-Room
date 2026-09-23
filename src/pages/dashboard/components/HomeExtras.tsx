@@ -1,4 +1,4 @@
-import { Bot, CalendarDays, ChevronRight, FileText, FolderOpen, Languages, ListChecks, MessageCircle, Sparkles, UsersRound, WandSparkles } from 'lucide-react';
+import { CalendarDays, ChevronRight, FileText, FolderOpen, Headphones, Languages, ListChecks, MessageCircle, MonitorUp, PanelsTopLeft, Sparkles, UsersRound, Video, WandSparkles } from 'lucide-react';
 import type { Meeting } from '../../../services/meetingService';
 import { getStoredLanguage, persistAppLanguage, type AppLanguage } from '../../../lib/appLanguage';
 
@@ -45,7 +45,7 @@ export function HomeQuickAccess({ onMessages, onContacts, onCalendar, onFiles, o
       <button type="button" onClick={onCalendar}><CalendarDays/><span>Calendrier</span></button>
       <button type="button" onClick={onFiles}><FolderOpen/><span>Fichiers</span></button>
       <button type="button" onClick={onPolls}><ListChecks/><span>Sondages</span></button>
-      <button type="button" onClick={onWhiteboard}><Bot/><span>Tableau blanc</span></button>
+      <button type="button" onClick={onWhiteboard}><PanelsTopLeft/><span>Tableau blanc</span></button>
     </div>
   </section>;
 }
@@ -57,10 +57,10 @@ export function HomeFeatureBanner({ imageUrl, onDiscover }: { imageUrl?: string;
       <h2>Des réunions plus humaines avec MBotéRoom</h2>
       <p>Collaborez, partagez, créez, où que vous soyez.</p>
       <div className="home-feature-points">
-        <span>🎧 <small>Audio HD</small></span>
-        <span>🎥 <small>Vidéo HD</small></span>
-        <span>💬 <small>Messagerie</small></span>
-        <span>🖥️ <small>Partage d’écran</small></span>
+        <span><Headphones aria-hidden="true"/><small>Audio HD</small></span>
+        <span><Video aria-hidden="true"/><small>Vidéo HD</small></span>
+        <span><MessageCircle aria-hidden="true"/><small>Messagerie</small></span>
+        <span><MonitorUp aria-hidden="true"/><small>Partage d’écran</small></span>
       </div>
       <button type="button" onClick={onDiscover}>Découvrir toutes les fonctionnalités <ChevronRight/></button>
     </div>
