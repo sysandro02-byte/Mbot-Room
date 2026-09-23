@@ -193,7 +193,7 @@ try {
   });
 
   const routes = [
-    ['/app', 'Bonjour Admin Smoke'],
+    ['/app', 'Bienvenue sur'],
     ['/app/meetings', 'Réunions'],
     ['/app/search', 'Recherche'],
     ['/app/calendar', 'Calendrier'],
