@@ -82,23 +82,6 @@ export default function MessagesPage(){
   const [scheduleOpen,setScheduleOpen]=useState(false);
   const [callBusy,setCallBusy]=useState(false);
 
-  const loadConversations=async()=>{
-    try{
-      const rows=await conversationService.getConversations();
-      setConversations(rows);
-      setSelectedId((current)=>{
-        const requested=params.get('conversation');
-        if(requested&&rows.some((item)=>item.id===requested))return requested;
-        if(current&&rows.some((item)=>item.id===current))return current;
-        return rows.find((item)=>!item.archived)?.id||rows[0]?.id||null;
-      });
-      return rows;
-    }catch(cause){
-      setError(cause instanceof Error?cause.message:'Impossible de charger les conversations.');
-      return [] as Conversation[];
-    }
-  };
-
   useEffect(()=>{
     let cancelled=false;
     const load=async()=>{
