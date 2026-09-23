@@ -45,6 +45,17 @@ export const runProductMigrations = async () => {
     CREATE INDEX IF NOT EXISTS room_recordings_provider_id_idx ON room_recordings(provider_recording_id);
     CREATE INDEX IF NOT EXISTS room_recordings_meeting_status_idx ON room_recordings(meeting_id,status,created_at DESC);
 
+    CREATE TABLE IF NOT EXISTS room_recording_user_state (
+      recording_id uuid NOT NULL REFERENCES room_recordings(id) ON DELETE CASCADE,
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      favorite boolean NOT NULL DEFAULT false,
+      hidden boolean NOT NULL DEFAULT false,
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (recording_id,user_id)
+    );
+    CREATE INDEX IF NOT EXISTS room_recording_user_state_user_idx
+      ON room_recording_user_state(user_id,hidden,favorite,updated_at DESC);
+
     CREATE TABLE IF NOT EXISTS room_push_subscriptions (
       id uuid PRIMARY KEY,
       user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
