@@ -198,6 +198,7 @@ try {
     ['/app/search', 'Recherche'],
     ['/app/calendar', 'Calendrier'],
     ['/app/recordings', 'Enregistrements'],
+    ['/app/files', 'Fichiers'],
     ['/app/messages', 'Messages'],
     ['/app/contacts', 'Contacts'],
     ['/app/notifications', 'Centre de notifications'],
