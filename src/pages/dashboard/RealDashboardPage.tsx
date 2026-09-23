@@ -53,11 +53,14 @@ export default function RealDashboardPage() {
 
   useEffect(() => { void load(); }, []);
 
+  const heroSlides = useMemo(() => homeSlides.filter((slide) => slide.slot >= 1 && slide.slot <= 3 && slide.isActive !== false), [homeSlides]);
+  const bannerSlide = useMemo(() => homeSlides.find((slide) => slide.slot === 4 && slide.isActive !== false) || null, [homeSlides]);
+
   useEffect(() => {
-    if (homeSlides.length < 2) return undefined;
-    const timer = window.setInterval(() => setActiveSlide((current) => (current + 1) % homeSlides.length), 7000);
+    if (heroSlides.length < 2) return undefined;
+    const timer = window.setInterval(() => setActiveSlide((current) => (current + 1) % heroSlides.length), 7000);
     return () => window.clearInterval(timer);
-  }, [homeSlides.length]);
+  }, [heroSlides.length]);
 
   useEffect(() => {
     const refreshSlides = () => void meetingService.getHomeSlides()
@@ -160,7 +163,7 @@ export default function RealDashboardPage() {
   return <main className="real-dashboard">
     <HomeHero
       firstName={firstName}
-      slides={homeSlides}
+      slides={heroSlides}
       activeSlide={activeSlide}
       onSlideChange={setActiveSlide}
       onCreate={() => navigate('/app/meetings?new=1')}
@@ -220,7 +223,13 @@ export default function RealDashboardPage() {
       Vous avez <strong>{unreadNotifications}</strong> notification{unreadNotifications > 1 ? 's' : ''} non lue{unreadNotifications > 1 ? 's' : ''}.
     </button> : null}
 
-    <HomeFeatureBanner imageUrl={homeSlides[0]?.imageUrl} onDiscover={() => navigate('/fonctionnalites')}/>
+    <HomeFeatureBanner
+      imageUrl={bannerSlide?.imageUrl}
+      title={bannerSlide?.title}
+      body={bannerSlide?.body}
+      actionLabel={bannerSlide?.actionLabel}
+      onDiscover={() => navigate(bannerSlide?.actionPath || '/fonctionnalites')}
+    />
 
     {tips.length ? <section className="home-admin-tips">
       {tips.map((tip) => <article key={tip.id}><span><Sparkles size={16}/></span><div><strong>{tip.title}</strong><p>{tip.body}</p>{tip.actionLabel && tip.actionPath ? <button type="button" onClick={() => navigate(tip.actionPath)}>{tip.actionLabel}</button> : null}</div></article>)}
