@@ -162,7 +162,9 @@ export interface EndedMeetingPayload {
     decisions: string[];
     actions: string[];
     nextMeeting?: string;
-    processingStatus: 'ready' | 'fallback' | 'pending';
+    processingStatus: 'ready' | 'empty' | 'pending' | 'unavailable';
+    sourceCounts: { chat: number; captions: number };
+    lunaConfigured: boolean;
   };
   nextActions: Array<{ id: string; label: string; completed: boolean }>;
   recording: {
