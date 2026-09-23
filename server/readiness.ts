@@ -13,6 +13,7 @@ export type RuntimeReadiness = {
     brevo: boolean;
     resend: boolean;
     mboteAuth: boolean;
+    googleCalendar: boolean;
     livekit: boolean;
     turn: boolean;
     serverRecording: boolean;
@@ -31,6 +32,10 @@ export const getRuntimeReadiness = (databaseType: string): RuntimeReadiness => {
   const transcription = has(process.env.GROQ_TRANSCRIPTION_API_KEY) || groq;
   const emailDelivery = getEmailDeliveryStatus();
   const mboteAuth = has(process.env.MBOTE_AUTH_BASE_URL) && has(process.env.MBOTE_AUTH_CLIENT_ID);
+  const googleCalendar = has(process.env.GOOGLE_CALENDAR_CLIENT_ID)
+    && has(process.env.GOOGLE_CALENDAR_CLIENT_SECRET)
+    && has(process.env.GOOGLE_CALENDAR_REDIRECT_URI)
+    && has(process.env.GOOGLE_CALENDAR_TOKEN_SECRET);
   const livekit = has(process.env.LIVEKIT_URL) && has(process.env.LIVEKIT_API_KEY) && has(process.env.LIVEKIT_API_SECRET);
   const dynamicTurn = has(process.env.TURN_URLS) && has(process.env.TURN_SHARED_SECRET);
   const staticTurn = has(process.env.MBOTEROOM_TURN_URL)
@@ -70,6 +75,7 @@ export const getRuntimeReadiness = (databaseType: string): RuntimeReadiness => {
       brevo: emailDelivery.brevo,
       resend: emailDelivery.resend,
       mboteAuth,
+      googleCalendar,
       livekit,
       turn,
       serverRecording,
