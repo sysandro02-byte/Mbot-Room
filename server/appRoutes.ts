@@ -18,7 +18,7 @@ import {
 import { createNotificationAndPush, getPushStatus } from './pushService.js';
 import { isPlatformFeatureEnabled } from './platformSettings.js';
 import { deleteCalendarEventFromGoogle, syncCalendarEventToGoogle } from './workspaceRoutes.js';
-import { parseSupabaseRecordingMarker, requestSupabaseRecordingSigner } from './supabaseRecordingStorage.js';
+import { parseSupabaseRecordingMarker, requestSupabaseRecordingSigner, type RecordingDownloadTicket } from './supabaseRecordingStorage.js';
 
 const safeImageUrl = (value: unknown, fallback = '') => {
   const raw=String(value||'').trim().slice(0,800000);
@@ -869,7 +869,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
       const storageUrl=String(row.storage_url||'').trim();
       const marker=parseSupabaseRecordingMarker(storageUrl);
       if(marker){
-        const signed=await requestSupabaseRecordingSigner(request,{
+        const signed=await requestSupabaseRecordingSigner<RecordingDownloadTicket>(request,{
           action:'download',
           recordingId:String(request.params.recordingId),
           download:String(request.query.download||'')==='1',
