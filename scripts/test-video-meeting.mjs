@@ -541,7 +541,7 @@ try {
   }, undefined, { timeout: 10_000 });
 
   await clickControl(hostRoom.page, 'Enregistrer');
-  await hostRoom.page.waitForFunction(() => document.body.innerText.includes('Enregistrement composite local démarré pour 3 flux.'), undefined, { timeout: 10_000 });
+  await hostRoom.page.getByRole('button', { name: 'Stop rec.', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
   await sleep(2_500);
   const [download] = await Promise.all([
     hostRoom.page.waitForEvent('download', { timeout: 20_000 }),
