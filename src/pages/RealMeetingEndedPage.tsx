@@ -160,7 +160,7 @@ export default function RealMeetingEndedPage(){
         </article>
         <article>
           <span><MessageCircle/></span>
-          <div><strng>{messages.length}</strong><small>Message{messages.length>1?'s':''}</small></div>
+          <div><strong>{messages.length}</strong><small>Message{messages.length>1?'s':''}</small></div>
         </article>
       </section>
 
