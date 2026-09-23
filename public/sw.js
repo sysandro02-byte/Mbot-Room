@@ -101,8 +101,9 @@ self.addEventListener('push', (event) => {
     badge: payload.badge || '/icons/mboteroom-192.png',
     tag: payload.tag || 'mboteroom',
     data,
-    renotify: true,
-    vibrate: [120, 70, 120],
+    renotify: payload.silent !== true,
+    silent: payload.silent === true,
+    vibrate: Array.isArray(payload.vibrate) ? payload.vibrate : [120, 70, 120],
   }));
 });
 
