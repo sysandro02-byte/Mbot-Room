@@ -11,6 +11,12 @@ import {
   sendApiError,
 } from './core.js';
 import { isPlatformFeatureEnabled } from './platformSettings.js';
+import {
+  isSupabaseRecordingStorageReady,
+  parseSupabaseRecordingMarker,
+  recordingStorageBucket,
+  requestSupabaseRecordingSigner,
+} from './supabaseRecordingStorage.js';
 
 type EgressInfo = Record<string, any>;
 
@@ -185,6 +191,23 @@ const canModerate = async (meetingId: number, userId: number, role: string) => {
   return Boolean(row && (Number(row.host_id) === userId || Number(row.co_host_id || 0) === userId));
 };
 
+const canRecordMeeting = async (meetingId: number, user: NonNullable<AuthedRequest['user']>) => {
+  const result = await query('SELECT host_id,co_host_id,settings FROM room_meetings WHERE id=$1 LIMIT 1', [meetingId]);
+  const row = result.rows[0];
+  if (!row) return false;
+  if (user.role === 'admin' || Number(row.host_id) === user.id || Number(row.co_host_id || 0) === user.id) return true;
+  const settings = typeof row.settings === 'string' ? JSON.parse(row.settings || '{}') : (row.settings || {});
+  return settings.recording === true && hasMeetingAccess(meetingId, user);
+};
+
+const recordingExtension = (mimeType: string) => ({
+  'video/webm': 'webm',
+  'video/mp4': 'mp4',
+  'audio/webm': 'webm',
+  'audio/mp4': 'm4a',
+  'audio/ogg': 'ogg',
+}[mimeType] || '');
+
 const roomNameForRecording = async (meetingId: number, breakoutRoomId = '') => {
   if (!breakoutRoomId) return `mboteroom-${meetingId}`;
   const room = await query('SELECT id FROM room_breakout_rooms WHERE id=$1 AND meeting_id=$2 LIMIT 1', [breakoutRoomId, meetingId]);
@@ -238,7 +261,77 @@ export const registerRecordingRoutes = (app: express.Express, io: Server) => {
       egressEnabled: storage.enabled,
       storageReady: isStorageReady(),
       storageMode: storage.useServerDefaultStorage ? 'server-default' : storage.bucket ? 's3' : 'none',
+      supabaseStorageReady: isSupabaseRecordingStorageReady(),
+      supabaseBucket: recordingStorageBucket(),
     });
+  });
+
+  app.post('/api/recording-storage/authorize', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const action = String(request.body?.action || '');
+      const bucket = recordingStorageBucket();
+
+      if (action === 'upload') {
+        const meetingId = Number(request.body?.meetingId || 0);
+        const mimeType = String(request.body?.mimeType || '').split(';')[0].trim().toLowerCase();
+        const sizeBytes = Math.max(0, Number(request.body?.sizeBytes || 0));
+        const maxBytes = Math.max(50 * 1024 * 1024, Number(process.env.MBOTE_RECORDING_MAX_BYTES || 2 * 1024 * 1024 * 1024));
+        const extension = recordingExtension(mimeType);
+
+        if (!meetingId || !extension) return sendApiError(response, 400, 'RECORDING_MEDIA_INVALID', 'Format d’enregistrement non pris en charge.');
+        if (!sizeBytes || sizeBytes > maxBytes) return sendApiError(response, 413, 'RECORDING_TOO_LARGE', 'Cet enregistrement dépasse la taille autorisée.');
+        if (!(await canRecordMeeting(meetingId, request.user!))) {
+          return sendApiError(response, 403, 'RECORDING_ACCESS_DENIED', 'Vous n’êtes pas autorisé à enregistrer cette réunion.');
+        }
+
+        const path = `users/${request.user!.id}/meetings/${meetingId}/${Date.now()}-${createId()}.${extension}`;
+        return response.json({ allowed: true, action, bucket, path, userId: request.user!.id, meetingId });
+      }
+
+      if (action === 'download') {
+        const recordingId = String(request.body?.recordingId || '').trim();
+        if (!recordingId) return sendApiError(response, 400, 'RECORDING_ID_REQUIRED', 'Enregistrement requis.');
+        const result = await query(
+          `SELECT r.id,r.meeting_id,r.storage_url,m.host_id,m.co_host_id
+             FROM room_recordings r
+             JOIN room_meetings m ON m.id=r.meeting_id
+            WHERE r.id=$1
+              AND (m.host_id=$2 OR m.co_host_id=$2 OR $3='admin' OR EXISTS(
+                SELECT 1 FROM room_meeting_members mm
+                 WHERE mm.meeting_id=m.id AND mm.user_id=$2 AND mm.status='accepted'
+              ))
+            LIMIT 1`,
+          [recordingId, request.user!.id, request.user!.role],
+        );
+        const row = result.rows[0];
+        if (!row) return sendApiError(response, 404, 'RECORDING_NOT_FOUND', 'Enregistrement introuvable.');
+        const marker = parseSupabaseRecordingMarker(row.storage_url);
+        if (!marker || marker.bucket !== bucket) return sendApiError(response, 409, 'RECORDING_STORAGE_INVALID', 'Cet enregistrement n’est pas stocké dans Supabase.');
+        return response.json({ allowed: true, action, bucket: marker.bucket, path: marker.path, recordingId });
+      }
+
+      return sendApiError(response, 400, 'STORAGE_ACTION_INVALID', 'Action de stockage invalide.');
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/meetings/:meetingId/recordings/upload-ticket', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      if (!isSupabaseRecordingStorageReady()) {
+        return sendApiError(response, 503, 'SUPABASE_RECORDING_STORAGE_NOT_CONFIGURED', 'Le stockage Supabase des enregistrements n’est pas configuré.');
+      }
+      const meetingId = Number(request.params.meetingId || 0);
+      if (!meetingId || !(await canRecordMeeting(meetingId, request.user!))) {
+        return sendApiError(response, 403, 'RECORDING_ACCESS_DENIED', 'Vous n’êtes pas autorisé à enregistrer cette réunion.');
+      }
+      const mimeType = String(request.body?.mimeType || '').split(';')[0].trim().toLowerCase();
+      const sizeBytes = Math.max(0, Number(request.body?.sizeBytes || 0));
+      const ticket = await requestSupabaseRecordingSigner(request, { action: 'upload', meetingId, mimeType, sizeBytes });
+      response.json(ticket);
+    } catch (error) {
+      next(error);
+    }
   });
 
   app.post('/api/meetings/:meetingId/recordings/start', ...protectedApi, async (request: AuthedRequest, response, next) => {
