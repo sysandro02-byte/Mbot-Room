@@ -42,6 +42,7 @@ const localStoredUser = (): RoomUser => {
 export type CalendarEvent = {
   id:string; user_id:number; meeting_id?:number|null; title:string; description:string;
   starts_at:string; ends_at:string; created_at:string; updated_at:string;
+  google_event_id?:string|null; source?:string;
 };
 export type Contact = { id:number; name:string; username:string; email:string; avatar:string; is_guest:boolean };
 export type Recording = { id:string; meeting_id:number; title:string; start_time:string; storage_url:string; mime_type:string; size_bytes:number; duration_seconds:number; created_at:string };
