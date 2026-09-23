@@ -667,17 +667,19 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
       );
       for(const recipient of recipients.rows){
         const userId=Number(recipient.user_id);
-        io.to(`user:${userId}`).emit('conversation:message',payload);
-        if(recipient.notifications_enabled!==false){
+        const userRoom=`user:${userId}`;
+        const hasLiveDevice=(io.sockets.adapter.rooms.get(userRoom)?.size||0)>0;
+        io.to(userRoom).emit('conversation:message',payload);
+        if(recipient.notifications_enabled!==false&&!hasLiveDevice){
           const notification=await createNotificationAndPush(userId,{
-            type:'CONVERSATION_MESSAGE',
+            type:'MESSAGE_OFFLINE',
             title:request.user!.name||'Nouveau message',
             body:text||'Vous a envoyé une pièce jointe.',
             url:`/app/messages?conversation=${encodeURIComponent(request.params.conversationId)}`,
             tag:`conversation-${request.params.conversationId}`,
             data:{conversationId:request.params.conversationId,messageId:id,senderId:request.user!.id},
           });
-          io.to(`user:${userId}`).emit('notification:new',notification);
+          io.to(userRoom).emit('notification:new',notification);
         }
       }
       response.status(201).json(payload);
