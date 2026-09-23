@@ -20,6 +20,8 @@ export type PublicUser = {
   birthDate?: string;
   birthPlace?: string;
   address?: string;
+  bio?: string;
+  profileVisible?: boolean;
   mboteUserId?: string;
   isGuest: boolean;
   role: UserRole;
@@ -178,6 +180,8 @@ export const toPublicUser = (row: any): PublicUser => {
     birthDate: String(row.birth_date || ''),
     birthPlace: String(row.birth_place || ''),
     address: String(row.address || ''),
+    bio: String(row.bio || ''),
+    profileVisible: row.profile_visible !== false,
     mboteUserId: String(row.mbote_user_id || ''),
     isGuest: Boolean(row.is_guest),
     role,
@@ -379,6 +383,8 @@ export const runMigrations = async () => {
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS birth_date text NOT NULL DEFAULT '';
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS birth_place text NOT NULL DEFAULT '';
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS address text NOT NULL DEFAULT '';
+    ALTER TABLE room_users ADD COLUMN IF NOT EXISTS bio text NOT NULL DEFAULT '';
+    ALTER TABLE room_users ADD COLUMN IF NOT EXISTS profile_visible boolean NOT NULL DEFAULT true;
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS mbote_user_id text NOT NULL DEFAULT '';
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'user';
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS is_suspended boolean NOT NULL DEFAULT false;
