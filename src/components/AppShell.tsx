@@ -29,6 +29,7 @@ import {
 import { authService } from '../services/authService';
 import { notificationService } from '../services/notificationService';
 import { socket } from '../lib/socket';
+import { readCachedPreferences } from '../lib/userPreferences';
 import './AppShell.css';
 
 type AppShellProps = {
@@ -80,12 +81,37 @@ export default function AppShell({ children, title }: AppShellProps) {
     const refreshUnread = () => void notificationService.list()
       .then((rows) => setUnreadNotifications(rows.filter((item) => !item.readAt).length))
       .catch(() => undefined);
+    const feedback = () => {
+      const preferences = readCachedPreferences();
+      if (preferences.vibration === true && 'vibrate' in navigator) navigator.vibrate([90, 45, 90]);
+      if (preferences.notificationSounds !== false) {
+        try {
+          const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+          if (AudioContextCtor) {
+            const context = new AudioContextCtor();
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+            oscillator.frequency.value = 720;
+            gain.gain.setValueAtTime(.0001, context.currentTime);
+            gain.gain.exponentialRampToValueAtTime(.08, context.currentTime + .015);
+            gain.gain.exponentialRampToValueAtTime(.0001, context.currentTime + .18);
+            oscillator.connect(gain).connect(context.destination);
+            oscillator.start();
+            oscillator.stop(context.currentTime + .2);
+            oscillator.addEventListener('ended', () => void context.close());
+          }
+        } catch {
+          // Browser audio feedback can be blocked until the user interacts with the page.
+        }
+      }
+    };
+    const onNotification = () => { refreshUnread(); feedback(); };
     refreshUnread();
     if (!socket.connected) socket.connect();
-    socket.on('notification:new', refreshUnread);
+    socket.on('notification:new', onNotification);
     window.addEventListener('focus', refreshUnread);
     return () => {
-      socket.off('notification:new', refreshUnread);
+      socket.off('notification:new', onNotification);
       window.removeEventListener('focus', refreshUnread);
     };
   }, []);
