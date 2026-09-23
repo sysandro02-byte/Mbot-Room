@@ -20,7 +20,6 @@ const formatDate=(value:string)=>new Intl.DateTimeFormat(getAppLocale(),{dateSty
 export default function RealMeetingList(){
   const navigate=useNavigate();
   const [searchParams,setSearchParams]=useSearchParams();
-  const [searchParams,setSearchParams]=useSearchParams();
   const user=authService.getCurrentUser();
   const [meetings,setMeetings]=useState<Meeting[]>([]);
   const [loading,setLoading]=useState(true);
@@ -35,23 +34,6 @@ export default function RealMeetingList(){
 
   const load=async()=>{setLoading(true);setError('');try{const rows=await meetingService.getMeetings();setMeetings(Array.isArray(rows)?rows:[]);}catch(cause){setError(cause instanceof Error?cause.message:'Impossible de charger les réunions.');}finally{setLoading(false);}};
   useEffect(()=>{void load();},[]);
-
-  useEffect(()=>{
-    const createRequested=searchParams.get('new')==='1';
-    const editId=Number(searchParams.get('edit')||0);
-    if(createRequested){
-      setEditingMeeting(null);
-      setForm(defaultForm());
-      setShowCreate(true);
-      return;
-    }
-    if(editId&&meetings.length){
-      const meeting=meetings.find((item)=>Number(item.id)===editId);
-      if(meeting&&canManageAsPrimary(meeting)&&!meeting.is_active){
-        openEdit(meeting);
-      }
-    }
-  },[searchParams,meetings.length]);
 
   const closeMeetingForm=()=>{
     setShowCreate(false);
