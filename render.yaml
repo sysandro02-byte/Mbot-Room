@@ -42,6 +42,14 @@ services:
         value: https://mbote-backend.onrender.com/api/users/me
       - key: MBOTE_AUTH_REDIRECT_URI
         sync: false
+      - key: GOOGLE_CALENDAR_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CALENDAR_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CALENDAR_REDIRECT_URI
+        value: https://mbote-room-api.onrender.com/api/calendar/google/callback
+      - key: GOOGLE_CALENDAR_TOKEN_SECRET
+        sync: false
       - key: GROQ_API_KEY
         sync: false
       - key: GROQ_MODEL
