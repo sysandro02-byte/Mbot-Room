@@ -187,6 +187,7 @@ export default function RealDashboardPage() {
           canManage={canManage(nextMeeting)}
           onOpen={(meeting) => void openMeeting(meeting)}
           onManage={manageMeeting}
+          onPlan={() => navigate('/app/meetings?new=1&mode=schedule')}
         />
         <RecentMeetings
           meetings={recent}
