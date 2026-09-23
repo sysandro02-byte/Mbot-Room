@@ -151,31 +151,31 @@ export default function AppShell({ children, title }: AppShellProps) {
         <div className="app-shell-sidebar-main">{renderNav(primaryNavItems, 'Navigation principale')}</div>
         <div className="app-shell-sidebar-secondary">{renderNav(secondaryNavItems, 'Navigation secondaire')}</div>
 
-        <section className="app-shell-pwa-card">
-          <div className="app-shell-pwa-visual" aria-hidden="true"><MonitorSmartphone size={34}/><Smartphone size={23}/></div>
-          <strong>Toujours connecté</strong>
-          <p>Accédez à vos réunions depuis tous vos appareils.</p>
-          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('mboteroom-install-request'))}><Download size={15}/> Installer l’application</button>
-        </section>
-
-        <div className="app-shell-creator">MBotéRoom application créée par <strong>LoukaTech</strong>.</div>
-
-        <div className="app-shell-sidebar-profile-wrap" ref={sidebarProfileRef}>
-          <section className="app-shell-profile">
-            <span>{user?.avatar ? <img src={user.avatar} alt="" /> : initials}</span>
-            <div>
-              <strong>{userName}</strong>
-              <small>{user?.role === 'admin' ? 'Administrateur MBotéRoom' : user?.role === 'guest' ? 'Invité MBotéRoom' : 'Membre MBotéRoom'}</small>
-            </div>
-            <button type="button" aria-label="Options du profil" aria-expanded={sidebarProfileOpen} onClick={() => setSidebarProfileOpen((value) => !value)}>
-              <MoreVertical size={18} aria-hidden="true" />
-            </button>
+        <div className="app-shell-sidebar-bottom">
+          <section className="app-shell-pwa-card">
+            <div className="app-shell-pwa-visual" aria-hidden="true"><MonitorSmartphone size={34}/><Smartphone size={23}/></div>
+            <strong>Toujours connecté</strong>
+            <p>Accédez à vos réunions depuis tous vos appareils.</p>
+            <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('mboteroom-install-request'))}><Download size={15}/> Installer l’application</button>
           </section>
-          {sidebarProfileOpen ? <div className="app-shell-sidebar-profile-menu" role="menu">
-            <button type="button" role="menuitem" onClick={() => goFromProfile('/app/profile')}><UserRound size={16}/> Mon profil</button>
-            <button type="button" role="menuitem" onClick={() => goFromProfile('/app/settings')}><Settings size={16}/> Paramètres</button>
-            <button className="is-danger" type="button" role="menuitem" onClick={() => void authService.logout()}><LogOut size={16}/> Se déconnecter</button>
-          </div> : null}
+
+          <div className="app-shell-sidebar-profile-wrap" ref={sidebarProfileRef}>
+            <section className="app-shell-profile">
+              <span>{user?.avatar ? <img src={user.avatar} alt="" /> : initials}</span>
+              <div>
+                <strong>{userName}</strong>
+                <small>{user?.role === 'admin' ? 'Administrateur MBotéRoom' : user?.role === 'guest' ? 'Invité MBotéRoom' : 'Membre MBotéRoom'}</small>
+              </div>
+              <button type="button" aria-label="Options du profil" aria-expanded={sidebarProfileOpen} onClick={() => setSidebarProfileOpen((value) => !value)}>
+                <MoreVertical size={18} aria-hidden="true" />
+              </button>
+            </section>
+            {sidebarProfileOpen ? <div className="app-shell-sidebar-profile-menu" role="menu">
+              <button type="button" role="menuitem" onClick={() => goFromProfile('/app/profile')}><UserRound size={16}/> Mon profil</button>
+              <button type="button" role="menuitem" onClick={() => goFromProfile('/app/settings')}><Settings size={16}/> Paramètres</button>
+              <button className="is-danger" type="button" role="menuitem" onClick={() => void authService.logout()}><LogOut size={16}/> Se déconnecter</button>
+            </div> : null}
+          </div>
         </div>
       </aside>
 
