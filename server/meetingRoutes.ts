@@ -251,6 +251,17 @@ const callGroq = async (system: string, prompt: string) => {
   return null;
 };
 
+const getSummarySourceStats = async (meetingId: number) => {
+  const [messages, captions] = await Promise.all([
+    query(`SELECT COUNT(*)::int AS count FROM room_messages WHERE meeting_id=$1 AND deleted_at IS NULL`, [meetingId]),
+    query(`SELECT COUNT(*)::int AS count FROM room_captions WHERE meeting_id=$1`, [meetingId]),
+  ]);
+  return {
+    chat: Number(messages.rows[0]?.count || 0),
+    captions: Number(captions.rows[0]?.count || 0),
+  };
+};
+
 const generateSummary = async (meeting: Meeting) => {
   const [messages, captions] = await Promise.all([
     query(`SELECT sender,text,created_at FROM room_messages WHERE meeting_id=$1 AND deleted_at IS NULL ORDER BY created_at ASC LIMIT 500`, [meeting.id]),
@@ -980,7 +991,22 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
   });
 
   app.post('/api/meetings/:meetingId/summary/generate', ...protectedApi, async (request:AuthedRequest,response,next)=>{
-    try{const meeting=await getMeetingById(Number(request.params.meetingId));if(!meeting||!canModerateMeeting(meeting,request.user!))return sendApiError(response,403,'MEETING_HOST_REQUIRED','Action réservée à l’hôte.');const summary=await generateSummary(meeting);if(!summary)return response.status(422).json({error:'Aucun transcript textuel exploitable ou Luna IA non configurée.',code:'SUMMARY_UNAVAILABLE'});response.json(summary);}catch(error){next(error);}
+    try{
+      const meeting=await getMeetingById(Number(request.params.meetingId));
+      if(!meeting||!canModerateMeeting(meeting,request.user!))return sendApiError(response,403,'MEETING_HOST_REQUIRED','Action réservée à l’hôte.');
+      if(!String(process.env.GROQ_API_KEY||'').trim()){
+        return sendApiError(response,503,'LUNA_NOT_CONFIGURED','Luna est momentanément indisponible pour générer ce résumé.');
+      }
+      const sourceCounts=await getSummarySourceStats(meeting.id);
+      if(sourceCounts.chat+sourceCounts.captions===0){
+        return sendApiError(response,409,'SUMMARY_SOURCE_EMPTY','Aucune transcription audio ni aucun message n’a été enregistré pendant cette réunion.');
+      }
+      const summary=await generateSummary(meeting);
+      if(!summary){
+        return sendApiError(response,502,'SUMMARY_GENERATION_FAILED','Luna n’a pas pu générer le résumé pour le moment. Réessayez dans quelques instants.');
+      }
+      response.json({...summary,sourceCounts});
+    }catch(error){next(error);}
   });
 
   app.get('/api/meetings/:meetingId/breakouts', ...protectedApi, async (request: AuthedRequest, response, next) => {
@@ -1092,12 +1118,51 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
 
   app.get('/api/meetings/:meetingId/ended', ...protectedApi, async (request:AuthedRequest,response,next)=>{
     try{
-      const meeting=await findMeetingByValue(request.params.meetingId); if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.'); if(!(await hasMeetingAccess(meeting.id,request.user!)))return sendApiError(response,403,'MEETING_ACCESS_DENIED','Accès refusé.');
-      const members=await query(`SELECT m.user_id,m.role,u.name,u.avatar,u.is_guest FROM room_meeting_members m JOIN room_users u ON u.id=m.user_id WHERE m.meeting_id=$1 ORDER BY m.role,u.name`,[meeting.id]);
-      const summaryResult=await query('SELECT * FROM room_meeting_summaries WHERE meeting_id=$1 LIMIT 1',[meeting.id]); const summaryRow=summaryResult.rows[0];
-      const startedAt=meeting.started_at||meeting.start_time; const endedAt=meeting.ended_at||new Date().toISOString(); const durationMinutes=Math.max(0,Math.round((new Date(endedAt).getTime()-new Date(startedAt).getTime())/60000));
-      const recordings=await query('SELECT storage_url FROM room_recordings WHERE meeting_id=$1 ORDER BY created_at DESC LIMIT 1',[meeting.id]);
-      response.json({meeting:{...meeting,settings:sanitizeMeetingSettings(meeting.settings)},publicId:String(meeting.settings.meetingAccessId||meeting.id),status:meeting.status==='ended'?'ended':'active',startedAt,endedAt,durationMinutes,timezone:meeting.settings.timeZone||'UTC',userRole:meetingRole(meeting,request.user!),participants:members.rows.map((row)=>({id:String(row.user_id),name:row.name,role:row.role==='host'?'Hôte':row.role==='cohost'?'Co-hôte':row.is_guest?'Invité':'Participant',avatar:row.avatar})),summary:{bullets:summaryRow?.bullets||[],decisions:summaryRow?.decisions||[],actions:summaryRow?.actions||[],nextMeeting:summaryRow?.next_meeting||'',processingStatus:summaryRow?'ready':'pending'},nextActions:[],recording:{available:Boolean(recordings.rows[0]),retentionDays:0,url:recordings.rows[0]?.storage_url||null},permissions:{canDownloadSummary:true,canShareSummary:true,canViewRecording:Boolean(recordings.rows[0]),canExportChat:true,canRate:true},guestRestrictions:Boolean(request.user!.isGuest)});
+      const meeting=await findMeetingByValue(request.params.meetingId);
+      if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');
+      if(!(await hasMeetingAccess(meeting.id,request.user!)))return sendApiError(response,403,'MEETING_ACCESS_DENIED','Accès refusé.');
+      const [members,summaryResult,recordings,sourceCounts]=await Promise.all([
+        query(`SELECT m.user_id,m.role,u.name,u.avatar,u.is_guest FROM room_meeting_members m JOIN room_users u ON u.id=m.user_id WHERE m.meeting_id=$1 ORDER BY m.role,u.name`,[meeting.id]),
+        query('SELECT * FROM room_meeting_summaries WHERE meeting_id=$1 LIMIT 1',[meeting.id]),
+        query('SELECT storage_url FROM room_recordings WHERE meeting_id=$1 ORDER BY created_at DESC LIMIT 1',[meeting.id]),
+        getSummarySourceStats(meeting.id),
+      ]);
+      const summaryRow=summaryResult.rows[0];
+      const lunaConfigured=Boolean(String(process.env.GROQ_API_KEY||'').trim());
+      const processingStatus=summaryRow
+        ? 'ready'
+        : sourceCounts.chat+sourceCounts.captions===0
+          ? 'empty'
+          : lunaConfigured
+            ? 'pending'
+            : 'unavailable';
+      const startedAt=meeting.started_at||meeting.start_time;
+      const endedAt=meeting.ended_at||new Date().toISOString();
+      const durationMinutes=Math.max(0,Math.round((new Date(endedAt).getTime()-new Date(startedAt).getTime())/60000));
+      response.json({
+        meeting:{...meeting,settings:sanitizeMeetingSettings(meeting.settings)},
+        publicId:String(meeting.settings.meetingAccessId||meeting.id),
+        status:meeting.status==='ended'?'ended':'active',
+        startedAt,
+        endedAt,
+        durationMinutes,
+        timezone:meeting.settings.timeZone||'UTC',
+        userRole:meetingRole(meeting,request.user!),
+        participants:members.rows.map((row)=>({id:String(row.user_id),name:row.name,role:row.role==='host'?'Hôte':row.role==='cohost'?'Co-hôte':row.is_guest?'Invité':'Participant',avatar:row.avatar})),
+        summary:{
+          bullets:summaryRow?.bullets||[],
+          decisions:summaryRow?.decisions||[],
+          actions:summaryRow?.actions||[],
+          nextMeeting:summaryRow?.next_meeting||'',
+          processingStatus,
+          sourceCounts,
+          lunaConfigured,
+        },
+        nextActions:[],
+        recording:{available:Boolean(recordings.rows[0]),retentionDays:0,url:recordings.rows[0]?.storage_url||null},
+        permissions:{canDownloadSummary:true,canShareSummary:true,canViewRecording:Boolean(recordings.rows[0]),canExportChat:true,canRate:true},
+        guestRestrictions:Boolean(request.user!.isGuest),
+      });
     }catch(error){next(error);}
   });
 
