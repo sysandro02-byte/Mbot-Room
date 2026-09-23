@@ -2,23 +2,8 @@ import { useEffect, useState } from 'react';
 import { authService } from '../services/authService';
 import { appDataService, type Preferences } from '../services/appDataService';
 import { persistAppLanguage, type AppLanguage } from '../lib/appLanguage';
+import { PREFERENCES_EVENT, readCachedPreferences, writeCachedPreferences } from '../lib/userPreferences';
 import './UserPreferencesRuntime.css';
-
-export const PREFERENCES_CACHE_KEY = 'mboteroom-preferences-cache';
-export const PREFERENCES_EVENT = 'mboteroom-preferences-changed';
-
-export const readCachedPreferences = (): Preferences => {
-  try {
-    const raw = localStorage.getItem(PREFERENCES_CACHE_KEY);
-    return raw ? JSON.parse(raw) as Preferences : {};
-  } catch {
-    return {};
-  }
-};
-
-export const writeCachedPreferences = (preferences: Preferences) => {
-  try { localStorage.setItem(PREFERENCES_CACHE_KEY, JSON.stringify(preferences)); } catch { /* ignored */ }
-};
 
 const resolveTheme = (theme: string | undefined) => {
   if (theme === 'dark' || theme === 'light') return theme;
