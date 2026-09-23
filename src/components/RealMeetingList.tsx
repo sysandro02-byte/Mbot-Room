@@ -20,6 +20,7 @@ const formatDate=(value:string)=>new Intl.DateTimeFormat(getAppLocale(),{dateSty
 export default function RealMeetingList(){
   const navigate=useNavigate();
   const [searchParams,setSearchParams]=useSearchParams();
+  const [searchParams,setSearchParams]=useSearchParams();
   const user=authService.getCurrentUser();
   const [meetings,setMeetings]=useState<Meeting[]>([]);
   const [loading,setLoading]=useState(true);
@@ -34,6 +35,32 @@ export default function RealMeetingList(){
 
   const load=async()=>{setLoading(true);setError('');try{const rows=await meetingService.getMeetings();setMeetings(Array.isArray(rows)?rows:[]);}catch(cause){setError(cause instanceof Error?cause.message:'Impossible de charger les réunions.');}finally{setLoading(false);}};
   useEffect(()=>{void load();},[]);
+
+  useEffect(()=>{
+    const createRequested=searchParams.get('new')==='1';
+    const editId=Number(searchParams.get('edit')||0);
+    if(createRequested){
+      setEditingMeeting(null);
+      setForm(defaultForm());
+      setShowCreate(true);
+      return;
+    }
+    if(editId&&meetings.length){
+      const meeting=meetings.find((item)=>Number(item.id)===editId);
+      if(meeting&&canManageAsPrimary(meeting)&&!meeting.is_active){
+        openEdit(meeting);
+      }
+    }
+  },[searchParams,meetings.length]);
+
+  const closeMeetingForm=()=>{
+    setShowCreate(false);
+    setEditingMeeting(null);
+    setForm(defaultForm());
+    const next=new URLSearchParams(searchParams);
+    next.delete('new');next.delete('mode');next.delete('intent');next.delete('edit');
+    setSearchParams(next,{replace:true});
+  };
   useEffect(()=>{
     const closeMenus=(event:KeyboardEvent)=>{if(event.key==='Escape'){setOpenMenuId(null);setDeleteTarget(null);}};
     document.addEventListener('keydown',closeMenus);
@@ -55,7 +82,7 @@ export default function RealMeetingList(){
         title:form.title.trim(),description:form.description.trim(),startTime:new Date(form.startTime).toISOString(),duration:Number(form.duration),participants,
         settings:{password:form.password,participants,waitingRoom:form.waitingRoom,joinBeforeHost:form.joinBeforeHost,participantAudio:form.participantAudio,participantVideo:form.participantVideo,screenShare:form.screenShare,chat:form.chat,reactions:form.reactions,lunaSummary:form.lunaSummary,linkSharing:true,externalAccess:true,isPublic:form.isPublic,visibility:form.isPublic?'public':'private',encryption:true},
       });
-      setMeetings((current)=>[...current,meeting]);setShowCreate(false);setForm(defaultForm());setNotice('Réunion créée. Les invitations sont en cours d’envoi.');
+      setMeetings((current)=>[...current,meeting]);closeMeetingForm();setNotice('Réunion créée. Les invitations sont en cours d’envoi.');
     }catch(cause){setError(cause instanceof Error?cause.message:'Création impossible.');}
   };
 
@@ -134,7 +161,7 @@ export default function RealMeetingList(){
         settings,
       });
       setMeetings((current)=>current.map((item)=>item.id===updated.id?updated:item));
-      setShowCreate(false);setEditingMeeting(null);setForm(defaultForm());setNotice('Réunion mise à jour.');
+      closeMeetingForm();setNotice('Réunion mise à jour.');
     }catch(cause){setError(cause instanceof Error?cause.message:'Modification impossible.');}
     finally{setBusyId(null);}
   };
@@ -194,10 +221,10 @@ export default function RealMeetingList(){
   const copy=async(meeting:Meeting)=>{setOpenMenuId(null);try{await navigator.clipboard.writeText(getMeetingJoinUrl(meeting));setNotice('Lien de réunion copié.');}catch{setError('Impossible de copier le lien.');}};
 
   return <section className="real-meeting-page" onMouseDown={(event)=>{if(openMenuId&&!(event.target as HTMLElement).closest('.real-meeting-menu-wrap'))setOpenMenuId(null);}}>
-    <header className="real-meeting-head"><div><h1>Réunions</h1><p>Planifiez, organisez et rejoignez vos réunions depuis cet espace.</p></div><div><button className="secondary" onClick={()=>void load()}><RefreshCw size={17}/> Actualiser</button><button onClick={()=>setShowCreate(true)}><Plus size={17}/> Nouvelle réunion</button></div></header>
+    <header className="real-meeting-head"><div><h1>Réunions</h1><p>Planifiez, organisez et rejoignez vos réunions depuis cet espace.</p></div><div><button className="secondary" onClick={()=>void load()}><RefreshCw size={17}/> Actualiser</button><button onClick={()=>{setEditingMeeting(null);setForm(defaultForm());setShowCreate(true);}}><Plus size={17}/> Nouvelle réunion</button></div></header>
     {notice?<div className="real-meeting-notice">{notice}</div>:null}{error?<div className="real-meeting-error">{error}</div>:null}
     {loading?<div className="real-meeting-empty">Chargement des réunions…</div>:null}
-    {!loading&&!sorted.length?<div className="real-meeting-empty"><Video size={42}/><h2>Aucune réunion</h2><p>Créez votre première réunion pour commencer.</p><button onClick={()=>setShowCreate(true)}><CalendarPlus size={17}/> Planifier</button></div>:null}
+    {!loading&&!sorted.length?<div className="real-meeting-empty"><Video size={42}/><h2>Aucune réunion</h2><p>Créez votre première réunion pour commencer.</p><button onClick={()=>{setEditingMeeting(null);setForm(defaultForm());setShowCreate(true);}}><CalendarPlus size={17}/> Planifier</button></div>:null}
     <div className="real-meeting-grid">{sorted.map((meeting)=>{
       const actualHost=isActualHost(meeting);const primaryManager=canManageAsPrimary(meeting);const coHost=isCoHost(meeting);const moderator=canModerate(meeting);const startAt=new Date(meeting.start_time);const cancelled=meeting.status==='cancelled';const ended=meeting.status==='ended'||cancelled||(startAt.getTime()+meeting.duration*60000<Date.now()&&!meeting.is_active&&meeting.status!=='scheduled');const roleLabel=actualHost?'Vous êtes hôte':coHost?'Vous êtes co-hôte':isAdmin()?'Administration':meeting.host_name;const statusLabel=meeting.is_active?'EN DIRECT':cancelled?'ANNULÉE':ended?'TERMINÉE':'PROGRAMMÉE';
       return <article key={meeting.id} className="real-meeting-card">
@@ -222,7 +249,7 @@ export default function RealMeetingList(){
         <div className="real-meeting-actions"><button className="secondary" onClick={()=>void copy(meeting)}><Copy size={16}/> Copier</button>{ended?<button onClick={()=>void join(meeting)} disabled={busyId===meeting.id}><Video size={16}/> Résumé</button>:moderator&&!meeting.is_active?<button onClick={()=>void start(meeting)} disabled={busyId===meeting.id}><Play size={16}/> Démarrer</button>:<button onClick={()=>void join(meeting)} disabled={busyId===meeting.id}><Video size={16}/> Rejoindre</button>}</div>
       </article>})}</div>
 
-    {showCreate?<div className="real-meeting-modal" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget){setShowCreate(false);setEditingMeeting(null);setForm(defaultForm());}}}><form className="real-meeting-form" onSubmit={submitMeeting}><header><div><h2>{editingMeeting?'Modifier la réunion':'Planifier une réunion'}</h2><p>{editingMeeting?'Mettez à jour les informations et réglages de cette réunion.':'Le lien de réunion est créé automatiquement.'}</p></div><button type="button" onClick={()=>{setShowCreate(false);setEditingMeeting(null);setForm(defaultForm());}}><X/></button></header><label>Titre<input required maxLength={160} value={form.title} onChange={(event)=>setForm((current)=>({...current,title:event.target.value}))}/></label><label>Description<textarea maxLength={1500} value={form.description} onChange={(event)=>setForm((current)=>({...current,description:event.target.value}))}/></label><div className="real-meeting-form-row"><label>Début<input required type="datetime-local" value={form.startTime} onChange={(event)=>setForm((current)=>({...current,startTime:event.target.value}))}/></label><label>Durée<select value={form.duration} onChange={(event)=>setForm((current)=>({...current,duration:Number(event.target.value)}))}><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>1 heure</option><option value={90}>1 h 30</option><option value={120}>2 heures</option></select></label></div><label>Invités (emails)<textarea placeholder="amina@example.com; paul@example.com" value={form.participants} onChange={(event)=>setForm((current)=>({...current,participants:event.target.value}))}/></label><label>Mot de passe facultatif<input type="password" value={form.password} onChange={(event)=>setForm((current)=>({...current,password:event.target.value}))}/></label><div className="real-meeting-options"><Check label="Salle d’attente" value={form.waitingRoom} set={(value)=>setForm((current)=>({...current,waitingRoom:value}))}/><Check label="Autoriser avant l’hôte" value={form.joinBeforeHost} set={(value)=>setForm((current)=>({...current,joinBeforeHost:value}))}/><Check label="Micro participants" value={form.participantAudio} set={(value)=>setForm((current)=>({...current,participantAudio:value}))}/><Check label="Caméra participants" value={form.participantVideo} set={(value)=>setForm((current)=>({...current,participantVideo:value}))}/><Check label="Partage d’écran" value={form.screenShare} set={(value)=>setForm((current)=>({...current,screenShare:value}))}/><Check label="Chat" value={form.chat} set={(value)=>setForm((current)=>({...current,chat:value}))}/><Check label="Réactions" value={form.reactions} set={(value)=>setForm((current)=>({...current,reactions:value}))}/><Check label="Résumé Luna" value={form.lunaSummary} set={(value)=>setForm((current)=>({...current,lunaSummary:value}))}/><Check label="Réunion publique" value={form.isPublic} set={(value)=>setForm((current)=>({...current,isPublic:value}))}/></div><footer><button type="button" className="secondary" onClick={()=>{setShowCreate(false);setEditingMeeting(null);setForm(defaultForm());}}>Annuler</button><button type="submit" disabled={Boolean(editingMeeting&&busyId===editingMeeting.id)}><CalendarPlus size={17}/> {editingMeeting?'Enregistrer les modifications':'Créer la réunion'}</button></footer></form></div>:null}
+    {showCreate?<div className="real-meeting-modal" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget){closeMeetingForm();}}}><form className="real-meeting-form" onSubmit={submitMeeting}><header><div><h2>{editingMeeting?'Modifier la réunion':'Planifier une réunion'}</h2><p>{editingMeeting?'Mettez à jour les informations et réglages de cette réunion.':'Le lien de réunion est créé automatiquement.'}</p></div><button type="button" onClick={()=>{closeMeetingForm();}}><X/></button></header><label>Titre<input required maxLength={160} value={form.title} onChange={(event)=>setForm((current)=>({...current,title:event.target.value}))}/></label><label>Description<textarea maxLength={1500} value={form.description} onChange={(event)=>setForm((current)=>({...current,description:event.target.value}))}/></label><div className="real-meeting-form-row"><label>Début<input required type="datetime-local" value={form.startTime} onChange={(event)=>setForm((current)=>({...current,startTime:event.target.value}))}/></label><label>Durée<select value={form.duration} onChange={(event)=>setForm((current)=>({...current,duration:Number(event.target.value)}))}><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>1 heure</option><option value={90}>1 h 30</option><option value={120}>2 heures</option></select></label></div><label>Invités (emails)<textarea placeholder="amina@example.com; paul@example.com" value={form.participants} onChange={(event)=>setForm((current)=>({...current,participants:event.target.value}))}/></label><label>Mot de passe facultatif<input type="password" value={form.password} onChange={(event)=>setForm((current)=>({...current,password:event.target.value}))}/></label><div className="real-meeting-options"><Check label="Salle d’attente" value={form.waitingRoom} set={(value)=>setForm((current)=>({...current,waitingRoom:value}))}/><Check label="Autoriser avant l’hôte" value={form.joinBeforeHost} set={(value)=>setForm((current)=>({...current,joinBeforeHost:value}))}/><Check label="Micro participants" value={form.participantAudio} set={(value)=>setForm((current)=>({...current,participantAudio:value}))}/><Check label="Caméra participants" value={form.participantVideo} set={(value)=>setForm((current)=>({...current,participantVideo:value}))}/><Check label="Partage d’écran" value={form.screenShare} set={(value)=>setForm((current)=>({...current,screenShare:value}))}/><Check label="Chat" value={form.chat} set={(value)=>setForm((current)=>({...current,chat:value}))}/><Check label="Réactions" value={form.reactions} set={(value)=>setForm((current)=>({...current,reactions:value}))}/><Check label="Résumé Luna" value={form.lunaSummary} set={(value)=>setForm((current)=>({...current,lunaSummary:value}))}/><Check label="Réunion publique" value={form.isPublic} set={(value)=>setForm((current)=>({...current,isPublic:value}))}/></div><footer><button type="button" className="secondary" onClick={()=>{closeMeetingForm();}}>Annuler</button><button type="submit" disabled={Boolean(editingMeeting&&busyId===editingMeeting.id)}><CalendarPlus size={17}/> {editingMeeting?'Enregistrer les modifications':'Créer la réunion'}</button></footer></form></div>:null}
 
     {deleteTarget?<div className="real-meeting-confirm-backdrop" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)setDeleteTarget(null);}}>
       <section className="real-meeting-confirm" role="dialog" aria-modal="true" aria-labelledby="delete-meeting-title">
