@@ -143,7 +143,7 @@ export default function App() {
     <Route path="/confidentialite" element={<SimpleInfoPage title="Confidentialité" description="Consultez ici les informations de confidentialité applicables à votre espace MBotéRoom." />} />
     <Route path="/conditions" element={<SimpleInfoPage title="Conditions d’utilisation" description="Consultez ici les conditions d’utilisation de MBotéRoom." />} />
     <Route path="/app/meetings" element={<ProtectedRoute><AppShell title="Réunions"><RealMeetingList /></AppShell></ProtectedRoute>} />
-    <Route path="/app/search" element={<ProtectedRoute><GlobalSearchPage /></ProtectedRoute>} />
+    <Route path="/app/search" element={<ProtectedRoute><AppShell title="Recherche"><GlobalSearchPage /></AppShell></ProtectedRoute>} />
     <Route path="/app/calendar" element={<ProtectedRoute><RealFeaturePage kind="calendar" /></ProtectedRoute>} />
     <Route path="/app/recordings" element={<ProtectedRoute><RealFeaturePage kind="recordings" /></ProtectedRoute>} />
     <Route path="/app/messages" element={<ProtectedRoute><RealFeaturePage kind="messages" /></ProtectedRoute>} />
