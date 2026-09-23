@@ -25,6 +25,8 @@ export type PushPayload = {
   icon?: string;
   badge?: string;
   data?: Record<string, unknown>;
+  silent?: boolean;
+  vibrate?: number[];
 };
 
 const base64Url = (value: Buffer | string) =>
@@ -161,7 +163,8 @@ export const sendPushToUsers = async (userIds: number[], payload: PushPayload) =
   if (!uniqueIds.length || !getVapidConfig().configured) return { sent: 0, failed: 0, stale: 0 };
 
   const result = await query(
-    `SELECT ps.id,ps.user_id,ps.endpoint,ps.p256dh,ps.auth,ps.expiration_time
+    `SELECT ps.id,ps.user_id,ps.endpoint,ps.p256dh,ps.auth,ps.expiration_time,
+            COALESCE(pref.preferences,'{}'::jsonb) AS preferences
        FROM room_push_subscriptions ps
        LEFT JOIN room_user_preferences pref ON pref.user_id=ps.user_id
       WHERE ps.user_id = ANY($1::int[])
@@ -174,11 +177,21 @@ export const sendPushToUsers = async (userIds: number[], payload: PushPayload) =
   let stale = 0;
   for (const row of result.rows) {
     try {
+      const preferences = row.preferences && typeof row.preferences === 'object' ? row.preferences : {};
+      const privatePreview = preferences.lockScreenPreview === false;
+      const notificationSounds = preferences.notificationSounds !== false;
+      const vibration = preferences.vibration === true;
       const delivery = await sendSubscription({
         endpoint: row.endpoint,
         keys: { p256dh: row.p256dh, auth: row.auth },
         expirationTime: row.expiration_time ? Number(row.expiration_time) : null,
-      }, payload);
+      }, {
+        ...payload,
+        title: privatePreview ? 'MBotéRoom' : payload.title,
+        body: privatePreview ? 'Vous avez une nouvelle activité.' : payload.body,
+        silent: !notificationSounds,
+        vibrate: vibration ? [120, 70, 120] : [],
+      });
       if (delivery.ok) sent += 1;
       if (delivery.stale) {
         stale += 1;
