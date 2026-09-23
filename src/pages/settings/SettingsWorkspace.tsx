@@ -153,6 +153,10 @@ export default function SettingsWorkspace({
       setStorageQuota(typeof estimate.quota === 'number' ? estimate.quota : null);
     }).catch(() => undefined);
   }, []);
+  useEffect(() => {
+    void appDataService.getConnectedSessions().then(setSessions).catch(() => undefined);
+  }, []);
+
 
   const update = async (key: string, patch: Partial<Preferences>) => {
     const next = { ...preferences, ...patch };
@@ -418,8 +422,8 @@ export default function SettingsWorkspace({
 
         <SettingsCard title="Aide" subtitle="Obtenez de l’aide et contactez-nous" icon={<CircleHelp/>}>
           <SettingRow icon={<CircleHelp/>} label="Centre d’aide" description="Guides, tutoriels et questions fréquentes" onClick={() => navigate('/aide')}/>
-          <SettingRow icon={<MessageCircle/>} label="Contacter le support" description="Notre équipe est là pour vous aider" onClick={() => navigate('/aide')}/>
-          <SettingRow icon={<ShieldCheck/>} label="Conditions et confidentialité" description="Nos règles et votre vie privée" onClick={() => navigate('/confidentialite')}/>
+          <SettingRow icon={<MessageCircle/>} label="Contacter le support" description="Notre équipe est là pour vous aider" onClick={() => { window.location.href='mailto:contacts@loukatech.com?subject=Support%20MBot%C3%A9Room'; }}/>
+          <SettingRow icon={<ShieldCheck/>} label="Conditions et confidentialité" description="Nos règles et votre vie privée" onClick={() => navigate('/conditions')}/>
           <SettingRow icon={<Info/>} label="À propos" value="Version 0.2.0" onClick={() => navigate('/fonctionnalites')}/>
         </SettingsCard>
 
