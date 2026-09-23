@@ -129,7 +129,7 @@ export interface DashboardTip {
 }
 
 export interface HomeSlide {
-  slot: 1 | 2 | 3;
+  slot: 1 | 2 | 3 | 4;
   title: string;
   body: string;
   imageUrl: string;
