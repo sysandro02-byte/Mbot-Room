@@ -1,6 +1,6 @@
 import { FormEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AtSign, Bell, BriefcaseBusiness, Building2, CalendarDays, Camera, Download, Eraser, KeyRound, Mail, MessageCircle, Phone, Plus, Search, Settings, ShieldCheck, Trash2, UserRound, UsersRound, Vote } from 'lucide-react';
+import { AtSign, Bell, BriefcaseBusiness, Building2, CalendarDays, Camera, Download, Eraser, KeyRound, Mail, MessageCircle, Phone, Plus, Save, Search, Settings, ShieldCheck, Trash2, UserRound, UsersRound, Vote } from 'lucide-react';
 import AppShell from '../components/AppShell';
 import { authService } from '../services/authService';
 import { appDataService, CalendarEvent, Contact, Preferences, Recording, Whiteboard, WhiteboardStroke } from '../services/appDataService';
