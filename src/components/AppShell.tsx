@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Bell,
+  BriefcaseBusiness,
   CalendarDays,
   CircleHelp,
   CirclePlay,
@@ -42,6 +43,7 @@ const primaryNavItems = [
   { label: 'Calendrier', icon: CalendarDays, to: '/app/calendar' },
   { label: 'Messages', icon: MessageCircle, to: '/app/messages' },
   { label: 'Contacts', icon: UsersRound, to: '/app/contacts' },
+  { label: 'Groupes', icon: BriefcaseBusiness, to: '/app/groups' },
 ];
 
 const secondaryNavItems = [
