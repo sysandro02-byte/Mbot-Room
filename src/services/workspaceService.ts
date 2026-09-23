@@ -97,7 +97,7 @@ export const workspaceService={
     },90_000));
   },
 
-  async openFile(fileId:string){
+  async openFile(fileId:string,downloadName?:string){
     const response=await apiFetch(apiUrl(`/api/files/${encodeURIComponent(fileId)}/content`),{headers:getAuthHeaders()},60_000);
     if(!response.ok){
       const payload=await response.json().catch(()=>({}));
@@ -107,8 +107,8 @@ export const workspaceService={
     const url=URL.createObjectURL(blob);
     const link=document.createElement('a');
     link.href=url;
-    link.target='_blank';
-    link.rel='noopener noreferrer';
+    if(downloadName)link.download=downloadName;
+    else{link.target='_blank';link.rel='noopener noreferrer';}
     document.body.appendChild(link);
     link.click();
     link.remove();
