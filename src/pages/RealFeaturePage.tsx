@@ -72,7 +72,7 @@ export default function RealFeaturePage({kind}:Props){
         }
         if(kind==='contacts')setContacts(await appDataService.getContacts());
         if(kind==='recordings')setRecordings(await appDataService.getRecordings());
-        if(kind==='settings')setPreferences(await appDataService.getPreferences());
+        if(['settings','messages','recordings'].includes(kind))setPreferences(await appDataService.getPreferences());
         if(kind==='profile'){
           const result=await appDataService.getProfile();
           setProfile({name:result.user.name,username:result.user.username,avatar:result.user.avatar,phoneNumber:result.user.phoneNumber||'',organization:result.user.organization||'',jobTitle:result.user.jobTitle||''});
@@ -123,6 +123,18 @@ export default function RealFeaturePage({kind}:Props){
   },[kind,strokes]);
 
   const filteredContacts=useMemo(()=>{const query=contactSearch.trim().toLowerCase();return contacts.filter((contact)=>!query||contact.name.toLowerCase().includes(query)||contact.email.toLowerCase().includes(query)||contact.username.toLowerCase().includes(query));},[contactSearch,contacts]);
+  const messageMeetings=useMemo(()=>{
+    const days=Number(preferences.autoArchiveDays||0);
+    if(!days)return meetings;
+    const cutoff=Date.now()-days*24*60*60*1000;
+    return meetings.filter((meeting)=>meeting.status!=='ended'||new Date(meeting.start_time).getTime()>=cutoff);
+  },[meetings,preferences.autoArchiveDays]);
+
+  useEffect(()=>{
+    if(kind!=='messages'||!messageMeetings.length)return;
+    if(!selectedMeetingId||!messageMeetings.some((meeting)=>meeting.id===selectedMeetingId))setSelectedMeetingId(messageMeetings[0].id);
+  },[kind,messageMeetings,selectedMeetingId]);
+
 
   const connectGoogleCalendar=async()=>{
     setGoogleBusy(true);
@@ -227,7 +239,7 @@ export default function RealFeaturePage({kind}:Props){
 
       {!loading&&kind==='contacts'?<section className="real-card"><div className="real-search"><Search size={17}/><input value={contactSearch} onChange={(event)=>setContactSearch(event.target.value)} placeholder="Rechercher un participant…"/></div><div className="real-contact-grid">{filteredContacts.map((contact)=><article key={contact.id}><span>{contact.avatar?<img src={contact.avatar} alt=""/>:contact.name.slice(0,2).toUpperCase()}</span><div><strong>{contact.name}</strong><small>@{contact.username} · {contact.email}</small></div></article>)}</div>{!filteredContacts.length?<p>Aucun contact issu de vos réunions.</p>:null}</section>:null}
 
-      {!loading&&kind==='messages'?<section className="real-card"><MeetingSelector meetings={meetings} value={selectedMeetingId} onChange={setSelectedMeetingId}/><div className="real-messages">{messages.map((message)=><article key={message.id}><div><strong>{message.sender}</strong><small>{formatDate(message.time)}</small></div><p>{message.text}</p></article>)}</div><form className="real-message-form" onSubmit={sendMessage}><textarea value={messageDraft} onChange={(event)=>setMessageDraft(event.target.value)} placeholder="Message de réunion"/><button disabled={!selectedMeetingId||!messageDraft.trim()}><MessageCircle size={17}/> Envoyer</button></form></section>:null}
+      {!loading&&kind==='messages'?<section className="real-card"><MeetingSelector meetings={messageMeetings} value={selectedMeetingId} onChange={setSelectedMeetingId}/><div className="real-messages">{messages.map((message)=><article key={message.id}><div><strong>{message.sender}</strong><small>{formatDate(message.time)}</small></div><p>{message.text}</p></article>)}</div><form className="real-message-form" onSubmit={sendMessage}><textarea value={messageDraft} onChange={(event)=>setMessageDraft(event.target.value)} placeholder="Message de réunion"/><button disabled={!selectedMeetingId||!messageDraft.trim()}><MessageCircle size={17}/> Envoyer</button></form></section>:null}
 
       {!loading&&kind==='polls'?<div className="real-feature-grid"><section className="real-card"><h2>Nouveau sondage</h2><MeetingSelector meetings={meetings} value={selectedMeetingId} onChange={setSelectedMeetingId}/><form className="real-form" onSubmit={createPoll}><input value={pollQuestion} onChange={(event)=>setPollQuestion(event.target.value)} placeholder="Question"/><input value={pollA} onChange={(event)=>setPollA(event.target.value)} placeholder="Option 1"/><input value={pollB} onChange={(event)=>setPollB(event.target.value)} placeholder="Option 2"/><button><Vote size={17}/> Créer</button></form></section><section className="real-card"><h2>Sondages de la réunion</h2>{polls.map((poll)=><article className="real-poll" key={poll.id}><strong>{poll.question}</strong>{poll.options.map((option)=><button key={option.id} disabled={!poll.isOpen} onClick={()=>selectedMeetingId&&void collaborationService.vote(selectedMeetingId,poll.id,option.id).then((updated)=>setPolls((current)=>current.map((item)=>item.id===updated.id?updated:item)))}><span>{option.label}</span><b>{option.votes}</b></button>)}</article>)}{!polls.length?<p>Aucun sondage.</p>:null}</section></div>:null}
 
