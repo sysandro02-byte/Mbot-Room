@@ -1,4 +1,5 @@
 import { apiFetch, apiUrl, getAuthHeaders } from '../lib/api';
+import { publishPreferences, readCachedPreferences } from '../lib/userPreferences';
 import { queueOfflineMutation } from '../lib/offline';
 import type { RoomUser } from './authService';
 
@@ -109,10 +110,20 @@ export const appDataService = {
     return readJson<Recording[]>(await apiFetch(apiUrl('/api/recordings'),{headers:getAuthHeaders()}));
   },
   async getPreferences() {
-    return readJson<Preferences>(await apiFetch(apiUrl('/api/preferences'),{headers:getAuthHeaders()}));
+    try {
+      const preferences = await readJson<Preferences>(await apiFetch(apiUrl('/api/preferences'),{headers:getAuthHeaders()}));
+      publishPreferences(preferences);
+      return preferences;
+    } catch (error) {
+      const cached = readCachedPreferences();
+      if (Object.keys(cached).length) return cached;
+      throw error;
+    }
   },
   async updatePreferences(payload:Preferences) {
-    return safeOfflineMutation<Preferences>(apiUrl('/api/preferences'),'PUT',payload,()=>payload);
+    const saved = await safeOfflineMutation<Preferences>(apiUrl('/api/preferences'),'PUT',payload,()=>payload);
+    publishPreferences(saved);
+    return saved;
   },
   async getProfile() {
     return readJson<{user:RoomUser}>(await apiFetch(apiUrl('/api/profile'),{headers:getAuthHeaders()}));
