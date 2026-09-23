@@ -386,7 +386,7 @@ export default function SettingsWorkspace({
             <Switch checked={preferences.lunaAutoSummary !== false} label="Résumés automatiques Luna" disabled={savingKey==='lunaAutoSummary'} onChange={(value) => void update('lunaAutoSummary', { lunaAutoSummary: value })}/>
           </SettingRow>
           <SettingRow icon={<Globe2/>} label="Traduction en temps réel">
-            <Switch checked={preferences.lunaRealtimeTranslation !== false} label="Traduction en temps réel Luna" disabled={savingKey==='lunaRealtimeTranslation'} onChange={(value) => void update('lunaRealtimeTranslation', { lunaRealtimeTranslation: value })}/>
+            <Switch checked={preferences.lunaRealtimeTranslation === true} label="Traduction en temps réel Luna" disabled={savingKey==='lunaRealtimeTranslation'} onChange={(value) => void update('lunaRealtimeTranslation', { lunaRealtimeTranslation: value })}/>
           </SettingRow>
           <SettingRow icon={<WandSparkles/>} label="Suggestions d’actions">
             <Switch checked={preferences.lunaActionSuggestions !== false} label="Suggestions d’actions Luna" disabled={savingKey==='lunaActionSuggestions'} onChange={(value) => void update('lunaActionSuggestions', { lunaActionSuggestions: value })}/>
