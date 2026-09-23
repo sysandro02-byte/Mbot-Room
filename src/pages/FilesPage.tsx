@@ -1,7 +1,7 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { CirclePlay, Eye, FileImage, FileText, FolderOpen, LoaderCircle, Search, Sparkles, Trash2, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { appDataService, type Recording, type Whiteboard } from '../services/appDataService';
+import { appDataService, type Preferences, type Recording, type Whiteboard } from '../services/appDataService';
 import { authService } from '../services/authService';
 import { workspaceService, type WorkspaceFile } from '../services/workspaceService';
 import { showAppMessage } from '../lib/appMessage';
@@ -20,6 +20,7 @@ export default function FilesPage() {
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [whiteboards, setWhiteboards] = useState<Whiteboard[]>([]);
   const [uploadedFiles,setUploadedFiles]=useState<WorkspaceFile[]>([]);
+  const [preferences,setPreferences]=useState<Preferences>({});
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [uploading,setUploading]=useState(false);
@@ -28,14 +29,16 @@ export default function FilesPage() {
   const load=async()=>{
     setLoading(true);setError('');
     try{
-      const [recordingRows,whiteboardRows,fileRows]=await Promise.all([
+      const [recordingRows,whiteboardRows,fileRows,prefs]=await Promise.all([
         appDataService.getRecordings().catch(()=>[]),
         appDataService.getWhiteboards().catch(()=>[]),
         workspaceService.getFiles().catch(()=>[]),
+        appDataService.getPreferences().catch(()=>({} as Preferences)),
       ]);
       setRecordings(Array.isArray(recordingRows)?recordingRows:[]);
       setWhiteboards(Array.isArray(whiteboardRows)?whiteboardRows:[]);
       setUploadedFiles(Array.isArray(fileRows)?fileRows:[]);
+      setPreferences(prefs||{});
     }catch(cause){
       setError(cause instanceof Error?cause.message:'Fichiers indisponibles.');
     }finally{setLoading(false);}
@@ -75,6 +78,13 @@ export default function FilesPage() {
     }
   };
 
+  const shouldDownloadMedia=()=>{
+    if(preferences.mediaDownload==='always')return true;
+    if(preferences.mediaDownload==='never')return false;
+    const connection=(navigator as Navigator & {connection?:{type?:string;effectiveType?:string}}).connection;
+    return connection?.type==='wifi';
+  };
+
   const normalized = query.trim().toLowerCase();
   const visibleRecordings = useMemo(() => recordings.filter((item) => !normalized || item.title.toLowerCase().includes(normalized)), [recordings, normalized]);
   const visibleWhiteboards = useMemo(() => whiteboards.filter((item) => !normalized || item.title.toLowerCase().includes(normalized)), [whiteboards, normalized]);
@@ -103,7 +113,7 @@ export default function FilesPage() {
           <span>{file.mimeType==='application/pdf'?<FileText size={18}/>:<FileImage size={18}/>}</span>
           <div><strong>{file.name}</strong><small>{file.mimeType==='application/pdf'?'PDF':'Image'} · {formatBytes(file.sizeBytes)}</small></div>
           <div className="files-row-actions">
-            <button type="button" onClick={()=>void workspaceService.openFile(file.id)}><Eye size={15}/> Ouvrir</button>
+            <button type="button" onClick={()=>void workspaceService.openFile(file.id,shouldDownloadMedia()?file.name:undefined)}><Eye size={15}/>{shouldDownloadMedia()?'Télécharger':'Ouvrir'}</button>
             {Number(file.ownerId)===Number(currentUser?.id)?<button className="is-danger" type="button" aria-label={`Supprimer ${file.name}`} onClick={()=>void remove(file)}><Trash2 size={15}/></button>:null}
           </div>
         </article>):<p className="files-empty">Aucun PDF ou image envoyé.</p>}
