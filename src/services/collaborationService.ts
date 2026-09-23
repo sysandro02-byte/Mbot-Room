@@ -24,7 +24,7 @@ export type RecordingMetadata = {
   size_bytes:number;
   duration_seconds:number;
   created_at:string;
-  provider?:'manual'|'livekit';
+  provider?:'manual'|'livekit'|'supabase';
   provider_recording_id?:string;
   status?:'starting'|'active'|'ending'|'complete'|'failed'|'aborted'|'limit_reached'|'ready'|'unknown';
   started_at?:string|null;
@@ -35,6 +35,107 @@ export type RecordingMetadata = {
 export type BreakoutRoom = {
   id:string; meetingId:number; name:string; isOpen:boolean; createdAt?:string; updatedAt?:string;
   members:Array<{userId:number;name:string;avatar:string}>;
+};
+
+type RecordingUploadTicket = {
+  bucket:string;
+  path:string;
+  token:string;
+  tusEndpoint:string;
+  expiresInSeconds:number;
+};
+
+const encodeTusMetadata = (value:string) => {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+};
+
+const readTusOffset = async (uploadUrl:string) => {
+  const response = await fetch(uploadUrl, { method:'HEAD', headers:{ 'Tus-Resumable':'1.0.0' } });
+  if (!response.ok) throw new Error('Impossible de reprendre l’envoi de l’enregistrement.');
+  return Math.max(0, Number(response.headers.get('Upload-Offset') || 0));
+};
+
+const uploadBlobToSupabaseTus = async (
+  ticket:RecordingUploadTicket,
+  blob:Blob,
+  meetingId:number,
+  onProgress?:(progress:number)=>void,
+) => {
+  const metadata = [
+    `bucketName ${encodeTusMetadata(ticket.bucket)}`,
+    `objectName ${encodeTusMetadata(ticket.path)}`,
+    `contentType ${encodeTusMetadata(blob.type || 'video/webm')}`,
+    `cacheControl ${encodeTusMetadata('3600')}`,
+    `metadata ${encodeTusMetadata(JSON.stringify({ source:'mboteroom', meetingId }))}`,
+  ].join(',');
+
+  const created = await fetch(ticket.tusEndpoint, {
+    method:'POST',
+    headers:{
+      'Tus-Resumable':'1.0.0',
+      'Upload-Length':String(blob.size),
+      'Upload-Metadata':metadata,
+      'x-signature':ticket.token,
+      'x-upsert':'false',
+    },
+  });
+  if (!created.ok) {
+    const message = await created.text().catch(()=>'');
+    throw new Error(message || 'Supabase n’a pas pu préparer l’envoi de l’enregistrement.');
+  }
+
+  const location = created.headers.get('Location');
+  if (!location) throw new Error('Supabase n’a pas retourné de destination d’envoi.');
+  const uploadUrl = new URL(location, ticket.tusEndpoint).toString();
+  const chunkSize = 6 * 1024 * 1024;
+  let offset = Math.max(0, Number(created.headers.get('Upload-Offset') || 0));
+
+  while (offset < blob.size) {
+    const end = Math.min(blob.size, offset + chunkSize);
+    const chunk = blob.slice(offset, end);
+    let completed = false;
+    let lastError:unknown = null;
+
+    for (let attempt = 0; attempt < 4 && !completed; attempt += 1) {
+      try {
+        const response = await fetch(uploadUrl, {
+          method:'PATCH',
+          headers:{
+            'Tus-Resumable':'1.0.0',
+            'Upload-Offset':String(offset),
+            'Content-Type':'application/offset+octet-stream',
+          },
+          body:chunk,
+        });
+        if (!response.ok) throw new Error(await response.text().catch(()=>''));
+        offset = Math.max(end, Number(response.headers.get('Upload-Offset') || end));
+        completed = true;
+        onProgress?.(Math.min(100, Math.round(offset / blob.size * 100)));
+      } catch (error) {
+        lastError = error;
+        if (attempt >= 3) break;
+        await new Promise((resolve)=>window.setTimeout(resolve, 700 * (attempt + 1)));
+        try {
+          offset = await readTusOffset(uploadUrl);
+          if (offset >= end) {
+            completed = true;
+            onProgress?.(Math.min(100, Math.round(offset / blob.size * 100)));
+          }
+        } catch {
+          // Retry the same chunk if the offset cannot be read.
+        }
+      }
+    }
+
+    if (!completed) {
+      throw lastError instanceof Error && lastError.message
+        ? lastError
+        : new Error('L’envoi de l’enregistrement vers Supabase a échoué.');
+    }
+  }
 };
 
 export const collaborationService = {
@@ -123,6 +224,32 @@ export const collaborationService = {
     return readJson<RecordingMetadata>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/recordings/${encodeURIComponent(recordingId)}/stop`),{
       method:'POST',
       headers:getAuthHeaders(),
+    }));
+  },
+  async uploadLocalRecording(
+    meetingId:number,
+    blob:Blob,
+    durationSeconds:number,
+    onProgress?:(progress:number)=>void,
+  ) {
+    const ticket=await readJson<RecordingUploadTicket>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/recordings/upload-ticket`),{
+      method:'POST',
+      headers:getAuthHeaders(),
+      body:JSON.stringify({
+        mimeType:(blob.type||'video/webm').split(';')[0],
+        sizeBytes:blob.size,
+      }),
+    }));
+    await uploadBlobToSupabaseTus(ticket,blob,meetingId,onProgress);
+    return readJson<RecordingMetadata>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/recordings`),{
+      method:'POST',
+      headers:getAuthHeaders(),
+      body:JSON.stringify({
+        storagePath:ticket.path,
+        mimeType:(blob.type||'video/webm').split(';')[0],
+        sizeBytes:blob.size,
+        durationSeconds:Math.max(0,Math.round(durationSeconds)),
+      }),
     }));
   },
 };
