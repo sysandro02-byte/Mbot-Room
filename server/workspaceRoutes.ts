@@ -313,6 +313,12 @@ export const registerWorkspaceRoutes=(app:express.Express,io:Server)=>{
          LEFT JOIN room_work_group_members gm ON gm.group_id=gf.group_id
          LEFT JOIN room_work_groups g ON g.id=gf.group_id
          WHERE f.owner_id=$1 OR g.owner_id=$1 OR gm.user_id=$1 OR lower(gm.email)=lower($2)
+            OR EXISTS(
+              SELECT 1
+                FROM room_conversation_messages cm
+                JOIN room_conversation_members cmm ON cmm.conversation_id=cm.conversation_id
+               WHERE cm.file_id=f.id AND cm.deleted_at IS NULL AND cmm.user_id=$1
+            )
          ORDER BY f.created_at DESC LIMIT 300`,
         [request.user!.id,request.user!.email],
       );
@@ -358,6 +364,11 @@ export const registerWorkspaceRoutes=(app:express.Express,io:Server)=>{
              JOIN room_work_groups g ON g.id=gf.group_id
              LEFT JOIN room_work_group_members gm ON gm.group_id=g.id
              WHERE gf.file_id=f.id AND (g.owner_id=$2 OR gm.user_id=$2 OR lower(gm.email)=lower($3))
+           ) OR EXISTS(
+             SELECT 1
+               FROM room_conversation_messages cm
+               JOIN room_conversation_members cmm ON cmm.conversation_id=cm.conversation_id
+              WHERE cm.file_id=f.id AND cm.deleted_at IS NULL AND cmm.user_id=$2
            )
          ) LIMIT 1`,
         [request.params.fileId,request.user!.id,request.user!.email],
