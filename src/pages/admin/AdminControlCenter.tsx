@@ -31,6 +31,7 @@ export default function AdminControlCenter(){
   const [message,setMessage]=useState('');
   const [error,setError]=useState('');
   const [editing,setEditing]=useState<AdminManagedUser|null>(null);
+  const [revokeTarget,setRevokeTarget]=useState<AdminManagedUser|null>(null);
   const [draft,setDraft]=useState({name:'',phoneNumber:'',organization:'',jobTitle:''});
 
   const load=async()=>{
@@ -91,10 +92,12 @@ export default function AdminControlCenter(){
   };
 
   const revokeSessions=async(user:AdminManagedUser)=>{
-    if(!window.confirm(`Déconnecter ${user.name} de tous ses appareils ?`))return;
     setBusy(true);setError('');setMessage('');
-    try{await adminDashboardService.revokeUserSessions(user.id);setMessage(`${user.name} a été déconnecté de tous ses appareils.`);}
-    catch(cause){setError(cause instanceof Error?cause.message:'Déconnexion impossible.');}
+    try{
+      await adminDashboardService.revokeUserSessions(user.id);
+      setRevokeTarget(null);
+      setMessage(`${user.name} a été déconnecté de tous ses appareils.`);
+    }catch(cause){setError(cause instanceof Error?cause.message:'Déconnexion impossible.');}
     finally{setBusy(false);}
   };
 
@@ -123,7 +126,7 @@ export default function AdminControlCenter(){
             <td><strong>{user.organization||'—'}</strong><small>{user.jobTitle||''}</small></td>
             <td><span className={'admin-role-badge is-'+user.role}>{user.role==='admin'?'Administrateur':user.isGuest?'Invité':'Utilisateur'}</span></td>
             <td><span className={user.isSuspended?'admin-state-badge is-suspended':'admin-state-badge is-active'}>{user.isSuspended?'Suspendu':'Actif'}</span></td>
-            <td><div className="admin-user-actions"><button type="button" onClick={()=>startEdit(user)}><UserCog size={15}/> Modifier</button><button type="button" className={user.isSuspended?'is-restore':'is-danger'} onClick={()=>void toggleSuspension(user)} disabled={busy||String(user.id)===String(current?.id)}>{user.isSuspended?<><CheckCircle2 size={15}/> Réactiver</>:<><Ban size={15}/> Suspendre</>}</button><button type="button" onClick={()=>void revokeSessions(user)} disabled={busy||String(user.id)===String(current?.id)} title="Fermer toutes les sessions de ce compte"><LogOut size={15}/> Déconnecter</button></div></td>
+            <td><div className="admin-user-actions"><button type="button" onClick={()=>startEdit(user)}><UserCog size={15}/> Modifier</button><button type="button" className={user.isSuspended?'is-restore':'is-danger'} onClick={()=>void toggleSuspension(user)} disabled={busy||String(user.id)===String(current?.id)}>{user.isSuspended?<><CheckCircle2 size={15}/> Réactiver</>:<><Ban size={15}/> Suspendre</>}</button><button type="button" onClick={()=>setRevokeTarget(user)} disabled={busy||String(user.id)===String(current?.id)} title="Fermer toutes les sessions de ce compte"><LogOut size={15}/> Déconnecter</button></div></td>
           </tr>)}</tbody></table>
       </div>
       {!filtered.length&&<p className="admin-control-empty">Aucun compte ne correspond à cette recherche.</p>}
@@ -138,6 +141,15 @@ export default function AdminControlCenter(){
         <label>Fonction<input value={draft.jobTitle} onChange={e=>setDraft(v=>({...v,jobTitle:e.target.value}))} maxLength={120}/></label>
         <div><button type="button" onClick={()=>setEditing(null)}>Annuler</button><button type="submit" className="primary" disabled={busy}><Save size={16}/> Enregistrer</button></div>
       </form>
+    </div>}
+
+    {revokeTarget&&<div className="admin-edit-backdrop" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)setRevokeTarget(null);}}>
+      <section className="admin-revoke-confirm" role="dialog" aria-modal="true" aria-labelledby="admin-revoke-title">
+        <span><LogOut size={25}/></span>
+        <h2 id="admin-revoke-title">Déconnecter tous les appareils ?</h2>
+        <p><strong>{revokeTarget.name}</strong> devra se reconnecter sur chacun de ses appareils.</p>
+        <div><button type="button" onClick={()=>setRevokeTarget(null)} disabled={busy}>Annuler</button><button type="button" className="is-danger" onClick={()=>void revokeSessions(revokeTarget)} disabled={busy}><LogOut size={16}/>{busy?'Déconnexion…':'Déconnecter'}</button></div>
+      </section>
     </div>}
   </>;
 }
