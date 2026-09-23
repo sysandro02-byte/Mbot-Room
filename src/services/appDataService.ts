@@ -61,6 +61,7 @@ export type Preferences = {
   language?: string;
   theme?: string;
   notifications?: boolean;
+  emailNotifications?: boolean;
   audio?: boolean;
   video?: boolean;
   defaultMic?: boolean;
