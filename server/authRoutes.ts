@@ -265,6 +265,16 @@ const canRegisterAdminEmail = async (email: string) => {
   return Number(activeAdmins.rows[0]?.count || 0) === 0;
 };
 
+const linkPendingWorkGroupMemberships = async (userId: number, email: string) => {
+  if (!userId || !email) return;
+  await query(
+    `UPDATE room_work_group_members
+        SET user_id=$1
+      WHERE user_id IS NULL AND lower(email)=lower($2)`,
+    [userId, email],
+  );
+};
+
 
 export const registerAuthRoutes = (app: express.Express) => {
   app.post('/api/auth/register', requireDatabase, async (request, response, next) => {
@@ -314,6 +324,7 @@ export const registerAuthRoutes = (app: express.Express) => {
           role,
         ],
       );
+      await linkPendingWorkGroupMemberships(Number(inserted.rows[0].id), email);
       const session = await createSession(Number(inserted.rows[0].id), true);
       const appUrl = String(process.env.MBOTE_ROOM_APP_URL || resolveAllowedClientOrigin(request.headers.origin, getOrigin(request))).replace(/\/+$/, '');
       const welcomeEmailSent = await sendWelcomeEmail(email, name, appUrl).catch(() => false);
@@ -376,6 +387,7 @@ export const registerAuthRoutes = (app: express.Express) => {
         return sendApiError(response, 401, 'INVALID_CREDENTIALS', 'Email ou mot de passe incorrect.');
       }
 
+      await linkPendingWorkGroupMemberships(Number(user.id), String(user.email));
       await query('DELETE FROM room_login_otps WHERE user_id=$1 OR expires_at<=now() OR consumed_at IS NOT NULL', [user.id]);
       const challengeId = createId();
       const code = createOtpCode();
