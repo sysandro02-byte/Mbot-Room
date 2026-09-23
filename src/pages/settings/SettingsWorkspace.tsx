@@ -1,10 +1,9 @@
-import { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react';
+import { Dispatch, ReactNode, SetStateAction, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Accessibility,
   Archive,
   Bell,
-  Bot,
   Camera,
   ChevronRight,
   CircleHelp,
@@ -58,7 +57,7 @@ type SettingsCardProps = {
   title: string;
   subtitle: string;
   icon: JSX.Element;
-  children: React.ReactNode;
+  children: ReactNode;
   className?: string;
   badge?: string;
 };
