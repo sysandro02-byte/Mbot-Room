@@ -68,6 +68,8 @@
   border:8px solid rgba(255,255,255,.78);box-shadow:0 20px 45px rgba(6,59,99,.14)
 }
 .home-hero-slogan{position:absolute;right:28px;bottom:28px;color:var(--home-navy);font:700 19px/1.05 "Segoe Print","Comic Sans MS",cursive;transform:rotate(-5deg);text-align:right}
+.home-hero-slide-note{position:absolute;right:34px;top:30px;z-index:3;max-width:220px;padding:10px 13px;border:1px solid rgba(255,255,255,.8);border-radius:13px;background:rgba(255,255,255,.92);box-shadow:0 10px 28px rgba(6,59,99,.1);color:var(--home-navy);font-size:11px;font-weight:850;line-height:1.3;text-align:center;backdrop-filter:blur(10px)}
+
 .home-hero-slider-controls{position:absolute;left:34px;bottom:13px;z-index:3;display:flex;align-items:center;gap:8px}
 .home-hero-slider-controls>button{display:none}
 .home-hero-slider-controls>div{display:flex;gap:6px}
@@ -245,7 +247,7 @@
   .home-hero-mobile-greeting{display:block;margin-bottom:7px;color:#12335d;font-size:24px;font-weight:850;line-height:1.15}
   .home-hero-mobile-greeting b{color:var(--home-teal-dark)}
   .home-hero-kicker{font-size:10px}
-  .home-hero h1{margin:3px 0 8px;font-size:30px}
+  .home-hero h1{display:none}
   .home-hero-desktop-title{display:none}
   .home-hero-brand{font-size:30px}
   .home-hero-brand img{display:none}
@@ -256,7 +258,7 @@
   .home-hero-benefits{display:none}
   .home-hero-visual{min-height:0;padding:0 18px 18px}
   .home-hero-visual img{max-height:170px;border-width:5px;border-radius:18px}
-  .home-hero-slogan{display:none}
+  .home-hero-slogan,.home-hero-slide-note{display:none}
   .home-hero-slider-controls{left:50%;bottom:6px;transform:translateX(-50%)}
   .home-quick-actions-desktop{display:none}
   .home-quick-actions-mobile{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
