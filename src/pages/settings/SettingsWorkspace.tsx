@@ -7,7 +7,7 @@ import {
   Camera,
   ChevronRight,
   CircleHelp,
-  CircleInfo,
+  Info,
   Database,
   Download,
   FileText,
@@ -375,7 +375,7 @@ export default function SettingsWorkspace({
           <SettingRow icon={<CircleHelp/>} label="Centre d’aide" description="Guides, tutoriels et questions fréquentes" onClick={() => navigate('/aide')}/>
           <SettingRow icon={<MessageCircle/>} label="Contacter le support" description="Notre équipe est là pour vous aider" onClick={() => navigate('/aide')}/>
           <SettingRow icon={<ShieldCheck/>} label="Conditions et confidentialité" description="Nos règles et votre vie privée" onClick={() => navigate('/confidentialite')}/>
-          <SettingRow icon={<CircleInfo/>} label="À propos" value="Version 0.2.0" onClick={() => navigate('/fonctionnalites')}/>
+          <SettingRow icon={<Info/>} label="À propos" value="Version 0.2.0" onClick={() => navigate('/fonctionnalites')}/>
         </SettingsCard>
 
         <SettingsCard title="Synchronisation" subtitle="Continuité de service et données locales" icon={<Wifi/>}>
