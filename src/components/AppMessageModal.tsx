@@ -111,6 +111,15 @@ export default function AppMessageModal() {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [message]);
 
+  useEffect(() => {
+    if (!message || (message.tone !== 'info' && message.tone !== 'success')) return undefined;
+    const timer = window.setTimeout(() => {
+      lastMessageRef.current = '';
+      setMessage(null);
+    }, 3200);
+    return () => window.clearTimeout(timer);
+  }, [message]);
+
   if (!message) return null;
   const tone = message.tone || 'info';
   const Icon = tone === 'success' ? CheckCircle2 : tone === 'warning' ? AlertTriangle : tone === 'error' ? XCircle : Info;
