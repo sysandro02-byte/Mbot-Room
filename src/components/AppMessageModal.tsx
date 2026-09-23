@@ -45,13 +45,23 @@ const titleForTone = (tone: AppMessageTone) => ({
   error: 'Une action est nécessaire',
 }[tone]);
 
+const sanitizeTechnicalMessage = (value: string) => {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  const technicalPattern = /(cannot read properties|cannot read property|undefined is not|is not a function|referenceerror|typeerror|syntaxerror|stack trace|reading ['"`]|null.*reading|unexpected token)/i;
+  if (technicalPattern.test(text)) {
+    return 'Une erreur temporaire s’est produite. Réessayez. Si le problème continue, actualisez la page.';
+  }
+  return text;
+};
+
 export default function AppMessageModal() {
   const [message, setMessage] = useState<AppMessageDetail | null>(null);
   const lastMessageRef = useRef('');
 
   useEffect(() => {
     const openMessage = (detail: AppMessageDetail) => {
-      const text = String(detail.message || '').replace(/\s+/g, ' ').trim();
+      const text = sanitizeTechnicalMessage(detail.message || '');
       if (!text || text === lastMessageRef.current) return;
       lastMessageRef.current = text;
       setMessage({
