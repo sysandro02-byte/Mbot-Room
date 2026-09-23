@@ -25,7 +25,7 @@ export default function HomeHero({ firstName, slides, activeSlide, onSlideChange
       <div className="home-hero-copy">
         <span className="home-hero-mobile-greeting">Bonjour <b>{firstName}</b> ! <span aria-hidden="true">👋</span></span>
         <span className="home-hero-kicker">Bienvenue sur</span>
-        <h1><span className="home-hero-desktop-title">Bienvenue sur</span><span className="home-hero-brand"><img src="/icons/mboteroom-symbol.png" alt="" />MBoté<span>Room</span></span></h1>
+        <h1 aria-label="MBotéRoom"><span className="home-hero-brand"><img src="/icons/mboteroom-wordmark.png" alt="MBotéRoom" /></span></h1>
         <p>{slide?.body || fallbackBody}</p>
         <div className="home-hero-actions">
           <button type="button" onClick={onCreate}><Video size={19}/> Créer une réunion <ChevronRight size={18}/></button>
