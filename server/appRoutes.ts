@@ -118,7 +118,12 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
 
   app.put('/api/preferences', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
-      const allowed=['language','theme','notifications','audio','video','defaultMic','defaultCamera','background','timezone','accessibility'];
+      const allowed=[
+        'language','theme','notifications','audio','video','defaultMic','defaultCamera','background','timezone','accessibility',
+        'textSize','notificationSounds','vibration','lockScreenPreview','autoArchiveDays','mediaDownload','chatBackground',
+        'noiseReduction','hdVideo','lunaAutoSummary','lunaRealtimeTranslation','lunaActionSuggestions','dataSaver',
+        'waitingRoomDefault','meetingLockDefault','participantAudioAllowed','participantVideoAllowed','screenShareAllowed',
+      ];
       const preferences:Record<string,unknown>={}; for(const key of allowed){if(Object.prototype.hasOwnProperty.call(request.body||{},key))preferences[key]=request.body[key];}
       const result=await query(`INSERT INTO room_user_preferences (user_id,preferences) VALUES ($1,$2::jsonb) ON CONFLICT (user_id) DO UPDATE SET preferences=room_user_preferences.preferences||excluded.preferences,updated_at=now() RETURNING preferences`,[request.user!.id,JSON.stringify(preferences)]);
       response.json(result.rows[0]?.preferences||{});
