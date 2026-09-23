@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" role="img" aria-labelledby="title desc">
+<title id="title">Collaboration MBotéRoom</title><desc id="desc">Illustration d'une professionnelle utilisant MBotéRoom sur son ordinateur.</desc>
+<defs>
+ <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#e9f8f5"/><stop offset="1" stop-color="#f8fcff"/></linearGradient>
+ <linearGradient id="shirt" x1="0" x2="1"><stop stop-color="#0a8f8d"/><stop offset="1" stop-color="#0c5d72"/></linearGradient>
+ <filter id="s" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#063b63" flood-opacity=".14"/></filter>
+</defs>
+<rect width="1000" height="620" rx="44" fill="url(#bg)"/>
+<circle cx="142" cy="116" r="88" fill="#08a6a6" opacity=".08"/><circle cx="868" cy="110" r="128" fill="#2f80ed" opacity=".06"/>
+<g transform="translate(110 68)" filter="url(#s)">
+ <rect x="0" y="270" width="780" height="210" rx="36" fill="#fff"/>
+ <rect x="430" y="178" width="308" height="196" rx="24" fill="#063b63"/>
+ <rect x="447" y="195" width="274" height="159" rx="14" fill="#dff6f2"/>
+ <g transform="translate(476 215)">
+  <rect width="104" height="56" rx="12" fill="#08a6a6"/><circle cx="52" cy="22" r="13" fill="#dff6f2"/><path d="M27 50c6-15 15-22 25-22s20 8 25 22" fill="#063b63"/>
+  <rect x="119" width="104" height="56" rx="12" fill="#eae7ff"/><circle cx="171" cy="22" r="13" fill="#6f43df"/><path d="M146 50c6-15 15-22 25-22s20 8 25 22" fill="#2f80ed"/>
+  <rect y="70" width="104" height="56" rx="12" fill="#fff0ed"/><circle cx="52" cy="92" r="13" fill="#b96c4c"/><path d="M27 120c6-15 15-22 25-22s20 8 25 22" fill="#f8644d"/>
+  <rect x="119" y="70" width="104" height="56" rx="12" fill="#edf4ff"/><circle cx="171" cy="92" r="13" fill="#315b83"/><path d="M146 120c6-15 15-22 25-22s20 8 25 22" fill="#08a6a6"/>
+ </g>
+ <path d="M397 383h372l42 38H355z" fill="#dce8ef"/>
+ <circle cx="273" cy="134" r="72" fill="#8a513d"/>
+ <path d="M201 126c4-60 36-92 76-92 46 0 78 38 76 96-24-18-55-27-93-26-18 0-38 7-59 22z" fill="#0c2340"/>
+ <circle cx="246" cy="137" r="6" fill="#fff"/><circle cx="299" cy="137" r="6" fill="#fff"/><path d="M252 169c13 15 29 15 43 0" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+ <path d="M145 330c14-102 67-154 128-154 64 0 116 52 132 154" fill="url(#shirt)"/>
+ <path d="M203 208c-34 0-65-27-75-60-7-24-2-53 15-77 8-12 25-1 20 12-10 22-11 39-4 55 9 20 27 34 50 38z" fill="#8a513d"/>
+ <path d="M122 68c-6-17 2-35 20-41 17-5 34 2 41 18" fill="none" stroke="#8a513d" stroke-width="18" stroke-linecap="round"/>
+ <rect x="34" y="347" width="332" height="20" rx="10" fill="#dce8ef"/>
+ <rect x="70" y="367" width="14" height="113" rx="7" fill="#b4c7d1"/><rect x="316" y="367" width="14" height="113" rx="7" fill="#b4c7d1"/>
+</g>
+<g transform="translate(700 58)">
+ <rect width="220" height="72" rx="22" fill="#fff" filter="url(#s)"/>
+ <circle cx="38" cy="36" r="18" fill="#08a6a6"/><path d="M29 31h18v12H29z" fill="#fff"/><path d="m47 33 8-5v18l-8-5z" fill="#fff"/>
+ <rect x="72" y="22" width="110" height="10" rx="5" fill="#0c2340"/><rect x="72" y="40" width="82" height="8" rx="4" fill="#9eb2c0"/>
+</g>
+</svg>
