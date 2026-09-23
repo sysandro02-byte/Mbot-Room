@@ -373,7 +373,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
   app.put('/api/preferences', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
       const allowed=[
-        'language','theme','notifications','audio','video','defaultMic','defaultCamera','background','timezone','accessibility',
+        'language','theme','notifications','emailNotifications','audio','video','defaultMic','defaultCamera','background','timezone','accessibility',
         'textSize','notificationSounds','vibration','lockScreenPreview','autoArchiveDays','mediaDownload','chatBackground',
         'noiseReduction','hdVideo','lunaAutoSummary','lunaRealtimeTranslation','lunaActionSuggestions','dataSaver',
         'waitingRoomDefault','meetingLockDefault','participantAudioAllowed','participantVideoAllowed','screenShareAllowed',
