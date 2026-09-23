@@ -26,6 +26,8 @@ const HelpPage = lazy(() => import('./pages/HelpPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 const ContactsPage = lazy(() => import('./pages/ContactsPage'));
+const RecordingsPage = lazy(() => import('./pages/RecordingsPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const FilesPage = lazy(() => import('./pages/FilesPage'));
 const WorkGroupsPage = lazy(() => import('./pages/WorkGroupsPage'));
 const Login = lazy(() => import('./pages/Login'));
@@ -149,7 +151,7 @@ export default function App() {
     <Route path="/app/meetings" element={<ProtectedRoute><AppShell title="Réunions"><RealMeetingList /></AppShell></ProtectedRoute>} />
     <Route path="/app/search" element={<ProtectedRoute><AppShell title="Recherche"><GlobalSearchPage /></AppShell></ProtectedRoute>} />
     <Route path="/app/calendar" element={<ProtectedRoute><RealFeaturePage kind="calendar" /></ProtectedRoute>} />
-    <Route path="/app/recordings" element={<ProtectedRoute><RealFeaturePage kind="recordings" /></ProtectedRoute>} />
+    <Route path="/app/recordings" element={<ProtectedRoute><AppShell title="Enregistrements"><RecordingsPage /></AppShell></ProtectedRoute>} />
     <Route path="/app/messages" element={<ProtectedRoute><AppShell title="Messages"><MessagesPage /></AppShell></ProtectedRoute>} />
     <Route path="/app/contacts" element={<ProtectedRoute><AppShell title="Contacts"><ContactsPage /></AppShell></ProtectedRoute>} />
     <Route path="/app/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
@@ -158,7 +160,7 @@ export default function App() {
     <Route path="/app/whiteboard" element={<ProtectedRoute><RealFeaturePage kind="whiteboard" /></ProtectedRoute>} />
     <Route path="/app/polls" element={<ProtectedRoute><RealFeaturePage kind="polls" /></ProtectedRoute>} />
     <Route path="/app/settings" element={<ProtectedRoute><RealFeaturePage kind="settings" /></ProtectedRoute>} />
-    <Route path="/app/profile" element={<ProtectedRoute><RealFeaturePage kind="profile" /></ProtectedRoute>} />
+    <Route path="/app/profile" element={<ProtectedRoute><AppShell title="Mon profil"><ProfilePage /></AppShell></ProtectedRoute>} />
     <Route path="/reunions/terminee" element={<ProtectedRoute><RealMeetingEndedPage /></ProtectedRoute>} />
     <Route path="/reunions" element={<ProtectedRoute><AppShell title="Réunions"><RealMeetingList /></AppShell></ProtectedRoute>} />
     <Route path="/reunions/:meetingId/salle-attente" element={<GuestWaitingRoomPage />} />
