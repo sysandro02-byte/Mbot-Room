@@ -97,8 +97,26 @@ export default function RealFeaturePage({kind}:Props){
   const filteredContacts=useMemo(()=>{const query=contactSearch.trim().toLowerCase();return contacts.filter((contact)=>!query||contact.name.toLowerCase().includes(query)||contact.email.toLowerCase().includes(query)||contact.username.toLowerCase().includes(query));},[contactSearch,contacts]);
 
   const submitCalendar=async(event:FormEvent<HTMLFormElement>)=>{
-    event.preventDefault();const form=new FormData(event.currentTarget);const title=String(form.get('title')||'').trim();const start=String(form.get('start')||'');const end=String(form.get('end')||'');if(!title||!start||!end)return;
-    try{const created=await appDataService.createCalendarEvent({title,description:String(form.get('description')||''),startsAt:new Date(start).toISOString(),endsAt:new Date(end).toISOString()});setCalendar((current)=>[...current,created].sort((a,b)=>new Date(a.starts_at).getTime()-new Date(b.starts_at).getTime()));event.currentTarget.reset();setNotice('Événement enregistré.');}catch(cause){setError(cause instanceof Error?cause.message:'Création impossible.');}
+    event.preventDefault();
+    const formElement=event.currentTarget;
+    const form=new FormData(formElement);
+    const title=String(form.get('title')||'').trim();
+    const start=String(form.get('start')||'');
+    const end=String(form.get('end')||'');
+    if(!title||!start||!end)return;
+    try{
+      const created=await appDataService.createCalendarEvent({
+        title,
+        description:String(form.get('description')||''),
+        startsAt:new Date(start).toISOString(),
+        endsAt:new Date(end).toISOString(),
+      });
+      setCalendar((current)=>[...current,created].sort((a,b)=>new Date(a.starts_at).getTime()-new Date(b.starts_at).getTime()));
+      formElement.reset();
+      setNotice('Événement enregistré.');
+    }catch(cause){
+      setError(cause instanceof Error?cause.message:'Création impossible.');
+    }
   };
 
   const sendMessage=async(event:FormEvent)=>{event.preventDefault();if(!selectedMeetingId||!messageDraft.trim())return;try{const message=await collaborationService.sendMessage(selectedMeetingId,messageDraft.trim());setMessages((current)=>current.some((item)=>item.id===message.id)?current:[...current,message]);setMessageDraft('');}catch(cause){setError(cause instanceof Error?cause.message:'Message non envoyé.');}};
