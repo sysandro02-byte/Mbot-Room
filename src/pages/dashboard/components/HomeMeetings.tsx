@@ -21,9 +21,10 @@ type NextProps = {
   canManage: boolean;
   onOpen: (meeting: Meeting) => void;
   onManage: (meeting: Meeting) => void;
+  onPlan: () => void;
 };
 
-export function NextMeetingCard({ meeting, canManage, onOpen, onManage }: NextProps) {
+export function NextMeetingCard({ meeting, canManage, onOpen, onManage, onPlan }: NextProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const copy = async () => {
@@ -63,7 +64,7 @@ export function NextMeetingCard({ meeting, canManage, onOpen, onManage }: NextPr
             </div> : null}
           </div>
         </div>
-      </article> : <div className="home-empty-state"><CalendarEmpty/><strong>Aucune réunion programmée.</strong><p>Planifiez votre prochaine réunion pour la retrouver ici.</p></div>}
+      </article> : <div className="home-empty-state"><CalendarEmpty/><strong>Aucune réunion programmée.</strong><p>Planifiez votre prochaine réunion pour la retrouver ici.</p><button className="home-empty-action" type="button" onClick={onPlan}>Planifier une réunion</button></div>}
     </section>
   );
 }
