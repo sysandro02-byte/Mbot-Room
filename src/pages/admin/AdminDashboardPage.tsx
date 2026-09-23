@@ -47,11 +47,33 @@ type DashboardTipDraft = Pick<DashboardTip, 'title' | 'body' | 'actionLabel' | '
 type HomeSlideDraft = Omit<HomeSlide, 'slot' | 'updatedAt'>;
 
 const defaultHomeSlideDraft = (slot: HomeSlide['slot']): HomeSlideDraft => ({
-  title: slot === 1 ? 'Réunions simples, professionnelles et sécurisées' : slot === 2 ? 'Retrouvez votre équipe en quelques secondes' : 'Collaborez avec Luna IA',
-  body: slot === 1 ? 'Créez, planifiez et animez vos réunions depuis un espace pensé pour vos équipes.' : slot === 2 ? 'Rejoignez une réunion par ID ou par lien, avec salle d’attente et contrôles de sécurité.' : 'Retrouvez les décisions, points clés, messages et actions importantes de vos réunions.',
-  imageUrl: slot === 1 ? '/images/meeting-black-team.svg' : '',
-  actionLabel: slot === 1 ? 'Créer une réunion' : slot === 2 ? 'Rejoindre une réunion' : 'Découvrir mes réunions',
-  actionPath: slot === 2 ? '/join' : '/app/meetings',
+  title: slot === 1
+    ? 'Réunions simples, professionnelles et sécurisées'
+    : slot === 2
+      ? 'Retrouvez votre équipe en quelques secondes'
+      : slot === 3
+        ? 'Collaborez avec Luna IA'
+        : 'Des réunions plus humaines avec MBotéRoom',
+  body: slot === 1
+    ? 'Créez, planifiez et animez vos réunions depuis un espace pensé pour vos équipes.'
+    : slot === 2
+      ? 'Rejoignez une réunion par ID ou par lien, avec salle d’attente et contrôles de sécurité.'
+      : slot === 3
+        ? 'Retrouvez les décisions, points clés, messages et actions importantes de vos réunions.'
+        : 'Collaborez, partagez, créez, où que vous soyez.',
+  imageUrl: slot === 1
+    ? '/images/mboteroom-home-hero.svg'
+    : slot === 4
+      ? '/images/mboteroom-home-banner.svg'
+      : '',
+  actionLabel: slot === 1
+    ? 'Créer une réunion'
+    : slot === 2
+      ? 'Rejoindre une réunion'
+      : slot === 4
+        ? 'Découvrir toutes les fonctionnalités'
+        : 'Découvrir mes réunions',
+  actionPath: slot === 2 ? '/join' : slot === 4 ? '/fonctionnalites' : '/app/meetings',
   isActive: true,
 });
 
@@ -247,7 +269,7 @@ export default function AdminDashboardPage() {
         actionPath: saved.actionPath,
         isActive: saved.isActive,
       });
-      setToast(`Slide ${selectedHomeSlot} de l’accueil mis à jour.`);
+      setToast(selectedHomeSlot === 4 ? 'Bannière de l’accueil mise à jour.' : `Slide ${selectedHomeSlot} de l’accueil mis à jour.`);
     } catch (slideError) {
       setToast(slideError instanceof Error ? slideError.message : 'Enregistrement du slide impossible.');
     } finally {
@@ -694,29 +716,30 @@ function HomeSlidesCard({ slides, selectedSlot, draft, saving, onSelect, onDraft
     <section className="admin-tips-card admin-home-slides-card" id="admin-home-slides">
       <header>
         <div>
-          <h2>Slider de l’accueil</h2>
-          <p>Pilotez les trois slides visibles sur la page d’accueil de tous les utilisateurs.</p>
+          <h2>Visuels de l’accueil</h2>
+          <p>Pilotez les trois slides du hero et la bannière de bas de page. Chaque image peut être modifiée ici sans changer le code.</p>
         </div>
-        <span>3 emplacements</span>
+        <span>3 slides + 1 bannière</span>
       </header>
       <div className="admin-home-slide-tabs" role="tablist" aria-label="Slides de l’accueil">
-        {([1,2,3] as HomeSlide['slot'][]).map((slot) => {
+        {([1,2,3,4] as HomeSlide['slot'][]).map((slot) => {
           const item = slides.find((slide) => slide.slot === slot);
           return <button key={slot} type="button" className={selectedSlot === slot ? 'is-active' : ''} onClick={() => onSelect(slot)}>
-            <strong>Slide {slot}</strong><small>{item?.isActive === false ? 'Masqué' : 'Actif'}</small>
+            <strong>{slot === 4 ? 'Bannière' : `Slide ${slot}`}</strong><small>{item?.isActive === false ? 'Masqué' : 'Actif'}</small>
           </button>;
         })}
       </div>
       <form className="admin-tip-form admin-home-slide-form" onSubmit={onSubmit}>
         <label><span>Titre</span><input value={draft.title} maxLength={120} required onChange={(event) => onDraftChange({ ...draft, title: event.target.value })}/></label>
         <label><span>Message</span><textarea value={draft.body} maxLength={420} rows={4} required onChange={(event) => onDraftChange({ ...draft, body: event.target.value })}/></label>
-        <label><span>URL de l’image</span><input value={draft.imageUrl} maxLength={1000} placeholder="/images/..." onChange={(event) => onDraftChange({ ...draft, imageUrl: event.target.value })}/></label>
+        <label><span>Image affichée</span><input value={draft.imageUrl} maxLength={1000} placeholder="/images/... ou https://..." onChange={(event) => onDraftChange({ ...draft, imageUrl: event.target.value })}/><small className="admin-field-help">Utilisez une image interne ou une URL HTTPS. La modification est appliquée à l’accueil sans redéploiement du frontend.</small></label>
         <div className="admin-tip-form-grid">
           <label><span>Texte du bouton</span><input value={draft.actionLabel} maxLength={50} onChange={(event) => onDraftChange({ ...draft, actionLabel: event.target.value })}/></label>
           <label><span>Destination interne</span><input value={draft.actionPath} maxLength={300} placeholder="/app/meetings" onChange={(event) => onDraftChange({ ...draft, actionPath: event.target.value })}/></label>
         </div>
-        <label className="admin-tip-toggle"><input type="checkbox" checked={draft.isActive} onChange={(event) => onDraftChange({ ...draft, isActive: event.target.checked })}/><span>Afficher ce slide</span></label>
-        <div className="admin-tip-actions"><button type="submit" disabled={saving}>{saving ? 'Enregistrement...' : `Enregistrer le slide ${selectedSlot}`}</button></div>
+        <label className="admin-tip-toggle"><input type="checkbox" checked={draft.isActive} onChange={(event) => onDraftChange({ ...draft, isActive: event.target.checked })}/><span>{selectedSlot === 4 ? 'Afficher la bannière' : 'Afficher ce slide'}</span></label>
+        {draft.imageUrl ? <div className="admin-home-slide-preview"><img src={draft.imageUrl} alt={selectedSlot === 4 ? 'Aperçu de la bannière' : `Aperçu du slide ${selectedSlot}`} /></div> : null}
+        <div className="admin-tip-actions"><button type="submit" disabled={saving}>{saving ? 'Enregistrement...' : selectedSlot === 4 ? 'Enregistrer la bannière' : `Enregistrer le slide ${selectedSlot}`}</button></div>
       </form>
     </section>
   );
