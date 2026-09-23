@@ -399,7 +399,8 @@ export const registerWorkspaceRoutes=(app:express.Express,io:Server)=>{
     try{
       const name=normalizeText(request.body?.name).slice(0,120);
       const description=normalizeText(request.body?.description).slice(0,600);
-      const emails=[...new Set((Array.isArray(request.body?.emails)?request.body.emails:[]).map(normalizeEmail).filter(Boolean))].slice(0,50);
+      const emailInput:unknown[]=Array.isArray(request.body?.emails)?request.body.emails:[];
+      const emails:string[]=[...new Set(emailInput.map((value)=>normalizeEmail(value)).filter((value)=>value.length>0))].slice(0,50);
       if(!name)return sendApiError(response,400,'GROUP_NAME_REQUIRED','Le nom du groupe est requis.');
       const id=createId();
       let inserted:any=null;
