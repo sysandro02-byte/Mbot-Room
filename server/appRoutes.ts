@@ -556,7 +556,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
           LIMIT 100`,
         [request.user!.id],
       );
-      const payload=[];
+      const payload:Awaited<ReturnType<typeof hydrateConversation>>[]=[];
       for(const row of rows.rows)payload.push(await hydrateConversation(row,request.user!.id));
       response.json(payload);
     }catch(error){next(error);}
@@ -632,7 +632,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
           ORDER BY m.created_at DESC LIMIT 200`,
         [request.params.conversationId],
       );
-      const payload=[];
+      const payload:Awaited<ReturnType<typeof conversationMessagePayload>>[]=[];
       for(const row of rows.rows.reverse())payload.push(await conversationMessagePayload(row));
       response.json(payload);
     }catch(error){next(error);}
