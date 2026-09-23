@@ -179,5 +179,56 @@ export const runExtraMigrations = async () => {
       UNIQUE (group_id, meeting_id)
     );
     CREATE INDEX IF NOT EXISTS room_work_group_calls_group_idx ON room_work_group_calls(group_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS room_user_contacts (
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      contact_user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      favorite boolean NOT NULL DEFAULT false,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, contact_user_id),
+      CHECK (user_id <> contact_user_id)
+    );
+    CREATE INDEX IF NOT EXISTS room_user_contacts_contact_idx ON room_user_contacts(contact_user_id);
+
+    CREATE TABLE IF NOT EXISTS room_conversations (
+      id uuid PRIMARY KEY,
+      kind text NOT NULL CHECK (kind IN ('direct','work_group')),
+      title text NOT NULL DEFAULT '',
+      created_by integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      work_group_id uuid REFERENCES room_work_groups(id) ON DELETE CASCADE,
+      direct_key text,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS room_conversations_direct_unique
+      ON room_conversations(direct_key) WHERE direct_key IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS room_conversations_group_unique
+      ON room_conversations(work_group_id) WHERE work_group_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS room_conversations_updated_idx ON room_conversations(updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS room_conversation_members (
+      conversation_id uuid NOT NULL REFERENCES room_conversations(id) ON DELETE CASCADE,
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      pinned boolean NOT NULL DEFAULT false,
+      archived boolean NOT NULL DEFAULT false,
+      notifications_enabled boolean NOT NULL DEFAULT true,
+      last_read_at timestamptz NOT NULL DEFAULT now(),
+      joined_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (conversation_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS room_conversation_members_user_idx
+      ON room_conversation_members(user_id, archived, pinned);
+
+    CREATE TABLE IF NOT EXISTS room_conversation_messages (
+      id uuid PRIMARY KEY,
+      conversation_id uuid NOT NULL REFERENCES room_conversations(id) ON DELETE CASCADE,
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      text text NOT NULL DEFAULT '',
+      file_id uuid REFERENCES room_files(id) ON DELETE SET NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      deleted_at timestamptz
+    );
+    CREATE INDEX IF NOT EXISTS room_conversation_messages_conversation_idx
+      ON room_conversation_messages(conversation_id, created_at DESC);
   `);
 };
