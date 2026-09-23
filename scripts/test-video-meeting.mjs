@@ -540,12 +540,13 @@ try {
     return Boolean(tile && !tile.querySelector('[aria-label="Main levée"]'));
   }, undefined, { timeout: 10_000 });
 
-  const recordingDownload = hostRoom.page.waitForEvent('download', { timeout: 20_000 });
   await clickControl(hostRoom.page, 'Enregistrer');
   await hostRoom.page.waitForFunction(() => document.body.innerText.includes('Enregistrement composite local démarré pour 3 flux.'), undefined, { timeout: 10_000 });
   await sleep(2_500);
-  await clickControl(hostRoom.page, 'Stop rec.');
-  const download = await recordingDownload;
+  const [download] = await Promise.all([
+    hostRoom.page.waitForEvent('download', { timeout: 20_000 }),
+    clickControl(hostRoom.page, 'Stop rec.'),
+  ]);
   await mkdir('test-artifacts', { recursive: true });
   const recordingPath = 'test-artifacts/meeting-composite.webm';
   await download.saveAs(recordingPath);
