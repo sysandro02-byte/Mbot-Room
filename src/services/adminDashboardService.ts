@@ -4,7 +4,7 @@ import { DashboardTip, Meeting } from './meetingService';
 export type GuestAccessSlide = { id: string; title: string; body: string; imageUrl: string; isActive: boolean; createdAt: string; updatedAt: string };
 
 export type HomeSlide = {
-  slot: 1 | 2 | 3;
+  slot: 1 | 2 | 3 | 4;
   title: string;
   body: string;
   imageUrl: string;
