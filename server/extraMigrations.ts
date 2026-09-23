@@ -104,5 +104,80 @@ export const runExtraMigrations = async () => {
       created_at timestamptz NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS room_notifications_user_created_idx ON room_notifications(user_id, created_at DESC);
+
+    ALTER TABLE room_calendar_events ADD COLUMN IF NOT EXISTS google_event_id text;
+    ALTER TABLE room_calendar_events ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'mboteroom';
+    CREATE UNIQUE INDEX IF NOT EXISTS room_calendar_google_event_unique
+      ON room_calendar_events(user_id, google_event_id)
+      WHERE google_event_id IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS room_google_calendar_connections (
+      user_id integer PRIMARY KEY REFERENCES room_users(id) ON DELETE CASCADE,
+      access_token_enc text NOT NULL,
+      refresh_token_enc text NOT NULL DEFAULT '',
+      expires_at timestamptz,
+      scope text NOT NULL DEFAULT '',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS room_google_oauth_states (
+      state text PRIMARY KEY,
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      return_to text NOT NULL DEFAULT '/app/calendar',
+      expires_at timestamptz NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS room_google_oauth_states_expires_idx ON room_google_oauth_states(expires_at);
+
+    CREATE TABLE IF NOT EXISTS room_files (
+      id uuid PRIMARY KEY,
+      owner_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      name text NOT NULL,
+      mime_type text NOT NULL,
+      size_bytes integer NOT NULL,
+      content bytea NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS room_files_owner_created_idx ON room_files(owner_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS room_work_groups (
+      id uuid PRIMARY KEY,
+      owner_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      name text NOT NULL,
+      description text NOT NULL DEFAULT '',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS room_work_groups_owner_idx ON room_work_groups(owner_id, updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS room_work_group_members (
+      group_id uuid NOT NULL REFERENCES room_work_groups(id) ON DELETE CASCADE,
+      email text NOT NULL,
+      user_id integer REFERENCES room_users(id) ON DELETE SET NULL,
+      role text NOT NULL DEFAULT 'member' CHECK (role IN ('owner','member')),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (group_id, email)
+    );
+    CREATE INDEX IF NOT EXISTS room_work_group_members_user_idx ON room_work_group_members(user_id);
+
+    CREATE TABLE IF NOT EXISTS room_work_group_files (
+      group_id uuid NOT NULL REFERENCES room_work_groups(id) ON DELETE CASCADE,
+      file_id uuid NOT NULL REFERENCES room_files(id) ON DELETE CASCADE,
+      uploaded_by integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (group_id, file_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS room_work_group_calls (
+      id uuid PRIMARY KEY,
+      group_id uuid NOT NULL REFERENCES room_work_groups(id) ON DELETE CASCADE,
+      meeting_id integer NOT NULL REFERENCES room_meetings(id) ON DELETE CASCADE,
+      call_type text NOT NULL CHECK (call_type IN ('audio','video')),
+      created_by integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (group_id, meeting_id)
+    );
+    CREATE INDEX IF NOT EXISTS room_work_group_calls_group_idx ON room_work_group_calls(group_id, created_at DESC);
   `);
 };
