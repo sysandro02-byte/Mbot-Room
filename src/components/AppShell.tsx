@@ -11,6 +11,7 @@ import {
   LogOut,
   ChevronDown,
   MoreVertical,
+  Plus,
   UserRound,
   ShieldCheck,
   WifiOff,
@@ -57,7 +58,7 @@ const secondaryNavItems = [
 const mobileNavItems = [
   { label: 'Accueil', icon: Home, to: '/app' },
   { label: 'Réunions', icon: CalendarDays, to: '/app/meetings' },
-  { label: 'Rejoindre', icon: SquareArrowOutUpRight, to: '/join', primary: true },
+  { label: 'Rejoindre', icon: Plus, to: '/join', primary: true },
   { label: 'Messages', icon: MessageCircle, to: '/app/messages' },
   { label: 'Paramètres', icon: Settings, to: '/app/settings' },
 ];
