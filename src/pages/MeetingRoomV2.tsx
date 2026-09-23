@@ -321,7 +321,7 @@ export default function MeetingRoomV2() {
   const isAdmin = currentUser?.role === 'admin';
   const isModerator = Boolean(meeting && currentUser && (isHost || isCoHost || isAdmin));
   const canUseMic = Boolean(meeting && (isModerator || meeting.settings?.participantAudio !== false));
-  const canUseCamera = Boolean(meeting && (isModerator || meeting.settings?.participantVideo !== false));
+  const canUseCamera = Boolean(meeting && meeting.settings?.callType !== 'audio' && (isModerator || meeting.settings?.participantVideo !== false));
   const canShareScreen = Boolean(meeting && (isModerator || meeting.settings?.screenShare !== false));
   const canUseReactions = Boolean(meeting && (isModerator || meeting.settings?.reactions !== false));
   const canUseChat = Boolean(meeting && meeting.settings?.chat !== false);
@@ -489,7 +489,7 @@ export default function MeetingRoomV2() {
     setMediaReady(false);
 
     const audioRequested = initialMic && (isModerator || meeting.settings?.participantAudio !== false);
-    const videoRequested = initialCamera && (isModerator || meeting.settings?.participantVideo !== false);
+    const videoRequested = meeting.settings?.callType !== 'audio' && initialCamera && (isModerator || meeting.settings?.participantVideo !== false);
 
     if (!audioRequested && !videoRequested) {
       const emptyStream = new MediaStream();
