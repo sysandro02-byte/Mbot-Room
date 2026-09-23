@@ -46,6 +46,7 @@ import { getMeetingAccessCode, LobbyParticipant, LunaCatchUpResponse, Meeting, M
 import { mediaTransportService, type MediaTransportStatus } from '../services/mediaTransportService';
 import { createCompositeMeetingRecording, type CompositeRecordingSession } from '../lib/meetingRecording';
 import { getAppLocale } from '../lib/appLanguage';
+import { readCachedPreferences } from '../lib/userPreferences';
 import './MeetingRoomV2.css';
 
 type Panel = 'participants' | 'chat' | 'polls' | 'luna' | 'breakouts' | null;
@@ -251,8 +252,9 @@ export default function MeetingRoomV2() {
   const state = location.state as MeetingLocationState | null;
   const currentUser = authService.getCurrentUser();
   const isAuthenticated = authService.isAuthenticated();
-  const initialMic = state?.joinOptions?.mic !== false;
-  const initialCamera = state?.joinOptions?.camera !== false;
+  const userPreferences = readCachedPreferences();
+  const initialMic = state?.joinOptions?.mic !== undefined ? state.joinOptions.mic !== false : userPreferences.defaultMic !== false;
+  const initialCamera = state?.joinOptions?.camera !== undefined ? state.joinOptions.camera !== false : userPreferences.defaultCamera !== false;
 
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
@@ -512,15 +514,21 @@ export default function MeetingRoomV2() {
     let cancelled = false;
     const openMedia = async () => {
       try {
+        const dataSaver = userPreferences.dataSaver === true;
+        const hdVideo = userPreferences.hdVideo !== false && !dataSaver;
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: audioRequested ? {
             echoCancellation: true,
-            noiseSuppression: true,
+            noiseSuppression: userPreferences.noiseReduction !== false,
             autoGainControl: true,
             channelCount: { ideal: 1 },
           } : false,
           video: videoRequested
-            ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } }
+            ? {
+                width: { ideal: hdVideo ? 1280 : 640 },
+                height: { ideal: hdVideo ? 720 : 360 },
+                frameRate: { ideal: dataSaver ? 15 : 30, max: dataSaver ? 20 : 30 },
+              }
             : false,
         });
         if (cancelled) {
