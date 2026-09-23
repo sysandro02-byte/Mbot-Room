@@ -182,15 +182,15 @@ export default function RealMeetingEndedPage(){
             <div className="real-ended-summary-content">
               <section>
                 <h3><Sparkles size={15}/> Points clés</h3>
-                {payload.summary.bullets.length?><ul>{payload.summary.bullets.map((item,index)=><li key={index}>{item}</li>)}</ul>:<p>Aucun point clé identifié.</p>}
+                {payload.summary.bullets.length ? <ul>{payload.summary.bullets.map((item,index)=><li key={index}>{item}</li>)}</ul>:<p>Aucun point clé identifié.</p>}
               </section>
               <section>
                 <h3>Décisions</h3>
-                {payload.summary.decisions.length?><ul>{payload.summary.decisions.map((item,index)=><li key={index}>{item}</li>)}</ul>:<p>Aucune décision identifiée.</p>}
+                {payload.summary.decisions.length ? <ul>{payload.summary.decisions.map((item,index)=><li key={index}>{item}</li>)}</ul>:<p>Aucune décision identifiée.</p>}
               </section>
               <section>
                 <h3>Actions</h3>
-                {payload.summary.actions.length><ul>{payload.summary.actions.map((item,index)=><li key={index}>{item}</li>)}</ul>:<p>Aucune action identifiée.</p>}
+                {payload.summary.actions.length ? <ul>{payload.summary.actions.map((item,index)=><li key={index}>{item}</li>)}</ul>:<p>Aucune action identifiée.</p>}
               </section>
               {payload.summary.nextMeeting?<section><h3>Prochaine réunion</h3><p>{payload.summary.nextMeeting}</p></section>:null}
               <div className="real-ended-source-note">
