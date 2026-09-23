@@ -17,6 +17,7 @@ export type RuntimeReadiness = {
     livekit: boolean;
     turn: boolean;
     serverRecording: boolean;
+    supabaseRecordingStorage: boolean;
     push: boolean;
   };
   testReady: boolean;
@@ -49,6 +50,8 @@ export const getRuntimeReadiness = (databaseType: string): RuntimeReadiness => {
     && has(process.env.LIVEKIT_EGRESS_S3_SECRET_KEY)
     && (has(process.env.LIVEKIT_EGRESS_S3_ENDPOINT) || has(process.env.LIVEKIT_EGRESS_S3_REGION));
   const serverRecording = livekit && egressEnabled && (defaultStorage || s3Storage);
+  const supabaseRecordingStorage = has(process.env.MBOTE_SUPABASE_RECORDING_SIGNER_URL)
+    && has(process.env.MBOTE_SUPABASE_RECORDING_BUCKET);
   const push = has(process.env.WEB_PUSH_VAPID_PUBLIC_KEY) && has(process.env.WEB_PUSH_VAPID_PRIVATE_KEY);
   const requireLivekit = String(process.env.MBOTE_ROOM_REQUIRE_LIVEKIT || '').trim().toLowerCase() === 'true';
   const requireServerRecording = String(process.env.MBOTE_ROOM_REQUIRE_SERVER_RECORDING || '').trim().toLowerCase() === 'true';
@@ -79,6 +82,7 @@ export const getRuntimeReadiness = (databaseType: string): RuntimeReadiness => {
       livekit,
       turn,
       serverRecording,
+      supabaseRecordingStorage,
       push,
     },
     testReady: persistentDatabase,
