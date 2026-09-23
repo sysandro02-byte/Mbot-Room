@@ -334,7 +334,7 @@ export default function SettingsWorkspace({
         <SettingsCard title="Préférences" subtitle="Personnalisez votre expérience" icon={<Palette/>}>
           <SettingRow icon={<Languages/>} label="Langue">
             <select aria-label="Langue" value={preferences.language || 'fr'} disabled={savingKey==='language'} onChange={(event) => void update('language', { language: event.target.value })}>
-              <option value="fr">Français</option><option value="en">English</option>
+              <option value="fr">Français</option><option value="en">English</option><option value="ln">Lingala</option><option value="ar">العربية</option>
             </select>
           </SettingRow>
           <SettingRow icon={<Moon/>} label="Thème">
