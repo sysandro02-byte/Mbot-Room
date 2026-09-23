@@ -402,26 +402,28 @@ export const registerWorkspaceRoutes=(app:express.Express,io:Server)=>{
       const emails=[...new Set((Array.isArray(request.body?.emails)?request.body.emails:[]).map(normalizeEmail).filter(Boolean))].slice(0,50);
       if(!name)return sendApiError(response,400,'GROUP_NAME_REQUIRED','Le nom du groupe est requis.');
       const id=createId();
-      await query('BEGIN');
+      let inserted:any=null;
       try{
-        const inserted=await query('INSERT INTO room_work_groups (id,owner_id,name,description) VALUES ($1,$2,$3,$4) RETURNING *',[id,request.user!.id,name,description]);
+        inserted=await query('INSERT INTO room_work_groups (id,owner_id,name,description) VALUES ($1,$2,$3,$4) RETURNING *',[id,request.user!.id,name,description]);
         await query(`INSERT INTO room_work_group_members (group_id,email,user_id,role) VALUES ($1,$2,$3,'owner')`,[id,normalizeEmail(request.user!.email),request.user!.id]);
         for(const email of emails.filter((value)=>value!==normalizeEmail(request.user!.email))){
           const found=await query('SELECT id FROM room_users WHERE lower(email)=lower($1) AND is_guest=false LIMIT 1',[email]);
           await query(`INSERT INTO room_work_group_members (group_id,email,user_id,role) VALUES ($1,$2,$3,'member') ON CONFLICT DO NOTHING`,[id,email,found.rows[0]?.id||null]);
         }
-        await query('COMMIT');
-        const group={...inserted.rows[0],is_owner:true};
-        const payload=await groupPayload(group);
-        response.status(201).json(payload);
-        const origin=appOrigin();
-        void Promise.all(emails.map((email)=>sendTransactionalEmail({
-          to:email,
-          subject:`Invitation au groupe MBotéRoom : ${name}`,
-          text:`${request.user!.name} vous a ajouté au groupe « ${name} » sur MBotéRoom. Ouvrez ${origin}/app/groups pour accéder au groupe.`,
-          html:`<p><strong>${request.user!.name}</strong> vous a ajouté au groupe <strong>${name}</strong> sur MBotéRoom.</p><p><a href="${origin}/app/groups">Ouvrir le groupe</a></p>`,
-        }).catch(()=>false)));
-      }catch(error){await query('ROLLBACK');throw error;}
+      }catch(error){
+        await query('DELETE FROM room_work_groups WHERE id=$1',[id]).catch(()=>undefined);
+        throw error;
+      }
+      const group={...inserted.rows[0],is_owner:true};
+      const payload=await groupPayload(group);
+      response.status(201).json(payload);
+      const origin=appOrigin();
+      void Promise.all(emails.map((email)=>sendTransactionalEmail({
+        to:email,
+        subject:`Invitation au groupe MBotéRoom : ${name}`,
+        text:`${request.user!.name} vous a ajouté au groupe « ${name} » sur MBotéRoom. Ouvrez ${origin}/app/groups pour accéder au groupe.`,
+        html:`<p><strong>${request.user!.name}</strong> vous a ajouté au groupe <strong>${name}</strong> sur MBotéRoom.</p><p><a href="${origin}/app/groups">Ouvrir le groupe</a></p>`,
+      }).catch(()=>false)));
     }catch(error){next(error);}
   });
 
