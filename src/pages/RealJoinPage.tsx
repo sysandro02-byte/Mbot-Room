@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { ArrowLeft, LockKeyhole, Mic, MicOff, Video, VideoOff } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { authService } from '../services/authService';
+import { readCachedPreferences } from '../lib/userPreferences';
 import { Meeting, meetingService } from '../services/meetingService';
 import './RealJoinPage.css';
 
@@ -12,8 +13,9 @@ export default function RealJoinPage(){
   const [value,setValue]=useState(meetingLink||'');
   const [password,setPassword]=useState('');
   const [meeting,setMeeting]=useState<Meeting|null>(null);
-  const [mic,setMic]=useState(true);
-  const [camera,setCamera]=useState(true);
+  const initialPreferences=readCachedPreferences();
+  const [mic,setMic]=useState(initialPreferences.defaultMic!==false);
+  const [camera,setCamera]=useState(initialPreferences.defaultCamera!==false);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState('');
   const isMeetingModerator=Boolean(meeting&&(Number(meeting.host_id)===Number(user?.id)||Number(meeting.co_host_id||0)===Number(user?.id)||user?.role==='admin'));
