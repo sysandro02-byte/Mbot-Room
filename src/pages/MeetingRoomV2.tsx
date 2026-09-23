@@ -397,13 +397,14 @@ export default function MeetingRoomV2() {
   const networkQuality = usingLiveKit ? liveKitMedia.networkQuality : meshMedia.networkQuality;
   const activeSpeakerSocketId = usingLiveKit ? liveKitMedia.activeSpeakerSocketId : meshMedia.activeSpeakerSocketId;
 
+  const summaryTranscriptionEnabled = Boolean(meeting?.id && meeting.settings?.lunaSummary !== false);
   const liveCaptions = useMeetingCaptions({
     meetingId: meeting?.id || 0,
-    enabled: captionsEnabled && Boolean(meeting?.id),
+    enabled: Boolean(meeting?.id) && (captionsEnabled || summaryTranscriptionEnabled),
     audioStream: cameraStreamRef.current || localStream,
     breakoutRoomId,
     language: getAppLocale(),
-    onNotice: setNotice,
+    onNotice: captionsEnabled ? setNotice : undefined,
   });
 
   const loadMeeting = useCallback(async () => {
