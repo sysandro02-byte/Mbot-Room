@@ -309,7 +309,7 @@ export default function MeetingRoomV2() {
   const [mediaTransportStatus, setMediaTransportStatus] = useState<MediaTransportStatus | null>(null);
   const [mediaTransportChecked, setMediaTransportChecked] = useState(false);
   const [liveKitFailed, setLiveKitFailed] = useState(false);
-  const [captionsEnabled, setCaptionsEnabled] = useState(false);
+  const [captionsEnabled, setCaptionsEnabled] = useState(userPreferences.lunaRealtimeTranslation === true);
   const [pendingMediaRequest, setPendingMediaRequest] = useState<MeetingMediaRequest | null>(null);
 
   const localUserId = String(currentUser?.id || '');
@@ -1605,6 +1605,11 @@ export default function MeetingRoomV2() {
                   ):null}
                 </section>
                 <p>Luna peut utiliser le chat et les transcriptions audio persistées de la réunion. Elle n’invente pas le contenu qui n’a pas été transcrit.</p>
+                {userPreferences.lunaActionSuggestions !== false ? <div className="room-v2-luna-suggestions">
+                  {['Résume les points clés', 'Quelles actions restent à faire ?', 'Quelles décisions ont été prises ?'].map((suggestion) => (
+                    <button key={suggestion} type="button" disabled={!canUseLuna || lunaLoading} onClick={() => setLunaPrompt(suggestion)}>{suggestion}</button>
+                  ))}
+                </div> : null}
                 <form onSubmit={askLuna}>
                   <textarea value={lunaPrompt} onChange={(event) => setLunaPrompt(event.target.value)} placeholder={canUseLuna ? 'Ex. Quelles décisions ont déjà été prises ?' : 'Luna est désactivée par l’hôte'} maxLength={5000} disabled={!canUseLuna}/>
                   <button type="submit" disabled={!canUseLuna || lunaLoading || !lunaPrompt.trim()}>{lunaLoading ? 'Analyse…' : 'Demander à Luna'}</button>
@@ -1653,6 +1658,8 @@ export default function MeetingRoomV2() {
         <Control active={screenSharing} disabled={!canShareScreen} title={!canShareScreen ? 'Partage d’écran désactivé par l’hôte' : undefined} label="Partager" onClick={() => void toggleScreenShare()}><MonitorUp/></Control>
         <Control
           active={captionsEnabled}
+          disabled={userPreferences.lunaRealtimeTranslation !== true}
+          title={userPreferences.lunaRealtimeTranslation !== true ? 'Activez la traduction en temps réel dans Paramètres > Outils IA Luna' : undefined}
           label={captionsEnabled ? (liveCaptions.mode === 'server' ? 'Sous-titres IA' : 'Sous-titres') : 'Sous-titres'}
           testId="captions-button"
           onClick={() => {
