@@ -6,6 +6,8 @@ import {
   authenticateToken,
   createId,
   getDatabaseType,
+  getRawSessionTokenFromRequest,
+  hashToken,
   hasDatabase,
   publicMeeting,
   query,
@@ -110,6 +112,52 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
       const user=toPublicUser(result.rows[0]);
       io.to(`user:${user.id}`).emit('profile:updated',user);
       response.json({user});
+    }catch(error){next(error);}
+  });
+
+  app.get('/api/security/sessions', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+    try{
+      const currentHash=hashToken(getRawSessionTokenFromRequest(request));
+      const result=await query(
+        `SELECT token_hash,created_at,expires_at,last_activity
+           FROM room_sessions
+          WHERE user_id=$1 AND expires_at::timestamptz>now()
+          ORDER BY COALESCE(last_activity,created_at::timestamptz) DESC`,
+        [request.user!.id],
+      );
+      response.json(result.rows.map((row,index)=>({
+        id:String(row.token_hash).slice(0,16),
+        current:String(row.token_hash)===currentHash,
+        createdAt:new Date(row.created_at).toISOString(),
+        expiresAt:new Date(row.expires_at).toISOString(),
+        lastActivity:new Date(row.last_activity||row.created_at).toISOString(),
+        label:index===0?'Appareil récent':'Session MBotéRoom',
+      })));
+    }catch(error){next(error);}
+  });
+
+  app.delete('/api/security/sessions/:sessionId', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+    try{
+      const prefix=String(request.params.sessionId||'').replace(/[^a-f0-9]/gi,'').slice(0,16);
+      if(prefix.length<8)return sendApiError(response,400,'SESSION_INVALID','Session invalide.');
+      const currentHash=hashToken(getRawSessionTokenFromRequest(request));
+      const result=await query(
+        `SELECT token_hash FROM room_sessions WHERE user_id=$1 AND token_hash LIKE $2 LIMIT 1`,
+        [request.user!.id, prefix+'%'],
+      );
+      const tokenHash=String(result.rows[0]?.token_hash||'');
+      if(!tokenHash)return sendApiError(response,404,'SESSION_NOT_FOUND','Session introuvable.');
+      if(tokenHash===currentHash)return sendApiError(response,400,'CURRENT_SESSION','Utilisez le bouton Se déconnecter pour fermer la session actuelle.');
+      await query('DELETE FROM room_sessions WHERE user_id=$1 AND token_hash=$2',[request.user!.id,tokenHash]);
+      response.status(204).end();
+    }catch(error){next(error);}
+  });
+
+  app.post('/api/security/sessions/revoke-others', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+    try{
+      const currentHash=hashToken(getRawSessionTokenFromRequest(request));
+      const result=await query('DELETE FROM room_sessions WHERE user_id=$1 AND token_hash<>$2 RETURNING token_hash',[request.user!.id,currentHash]);
+      response.json({success:true,revoked:Number(result.rowCount||0)});
     }catch(error){next(error);}
   });
 
