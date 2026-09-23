@@ -18,6 +18,7 @@ import {
 import { createNotificationAndPush, getPushStatus } from './pushService.js';
 import { isPlatformFeatureEnabled } from './platformSettings.js';
 import { deleteCalendarEventFromGoogle, syncCalendarEventToGoogle } from './workspaceRoutes.js';
+import { parseSupabaseRecordingMarker, requestSupabaseRecordingSigner } from './supabaseRecordingStorage.js';
 
 const safeImageUrl = (value: unknown, fallback = '') => {
   const raw=String(value||'').trim().slice(0,800000);
@@ -858,16 +859,31 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
         `SELECT r.storage_url,r.status,r.mime_type
            FROM room_recordings r
            JOIN room_meetings m ON m.id=r.meeting_id
-          WHERE r.id=$1 AND (m.host_id=$2 OR m.co_host_id=$2 OR EXISTS(
+          WHERE r.id=$1 AND (m.host_id=$2 OR m.co_host_id=$2 OR $3='admin' OR EXISTS(
             SELECT 1 FROM room_meeting_members mm WHERE mm.meeting_id=m.id AND mm.user_id=$2 AND mm.status='accepted'
           )) LIMIT 1`,
-        [request.params.recordingId,request.user!.id],
+        [request.params.recordingId,request.user!.id,request.user!.role],
       );
       const row=result.rows[0];
       if(!row)return sendApiError(response,404,'RECORDING_NOT_FOUND','Enregistrement introuvable.');
       const storageUrl=String(row.storage_url||'').trim();
+      const marker=parseSupabaseRecordingMarker(storageUrl);
+      if(marker){
+        const signed=await requestSupabaseRecordingSigner(request,{
+          action:'download',
+          recordingId:String(request.params.recordingId),
+          download:String(request.query.download||'')==='1',
+        });
+        return response.json({
+          url:signed.url,
+          status:String(row.status||'ready'),
+          mimeType:String(row.mime_type||'video/mp4'),
+          storage:'supabase',
+          expiresInSeconds:signed.expiresInSeconds,
+        });
+      }
       if(!/^https:\/\//i.test(storageUrl))return sendApiError(response,409,'RECORDING_NOT_READY','Le fichier de cet enregistrement n’est pas encore disponible.');
-      response.json({url:storageUrl,status:String(row.status||'ready'),mimeType:String(row.mime_type||'video/mp4')});
+      response.json({url:storageUrl,status:String(row.status||'ready'),mimeType:String(row.mime_type||'video/mp4'),storage:'external'});
     }catch(error){next(error);}
   });
 
