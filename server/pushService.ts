@@ -7,6 +7,7 @@ import {
   sign,
 } from 'node:crypto';
 import { createId, query } from './core.js';
+import { sendTransactionalEmail } from './emailDelivery.js';
 
 type PushSubscriptionRecord = {
   endpoint: string;
@@ -226,5 +227,28 @@ export const createNotificationAndPush = async (
     badge: payload.badge || '/icons/mbote-room-192.png',
     data,
   }).catch(() => undefined);
+
+  if (payload.type !== 'PUSH_TEST') {
+    const recipient = await query(
+      `SELECT u.email,COALESCE(pref.preferences,'{}'::jsonb) AS preferences
+         FROM room_users u
+         LEFT JOIN room_user_preferences pref ON pref.user_id=u.id
+        WHERE u.id=$1 LIMIT 1`,
+      [userId],
+    ).catch(() => ({ rows: [] as any[] }));
+    const row = recipient.rows[0];
+    const emailEnabled = row?.preferences?.emailNotifications === true;
+    const email = String(row?.email || '').trim();
+    if (emailEnabled && email) {
+      const appUrl = String(process.env.MBOTE_ROOM_APP_URL || '').replace(/\/+$/, '');
+      const target = String(data.url || '/app/notifications');
+      const link = appUrl && target.startsWith('/') ? appUrl + target : '';
+      await sendTransactionalEmail({
+        to: email,
+        subject: `MBotéRoom · ${payload.title}`,
+        text: [payload.title, payload.body, link].filter(Boolean).join('\n\n'),
+      }).catch(() => false);
+    }
+  }
   return result.rows[0];
 };
