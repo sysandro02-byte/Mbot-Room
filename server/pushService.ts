@@ -250,5 +250,10 @@ export const createNotificationAndPush = async (
       }).catch(() => false);
     }
   }
-  return result.rows[0];
+  const row = result.rows[0];
+  return {
+    ...row,
+    createdAt: row?.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+    readAt: row?.read_at ? new Date(row.read_at).toISOString() : null,
+  };
 };
