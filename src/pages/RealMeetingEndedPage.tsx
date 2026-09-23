@@ -1,11 +1,42 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Bot, CheckCircle2, Clock3, Download, FileText, Play, UsersRound } from 'lucide-react';
+import {
+  ArrowLeft,
+  Bot,
+  Captions,
+  CheckCircle2,
+  Clock3,
+  Download,
+  FileText,
+  MessageCircle,
+  Play,
+  RefreshCw,
+  Sparkles,
+  UsersRound,
+} from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { collaborationService, MeetingMessage } from '../services/collaborationService';
-import { EndedMeetingPayload, meetingService } from '../services/meetingService';
+import { collaborationService, type MeetingMessage } from '../services/collaborationService';
+import { type EndedMeetingPayload, meetingService } from '../services/meetingService';
 import './RealMeetingEndedPage.css';
 
-const downloadText=(name:string,content:string,type='text/plain;charset=utf-8')=>{const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+const downloadText=(name:string,content:string,type='text/plain;charset=utf-8')=>{
+  const blob=new Blob([content],{type});
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=url;
+  link.download=name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+
+const formatMeetingDate=(value:string)=>{
+  try{
+    return new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
+  }catch{
+    return '';
+  }
+};
 
 export default function RealMeetingEndedPage(){
   const navigate=useNavigate();
@@ -14,19 +45,242 @@ export default function RealMeetingEndedPage(){
   const [messages,setMessages]=useState<MeetingMessage[]>([]);
   const [loading,setLoading]=useState(Boolean(meetingId));
   const [error,setError]=useState('');
+  const [summaryError,setSummaryError]=useState('');
   const [summaryBusy,setSummaryBusy]=useState(false);
 
-  const load=async()=>{if(!meetingId){setLoading(false);return;}setLoading(true);setError('');try{const value=await meetingService.getEndedMeeting(meetingId);setPayload(value);setMessages(await collaborationService.getMessages(value.meeting.id).catch(()=>[]));}catch(cause){setError(cause instanceof Error?cause.message:'Impossible de charger le compte rendu.');}finally{setLoading(false);}};
-  useEffect(()=>{void load();},[meetingId]);
-  const summaryReady=payload?.summary.processingStatus==='ready';
-  const summaryText=useMemo(()=>payload?[`Compte rendu — ${payload.meeting.title}`,`Durée: ${payload.durationMinutes} min`,`Participants: ${payload.participants.length}`,'','Résumé',...payload.summary.bullets.map((item)=>`- ${item}`),'','Décisions',...payload.summary.decisions.map((item)=>`- ${item}`),'','Actions',...payload.summary.actions.map((item)=>`- ${item}`),payload.summary.nextMeeting?`\nProchaine réunion: ${payload.summary.nextMeeting}`:''].join('\n'):'',[payload]);
-  const chatText=useMemo(()=>messages.map((message)=>`[${new Date(message.time).toLocaleString('fr-FR')}] ${message.sender}: ${message.text}`).join('\n'),[messages]);
-  const generateSummary=async()=>{if(!payload)return;setSummaryBusy(true);setError('');try{await collaborationService.generateSummary(payload.meeting.id);await load();}catch(cause){setError(cause instanceof Error?cause.message:'Résumé indisponible.');}finally{setSummaryBusy(false);}};
+  const load=async()=>{
+    if(!meetingId){setLoading(false);return;}
+    setLoading(true);
+    setError('');
+    try{
+      const value=await meetingService.getEndedMeeting(meetingId);
+      setPayload(value);
+      setMessages(await collaborationService.getMessages(value.meeting.id).catch(()=>[]));
+    }catch(cause){
+      setError(cause instanceof Error?cause.message:'Impossible de charger le compte rendu.');
+    }finally{
+      setLoading(false);
+    }
+  };
 
-  if(loading)return <main className="real-ended-state">Chargement du compte rendu…</main>;
-  if(!meetingId)return <main className="real-ended-state"><FileText size={40}/><h1>Aucune réunion sélectionnée</h1><button onClick={()=>navigate('/app')}>Retour au tableau de bord</button></main>;
-  if(error&&!payload)return <main className="real-ended-state"><FileText size={40}/><h1>Compte rendu indisponible</h1><p>{error}</p><button onClick={()=>navigate('/app')}>Retour</button></main>;
+  useEffect(()=>{void load();},[meetingId]);
+
+  const summaryReady=payload?.summary.processingStatus==='ready';
+  const sourceCounts=payload?.summary.sourceCounts||{chat:messages.length,captions:0};
+  const totalSources=sourceCounts.chat+sourceCounts.captions;
+
+  const summaryText=useMemo(()=>payload?[
+    `Compte rendu — ${payload.meeting.title}`,
+    `Durée : ${payload.durationMinutes} min`,
+    `Participants : ${payload.participants.length}`,
+    `Extraits audio : ${payload.summary.sourceCounts?.captions||0}`,
+    `Messages : ${payload.summary.sourceCounts?.chat||messages.length}`,
+    '',
+    'Points clés',
+    ...payload.summary.bullets.map((item)=>`- ${item}`),
+    '',
+    'Décisions',
+    ...payload.summary.decisions.map((item)=>`- ${item}`),
+    '',
+    'Actions',
+    ...payload.summary.actions.map((item)=>`- ${item}`),
+    payload.summary.nextMeeting?`\nProchaine réunion : ${payload.summary.nextMeeting}`:'',
+  ].join('\n'):'',[messages.length,payload]);
+
+  const chatText=useMemo(
+    ()=>messages.map((message)=>`[${new Date(message.time).toLocaleString('fr-FR')}] ${message.sender}: ${message.text}`).join('\n'),
+    [messages],
+  );
+
+  const generateSummary=async()=>{
+    if(!payload||totalSources===0||!payload.summary.lunaConfigured)return;
+    setSummaryBusy(true);
+    setSummaryError('');
+    try{
+      await collaborationService.generateSummary(payload.meeting.id);
+      await load();
+    }catch(cause){
+      setSummaryError(cause instanceof Error?cause.message:'Luna n’a pas pu générer le résumé pour le moment.');
+    }finally{
+      setSummaryBusy(false);
+    }
+  };
+
+  if(loading)return <main className="real-ended-state"><span className="real-ended-state-spinner"/><strong>Préparation du compte rendu…</strong></main>;
+
+  if(!meetingId)return (
+    <main className="real-ended-state">
+      <FileText size={42}/>
+      <h1>Aucune réunion sélectionnée</h1>
+      <button onClick={()=>navigate('/app')}>Retour au tableau de bord</button>
+    </main>
+  );
+
+  if(error&&!payload)return (
+    <main className="real-ended-state">
+      <FileText size={42}/>
+      <h1>Compte rendu indisponible</h1>
+      <p>{error}</p>
+      <button onClick={()=>navigate('/app')}>Retour au tableau de bord</button>
+    </main>
+  );
+
   if(!payload)return null;
 
-  return <main className="real-ended-page"><header><button className="back" onClick={()=>navigate('/app')}><ArrowLeft size={18}/> Tableau de bord</button><div><CheckCircle2 size={38}/><h1>Réunion terminée</h1><p>{payload.meeting.title}</p></div></header>{error?<div className="real-ended-error">{error}</div>:null}<section className="real-ended-stats"><article><Clock3/><div><strong>{payload.durationMinutes} min</strong><small>Durée réelle</small></div></article><article><UsersRound/><div><strong>{payload.participants.length}</strong><small>Participants enregistrés</small></div></article><article><FileText/><div><strong>{messages.length}</strong><small>Messages persistés</small></div></article></section><div className="real-ended-grid"><section className="real-ended-card"><div className="real-ended-title"><h2><Bot size={19}/> Résumé Luna</h2>{summaryReady?<button onClick={()=>downloadText(`resume-mboteroom-${payload.meeting.id}.txt`,summaryText)}><Download size={16}/> Télécharger</button>:null}</div>{summaryReady?<><h3>Points clés</h3>{payload.summary.bullets.length?<ul>{payload.summary.bullets.map((item,index)=><li key={index}>{item}</li>)}</ul>:<p>Aucun point clé enregistré.</p>}<h3>Décisions</h3>{payload.summary.decisions.length?<ul>{payload.summary.decisions.map((item,index)=><li key={index}>{item}</li>)}</ul>:<p>Aucune décision identifiée.</p>}<h3>Actions</h3>{payload.summary.actions.length?<ul>{payload.summary.actions.map((item,index)=><li key={index}>{item}</li>)}</ul>:<p>Aucune action identifiée.</p>}</>:<div className="real-ended-empty"><p>Aucun résumé n’est encore disponible. Luna génère uniquement un résumé à partir du chat persistant réellement disponible.</p><button disabled={summaryBusy} onClick={()=>void generateSummary()}><Bot size={16}/>{summaryBusy?'Génération…':'Générer maintenant'}</button></div>}</section><section className="real-ended-card"><div className="real-ended-title"><h2><UsersRound size={19}/> Participants</h2></div><div className="real-ended-people">{payload.participants.map((participant)=><article key={participant.id}><span>{participant.avatar?<img src={participant.avatar} alt=""/>:participant.name.slice(0,2).toUpperCase()}</span><div><strong>{participant.name}</strong><small>{participant.role}</small></div></article>)}</div></section></div><section className="real-ended-card"><div className="real-ended-title"><h2><FileText size={19}/> Discussion</h2>{messages.length?<button onClick={()=>downloadText(`chat-mboteroom-${payload.meeting.id}.txt`,chatText)}><Download size={16}/> Exporter</button>:null}</div>{messages.length?<div className="real-ended-chat">{messages.map((message)=><article key={message.id}><strong>{message.sender}</strong><time>{new Date(message.time).toLocaleString('fr-FR')}</time><p>{message.text}</p></article>)}</div>:<p>Aucun message n’a été enregistré pendant cette réunion.</p>}</section>{payload.recording.available&&payload.recording.url?<section className="real-ended-recording"><div><Play size={22}/><div><strong>Enregistrement disponible</strong><small>Vous pouvez ouvrir l’enregistrement de cette réunion.</small></div></div><a href={payload.recording.url} target="_blank" rel="noreferrer"><Play size={16}/> Ouvrir</a></section>:null}</main>;
+  const summaryState=payload.summary.processingStatus;
+
+  return (
+    <main className="real-ended-page">
+      <header className="real-ended-header">
+        <button className="back" onClick={()=>navigate('/app')}><ArrowLeft size={18}/> Tableau de bord</button>
+        <div className="real-ended-hero">
+          <span className="real-ended-hero-icon"><CheckCircle2 size={30}/></span>
+          <div className="real-ended-hero-copy">
+            <span className="real-ended-eyebrow">Compte rendu de réunion</span>
+            <h1>Réunion terminée</h1>
+            <p>{payload.meeting.title}</p>
+            <small>{formatMeetingDate(payload.endedAt)}</small>
+          </div>
+          <span className="real-ended-status-badge"><CheckCircle2 size={14}/> Terminée</span>
+        </div>
+      </header>
+
+      <section className="real-ended-stats" aria-label="Statistiques de la réunion">
+        <article>
+          <span><Clock3/></span>
+          <div><strong>{payload.durationMinutes} min</strong><small>Durée</small></div>
+        </article>
+        <article>
+          <span><UsersRound/></span>
+          <div><strong>{payload.participants.length}</strong><small>Participant{payload.participants.length>1?'s':''}</small></div>
+        </article>
+        <article>
+          <span><Captions/></span>
+          <div><strong>{sourceCounts.captions}</strong><small>Extrait{sourceCounts.captions>1?'s':''} audio</small></div>
+        </article>
+        <article>
+          <span><MessageCircle/></span>
+          <div><strng>{messages.length}</strong><small>Message{messages.length>1?'s':''}</small></div>
+        </article>
+      </section>
+
+      <div className="real-ended-grid">
+        <section className="real-ended-card real-ended-summary-card">
+          <div className="real-ended-title">
+            <div>
+              <span className="real-ended-title-icon"><Bot size={19}/></span>
+              <div><h2>Résumé Luna</h2><small>Compte rendu basé uniquement sur le contenu réellement enregistré</small></div>
+            </div>
+            {summaryReady&&payload.permissions.canDownloadSummary?((
+              <button onClick={()=>downloadText(`resume-mboteroom-${payload.meeting.id}.txt`,summaryText)}>
+                <Download size={16}/> Télécharger
+              </button>
+            ):null}
+          </div>
+
+          {summaryReady?((
+            <div className="real-ended-summary-content">
+              <section>
+                <h3><Sparkles size={15}/> Points clés</h3>
+                {payload.summary.bullets.length?><ul>{payload.summary.bullets.map((item,index)=><li key={index}>{item}</li>)}</ul>:<p>Aucun point clé identifié.</p>}
+              </section>
+              <section>
+                <h3>Décisions</h3>
+                {payload.summary.decisions.length?><ul>{payload.summary.decisions.map((item,index)=><li key={index}>{item}</li>)}</ul>:<p>Aucune décision identifiée.</p>}
+              </section>
+              <section>
+                <h3>Actions</h3>
+                {payload.summary.actions.length><ul>{payload.summary.actions.map((item,index)=><li key={index}>{item}</li>)}</ul>:<p>Aucune action identifiée.</p>}
+              </section>
+              {payload.summary.nextMeeting?<section><h3>Prochaine réunion</h3><p>{payload.summary.nextMeeting}</p></section>:null}
+              <div className="real-ended-source-note">
+                <Captions size={14}/> {sourceCounts.captions} extrait{sourceCounts.captions>1?'s':''} audio
+                <span>·</span>
+                <MessageCircle size={14}/> {sourceCounts.chat} message{sourceCounts.chat>1?'s':''}
+              </div>
+            </div>
+          ):summaryState==='empty'?(
+            <div className="real-ended-empty real-ended-empty-neutral">
+              <span><Bot size={26}/></span>
+              <strong>Aucun contenu à résumer</strong>
+              <p>Aucune transcription audio ni aucun message n’a été enregistré pendant cette réunion. Il n’y a donc pas assez de contenu fiable pour créer un résumé.</p>
+              <small>Pour les prochaines réunions, MBotéRoom conservera automatiquement la transcription nécessaire lorsque le résumé Luna est activé.</small>
+            </div>
+          ):summaryState==='unavailable'?(
+            <div className="real-ended-empty real-ended-empty-warning">
+              <span><Bot size={26}/></span>
+              <strong>Luna est momentanément indisponible</strong>
+              <p>Le contenu de la réunion est conservé, mais le service de résumé n’est pas disponible pour le moment.</p>
+            </div>
+          ):(
+            <div className="real-ended-empty real-ended-empty-ready">
+              <span><Sparkles size={26}/></span>
+              <strong>Le contenu est prêt pour Luna</strong>
+              <p>{sourceCounts.captions} extrait{sourceCounts.captions>1?'s':''} audio et {sourceCounts.chat} message{sourceCounts.chat>1?'s':''} peuvent être utilisés pour créer le compte rendu.</p>
+              <button disabled={summaryBusy} onClick={()=>void generateSummary()}>
+                {summaryBusy?<RefreshCw className="is-spinning" size={16}/>:<Bot size={16}/>}
+                {summaryBusy?'Génération en cours…':'Générer le résumé'}
+              </button>
+              {summaryError?<div className="real-ended-summary-error" role="status">{summaryError}</div>:null}
+            </div>
+          )}
+        </section>
+
+        <section className="real-ended-card real-ended-participants-card">
+          <div className="real-ended-title">
+            <div>
+              <span className="real-ended-title-icon"><UsersRound size={19}/></span>
+              <div><h2>Participants</h2><small>{payload.participants.length} personne{payload.participants.length>1?'s':''}</small></div>
+            </div>
+          </div>
+          {payload.participants.length?(
+            <div className="real-ended-people">
+              {payload.participants.map((participant)=>(
+                <article key={participant.id}>
+                  <span>{participant.avatar?<img src={participant.avatar} alt=""/>:participant.name.slice(0,2).toUpperCase()}</span>
+                  <div><strong>{participant.name}</strong><small>{participant.role}</small></div>
+                </article>
+              ))}
+            </div>
+          ):<div className="real-ended-mini-empty">Aucun participant enregistré.</div>}
+        </section>
+      </div>
+
+      <section className="real-ended-card real-ended-discussion-card">
+        <div className="real-ended-title">
+          <div>
+            <span className="real-ended-title-icon"><MessageCircle size={19}/></span>
+            <div><h2>Discussion</h2><small>{messages.length?`${messages.length} message${messages.length>1?'s':''}`:'Aucun message'}</small></div>
+          </div>
+          {messages.length&&payload.permissions.canExportChat?(
+            <button onClick={()=>downloadText(`discussion-mboteroom-${payload.meeting.id}.txt`,chatText)}>
+              <Download size={16}/> Exporter
+            </button>
+          ):null}
+        </div>
+        {messages.length?(
+          <div className="real-ended-chat">
+            {messages.map((message)=>(
+              <article key={message.id}>
+                <div><strong>{message.sender}</strong><time>{new Date(message.time).toLocaleString('fr-FR')}</time></div>
+                <p>{message.text}</p>
+              </article>
+            ))}
+          </div>
+        ):(
+          <div className="real-ended-discussion-empty">
+            <MessageCircle size={22}/>
+            <span>Aucun message n’a été échangé pendant cette réunion.</span>
+          </div>
+        )}
+      </section>
+
+      {payload.recording.available&&payload.recording.url?(
+        <section className="real-ended-recording">
+          <div><span><Play size={20}/></span><div><strong>Enregistrement disponible</strong><small>Revoyez l’enregistrement de cette réunion.</small></div></div>
+          <a href={payload.recording.url} target="_blank" rel="noreferrer"><Play size={16}/> Ouvrir</a>
+        </section>
+      ):null}
+    </main>
+  );
 }
