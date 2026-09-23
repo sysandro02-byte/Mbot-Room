@@ -261,6 +261,7 @@ export default function MeetingRoomV2() {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingSessionRef = useRef<CompositeRecordingSession | null>(null);
+  const recordingStartedAtRef = useRef(0);
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1018,21 +1019,39 @@ export default function MeetingRoomV2() {
       recordingChunksRef.current = [];
       const recorder = new MediaRecorder(stream, { mimeType: preferred });
       recorder.ondataavailable = (event) => { if (event.data.size > 0) recordingChunksRef.current.push(event.data); };
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `mboteroom-${meeting?.id || 'reunion'}-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        void recordingSessionRef.current?.stop();
+        const durationSeconds = Math.max(1, Math.round((Date.now() - recordingStartedAtRef.current) / 1000));
+        await recordingSessionRef.current?.stop();
         recordingSessionRef.current = null;
         recorderRef.current = null;
         setRecording(false);
         setRecordingMode(null);
-        setNotice('Enregistrement composite terminé et téléchargé.');
+
+        try {
+          if (!meeting?.id) throw new Error('Réunion introuvable pour cet enregistrement.');
+          setNotice('Enregistrement terminé. Envoi sécurisé vers Supabase… 0 %');
+          await collaborationService.uploadLocalRecording(
+            meeting.id,
+            blob,
+            durationSeconds,
+            (progress) => setNotice(`Envoi sécurisé vers Supabase… ${progress} %`),
+          );
+          setNotice('Enregistrement sauvegardé dans Supabase et disponible dans vos enregistrements.');
+        } catch (cause) {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `mboteroom-${meeting?.id || 'reunion'}-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          setNotice(`${cause instanceof Error ? cause.message : 'Envoi vers Supabase impossible.'} Une copie locale de sécurité a été téléchargée.`);
+        } finally {
+          recordingChunksRef.current = [];
+          recordingStartedAtRef.current = 0;
+        }
       };
+      recordingStartedAtRef.current = Date.now();
       recorder.start(1000);
       recorderRef.current = recorder;
       setRecordingMode('local');
