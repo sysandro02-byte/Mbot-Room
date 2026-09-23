@@ -38,11 +38,13 @@ import {
   Vibrate,
   WandSparkles,
   Wifi,
+  X,
+  Clock3,
 } from 'lucide-react';
 import OfflineModeSettings from '../../components/OfflineModeSettings';
 import PushNotificationSettings from '../../components/PushNotificationSettings';
 import { authService } from '../../services/authService';
-import type { Preferences } from '../../services/appDataService';
+import { appDataService, type ConnectedSession, type Preferences } from '../../services/appDataService';
 import './SettingsWorkspace.css';
 
 type SettingsWorkspaceProps = {
@@ -134,6 +136,10 @@ export default function SettingsWorkspace({
   const [storageQuota, setStorageQuota] = useState<number | null>(null);
   const [storageBusy, setStorageBusy] = useState(false);
   const [connectionCopied, setConnectionCopied] = useState(false);
+  const [securityView, setSecurityView] = useState<'security' | 'sessions' | null>(null);
+  const [sessions, setSessions] = useState<ConnectedSession[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsBusy, setSessionsBusy] = useState('');
 
   const initials = useMemo(() => {
     const source = user?.name || user?.email || 'MB';
@@ -210,6 +216,45 @@ export default function SettingsWorkspace({
       onError('Impossible de copier l’adresse de connexion.');
     }
   };
+  const loadSessions = async (view: 'security' | 'sessions' = 'sessions') => {
+    setSecurityView(view);
+    setSessionsLoading(true);
+    try {
+      setSessions(await appDataService.getConnectedSessions());
+    } catch (error) {
+      onError(error instanceof Error ? error.message : 'Impossible de charger les appareils connectés.');
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const revokeSession = async (session: ConnectedSession) => {
+    if (session.current) return;
+    setSessionsBusy(session.id);
+    try {
+      await appDataService.revokeConnectedSession(session.id);
+      setSessions((current) => current.filter((item) => item.id !== session.id));
+      onNotice('Session fermée.');
+    } catch (error) {
+      onError(error instanceof Error ? error.message : 'Impossible de fermer cette session.');
+    } finally {
+      setSessionsBusy('');
+    }
+  };
+
+  const revokeOthers = async () => {
+    setSessionsBusy('all');
+    try {
+      const result = await appDataService.revokeOtherSessions();
+      setSessions((current) => current.filter((item) => item.current));
+      onNotice(result.revoked ? `${result.revoked} autre session${result.revoked > 1 ? 's' : ''} fermée${result.revoked > 1 ? 's' : ''}.` : 'Aucune autre session active.');
+    } catch (error) {
+      onError(error instanceof Error ? error.message : 'Impossible de fermer les autres sessions.');
+    } finally {
+      setSessionsBusy('');
+    }
+  };
+
 
   const storageLabel = storageUsage === null
     ? 'Calcul…'
@@ -238,9 +283,9 @@ export default function SettingsWorkspace({
       <div className="settings-column">
         <SettingsCard title="Compte" subtitle="Gérez votre compte et votre sécurité" icon={<UserRound/>}>
           <SettingRow icon={<UserRound/>} label="Mon profil" description="Identité, avatar et organisation" onClick={() => navigate('/app/profile')}/>
-          <SettingRow icon={<ShieldCheck/>} label="Sécurité" description="Mot de passe et protection" onClick={() => navigate('/securite')}/>
-          <SettingRow icon={<Laptop/>} label="Appareils connectés" description="Votre session et vos appareils" onClick={() => navigate('/securite')}/>
-          <SettingRow icon={<LockKeyhole/>} label="Vérification en deux étapes" description="Code de sécurité demandé à la connexion" value="Activée" onClick={() => navigate('/securite')}/>
+          <SettingRow icon={<ShieldCheck/>} label="Sécurité" description="Mot de passe, sessions et protection" onClick={() => void loadSessions('security')}/>
+          <SettingRow icon={<Laptop/>} label="Appareils connectés" description="Consultez et fermez vos sessions actives" value={sessions.length ? String(sessions.length) : undefined} onClick={() => void loadSessions('sessions')}/>
+          <SettingRow icon={<LockKeyhole/>} label="Vérification en deux étapes" description="Code de sécurité par e-mail à chaque connexion" value="Activée" onClick={() => void loadSessions('security')}/>
         </SettingsCard>
 
         <SettingsCard title="Notifications" subtitle="Choisissez comment vous êtes notifié" icon={<Bell/>}>
@@ -277,7 +322,7 @@ export default function SettingsWorkspace({
         </SettingsCard>
 
         <SettingsCard title="Localiser mon appareil" subtitle="Retrouvez et sécurisez vos appareils" icon={<MapPin/>} badge="Premium">
-          <SettingRow icon={<MapPin/>} label="Localiser un appareil perdu" description="Disponible avec MBotéRoom Premium" value="Premium" disabled/>
+          <SettingRow icon={<MapPin/>} label="Retrouver mes appareils" description="Voir la dernière activité de vos sessions MBotéRoom" value="Premium" onClick={() => void loadSessions('sessions')}/>
         </SettingsCard>
       </div>
 
@@ -385,5 +430,26 @@ export default function SettingsWorkspace({
     </div>
 
     <button className="settings-logout" type="button" onClick={() => void authService.logout()}><LogOut size={19}/> Se déconnecter</button>
+
+    {securityView ? <div className="settings-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSecurityView(null); }}>
+      <section className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-security-title">
+        <header>
+          <div><span>{securityView === 'security' ? <ShieldCheck/> : <Laptop/>}</span><div><h2 id="settings-security-title">{securityView === 'security' ? 'Sécurité du compte' : 'Appareils connectés'}</h2><p>{securityView === 'security' ? 'Protégez votre compte et contrôlez vos sessions.' : 'Les sessions actives sur votre compte MBotéRoom.'}</p></div></div>
+          <button type="button" aria-label="Fermer" onClick={() => setSecurityView(null)}><X size={20}/></button>
+        </header>
+        {securityView === 'security' ? <div className="settings-security-summary">
+          <div><LockKeyhole/><span><strong>Vérification en deux étapes active</strong><small>Un code à 6 chiffres est envoyé par e-mail à chaque connexion par mot de passe.</small></span></div>
+          <button type="button" onClick={() => navigate('/mot-de-passe-oublie')}>Changer mon mot de passe</button>
+        </div> : null}
+        <div className="settings-sessions-head"><strong>Sessions actives</strong><button type="button" onClick={() => void revokeOthers()} disabled={sessionsBusy==='all'||sessionsLoading}>Fermer les autres sessions</button></div>
+        {sessionsLoading ? <p className="settings-session-empty">Chargement des sessions…</p> : sessions.length ? <div className="settings-session-list">
+          {sessions.map((session) => <article key={session.id}>
+            <span><Laptop size={20}/></span>
+            <div><strong>{session.current ? 'Cet appareil' : session.label}</strong><small><Clock3 size={13}/> Dernière activité : {new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(session.lastActivity))}</small><small>Expiration : {new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium'}).format(new Date(session.expiresAt))}</small></div>
+            {session.current ? <b>Actuelle</b> : <button type="button" onClick={() => void revokeSession(session)} disabled={sessionsBusy===session.id}>{sessionsBusy===session.id?'Fermeture…':'Déconnecter'}</button>}
+          </article>)}
+        </div> : <p className="settings-session-empty">Aucune session active trouvée.</p>}
+      </section>
+    </div> : null}
   </section>;
 }
