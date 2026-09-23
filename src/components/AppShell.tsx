@@ -29,7 +29,7 @@ import {
 import { authService } from '../services/authService';
 import { notificationService } from '../services/notificationService';
 import { socket } from '../lib/socket';
-import { readCachedPreferences } from '../lib/userPreferences';
+import { PREFERENCES_EVENT, readCachedPreferences } from '../lib/userPreferences';
 import './AppShell.css';
 
 type AppShellProps = {
@@ -78,11 +78,18 @@ export default function AppShell({ children, title }: AppShellProps) {
   const initials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'MB';
 
   useEffect(() => {
-    const refreshUnread = () => void notificationService.list()
-      .then((rows) => setUnreadNotifications(rows.filter((item) => !item.readAt).length))
-      .catch(() => undefined);
+    const refreshUnread = () => {
+      if (readCachedPreferences().notifications === false) {
+        setUnreadNotifications(0);
+        return;
+      }
+      void notificationService.list()
+        .then((rows) => setUnreadNotifications(rows.filter((item) => !item.readAt).length))
+        .catch(() => undefined);
+    };
     const feedback = () => {
       const preferences = readCachedPreferences();
+      if (preferences.notifications === false) return;
       if (preferences.vibration === true && 'vibrate' in navigator) navigator.vibrate([90, 45, 90]);
       if (preferences.notificationSounds !== false) {
         try {
@@ -110,9 +117,11 @@ export default function AppShell({ children, title }: AppShellProps) {
     if (!socket.connected) socket.connect();
     socket.on('notification:new', onNotification);
     window.addEventListener('focus', refreshUnread);
+    window.addEventListener(PREFERENCES_EVENT, refreshUnread);
     return () => {
       socket.off('notification:new', onNotification);
       window.removeEventListener('focus', refreshUnread);
+      window.removeEventListener(PREFERENCES_EVENT, refreshUnread);
     };
   }, []);
 
