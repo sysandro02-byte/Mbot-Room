@@ -304,3 +304,5 @@
   .home-skeleton{animation:none}
   .home-quick-actions>button,.home-hero-actions button{transition:none}
 }
+
+.home-empty-action{margin-top:14px;min-height:40px;padding:0 14px;border:0;border-radius:11px;background:linear-gradient(135deg,var(--home-teal-dark),var(--home-teal));color:#fff;font-weight:850;box-shadow:0 10px 22px rgba(8,166,166,.16)}
