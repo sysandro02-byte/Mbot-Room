@@ -3,7 +3,7 @@ import { BellRing, CheckCircle2, LoaderCircle, Send, ShieldCheck, Smartphone, XC
 import { notificationService, PushState } from '../services/notificationService';
 import './PushNotificationSettings.css';
 
-export default function PushNotificationSettings(){
+export default function PushNotificationSettings({ compact = false }: { compact?: boolean } = {}){
   const [state,setState]=useState<PushState|null>(null);
   const [loading,setLoading]=useState(true);
   const [action,setAction]=useState('');
@@ -42,6 +42,29 @@ export default function PushNotificationSettings(){
     :!state?.configured?'Indisponibles'
     :state.subscribed?'Activées'
     :state.permission==='denied'?'Bloquées par le système':'Désactivées';
+
+  if (compact) {
+    const toggleDisabled = loading || Boolean(action) || !state?.supported || !state?.configured;
+    return <div className="push-settings-compact" id="system-notifications">
+      <div className="push-settings-compact-main">
+        <span className="push-settings-compact-icon"><BellRing size={18}/></span>
+        <div><strong>Notifications système</strong><small>{loading?'Vérification…':statusLabel}</small></div>
+      </div>
+      <div className="push-settings-compact-actions">
+        <button
+          className={state?.subscribed?'push-switch is-on':'push-switch'}
+          type="button"
+          role="switch"
+          aria-checked={Boolean(state?.subscribed)}
+          aria-label={state?.subscribed?'Désactiver les notifications système':'Activer les notifications système'}
+          disabled={toggleDisabled}
+          onClick={()=>void (state?.subscribed?disable():enable())}
+        ><span/></button>
+        {state?.subscribed?<button className="push-test-button" type="button" onClick={()=>void test()} disabled={Boolean(action)}><Send size={14}/> Test</button>:null}
+      </div>
+      {message?<div className="push-settings-compact-message" role="status">{message}</div>:null}
+    </div>;
+  }
 
   return <section className="push-settings-card" aria-labelledby="push-settings-title">
     <div className="push-settings-icon"><BellRing size={24}/></div>
