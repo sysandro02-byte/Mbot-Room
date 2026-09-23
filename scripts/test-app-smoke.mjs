@@ -154,6 +154,55 @@ try {
   });
   assert.equal(createMeeting.response.status, 201, JSON.stringify(createMeeting.data));
 
+  const googleStatus = await jsonRequest('/api/calendar/google/status', {
+    headers: authHeaders(verified.data.token),
+  });
+  assert.equal(googleStatus.response.status, 200, JSON.stringify(googleStatus.data));
+  assert.equal(googleStatus.data.connected, false);
+
+  const createGroup = await jsonRequest('/api/work-groups', {
+    method: 'POST',
+    headers: authHeaders(verified.data.token),
+    body: JSON.stringify({
+      name: 'Équipe smoke',
+      description: 'Validation groupes, fichiers et appels',
+      emails: ['membre.un@mbote.test', 'membre.deux@mbote.test'],
+    }),
+  });
+  assert.equal(createGroup.response.status, 201, JSON.stringify(createGroup.data));
+  assert.ok(createGroup.data.id);
+  assert.equal(createGroup.data.isOwner, true);
+  assert.ok(createGroup.data.members.length >= 3);
+
+  const pdfUpload = await fetch(`${baseUrl}/api/files/upload`, {
+    method: 'POST',
+    headers: {
+      ...authHeaders(verified.data.token),
+      Origin: baseUrl,
+      'Content-Type': 'application/pdf',
+      'X-File-Name': encodeURIComponent('workspace-smoke.pdf'),
+      'X-Work-Group-Id': createGroup.data.id,
+    },
+    body: Buffer.from('%PDF-1.4\n% MBoteRoom smoke PDF\n'),
+  });
+  const uploadedPdf = await pdfUpload.json().catch(() => ({}));
+  assert.equal(pdfUpload.status, 201, JSON.stringify(uploadedPdf));
+  assert.equal(uploadedPdf.name, 'workspace-smoke.pdf');
+
+  const attachCall = await jsonRequest(`/api/work-groups/${createGroup.data.id}/calls`, {
+    method: 'POST',
+    headers: authHeaders(verified.data.token),
+    body: JSON.stringify({ meetingId: createMeeting.data.id, callType: 'video' }),
+  });
+  assert.equal(attachCall.response.status, 201, JSON.stringify(attachCall.data));
+
+  const groupDetail = await jsonRequest(`/api/work-groups/${createGroup.data.id}`, {
+    headers: authHeaders(verified.data.token),
+  });
+  assert.equal(groupDetail.response.status, 200, JSON.stringify(groupDetail.data));
+  assert.ok(groupDetail.data.files.some((item) => item.id === uploadedPdf.id));
+  assert.ok(groupDetail.data.calls.some((item) => Number(item.meetingId) === Number(createMeeting.data.id)));
+
   browser = await chromium.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-dev-shm-usage'],
@@ -199,6 +248,7 @@ try {
     ['/app/calendar', 'Calendrier'],
     ['/app/recordings', 'Enregistrements'],
     ['/app/files', 'Fichiers'],
+    ['/app/groups', 'Groupes de travail'],
     ['/app/messages', 'Messages'],
     ['/app/contacts', 'Contacts'],
     ['/app/notifications', 'Centre de notifications'],
@@ -236,7 +286,13 @@ try {
   assert.equal(finalMe.status, 200);
   assert.equal(finalMe.data.user?.email, 'admin.smoke@mbote.test');
 
-  console.log('Authenticated multi-page application smoke checks passed.');
+  const deleteGroup = await jsonRequest(`/api/work-groups/${createGroup.data.id}`, {
+    method: 'DELETE',
+    headers: authHeaders(verified.data.token),
+  });
+  assert.equal(deleteGroup.response.status, 204);
+
+  console.log('Authenticated multi-page application smoke checks passed, including work groups and file upload.');
 } catch (error) {
   console.error(`APP_SMOKE_SERVER_OUTPUT\n${serverOutput}`);
   throw error;
