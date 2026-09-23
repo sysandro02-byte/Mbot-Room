@@ -2,6 +2,8 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { CalendarPlus, Clock3, Copy, CopyPlus, ExternalLink, Link2, Lock, MoreVertical, Pencil, Play, Plus, RefreshCw, Share2, Trash2, UsersRound, Video, X } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../services/authService';
+import { appDataService, type Preferences } from '../services/appDataService';
+import { readCachedPreferences } from '../lib/userPreferences';
 import { getMeetingAccessCode, getMeetingJoinUrl, Meeting, type MeetingSettings, meetingService } from '../services/meetingService';
 import { getAppLocale } from '../lib/appLanguage';
 import './RealMeetingList.css';
@@ -11,9 +13,20 @@ type MeetingForm = {
   waitingRoom:boolean;joinBeforeHost:boolean;participantAudio:boolean;participantVideo:boolean;screenShare:boolean;chat:boolean;reactions:boolean;lunaSummary:boolean;isPublic:boolean;
 };
 
-const defaultForm=():MeetingForm=>{
+const defaultForm=(preferences:Preferences=readCachedPreferences()):MeetingForm=>{
   const start=new Date(Date.now()+30*60_000);start.setSeconds(0,0);
-  return{title:'',description:'',startTime:new Date(start.getTime()-start.getTimezoneOffset()*60000).toISOString().slice(0,16),duration:60,password:'',participants:'',waitingRoom:true,joinBeforeHost:false,participantAudio:true,participantVideo:true,screenShare:true,chat:true,reactions:true,lunaSummary:true,isPublic:false};
+  return{
+    title:'',description:'',startTime:new Date(start.getTime()-start.getTimezoneOffset()*60000).toISOString().slice(0,16),
+    duration:60,password:'',participants:'',
+    waitingRoom:preferences.waitingRoomDefault!==false,
+    joinBeforeHost:false,
+    participantAudio:preferences.participantAudioAllowed!==false,
+    participantVideo:preferences.participantVideoAllowed!==false,
+    screenShare:preferences.screenShareAllowed!==false,
+    chat:true,reactions:true,
+    lunaSummary:preferences.lunaAutoSummary!==false,
+    isPublic:false,
+  };
 };
 const formatDate=(value:string)=>new Intl.DateTimeFormat(getAppLocale(),{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
 
@@ -22,6 +35,7 @@ export default function RealMeetingList(){
   const [searchParams,setSearchParams]=useSearchParams();
   const user=authService.getCurrentUser();
   const [meetings,setMeetings]=useState<Meeting[]>([]);
+  const [preferences,setPreferences]=useState<Preferences>(()=>readCachedPreferences());
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -29,16 +43,21 @@ export default function RealMeetingList(){
   const [editingMeeting,setEditingMeeting]=useState<Meeting|null>(null);
   const [deleteTarget,setDeleteTarget]=useState<Meeting|null>(null);
   const [openMenuId,setOpenMenuId]=useState<number|null>(null);
-  const [form,setForm]=useState<MeetingForm>(defaultForm);
+  const [form,setForm]=useState<MeetingForm>(()=>defaultForm(readCachedPreferences()));
   const [busyId,setBusyId]=useState<number|null>(null);
 
-  const load=async()=>{setLoading(true);setError('');try{const rows=await meetingService.getMeetings();setMeetings(Array.isArray(rows)?rows:[]);}catch(cause){setError(cause instanceof Error?cause.message:'Impossible de charger les réunions.');}finally{setLoading(false);}};
+  const load=async()=>{setLoading(true);setError('');try{
+    const [rows,prefs]=await Promise.all([meetingService.getMeetings(),appDataService.getPreferences().catch(()=>readCachedPreferences())]);
+    setMeetings(Array.isArray(rows)?rows:[]);
+    setPreferences(prefs||{});
+    if(!showCreate&&!editingMeeting)setForm(defaultForm(prefs||{}));
+  }catch(cause){setError(cause instanceof Error?cause.message:'Impossible de charger les réunions.');}finally{setLoading(false);}};
   useEffect(()=>{void load();},[]);
 
   const closeMeetingForm=()=>{
     setShowCreate(false);
     setEditingMeeting(null);
-    setForm(defaultForm());
+    setForm(defaultForm(preferences));
     const next=new URLSearchParams(searchParams);
     next.delete('new');next.delete('mode');next.delete('intent');next.delete('edit');
     setSearchParams(next,{replace:true});
@@ -62,7 +81,7 @@ export default function RealMeetingList(){
       const participants=form.participants.split(/[;,\n]+/).map((value)=>value.trim().toLowerCase()).filter(Boolean);
       const meeting=await meetingService.scheduleMeeting({
         title:form.title.trim(),description:form.description.trim(),startTime:new Date(form.startTime).toISOString(),duration:Number(form.duration),participants,
-        settings:{password:form.password,participants,waitingRoom:form.waitingRoom,joinBeforeHost:form.joinBeforeHost,participantAudio:form.participantAudio,participantVideo:form.participantVideo,screenShare:form.screenShare,chat:form.chat,reactions:form.reactions,lunaSummary:form.lunaSummary,linkSharing:true,externalAccess:true,isPublic:form.isPublic,visibility:form.isPublic?'public':'private',encryption:true},
+        settings:{password:form.password,participants,waitingRoom:form.waitingRoom,joinBeforeHost:form.joinBeforeHost,participantAudio:form.participantAudio,participantVideo:form.participantVideo,screenShare:form.screenShare,chat:form.chat,reactions:form.reactions,lunaSummary:form.lunaSummary,locked:preferences.meetingLockDefault===true,linkSharing:true,externalAccess:true,isPublic:form.isPublic,visibility:form.isPublic?'public':'private',encryption:true},
       });
       setMeetings((current)=>[...current,meeting]);closeMeetingForm();setNotice('Réunion créée. Les invitations sont en cours d’envoi.');
     }catch(cause){setError(cause instanceof Error?cause.message:'Création impossible.');}
@@ -96,7 +115,7 @@ export default function RealMeetingList(){
     const editId=Number(searchParams.get('edit')||0);
     if(createRequested){
       setEditingMeeting(null);
-      setForm(defaultForm());
+      setForm(defaultForm(preferences));
       setShowCreate(true);
       if(searchParams.get('intent')==='screen-share')setNotice('Créez la réunion, puis utilisez « Partager l’écran » une fois dans la salle.');
       setSearchParams({}, { replace:true });
