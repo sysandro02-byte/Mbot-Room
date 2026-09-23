@@ -1,12 +1,14 @@
 import { FormEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AtSign, Bell, BriefcaseBusiness, Building2, CalendarDays, Camera, Download, Eraser, KeyRound, Mail, MessageCircle, Phone, Plus, Save, Search, Settings, ShieldCheck, Trash2, UserRound, UsersRound, Vote } from 'lucide-react';
+import { AtSign, Bell, BriefcaseBusiness, Building2, CalendarDays, CalendarSync, Camera, Download, Eraser, KeyRound, Link2, Mail, MessageCircle, Phone, Plus, RefreshCw, Save, Search, Settings, ShieldCheck, Trash2, Unlink, UserRound, UsersRound, Vote } from 'lucide-react';
 import AppShell from '../components/AppShell';
 import { authService } from '../services/authService';
 import { appDataService, CalendarEvent, Contact, Preferences, Recording, Whiteboard, WhiteboardStroke } from '../services/appDataService';
 import { collaborationService, MeetingMessage, MeetingPoll } from '../services/collaborationService';
 import { Meeting, meetingService } from '../services/meetingService';
 import { getAppLocale } from '../lib/appLanguage';
+import { workspaceService, type GoogleCalendarStatus } from '../services/workspaceService';
+import { showAppMessage } from '../lib/appMessage';
 import SettingsWorkspace from './settings/SettingsWorkspace';
 import './RealFeaturePage.css';
 
@@ -31,6 +33,8 @@ export default function RealFeaturePage({kind}:Props){
   const [meetings,setMeetings]=useState<Meeting[]>([]);
   const [selectedMeetingId,setSelectedMeetingId]=useState<number|undefined>();
   const [calendar,setCalendar]=useState<CalendarEvent[]>([]);
+  const [googleCalendar,setGoogleCalendar]=useState<GoogleCalendarStatus>({configured:false,connected:false,scope:''});
+  const [googleBusy,setGoogleBusy]=useState(false);
   const [contacts,setContacts]=useState<Contact[]>([]);
   const [recordings,setRecordings]=useState<Recording[]>([]);
   const [preferences,setPreferences]=useState<Preferences>({});
@@ -58,7 +62,14 @@ export default function RealFeaturePage({kind}:Props){
         if(cancelled)return;
         setMeetings(meetingRows);
         setSelectedMeetingId((current)=>current||meetingRows[0]?.id);
-        if(kind==='calendar')setCalendar(await appDataService.getCalendar());
+        if(kind==='calendar'){
+          const [events,status]=await Promise.all([
+            appDataService.getCalendar(),
+            workspaceService.getGoogleCalendarStatus().catch(()=>({configured:false,connected:false,scope:''})),
+          ]);
+          setCalendar(events);
+          setGoogleCalendar(status);
+        }
         if(kind==='contacts')setContacts(await appDataService.getContacts());
         if(kind==='recordings')setRecordings(await appDataService.getRecordings());
         if(kind==='settings')setPreferences(await appDataService.getPreferences());
@@ -73,6 +84,24 @@ export default function RealFeaturePage({kind}:Props){
       finally{if(!cancelled)setLoading(false);}
     };
     void load();return()=>{cancelled=true;};
+  },[kind]);
+
+  useEffect(()=>{
+    if(kind!=='calendar')return;
+    const status=new URLSearchParams(window.location.search).get('google');
+    if(status==='connected'){
+      showAppMessage('Google Calendar est maintenant connecté à MBotéRoom.',{tone:'success',title:'Google Calendar connecté'});
+      window.history.replaceState({},'',window.location.pathname);
+      setGoogleBusy(true);
+      void workspaceService.syncGoogleCalendar()
+        .then(()=>Promise.all([appDataService.getCalendar(),workspaceService.getGoogleCalendarStatus()]))
+        .then(([events,googleStatus])=>{setCalendar(events);setGoogleCalendar(googleStatus);})
+        .catch((cause)=>showAppMessage(cause instanceof Error?cause.message:'Synchronisation Google Calendar impossible.',{tone:'error'}))
+        .finally(()=>setGoogleBusy(false));
+    }else if(status==='failed'){
+      showAppMessage('La connexion à Google Calendar n’a pas abouti. Réessayez.',{tone:'error',title:'Connexion Google Calendar'});
+      window.history.replaceState({},'',window.location.pathname);
+    }
   },[kind]);
 
   useEffect(()=>{
@@ -94,6 +123,40 @@ export default function RealFeaturePage({kind}:Props){
   },[kind,strokes]);
 
   const filteredContacts=useMemo(()=>{const query=contactSearch.trim().toLowerCase();return contacts.filter((contact)=>!query||contact.name.toLowerCase().includes(query)||contact.email.toLowerCase().includes(query)||contact.username.toLowerCase().includes(query));},[contactSearch,contacts]);
+
+  const connectGoogleCalendar=async()=>{
+    setGoogleBusy(true);
+    try{
+      const result=await workspaceService.connectGoogleCalendar('/app/calendar');
+      window.location.assign(result.url);
+    }catch(cause){
+      setGoogleBusy(false);
+      showAppMessage(cause instanceof Error?cause.message:'Connexion Google Calendar impossible.',{tone:'error'});
+    }
+  };
+
+  const syncGoogleCalendar=async()=>{
+    setGoogleBusy(true);
+    try{
+      const result=await workspaceService.syncGoogleCalendar();
+      const events=await appDataService.getCalendar();
+      setCalendar(events);
+      showAppMessage(`Synchronisation terminée : ${result.imported} événement(s) Google récupéré(s), ${result.pushed} événement(s) MBotéRoom envoyé(s).`,{tone:'success',title:'Agenda synchronisé'});
+    }catch(cause){
+      showAppMessage(cause instanceof Error?cause.message:'Synchronisation Google Calendar impossible.',{tone:'error'});
+    }finally{setGoogleBusy(false);}
+  };
+
+  const disconnectGoogleCalendar=async()=>{
+    setGoogleBusy(true);
+    try{
+      await workspaceService.disconnectGoogleCalendar();
+      setGoogleCalendar({configured:true,connected:false,scope:''});
+      showAppMessage('Google Calendar a été déconnecté de MBotéRoom.',{tone:'success'});
+    }catch(cause){
+      showAppMessage(cause instanceof Error?cause.message:'Déconnexion Google Calendar impossible.',{tone:'error'});
+    }finally{setGoogleBusy(false);}
+  };
 
   const submitCalendar=async(event:FormEvent<HTMLFormElement>)=>{
     event.preventDefault();
@@ -139,7 +202,26 @@ export default function RealFeaturePage({kind}:Props){
       {notice?<div className="real-feature-notice">{notice}</div>:null}{error?<div className="real-feature-error">{error}</div>:null}
       {loading?<p className="real-feature-loading">Chargement…</p>:null}
 
-      {!loading&&kind==='calendar'?<div className="real-feature-grid"><section className="real-card"><h2>Ajouter un événement</h2><form className="real-form" onSubmit={submitCalendar}><input name="title" required placeholder="Titre"/><textarea name="description" placeholder="Description"/><label>Début<input name="start" type="datetime-local" required defaultValue={toLocalInput(new Date(Date.now()+3600000))}/></label><label>Fin<input name="end" type="datetime-local" required defaultValue={toLocalInput(new Date(Date.now()+7200000))}/></label><button><Plus size={17}/> Enregistrer</button></form></section><section className="real-card"><h2>Agenda</h2>{calendar.length?calendar.map((event)=><article className="real-list-row" key={event.id}><div><strong>{event.title}</strong><small>{formatDate(event.starts_at)} → {formatDate(event.ends_at)}</small><p>{event.description}</p></div><button onClick={()=>void appDataService.deleteCalendarEvent(event.id).then(()=>setCalendar((current)=>current.filter((item)=>item.id!==event.id)))} aria-label="Supprimer"><Trash2 size={17}/></button></article>):<p>Aucun événement.</p>}</section></div>:null}
+      {!loading&&kind==='calendar'?<div className="real-calendar-page">
+        <section className="real-card real-google-calendar-card">
+          <div className="real-google-calendar-icon"><CalendarSync size={24}/></div>
+          <div className="real-google-calendar-copy">
+            <span>Synchronisation externe</span>
+            <h2>Google Calendar</h2>
+            <p>{!googleCalendar.configured?'La connexion Google Calendar doit d’abord être configurée par l’administrateur de MBotéRoom.':googleCalendar.connected?'Votre agenda Google est connecté. Les nouveaux événements MBotéRoom sont synchronisés automatiquement.':'Connectez votre agenda Google pour retrouver vos événements dans les deux calendriers.'}</p>
+          </div>
+          <div className="real-google-calendar-actions">
+            {!googleCalendar.connected?<button type="button" disabled={googleBusy||!googleCalendar.configured} onClick={()=>void connectGoogleCalendar()}><Link2 size={16}/>{googleBusy?'Connexion…':'Connecter Google Calendar'}</button>:<>
+              <button type="button" disabled={googleBusy} onClick={()=>void syncGoogleCalendar()}><RefreshCw className={googleBusy?'is-spinning':''} size={16}/>{googleBusy?'Synchronisation…':'Synchroniser maintenant'}</button>
+              <button className="secondary" type="button" disabled={googleBusy} onClick={()=>void disconnectGoogleCalendar()}><Unlink size={16}/> Déconnecter</button>
+            </>}
+          </div>
+        </section>
+        <div className="real-feature-grid">
+          <section className="real-card"><h2>Ajouter un événement</h2><form className="real-form" onSubmit={submitCalendar}><input name="title" required placeholder="Titre"/><textarea name="description" placeholder="Description"/><label>Début<input name="start" type="datetime-local" required defaultValue={toLocalInput(new Date(Date.now()+3600000))}/></label><label>Fin<input name="end" type="datetime-local" required defaultValue={toLocalInput(new Date(Date.now()+7200000))}/></label><button><Plus size={17}/> Enregistrer</button></form></section>
+          <section className="real-card"><h2>Agenda</h2>{calendar.length?calendar.map((event)=><article className="real-list-row" key={event.id}><div><strong>{event.title}</strong><small>{formatDate(event.starts_at)} → {formatDate(event.ends_at)} {event.source==='google'?<b className="real-calendar-source">Google</b>:null}</small><p>{event.description}</p></div><button onClick={()=>void appDataService.deleteCalendarEvent(event.id).then(()=>setCalendar((current)=>current.filter((item)=>item.id!==event.id)))} aria-label="Supprimer"><Trash2 size={17}/></button></article>):<p>Aucun événement.</p>}</section>
+        </div>
+      </div>:null}
 
       {!loading&&kind==='recordings'?<section className="real-card"><h2>Enregistrements disponibles</h2>{recordings.length?recordings.map((recording)=><article className="real-list-row" key={recording.id}><div><strong>{recording.title}</strong><small>{formatDate(recording.created_at)} · {Math.round(recording.size_bytes/1024/1024)} Mo · {Math.round(recording.duration_seconds/60)} min</small></div><a href={recording.storage_url} target="_blank" rel="noreferrer"><Download size={17}/> Ouvrir</a></article>):<p>Aucun enregistrement n’est disponible pour le moment.</p>}</section>:null}
 
