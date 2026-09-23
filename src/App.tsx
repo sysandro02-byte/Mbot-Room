@@ -6,6 +6,7 @@ import PwaExperience from './components/PwaExperience';
 import MobileSplash from './components/MobileSplash';
 import SessionSecurity from './components/SessionSecurity';
 import AppMessageModal from './components/AppMessageModal';
+import UserPreferencesRuntime from './components/UserPreferencesRuntime';
 import { sanitizeInternalPath } from './lib/navigationSecurity';
 import { AppLanguageBridge } from './lib/appLanguage';
 
@@ -126,7 +127,7 @@ function SimpleInfoPage({ title, description }: { title: string; description: st
 }
 
 export default function App() {
-  return <><AppLanguageBridge/><AppMessageModal/><MobileSplash/><PwaExperience/><SessionSecurity/><Suspense fallback={<main className="route-loading" role="status" aria-live="polite">Chargement de MBotéRoom…</main>}><Routes>
+  return <><AppLanguageBridge/><UserPreferencesRuntime/><AppMessageModal/><MobileSplash/><PwaExperience/><SessionSecurity/><Suspense fallback={<main className="route-loading" role="status" aria-live="polite">Chargement de MBotéRoom…</main>}><Routes>
     <Route path="/login" element={<Login />} />
     <Route path="/connexion" element={<Login />} />
     <Route path="/inscription" element={<Login initialView="register" />} />
