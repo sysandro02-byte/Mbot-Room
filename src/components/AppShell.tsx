@@ -49,8 +49,6 @@ const primaryNavItems = [
 const secondaryNavItems = [
   { label: 'Notifications', icon: Bell, to: '/app/notifications' },
   { label: 'Enregistrements', icon: CirclePlay, to: '/app/recordings' },
-  { label: 'Sondages', icon: BarChart3, to: '/app/polls' },
-  { label: 'Tableau blanc', icon: Sparkles, to: '/app/whiteboard' },
   { label: 'Fichiers', icon: FolderOpen, to: '/app/files' },
   { label: 'Paramètres', icon: Settings, to: '/app/settings' },
 ];
@@ -147,9 +145,9 @@ export default function AppShell({ children, title }: AppShellProps) {
           <X size={22} aria-hidden="true" />
         </button>
 
-        <Link className="app-shell-logo" to="/app" onClick={() => setMenuOpen(false)}>
-          <img src="/icons/mboteroom-symbol.png" alt="" />
-          <strong>MBoté<span>Room</span><small>Se réunir. Avancer. Ensemble.</small></strong>
+        <Link className="app-shell-logo" to="/app" onClick={() => setMenuOpen(false)} aria-label="Accueil MBotéRoom">
+          <img className="app-shell-logo-wordmark" src="/icons/mboteroom-wordmark.png" alt="MBotéRoom" />
+          <small>Se réunir. Avancer. Ensemble.</small>
         </Link>
 
         <div className="app-shell-sidebar-main">{renderNav(primaryNavItems, 'Navigation principale')}</div>
@@ -191,9 +189,8 @@ export default function AppShell({ children, title }: AppShellProps) {
             <Menu size={23} aria-hidden="true" />
           </button>
 
-          <Link className="app-shell-mobile-brand" to="/app">
-            <img src="/icons/mboteroom-symbol.png" alt="" />
-            <strong>MBoté<span>Room</span></strong>
+          <Link className="app-shell-mobile-brand" to="/app" aria-label="Accueil MBotéRoom">
+            <img src="/icons/mboteroom-wordmark.png" alt="MBotéRoom" />
           </Link>
 
           <form className="app-shell-search" onSubmit={(event) => {
@@ -213,7 +210,7 @@ export default function AppShell({ children, title }: AppShellProps) {
           </form>
 
           <div className="app-shell-header-actions">
-            {title ? <span className="app-shell-header-title">{title}</span> : null}
+            {title && location.pathname !== '/app' ? <span className="app-shell-header-title">{title}</span> : null}
             <button className="app-shell-header-icon" type="button" aria-label="Notifications" onClick={() => navigate('/app/notifications')}>
               <Bell size={20}/>
               {unreadNotifications > 0 ? <b>{Math.min(99, unreadNotifications)}</b> : null}
