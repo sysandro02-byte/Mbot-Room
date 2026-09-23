@@ -50,19 +50,31 @@ export function HomeQuickAccess({ onMessages, onContacts, onCalendar, onFiles, o
   </section>;
 }
 
-export function HomeFeatureBanner({ imageUrl, onDiscover }: { imageUrl?: string; onDiscover: () => void }) {
+export function HomeFeatureBanner({
+  imageUrl,
+  title,
+  body,
+  actionLabel,
+  onDiscover,
+}: {
+  imageUrl?: string;
+  title?: string;
+  body?: string;
+  actionLabel?: string;
+  onDiscover: () => void;
+}) {
   return <section className="home-feature-banner">
-    <div className="home-feature-image"><img src={imageUrl || '/images/meeting-black-team.svg'} alt="" loading="lazy"/></div>
+    <div className="home-feature-image"><img src={imageUrl || '/images/mboteroom-home-banner.svg'} alt="Collaboration en réunion avec MBotéRoom" loading="lazy"/></div>
     <div className="home-feature-copy">
-      <h2>Des réunions plus humaines avec MBotéRoom</h2>
-      <p>Collaborez, partagez, créez, où que vous soyez.</p>
+      <h2>{title || 'Des réunions plus humaines avec MBotéRoom'}</h2>
+      <p>{body || 'Collaborez, partagez, créez, où que vous soyez.'}</p>
       <div className="home-feature-points">
         <span><Headphones aria-hidden="true"/><small>Audio HD</small></span>
         <span><Video aria-hidden="true"/><small>Vidéo HD</small></span>
         <span><MessageCircle aria-hidden="true"/><small>Messagerie</small></span>
         <span><MonitorUp aria-hidden="true"/><small>Partage d’écran</small></span>
       </div>
-      <button type="button" onClick={onDiscover}>Découvrir toutes les fonctionnalités <ChevronRight/></button>
+      <button type="button" onClick={onDiscover}>{actionLabel || 'Découvrir toutes les fonctionnalités'} <ChevronRight/></button>
     </div>
     <span className="home-feature-slogan">La collaboration<br/>autrement !</span>
   </section>;
