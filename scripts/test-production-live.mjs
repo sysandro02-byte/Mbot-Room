@@ -255,26 +255,42 @@ try {
   assert.ok(String(pushConfig.data.publicKey || '').length > 40);
 
   const fakeEndpoint = `https://push.invalid/${runSuffix}`;
-  const subscribe = await api('/api/push/subscribe', {
+  const invalidSubscribe = await api('/api/push/subscribe', {
     method: 'POST',
     body: JSON.stringify({
       endpoint: fakeEndpoint,
       expirationTime: null,
       keys: {
-        p256dh: 'BHVz0gL-lqNhWjE1mY9zMxhUGzxwXxPlQ-bq6mYE7hehzU4SJt0PqY1tv-fake-smoke-key',
-        auth: 'c21va2UtYXV0aC1rZXk',
+        p256dh: 'invalid-smoke-key',
+        auth: 'invalid-auth',
+      },
+      platform: 'production-smoke',
+    }),
+  }, host.token);
+  assert.equal(invalidSubscribe.response.status, 400, JSON.stringify(invalidSubscribe.data));
+
+  const validShapeEndpoint = `https://push.invalid/shape/${runSuffix}`;
+  const subscribe = await api('/api/push/subscribe', {
+    method: 'POST',
+    body: JSON.stringify({
+      endpoint: validShapeEndpoint,
+      expirationTime: null,
+      keys: {
+        p256dh: Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 1)]).toString('base64url'),
+        auth: Buffer.alloc(16, 2).toString('base64url'),
       },
       platform: 'production-smoke',
     }),
   }, host.token);
   assert.equal(subscribe.response.status, 201, JSON.stringify(subscribe.data));
-  const pushTest = await api('/api/push/test', { method: 'POST' }, host.token);
-  assert.equal(pushTest.response.status, 200, JSON.stringify(pushTest.data));
   const unsubscribe = await api('/api/push/subscribe', {
     method: 'DELETE',
-    body: JSON.stringify({ endpoint: fakeEndpoint }),
+    body: JSON.stringify({ endpoint: validShapeEndpoint }),
   }, host.token);
   assert.equal(unsubscribe.response.status, 200, JSON.stringify(unsubscribe.data));
+
+  const pushTest = await api('/api/push/test', { method: 'POST' }, host.token);
+  assert.equal(pushTest.response.status, 409, JSON.stringify(pushTest.data));
 
   const created = await api('/api/meetings', {
     method: 'POST',
