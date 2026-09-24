@@ -65,7 +65,7 @@ export const runExtraMigrations = async () => {
       id uuid PRIMARY KEY,
       email text NOT NULL,
       token_hash text NOT NULL UNIQUE,
-      created_by bigint NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      created_by integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
       expires_at timestamptz NOT NULL,
       consumed_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now()
