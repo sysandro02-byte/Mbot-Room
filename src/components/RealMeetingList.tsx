@@ -1,8 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { CalendarPlus, Clock3, Copy, CopyPlus, ExternalLink, Link2, Lock, MoreVertical, Pencil, Play, Plus, RefreshCw, Share2, Trash2, UsersRound, Video, X } from 'lucide-react';
+import { CalendarDays, CalendarPlus, CheckCircle2, CirclePlay, Clock3, Copy, CopyPlus, Database, ExternalLink, Link2, Lock, MoreVertical, Pencil, Play, Plus, RefreshCw, Search, Share2, Trash2, UserPlus, UsersRound, Video, X } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../services/authService';
-import { appDataService, type Preferences } from '../services/appDataService';
+import { appDataService, type Preferences, type RecordingStats } from '../services/appDataService';
 import { readCachedPreferences } from '../lib/userPreferences';
 import { getMeetingAccessCode, getMeetingJoinUrl, Meeting, type MeetingSettings, meetingService } from '../services/meetingService';
 import { getAppLocale } from '../lib/appLanguage';
@@ -36,6 +36,9 @@ export default function RealMeetingList(){
   const user=authService.getCurrentUser();
   const [meetings,setMeetings]=useState<Meeting[]>([]);
   const [preferences,setPreferences]=useState<Preferences>(()=>readCachedPreferences());
+  const [recordingStats,setRecordingStats]=useState<RecordingStats|null>(null);
+  const [viewFilter,setViewFilter]=useState<'upcoming'|'live'|'ended'|'mine'|'invitations'>('upcoming');
+  const [searchQuery,setSearchQuery]=useState('');
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
@@ -47,9 +50,14 @@ export default function RealMeetingList(){
   const [busyId,setBusyId]=useState<number|null>(null);
 
   const load=async()=>{setLoading(true);setError('');try{
-    const [rows,prefs]=await Promise.all([meetingService.getMeetings(),appDataService.getPreferences().catch(()=>readCachedPreferences())]);
+    const [rows,prefs,recordingRows]=await Promise.all([
+      meetingService.getMeetings(),
+      appDataService.getPreferences().catch(()=>readCachedPreferences()),
+      appDataService.getRecordingStats().catch(()=>null),
+    ]);
     setMeetings(Array.isArray(rows)?rows:[]);
     setPreferences(prefs||{});
+    setRecordingStats(recordingRows);
     if(!showCreate&&!editingMeeting)setForm(defaultForm(prefs||{}));
   }catch(cause){setError(cause instanceof Error?cause.message:'Impossible de charger les réunions.');}finally{setLoading(false);}};
   useEffect(()=>{void load();},[]);
