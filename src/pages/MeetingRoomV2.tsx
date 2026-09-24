@@ -1126,24 +1126,32 @@ export default function MeetingRoomV2() {
         setRecording(false);
         setRecordingMode(null);
 
-        try {
-          if (!meeting?.id) throw new Error('Réunion introuvable pour cet enregistrement.');
-          setNotice('Enregistrement terminé. Envoi sécurisé vers Supabase… 0 %');
-          await collaborationService.uploadLocalRecording(
-            meeting.id,
-            blob,
-            durationSeconds,
-            (progress) => setNotice(`Envoi sécurisé vers Supabase… ${progress} %`),
-          );
-          setNotice('Enregistrement sauvegardé dans Supabase et disponible dans vos enregistrements.');
-        } catch (cause) {
+        const downloadLocalCopy = (message: string) => {
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = url;
           link.download = `mboteroom-${meeting?.id || 'reunion'}-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
           link.click();
           setTimeout(() => URL.revokeObjectURL(url), 1000);
-          setNotice(`${cause instanceof Error ? cause.message : 'Envoi vers Supabase impossible.'} Une copie locale de sécurité a été téléchargée.`);
+          setNotice(message);
+        };
+
+        try {
+          if (!meeting?.id) throw new Error('Réunion introuvable pour cet enregistrement.');
+          if (mediaTransportStatus?.recordingStorageReady === false) {
+            downloadLocalCopy('Enregistrement terminé. Le stockage cloud est indisponible : une copie locale a été téléchargée.');
+          } else {
+            setNotice('Enregistrement terminé. Envoi sécurisé vers Supabase… 0 %');
+            await collaborationService.uploadLocalRecording(
+              meeting.id,
+              blob,
+              durationSeconds,
+              (progress) => setNotice(`Envoi sécurisé vers Supabase… ${progress} %`),
+            );
+            setNotice('Enregistrement sauvegardé dans Supabase et disponible dans vos enregistrements.');
+          }
+        } catch (cause) {
+          downloadLocalCopy(`${cause instanceof Error ? cause.message : 'Envoi vers Supabase impossible.'} Une copie locale de sécurité a été téléchargée.`);
         } finally {
           recordingChunksRef.current = [];
           recordingStartedAtRef.current = 0;
@@ -1160,7 +1168,7 @@ export default function MeetingRoomV2() {
       recordingSessionRef.current = null;
       setNotice('Impossible de démarrer l’enregistrement local.');
     }
-  }, [localName, localStream, meeting?.id, remoteParticipants]);
+  }, [localName, localStream, mediaTransportStatus?.recordingStorageReady, meeting?.id, remoteParticipants]);
 
   const toggleRecording = async () => {
     if (!canRecord) {
