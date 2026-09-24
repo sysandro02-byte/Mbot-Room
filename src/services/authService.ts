@@ -108,18 +108,37 @@ const authRequestHeaders = () => ({
 });
 
 const fetchAuth = async (input: RequestInfo | URL, init: RequestInit = {}) => {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 45_000);
-  try {
-    return await fetch(input, { ...init, signal: init.signal || controller.signal });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('MBotéRoom met trop de temps à répondre. Réessayez.');
+  const method=String(init.method||'GET').toUpperCase();
+  const retryableRead=(method==='GET'||method==='HEAD')&&!init.signal;
+  const attempts=retryableRead?2:1;
+  const slowMobile=/MBoteRoomAndroid|; wv\)/i.test(navigator.userAgent);
+  const timeoutMs=slowMobile?90_000:60_000;
+
+  for(let attempt=0;attempt<attempts;attempt+=1){
+    const controller=new AbortController();
+    const timeout=window.setTimeout(()=>controller.abort(),timeoutMs);
+    try{
+      const response=await fetch(input,{...init,signal:init.signal||controller.signal});
+      if(retryableRead&&[408,425,429,500,502,503,504].includes(response.status)&&attempt+1<attempts){
+        await new Promise<void>((resolve)=>window.setTimeout(resolve,700));
+        continue;
+      }
+      return response;
+    }catch(error){
+      const aborted=error instanceof DOMException&&error.name==='AbortError';
+      if(!init.signal?.aborted&&attempt+1<attempts){
+        await new Promise<void>((resolve)=>window.setTimeout(resolve,aborted?500:800));
+        continue;
+      }
+      if(aborted){
+        throw new Error('Connexion lente détectée. MBotéRoom attend la réponse du serveur.');
+      }
+      throw new Error('MBotéRoom est momentanément indisponible. Vérifiez votre connexion puis réessayez.');
+    }finally{
+      window.clearTimeout(timeout);
     }
-    throw new Error('MBotéRoom est momentanément indisponible. Vérifiez votre connexion puis réessayez.');
-  } finally {
-    window.clearTimeout(timeout);
   }
+  throw new Error('MBotéRoom est momentanément indisponible. Vérifiez votre connexion puis réessayez.');
 };
 
 const postAuth = async (path: string, body: unknown): Promise<AuthResponse> => {
