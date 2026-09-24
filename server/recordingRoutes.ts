@@ -7,6 +7,7 @@ import {
   createId,
   hasMeetingAccess,
   query,
+  requireAccountFeature,
   requireDatabase,
   sendApiError,
 } from './core.js';
@@ -336,7 +337,7 @@ export const registerRecordingRoutes = (app: express.Express, io: Server) => {
     }
   });
 
-  app.post('/api/meetings/:meetingId/recordings/start', ...protectedApi, async (request: AuthedRequest, response, next) => {
+  app.post('/api/meetings/:meetingId/recordings/start', ...protectedApi, requireAccountFeature('recording'), async (request: AuthedRequest, response, next) => {
     try {
       if (!(await isPlatformFeatureEnabled('recordingEnabled')) && request.user?.role !== 'admin') {
         return sendApiError(response,403,'RECORDING_DISABLED','L’enregistrement est temporairement désactivé.');
