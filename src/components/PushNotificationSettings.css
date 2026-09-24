@@ -8,10 +8,10 @@
 .push-settings-compact-main strong{color:#18324f;font-size:12px}
 .push-settings-compact-main small{margin-top:2px;color:#8190a2;font-size:9px}
 .push-settings-compact-actions{display:flex;align-items:center;gap:7px}
-.push-switch{position:relative;width:48px;height:28px;padding:0;border:0;border-radius:999px;background:#cbd5e1;cursor:pointer;transition:.18s ease}
-.push-switch>span{position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 2px 7px rgba(16,38,55,.18);transition:.18s ease}
+.push-switch{position:relative;width:48px;min-width:48px;max-width:48px;height:28px!important;min-height:28px!important;max-height:28px;flex:0 0 48px;justify-self:end;align-self:center;box-sizing:border-box;padding:0!important;border:0;border-radius:999px;background:#cbd5e1;cursor:pointer;overflow:hidden;transition:background .18s ease}
+.push-switch>span{position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 2px 7px rgba(16,38,55,.18);pointer-events:none;transition:transform .18s ease}
 .push-switch.is-on{background:#079a98}.push-switch.is-on>span{transform:translateX(20px)}
 .push-switch:disabled{opacity:.55;cursor:not-allowed}
 .push-test-button{min-height:30px;padding:0 9px;border:1px solid #dbe5e9;border-radius:9px;background:#fff;color:#436077;font-size:9px;font-weight:800;display:inline-flex;align-items:center;gap:5px;cursor:pointer}
 .push-settings-compact-message{grid-column:1/-1;padding:8px 10px;border-radius:9px;background:#edf8f7;color:#42636b;font-size:10px}
-@media(max-width:560px){.push-settings-compact{grid-template-columns:1fr}.push-settings-compact-actions{justify-content:space-between}}
+@media(max-width:560px){.push-settings-compact{grid-template-columns:minmax(0,1fr) auto;gap:10px 8px}.push-settings-compact-actions{justify-content:flex-end;flex-wrap:wrap}.push-settings-compact-main{min-width:0}.push-settings-compact-main>div{min-width:0}}
