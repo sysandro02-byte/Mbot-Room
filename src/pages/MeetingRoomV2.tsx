@@ -281,7 +281,7 @@ export default function MeetingRoomV2() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [panel, setPanel] = useState<Panel>('participants');
+  const [panel, setPanel] = useState<Panel>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [mediaReady, setMediaReady] = useState(false);
   const [mediaDevices, setMediaDevices] = useState<MediaDeviceInfo[]>([]);
@@ -1718,7 +1718,7 @@ export default function MeetingRoomV2() {
       </header>
 
       <nav className="room-v2-mode-tabs" aria-label="Affichage de la réunion">
-        <button type="button" className={viewMode === 'participants' && !screenShareActive ? 'active' : ''} onClick={() => setViewMode('participants')} data-testid="participants-view-button"><UsersRound/><span>Participants</span></button>
+        <button type="button" className={panel === 'participants' ? 'active' : ''} onClick={() => setPanel(panel === 'participants' ? null : 'participants')} data-testid="participants-view-button"><UsersRound/><span>Participants</span></button>
         <button type="button" className={viewMode === 'gallery' && !screenShareActive ? 'active' : ''} onClick={() => setViewMode('gallery')} data-testid="gallery-view-button"><span>Galerie</span></button>
         <button type="button" className={viewMode === 'speaker' && !screenShareActive ? 'active' : ''} onClick={() => setViewMode('speaker')} data-testid="speaker-view-button"><span className="room-v2-speaker-icon" aria-hidden="true"/><span>Intervenant</span></button>
         {screenShareActive ? <button type="button" className="active room-v2-share-tab"><MonitorUp/><span>Partage d’écran</span></button> : null}
@@ -1912,7 +1912,7 @@ export default function MeetingRoomV2() {
           )}
         </div>
 
-        {!panel ? <aside className="room-v2-desktop-rail" aria-label="Participants de la réunion">
+        {panel === 'participants' ? <aside className="room-v2-desktop-rail is-panel-open" aria-label="Participants de la réunion">
           {raisedMembers.length ? <section className="room-v2-hand-queue">
             <header><span><Hand size={18}/></span><strong>File des mains levées ({raisedMembers.length})</strong></header>
             {raisedMembers.map((member) => {
@@ -1926,7 +1926,7 @@ export default function MeetingRoomV2() {
             })}
           </section> : null}
           <section className="room-v2-rail-participants">
-            <header><span><UsersRound size={18}/></span><strong>Participants ({activeMembers.length})</strong></header>
+            <header><span><UsersRound size={18}/></span><strong>Participants ({activeMembers.length})</strong><button type="button" className="room-v2-rail-close" onClick={()=>setPanel(null)} aria-label="Fermer les participants"><X size={17}/></button></header>
             <label><Search size={15}/><input value={participantSearch} onChange={(event)=>setParticipantSearch(event.target.value)} placeholder="Rechercher un participant…"/></label>
             <div>
               {visibleMembers.map((member) => {
@@ -1991,7 +1991,7 @@ export default function MeetingRoomV2() {
           </section>
         </aside> : null}
 
-        {panel ? (
+        {panel && panel !== 'participants' ? (
           <aside className="room-v2-panel">
             <div className="room-v2-panel-title">
               <h2>{panel === 'participants' ? 'Participants' : panel === 'chat' ? 'Discussion' : panel === 'polls' ? 'Sondages' : panel === 'breakouts' ? 'Sous-salles' : 'Luna IA'}</h2>
