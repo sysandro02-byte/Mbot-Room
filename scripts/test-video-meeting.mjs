@@ -101,7 +101,7 @@ const register = async (name, email) => {
   const result = await jsonRequest('/api/auth/register', {
     method: 'POST',
     headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
-    body: JSON.stringify({ name, email, password: 'Password2026!' }),
+    body: JSON.stringify({ name, email, password: 'Password2026!', termsAccepted: true, termsVersion: '2026-09-24' }),
   });
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
   return result.data;
