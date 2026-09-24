@@ -101,6 +101,7 @@ export default function ProfilePage(){
         address:profile.address,
         bio:profile.bio,
         profileVisible:profile.profileVisible,
+        personalMeetingId:profile.personalMeetingId,
       });
       const language=(preferences.language||getStoredLanguage()) as AppLanguage;
       const prefs=await appDataService.updatePreferences({
@@ -188,6 +189,7 @@ export default function ProfilePage(){
             <label>Nom complet<input value={profile.name||''} onChange={(event)=>update({name:event.target.value})} required/></label>
             <label>Nom d’utilisateur<input value={profile.username||''} onChange={(event)=>update({username:event.target.value})} required/></label>
             <label>E-mail<input value={profile.email||''} readOnly/><small>Adresse de connexion</small></label>
+            <label>ID personnel de réunion<input inputMode="numeric" pattern="[0-9]{6,12}" minLength={6} maxLength={12} value={profile.personalMeetingId||''} onChange={(event)=>update({personalMeetingId:event.target.value.replace(/\D/g,'').slice(0,12)})} placeholder="Ex. 1234567890"/><small>6 à 12 chiffres. Cet ID sera utilisable pour vos réunions.</small></label>
             <label>Téléphone<input value={profile.phoneNumber||''} onChange={(event)=>update({phoneNumber:event.target.value})} placeholder="+242 ..."/></label>
             <label>Organisation<input value={profile.organization||''} onChange={(event)=>update({organization:event.target.value})}/></label>
             <label>Fonction<input value={profile.jobTitle||''} onChange={(event)=>update({jobTitle:event.target.value})}/></label>
