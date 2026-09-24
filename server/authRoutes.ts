@@ -631,7 +631,7 @@ export const registerAuthRoutes = (app: express.Express) => {
     try {
       const rawToken = getRawSessionTokenFromRequest(request);
       const touched = await touchSessionActivity(rawToken);
-      if (!touched) return sendApiError(response, 401, 'SESSION_IDLE_EXPIRED', 'Votre session a expiré après 5 minutes d’inactivité.');
+      if (!touched) return sendApiError(response, 401, 'SESSION_IDLE_EXPIRED', 'Votre session a expiré pour cause d’inactivité.');
       response.setHeader('Cache-Control', 'no-store');
       response.status(204).end();
     } catch (error) { next(error); }
