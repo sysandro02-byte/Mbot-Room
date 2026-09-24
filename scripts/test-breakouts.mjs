@@ -196,6 +196,15 @@ try {
   assert.ok(participantCaptions.data.some((caption) => caption.text === 'Secret Atelier A'));
   assert.equal(participantCaptions.data.some((caption) => caption.text === 'Secret Atelier B'), false, 'Participant must not read captions from another breakout room');
 
+  const participantCatchUp = await jsonRequest(`/api/meetings/${meeting.id}/luna/catch-up`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ minutes: 15 }),
+  });
+  assert.equal(participantCatchUp.response.status, 200, JSON.stringify(participantCatchUp.data));
+  assert.equal(JSON.stringify(participantCatchUp.data).includes('Secret Atelier B'), false, 'Luna catch-up must not leak another breakout room');
+  assert.ok(JSON.stringify(participantCatchUp.data).includes('Secret Atelier A') || JSON.stringify(participantCatchUp.data).includes('Message salle principale'));
+
   const hostCaptions = await jsonRequest(`/api/meetings/${meeting.id}/captions`, {
     headers: authHeaders(host.token),
   });
