@@ -9,7 +9,6 @@ import {
   Headphones,
   Info,
   LockKeyhole,
-  LogIn,
   MonitorSmartphone,
   ShieldCheck,
   UserRound,
@@ -157,7 +156,6 @@ export default function GuestJoinPage() {
 
   return (
     <main className="guest-join-page">
-      <GuestJoinHeader />
 
       <section className="guest-join-layout" aria-label="Rejoindre une réunion MBotéRoom">
         <div className="guest-join-left">
@@ -277,16 +275,6 @@ export default function GuestJoinPage() {
                 <Info size={21} aria-hidden="true" />
                 <span>Selon les règles définies par l’hôte, vous pourrez être placé dans la salle d’attente avant d’entrer.</span>
               </div>
-
-              <div className="guest-auth-links">
-                <span>Vous n'avez pas de compte ?</span>
-                <Link to="/inscription">Créer un compte</Link>
-                <span className="guest-link-divider" aria-hidden="true" />
-                <Link className="guest-login-link" to="/connexion">
-                  <LogIn size={19} aria-hidden="true" />
-                  Se connecter
-                </Link>
-              </div>
             </form>
           </section>
 
@@ -321,29 +309,6 @@ export default function GuestJoinPage() {
         <div className="guest-created-by">MBotéRoom est une application créée par <strong>LoukaTech</strong>.</div>
       </footer>
     </main>
-  );
-}
-
-function GuestJoinHeader() {
-  return (
-    <header className="guest-join-header">
-      <Link className="guest-brand" to="/app" aria-label="Accueil MBotéRoom">
-        <span className="guest-brand-icon"><img src="/icons/mboteroom-symbol.png" alt="" /></span>
-        <span className="guest-brand-copy">
-          <strong><span>MBoté</span><span>Room</span></strong>
-          <small>Réunions sécurisées</small>
-        </span>
-      </Link>
-
-      <nav className="guest-header-actions" aria-label="Navigation invité">
-        <span className="guest-badge">
-          <UserRound size={18} aria-hidden="true" />
-          Invité
-        </span>
-        <Link className="guest-header-login" to="/connexion">Se connecter</Link>
-        <Link className="guest-header-register" to="/inscription">Créer un compte</Link>
-      </nav>
-    </header>
   );
 }
 
