@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { appDataService, type Recording, type RecordingStats } from '../services/appDataService';
 import { showAppMessage } from '../lib/appMessage';
 import './RecordingsPage.css';
+import AppLoader from '../components/AppLoader';
 
 type Filter='all'|'video'|'audio'|'favorites';
 type Sort='recent'|'oldest'|'longest';
@@ -153,7 +154,7 @@ export default function RecordingsPage(){
             <select value={sort} onChange={(event)=>setSort(event.target.value as Sort)}><option value="recent">Plus récents d’abord</option><option value="oldest">Plus anciens</option><option value="longest">Durée la plus longue</option></select>
           </div>
 
-          {loading?<div className="recordings-pro-empty">Chargement…</div>:list.map((item)=><article id={'recording-'+item.id} key={item.id}>
+          {loading?<AppLoader label="Chargement des enregistrements…" />:list.map((item)=><article id={'recording-'+item.id} key={item.id}>
             <button className="recordings-pro-thumb" onClick={()=>void openRecording(item)}>{audio(item)?<Headphones/>:<Play/>}<b>{duration(item.duration_seconds)}</b></button>
             <div className="recordings-pro-copy"><strong>{item.title}</strong><small><CalendarDays/> {date(item.start_time||item.created_at)} <UsersRound/> {Number(item.participant_count||0)} participants</small><span>{audio(item)?'Audio':'Vidéo'} · {bytes(item.size_bytes)}</span></div>
             <button className={item.favorite?'recordings-pro-star active':'recordings-pro-star'} onClick={()=>void favorite(item)}><Star fill={item.favorite?'currentColor':'none'}/></button>
