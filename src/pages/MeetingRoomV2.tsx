@@ -43,7 +43,7 @@ import {
   MeetingParticipant,
   MeetingPoll,
 } from '../services/collaborationService';
-import { getMeetingAccessCode, LobbyParticipant, LunaCatchUpResponse, Meeting, MeetingMediaRequest, meetingService } from '../services/meetingService';
+import { getMeetingAccessCode, getMeetingJoinUrl, LobbyParticipant, LunaCatchUpResponse, Meeting, MeetingMediaRequest, meetingService } from '../services/meetingService';
 import { mediaTransportService, type MediaTransportStatus } from '../services/mediaTransportService';
 import { createCompositeMeetingRecording, type CompositeRecordingSession } from '../lib/meetingRecording';
 import { getAppLocale } from '../lib/appLanguage';
@@ -220,6 +220,16 @@ const formatTime = (value: string) => {
   return new Intl.DateTimeFormat(getAppLocale(), { hour: '2-digit', minute: '2-digit' }).format(date);
 };
 
+const formatDuration = (seconds: number) => {
+  const total = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  return hours > 0
+    ? [hours, minutes, secs].map((value) => String(value).padStart(2, '0')).join(':')
+    : [minutes, secs].map((value) => String(value).padStart(2, '0')).join(':');
+};
+
 const dedupeMessages = (items: MeetingMessage[]) => {
   const map = new Map(items.map((message) => [message.id, message]));
   return [...map.values()].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
@@ -273,10 +283,13 @@ export default function MeetingRoomV2() {
   const [mediaReady, setMediaReady] = useState(false);
   const [mediaDevices, setMediaDevices] = useState<MediaDeviceInfo[]>([]);
   const [devicePanelOpen, setDevicePanelOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [participantSearch, setParticipantSearch] = useState('');
+  const [clockTick, setClockTick] = useState(Date.now());
   const [selectedAudioInputId, setSelectedAudioInputId] = useState('');
   const [selectedVideoInputId, setSelectedVideoInputId] = useState('');
   const [selectedAudioOutputId, setSelectedAudioOutputId] = useState('');
-  const [viewMode, setViewMode] = useState<'gallery' | 'speaker'>('gallery');
+  const [viewMode, setViewMode] = useState<'participants' | 'gallery' | 'speaker'>('gallery');
   const [pinnedSocketId, setPinnedSocketId] = useState<string | null>(null);
   const [micEnabled, setMicEnabled] = useState(initialMic);
   const [cameraEnabled, setCameraEnabled] = useState(initialCamera);
@@ -286,6 +299,7 @@ export default function MeetingRoomV2() {
   const [serverRecordingId, setServerRecordingId] = useState<string | null>(null);
   const [handRaised, setHandRaised] = useState(false);
   const [raisedHands, setRaisedHands] = useState<Set<number>>(new Set());
+  const [raisedHandTimes, setRaisedHandTimes] = useState<Record<number,string>>({});
   const [reactions, setReactions] = useState<Record<number, string>>({});
   const reactionTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const [reactionPanelOpen, setReactionPanelOpen] = useState(false);
