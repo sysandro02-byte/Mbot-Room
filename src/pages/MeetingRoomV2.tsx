@@ -797,6 +797,7 @@ export default function MeetingRoomV2() {
     socket.on('meeting:lobby-updated', onLobby);
     socket.on('meeting:hand-raised', onHandRaised);
     socket.on('meeting:hands-snapshot', onHandsSnapshot);
+    socket.emit('meeting:hands-request', { meetingId:id });
     socket.on('meeting:reaction', onReaction);
     socket.on('meeting:breakout-assigned', onBreakoutAssigned);
     socket.on('meeting:breakouts-updated', onBreakoutsUpdated);
@@ -1558,6 +1559,7 @@ export default function MeetingRoomV2() {
           ) : speakerViewEnabled && featuredParticipant ? (
             <div className="room-v2-speaker-layout" data-testid="speaker-layout">
               <div className="room-v2-speaker-main">
+                <span className="room-v2-featured-label"><Pin size={14}/> Intervenant actif</span>
                 <VideoTile
                   name={featuredParticipant.name}
                   stream={featuredParticipant.stream}
