@@ -2191,6 +2191,61 @@ export default function MeetingRoomV2() {
         </section>
       ) : null}
 
+      {privateMessageTarget ? (
+        <div className="room-v2-action-modal-backdrop" role="presentation" onMouseDown={() => !privateMessageSending && setPrivateMessageTarget(null)}>
+          <form className="room-v2-action-modal" onSubmit={sendPrivateMessage} onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <div>
+                <strong>Message particulier</strong>
+                <span>À {privateMessageTarget.name}</span>
+              </div>
+              <button type="button" aria-label="Fermer" disabled={privateMessageSending} onClick={() => setPrivateMessageTarget(null)}><X size={18}/></button>
+            </header>
+            <textarea
+              autoFocus
+              value={privateMessageDraft}
+              onChange={(event) => setPrivateMessageDraft(event.target.value)}
+              placeholder="Écrivez votre message privé…"
+              maxLength={4000}
+              rows={4}
+            />
+            <footer>
+              <button type="button" className="secondary" disabled={privateMessageSending} onClick={() => setPrivateMessageTarget(null)}>Annuler</button>
+              <button type="submit" disabled={privateMessageSending || !privateMessageDraft.trim()}>{privateMessageSending ? 'Envoi…' : 'Envoyer'}</button>
+            </footer>
+          </form>
+        </div>
+      ) : null}
+
+      {reportTarget ? (
+        <div className="room-v2-action-modal-backdrop" role="presentation" onMouseDown={() => !reportSending && setReportTarget(null)}>
+          <form className="room-v2-action-modal" onSubmit={submitParticipantReport} onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <div>
+                <strong>Signaler le compte</strong>
+                <span>{reportTarget.name}</span>
+              </div>
+              <button type="button" aria-label="Fermer" disabled={reportSending} onClick={() => setReportTarget(null)}><X size={18}/></button>
+            </header>
+            <label htmlFor="room-v2-report-reason">Raison du signalement</label>
+            <textarea
+              id="room-v2-report-reason"
+              autoFocus
+              value={reportReason}
+              onChange={(event) => setReportReason(event.target.value)}
+              placeholder="Expliquez brièvement le problème…"
+              maxLength={2000}
+              rows={4}
+            />
+            <small>Le signalement sera transmis à l’équipe de modération MBotéRoom avec la réunion concernée.</small>
+            <footer>
+              <button type="button" className="secondary" disabled={reportSending} onClick={() => setReportTarget(null)}>Annuler</button>
+              <button type="submit" className="danger" disabled={reportSending || reportReason.trim().length < 8}>{reportSending ? 'Envoi…' : 'Signaler'}</button>
+            </footer>
+          </form>
+        </div>
+      ) : null}
+
       {captionsEnabled && liveCaptions.captions.length ? (
         <div
           className="room-v2-caption-overlay"
