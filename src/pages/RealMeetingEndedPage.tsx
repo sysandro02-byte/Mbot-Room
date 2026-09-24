@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   Bot,
@@ -11,6 +11,7 @@ import {
   Play,
   RefreshCw,
   Sparkles,
+  Star,
   UsersRound,
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -49,6 +50,10 @@ export default function RealMeetingEndedPage(){
   const [summaryBusy,setSummaryBusy]=useState(false);
   const [restartBusy,setRestartBusy]=useState(false);
   const [restartError,setRestartError]=useState('');
+  const [feedbackRating,setFeedbackRating]=useState(0);
+  const [feedbackComment,setFeedbackComment]=useState('');
+  const [feedbackBusy,setFeedbackBusy]=useState(false);
+  const [feedbackError,setFeedbackError]=useState('');
 
   const load=async()=>{
     if(!meetingId){setLoading(false);return;}
@@ -57,6 +62,8 @@ export default function RealMeetingEndedPage(){
     try{
       const value=await meetingService.getEndedMeeting(meetingId);
       setPayload(value);
+      setFeedbackRating(value.feedback.rating||0);
+      setFeedbackComment(value.feedback.comment||'');
       setMessages(await collaborationService.getMessages(value.meeting.id).catch(()=>[]));
     }catch(cause){
       setError(cause instanceof Error?cause.message:'Impossible de charger le compte rendu.');
@@ -93,6 +100,24 @@ export default function RealMeetingEndedPage(){
     ()=>messages.map((message)=>`[${new Date(message.time).toLocaleString('fr-FR')}] ${message.sender}: ${message.text}`).join('\n'),
     [messages],
   );
+
+  const submitFeedback=async(event:FormEvent<HTMLFormElement>)=>{
+    event.preventDefault();
+    if(!payload||feedbackBusy)return;
+    if(feedbackRating<1||feedbackRating>5){setFeedbackError('Sélectionnez une note entre 1 et 5 étoiles.');return;}
+    const comment=feedbackComment.trim();
+    if(comment.length<3){setFeedbackError('Ajoutez un commentaire sur votre expérience.');return;}
+    setFeedbackBusy(true);
+    setFeedbackError('');
+    try{
+      await meetingService.submitFeedback(payload.meeting.id,feedbackRating,comment);
+      await load();
+    }catch(cause){
+      setFeedbackError(cause instanceof Error?cause.message:'Impossible d’envoyer votre avis.');
+    }finally{
+      setFeedbackBusy(false);
+    }
+  };
 
   const restartMeeting=async()=>{
     if(!payload||restartBusy)return;
@@ -142,6 +167,60 @@ export default function RealMeetingEndedPage(){
   );
 
   if(!payload)return null;
+
+  if(payload.permissions.canRate&&!payload.feedback.submitted)return (
+    <main className="real-ended-feedback-stage">
+      <div className="real-ended-feedback-backdrop">
+        <form className="real-ended-feedback-modal" onSubmit={submitFeedback} aria-labelledby="meeting-feedback-title">
+          <span className="real-ended-feedback-icon"><CheckCircle2 size={30}/></span>
+          <span className="real-ended-feedback-eyebrow">Réunion terminée</span>
+          <h1 id="meeting-feedback-title">Comment s’est passée cette réunion ?</h1>
+          <p>Votre avis aide MBotéRoom à améliorer l’expérience. Le résumé de <strong>{payload.meeting.title}</strong> sera affiché juste après l’envoi.</p>
+
+          <fieldset className="real-ended-feedback-rating">
+            <legend>Votre note</legend>
+            <div className="real-ended-feedback-stars" role="radiogroup" aria-label="Note de la réunion">
+              {[1,2,3,4,5].map((value)=>(
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={feedbackRating===value}
+                  aria-label={`${value} étoile${value>1?'s':''}`}
+                  className={feedbackRating>=value?'is-active':''}
+                  onClick={()=>{setFeedbackRating(value);setFeedbackError('');}}
+                >
+                  <Star size={32} fill={feedbackRating>=value?'currentColor':'none'}/>
+                </button>
+              ))}
+            </div>
+            <strong>{feedbackRating?`${feedbackRating}/5`:'Sélectionnez une note'}</strong>
+          </fieldset>
+
+          <label className="real-ended-feedback-comment">
+            Votre commentaire
+            <textarea
+              value={feedbackComment}
+              onChange={(event)=>{setFeedbackComment(event.target.value.slice(0,1000));setFeedbackError('');}}
+              rows={5}
+              minLength={3}
+              maxLength={1000}
+              placeholder="Dites-nous ce qui a bien fonctionné et ce qui peut être amélioré."
+              required
+            />
+            <small>{feedbackComment.length}/1000</small>
+          </label>
+
+          {feedbackError?<div className="real-ended-feedback-error" role="alert">{feedbackError}</div>:null}
+          <button className="real-ended-feedback-submit" type="submit" disabled={feedbackBusy||feedbackRating<1||feedbackComment.trim().length<3}>
+            {feedbackBusy?<RefreshCw className="is-spinning" size={17}/>:<Star size={17}/>}
+            {feedbackBusy?'Envoi de votre avis…':'Envoyer mon avis et voir le résumé'}
+          </button>
+          <small className="real-ended-feedback-note">Un seul avis est enregistré par participant et par réunion.</small>
+        </form>
+      </div>
+    </main>
+  );
 
   const summaryState=payload.summary.processingStatus;
 
