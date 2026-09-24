@@ -1015,3 +1015,48 @@
     animation: none;
   }
 }
+
+/* Waiting room cancel/exit action */
+.waiting-notice-copy{min-width:0;flex:1}
+.waiting-cancel-request{
+  min-height:42px;
+  flex:0 0 auto;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  margin-left:auto;
+  padding:0 16px;
+  border:1px solid rgba(0,126,131,.34);
+  border-radius:10px;
+  background:#eef9f8;
+  color:#007e83;
+  font:inherit;
+  font-size:12px;
+  font-weight:850;
+  cursor:pointer;
+  transition:transform .16s ease,background .16s ease,border-color .16s ease;
+}
+.waiting-cancel-request:hover:not(:disabled){
+  transform:translateY(-1px);
+  border-color:#007e83;
+  background:#e1f5f3;
+}
+.waiting-cancel-request:disabled,
+.waiting-leave-button:disabled,
+.waiting-controls-leave:disabled{
+  opacity:.6;
+  cursor:not-allowed;
+}
+@media(max-width:760px){
+  .waiting-notice{
+    flex-wrap:wrap;
+  }
+  .waiting-notice-copy{
+    flex:1 1 calc(100% - 82px);
+  }
+  .waiting-cancel-request{
+    width:100%;
+    margin-left:0;
+  }
+}
