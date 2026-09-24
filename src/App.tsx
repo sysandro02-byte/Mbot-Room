@@ -1,4 +1,4 @@
-import { lazy, ReactNode, Suspense, useEffect, useState } from 'react';
+import { ReactNode, Suspense, useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { authService } from './services/authService';
@@ -9,29 +9,31 @@ import AppMessageModal from './components/AppMessageModal';
 import UserPreferencesRuntime from './components/UserPreferencesRuntime';
 import { sanitizeInternalPath } from './lib/navigationSecurity';
 import { AppLanguageBridge } from './lib/appLanguage';
+import { lazyWithRetry } from './lib/lazyWithRetry';
+import AppErrorBoundary from './components/AppErrorBoundary';
 
-const RealMeetingList = lazy(() => import('./components/RealMeetingList'));
-const AppShell = lazy(() => import('./components/AppShell'));
-const RealJoinPage = lazy(() => import('./pages/RealJoinPage'));
-const CalendarPage = lazy(() => import('./pages/CalendarPage'));
-const GuestJoinPage = lazy(() => import('./pages/GuestJoinPage'));
-const MeetingRoomV2 = lazy(() => import('./pages/MeetingRoomV2'));
-const GuestWaitingRoomPage = lazy(() => import('./pages/GuestWaitingRoomPage'));
-const RealMeetingEndedPage = lazy(() => import('./pages/RealMeetingEndedPage'));
-const RealFeaturePage = lazy(() => import('./pages/RealFeaturePage'));
-const RealDashboardPage = lazy(() => import('./pages/dashboard/RealDashboardPage'));
-const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
-const AdminAuthPage = lazy(() => import('./pages/admin/AdminAuthPage'));
-const GlobalSearchPage = lazy(() => import('./pages/GlobalSearchPage'));
-const HelpPage = lazy(() => import('./pages/HelpPage'));
-const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
-const MessagesPage = lazy(() => import('./pages/MessagesPage'));
-const ContactsPage = lazy(() => import('./pages/ContactsPage'));
-const RecordingsPage = lazy(() => import('./pages/RecordingsPage'));
-const ProfilePage = lazy(() => import('./pages/ProfilePage'));
-const FilesPage = lazy(() => import('./pages/FilesPage'));
-const WorkGroupsPage = lazy(() => import('./pages/WorkGroupsPage'));
-const Login = lazy(() => import('./pages/Login'));
+const RealMeetingList = lazyWithRetry(() => import('./components/RealMeetingList'));
+const AppShell = lazyWithRetry(() => import('./components/AppShell'));
+const RealJoinPage = lazyWithRetry(() => import('./pages/RealJoinPage'));
+const CalendarPage = lazyWithRetry(() => import('./pages/CalendarPage'));
+const GuestJoinPage = lazyWithRetry(() => import('./pages/GuestJoinPage'));
+const MeetingRoomV2 = lazyWithRetry(() => import('./pages/MeetingRoomV2'));
+const GuestWaitingRoomPage = lazyWithRetry(() => import('./pages/GuestWaitingRoomPage'));
+const RealMeetingEndedPage = lazyWithRetry(() => import('./pages/RealMeetingEndedPage'));
+const RealFeaturePage = lazyWithRetry(() => import('./pages/RealFeaturePage'));
+const RealDashboardPage = lazyWithRetry(() => import('./pages/dashboard/RealDashboardPage'));
+const AdminDashboardPage = lazyWithRetry(() => import('./pages/admin/AdminDashboardPage'));
+const AdminAuthPage = lazyWithRetry(() => import('./pages/admin/AdminAuthPage'));
+const GlobalSearchPage = lazyWithRetry(() => import('./pages/GlobalSearchPage'));
+const HelpPage = lazyWithRetry(() => import('./pages/HelpPage'));
+const NotificationsPage = lazyWithRetry(() => import('./pages/NotificationsPage'));
+const MessagesPage = lazyWithRetry(() => import('./pages/MessagesPage'));
+const ContactsPage = lazyWithRetry(() => import('./pages/ContactsPage'));
+const RecordingsPage = lazyWithRetry(() => import('./pages/RecordingsPage'));
+const ProfilePage = lazyWithRetry(() => import('./pages/ProfilePage'));
+const FilesPage = lazyWithRetry(() => import('./pages/FilesPage'));
+const WorkGroupsPage = lazyWithRetry(() => import('./pages/WorkGroupsPage'));
+const Login = lazyWithRetry(() => import('./pages/Login'));
 
 function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: boolean }) {
   const location = useLocation();
@@ -132,7 +134,12 @@ function SimpleInfoPage({ title, description }: { title: string; description: st
 }
 
 export default function App() {
-  return <><AppLanguageBridge/><UserPreferencesRuntime/><AppMessageModal/><MobileSplash/><PwaExperience/><SessionSecurity/><Suspense fallback={<main className="route-loading" role="status" aria-live="polite">Chargement de MBotéRoom…</main>}><Routes>
+  useEffect(() => {
+    const timer = window.setTimeout(() => sessionStorage.removeItem('mboteroom-runtime-recovery'), 5000);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  return <AppErrorBoundary><><AppLanguageBridge/><UserPreferencesRuntime/><AppMessageModal/><MobileSplash/><PwaExperience/><SessionSecurity/><Suspense fallback={<main className="route-loading" role="status" aria-live="polite">Chargement de MBotéRoom…</main>}><Routes>
     <Route path="/login" element={<Login />} />
     <Route path="/connexion" element={<Login />} />
     <Route path="/inscription" element={<Login initialView="register" />} />
@@ -173,5 +180,5 @@ export default function App() {
     <Route path="/join" element={<ProtectedRoute><AppShell title="Rejoindre"><RealJoinPage /></AppShell></ProtectedRoute>} />
     <Route path="/join/:meetingLink" element={<ProtectedRoute><AppShell title="Rejoindre"><RealJoinPage /></AppShell></ProtectedRoute>} />
     <Route path="*" element={<Navigate to="/app" replace />} />
-  </Routes></Suspense></>;
+  </Routes></Suspense></></AppErrorBoundary>;
 }
