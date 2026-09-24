@@ -24,6 +24,8 @@
   transition:opacity .18s ease,padding .18s ease,width .18s ease
 }
 .app-shell.is-sidebar-collapsed{grid-template-columns:0 minmax(0,1fr)}
+.app-shell.is-guest-shell{grid-template-columns:minmax(0,1fr)}
+.app-shell.is-guest-shell .app-shell-workspace{grid-column:1/-1}
 .app-shell.is-sidebar-collapsed .app-shell-sidebar{
   width:0;
   min-width:0;
