@@ -114,7 +114,11 @@ const rateLimit = (limit: number, windowMs: number): express.RequestHandler => (
   const now = Date.now();
   cleanupRateBuckets(now);
   const routeKey = String(request.originalUrl || request.path).split('?')[0];
-  const key = `${request.ip}:${routeKey}`;
+  const authIdentity = routeKey.startsWith('/api/auth/')
+    ? String(request.body?.challengeId || request.body?.email || request.body?.meetingCode || '')
+        .trim().toLowerCase().slice(0, 180)
+    : '';
+  const key = `${request.ip}:${routeKey}:${authIdentity || '-'}`;
   const current = rateBuckets.get(key);
   if (!current || current.resetAt <= now) {
     rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
@@ -136,9 +140,13 @@ app.post('/api/auth/login', rateLimit(10, 60_000));
 app.post('/api/auth/register', rateLimit(8, 60_000));
 app.post('/api/auth/forgot-password', rateLimit(5, 60_000));
 app.use('/api/auth', rateLimit(60, 60_000));
+app.post('/api/meetings/:meetingId/join-request', rateLimit(20, 60_000));
+app.post('/api/meetings/:meetingId/lobby/respond', rateLimit(60, 60_000));
+app.post('/api/meetings/:meetingId/lobby/admit-all', rateLimit(20, 60_000));
 app.post('/api/meetings/:meetingId/luna/catch-up', rateLimit(10, 60_000));
 app.use('/api/meetings', rateLimit(240, 60_000));
 app.use('/api/ai', rateLimit(30, 60_000));
+app.use('/api', rateLimit(600, 60_000));
 
 registerAuthRoutes(app);
 registerMeetingRoutes(app, io);
@@ -155,7 +163,16 @@ app.use('/api', (_request, response) => {
   response.status(404).json({ error: 'API introuvable.', code: 'API_NOT_FOUND' });
 });
 
-app.use(express.static(rootDir));
+app.use((request, response, next) => {
+  const requestPath = String(request.path || '').toLowerCase();
+  if (requestPath === '/server.js' || requestPath === '/server.js.map' || requestPath.endsWith('.map')) {
+    response.setHeader('Cache-Control', 'no-store');
+    response.status(404).end();
+    return;
+  }
+  next();
+});
+app.use(express.static(rootDir, { dotfiles: 'deny', index: false, fallthrough: true }));
 app.get('*', (_request, response) => {
   response.sendFile(path.join(rootDir, 'index.html'));
 });
