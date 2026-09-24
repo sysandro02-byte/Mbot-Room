@@ -6,7 +6,8 @@ export type PlatformSettingKey =
   | 'meetingCreationEnabled'
   | 'lunaEnabled'
   | 'recordingEnabled'
-  | 'publicMeetingsEnabled';
+  | 'publicMeetingsEnabled'
+  | 'premiumPaymentEnabled';
 
 export type PlatformSettings = Record<PlatformSettingKey, boolean>;
 
@@ -17,6 +18,7 @@ export const platformSettingDefaults: PlatformSettings = {
   lunaEnabled: true,
   recordingEnabled: true,
   publicMeetingsEnabled: true,
+  premiumPaymentEnabled: false,
 };
 
 export const getPlatformSettings = async (): Promise<PlatformSettings> => {
