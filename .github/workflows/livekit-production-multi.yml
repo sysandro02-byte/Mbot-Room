@@ -36,5 +36,5 @@ jobs:
         env:
           MBOTE_ROOM_FRONTEND_URL: https://mbote-room.vercel.app
           MBOTE_ROOM_BACKEND_URL: https://mbote-room-api.onrender.com
-          MBOTE_ROOM_SMOKE_APP_URL: https://mboteroom.loukatech.com
+          MBOTE_ROOM_SMOKE_APP_URL: https://mbote-room-api.onrender.com
         run: node scripts/test-production-livekit-multi.mjs
