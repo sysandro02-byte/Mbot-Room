@@ -307,29 +307,48 @@ export default function AdminControlCenter(){
     </section>
 
     <section className="admin-users-card" id="admin-users">
-      <header><div><span className="admin-control-icon"><UsersRound size={20}/></span><div><h2>Utilisateurs</h2><p>Consultez, modifiez ou suspendez les comptes.</p></div></div><strong>{users.length} compte(s)</strong></header>
-      <label className="admin-users-search"><Search size={17}/><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Rechercher un nom, une adresse ou une organisation"/></label>
+      <header><div><span className="admin-control-icon"><UsersRound size={20}/></span><div><h2>Utilisateurs</h2><p>Filtrez les comptes par pays, ville, âge, entreprise et état, puis appliquez des restrictions.</p></div></div><strong>{filtered.length} / {users.length} compte(s)</strong></header>
+      <div className="admin-user-filters">
+        <label className="admin-users-search"><Search size={17}/><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Nom, e-mail, entreprise…"/></label>
+        <select value={countryFilter} onChange={event=>{setCountryFilter(event.target.value);setCityFilter('');}}><option value="">Tous les pays</option>{countries.map(value=><option key={value}>{value}</option>)}</select>
+        <select value={cityFilter} onChange={event=>setCityFilter(event.target.value)}><option value="">Toutes les villes</option>{cities.map(value=><option key={value}>{value}</option>)}</select>
+        <select value={organizationFilter} onChange={event=>setOrganizationFilter(event.target.value)}><option value="">Toutes les entreprises</option>{organizations.map(value=><option key={value}>{value}</option>)}</select>
+        <select value={statusFilter} onChange={event=>setStatusFilter(event.target.value)}><option value="">Tous les états</option><option value="active">Actifs</option><option value="quarantined">Quarantaine</option><option value="banned">Bannis</option><option value="suspended">Suspendus</option></select>
+        <input className="admin-age-filter" type="number" min="0" max="120" placeholder="Âge min." value={minAge} onChange={event=>setMinAge(event.target.value)}/>
+        <input className="admin-age-filter" type="number" min="0" max="120" placeholder="Âge max." value={maxAge} onChange={event=>setMaxAge(event.target.value)}/>
+      </div>
       <div className="admin-users-table-wrap">
-        <table className="admin-users-table"><thead><tr><th>Utilisateur</th><th>Organisation</th><th>Rôle</th><th>État</th><th>Actions</th></tr></thead>
+        <table className="admin-users-table"><thead><tr><th>Utilisateur</th><th>Localisation / âge</th><th>Entreprise</th><th>État</th><th>Actions</th></tr></thead>
           <tbody>{filtered.map(user=><tr key={user.id}>
-            <td><div className="admin-user-identity"><span>{user.name.slice(0,2).toUpperCase()}</span><div><strong>{user.name}</strong><small>{user.email}</small></div></div></td>
+            <td><div className="admin-user-identity"><span>{user.name.slice(0,2).toUpperCase()}</span><div><strong>{user.name}</strong><small>{user.email}</small><small>@{user.username}</small></div></div></td>
+            <td><strong className="admin-user-location"><MapPin size={12}/>{[user.city,user.country].filter(Boolean).join(', ')||'—'}</strong><small>{user.age!==null?user.age+' ans':'Âge non renseigné'}</small></td>
             <td><strong>{user.organization||'—'}</strong><small>{user.jobTitle||''}</small></td>
-            <td><span className={'admin-role-badge is-'+user.role}>{user.role==='admin'?'Administrateur':user.isGuest?'Invité':'Utilisateur'}</span></td>
-            <td><span className={user.isSuspended?'admin-state-badge is-suspended':'admin-state-badge is-active'}>{user.isSuspended?'Suspendu':'Actif'}</span></td>
-            <td><div className="admin-user-actions"><button type="button" onClick={()=>startEdit(user)}><UserCog size={15}/> Modifier</button><button type="button" className={user.isSuspended?'is-restore':'is-danger'} onClick={()=>void toggleSuspension(user)} disabled={busy||String(user.id)===String(current?.id)}>{user.isSuspended?<><CheckCircle2 size={15}/> Réactiver</>:<><Ban size={15}/> Suspendre</>}</button><button type="button" onClick={()=>setRevokeTarget(user)} disabled={busy||String(user.id)===String(current?.id)} title="Fermer toutes les sessions de ce compte"><LogOut size={15}/> Déconnecter</button></div></td>
+            <td><span className={user.isSuspended?'admin-state-badge is-suspended':'admin-state-badge is-'+user.accountStatus}>{user.isSuspended?'Suspendu':user.accountStatus==='quarantined'?'Quarantaine':user.accountStatus==='banned'?'Banni':'Actif'}</span>{user.featureRestrictions?.length?<small>{user.featureRestrictions.length} fonction(s) bloquée(s)</small>:null}</td>
+            <td><div className="admin-user-actions">
+              <button type="button" onClick={()=>startEdit(user)}><UserCog size={15}/> Gérer</button>
+              {user.accountStatus==='active'?<button type="button" onClick={()=>void setAccountStatus(user,'quarantined')} disabled={busy||String(user.id)===String(current?.id)}><ShieldAlert size={15}/> Quarantaine</button>:<button type="button" className="is-restore" onClick={()=>void setAccountStatus(user,'active')} disabled={busy||String(user.id)===String(current?.id)}><CheckCircle2 size={15}/> Activer</button>}
+              {user.accountStatus!=='banned'?<button type="button" className="is-danger" onClick={()=>void setAccountStatus(user,'banned')} disabled={busy||String(user.id)===String(current?.id)}><Ban size={15}/> Bannir</button>:null}
+              <button type="button" onClick={()=>setRevokeTarget(user)} disabled={busy||String(user.id)===String(current?.id)} title="Fermer toutes les sessions de ce compte"><LogOut size={15}/> Déconnecter</button>
+            </div></td>
           </tr>)}</tbody></table>
       </div>
-      {!filtered.length&&<p className="admin-control-empty">Aucun compte ne correspond à cette recherche.</p>}
+      {!filtered.length&&<p className="admin-control-empty">Aucun compte ne correspond aux filtres.</p>}
     </section>
 
     {editing&&<div className="admin-edit-backdrop" onMouseDown={()=>setEditing(null)}>
-      <form className="admin-edit-user" onSubmit={saveUser} onMouseDown={event=>event.stopPropagation()}>
-        <header><span><UserCog size={21}/></span><div><h2>Modifier le compte</h2><p>{editing.email}</p></div></header>
-        <label>Nom complet<input value={draft.name} onChange={e=>setDraft(v=>({...v,name:e.target.value}))} required maxLength={120}/></label>
-        <label>Téléphone<input value={draft.phoneNumber} onChange={e=>setDraft(v=>({...v,phoneNumber:e.target.value}))} maxLength={40}/></label>
-        <label>Organisation<input value={draft.organization} onChange={e=>setDraft(v=>({...v,organization:e.target.value}))} maxLength={120}/></label>
-        <label>Fonction<input value={draft.jobTitle} onChange={e=>setDraft(v=>({...v,jobTitle:e.target.value}))} maxLength={120}/></label>
-        <div><button type="button" onClick={()=>setEditing(null)}>Annuler</button><button type="submit" className="primary" disabled={busy}><Save size={16}/> Enregistrer</button></div>
+      <form className="admin-edit-user admin-edit-user-wide" onSubmit={saveUser} onMouseDown={event=>event.stopPropagation()}>
+        <header><span><UserCog size={21}/></span><div><h2>Gérer le compte</h2><p>{editing.email}</p></div></header>
+        <div className="admin-edit-grid">
+          <label>Nom complet<input value={draft.name} onChange={event=>setDraft(value=>({...value,name:event.target.value}))} required maxLength={120}/></label>
+          <label>Téléphone<input value={draft.phoneNumber} onChange={event=>setDraft(value=>({...value,phoneNumber:event.target.value}))} maxLength={40}/></label>
+          <label>Organisation<input value={draft.organization} onChange={event=>setDraft(value=>({...value,organization:event.target.value}))} maxLength={120}/></label>
+          <label>Fonction<input value={draft.jobTitle} onChange={event=>setDraft(value=>({...value,jobTitle:event.target.value}))} maxLength={120}/></label>
+          <label>Pays<input value={draft.country} onChange={event=>setDraft(value=>({...value,country:event.target.value}))} maxLength={120}/></label>
+          <label>Ville<input value={draft.city} onChange={event=>setDraft(value=>({...value,city:event.target.value}))} maxLength={120}/></label>
+          <label className="wide">État du compte<select value={draft.accountStatus} onChange={event=>setDraft(value=>({...value,accountStatus:event.target.value as AdminManagedUser['accountStatus']}))}><option value="active">Actif</option><option value="quarantined">Quarantaine</option><option value="banned">Banni</option></select></label>
+        </div>
+        <fieldset className="admin-feature-restrictions"><legend>Fonctionnalités bloquées pour ce compte</legend>{restrictionOptions.map(option=><label key={option.id}><input type="checkbox" checked={draft.featureRestrictions.includes(option.id)} onChange={event=>setDraft(value=>({...value,featureRestrictions:event.target.checked?[...value.featureRestrictions,option.id]:value.featureRestrictions.filter(item=>item!==option.id)}))}/><span>{option.label}</span></label>)}</fieldset>
+        <div className="admin-edit-actions"><button type="button" onClick={()=>setEditing(null)}>Annuler</button><button type="submit" className="primary" disabled={busy}><Save size={16}/> Enregistrer</button></div>
       </form>
     </div>}
 
