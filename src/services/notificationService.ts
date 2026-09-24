@@ -41,7 +41,7 @@ const currentSubscription=async()=>{
 };
 
 export const notificationService={
-  async list(){return readJson<RoomNotification[]>(await apiFetch(apiUrl('/api/notifications'),{headers:getAuthHeaders()}));},
+  async list(timeoutMs=45_000){return readJson<RoomNotification[]>(await apiFetch(apiUrl('/api/notifications'),{headers:getAuthHeaders()},timeoutMs));},
   async markRead(id:string){return readJson<RoomNotification>(await apiFetch(apiUrl(`/api/notifications/${encodeURIComponent(id)}/read`),{method:'POST',headers:getAuthHeaders()}));},
   async markAllRead(){return readJson<{success:boolean}>(await apiFetch(apiUrl('/api/notifications/read-all'),{method:'POST',headers:getAuthHeaders()}));},
 
