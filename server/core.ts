@@ -279,36 +279,71 @@ export const getRawSessionToken = (authorization: unknown, cookieHeader: unknown
 export const getRawSessionTokenFromRequest = (request: express.Request) =>
   getBearerToken(request) || getCookieValue(request.headers.cookie, SESSION_COOKIE_NAME);
 
-export const SESSION_IDLE_TIMEOUT_MS = Math.max(60_000, Math.min(60 * 60_000, Number(process.env.MBOTE_ROOM_IDLE_TIMEOUT_MS || 5 * 60_000)));
+export const SESSION_IDLE_TIMEOUT_MS = Math.max(60_000, Math.min(4 * 60 * 60_000, Number(process.env.MBOTE_ROOM_IDLE_TIMEOUT_MS || 5 * 60_000)));
+export const SESSION_IDLE_MINUTES = [0, 5, 15, 30, 60, 240] as const;
+
+const sessionIdleTimeoutMs = (preferences: unknown) => {
+  const source = preferences && typeof preferences === 'object' && !Array.isArray(preferences)
+    ? preferences as Record<string, unknown>
+    : {};
+  const requested = Number(source.automaticLogoutMinutes);
+  if (SESSION_IDLE_MINUTES.includes(requested as (typeof SESSION_IDLE_MINUTES)[number])) {
+    return requested === 0 ? 0 : requested * 60_000;
+  }
+  return SESSION_IDLE_TIMEOUT_MS;
+};
+
+const isSessionIdleExpired = (row: any) => {
+  const timeoutMs = sessionIdleTimeoutMs(row.session_preferences);
+  if (timeoutMs === 0) return false;
+  const lastActivity = new Date(row.session_last_activity || row.session_created_at || 0).getTime();
+  return !Number.isFinite(lastActivity) || Date.now() - lastActivity > timeoutMs;
+};
 
 export const getUserByRawToken = async (rawToken: string): Promise<PublicUser | null> => {
   if (!hasDatabase() || !rawToken) return null;
-  const idleCutoff = new Date(Date.now() - SESSION_IDLE_TIMEOUT_MS).toISOString();
   const result = await query(
-    `SELECT u.* FROM room_sessions s
+    `SELECT u.*,
+            s.last_activity AS session_last_activity,
+            s.created_at AS session_created_at,
+            COALESCE(pref.preferences,'{}'::jsonb) AS session_preferences
+       FROM room_sessions s
        JOIN room_users u ON u.id = s.user_id
+       LEFT JOIN room_user_preferences pref ON pref.user_id=u.id
       WHERE s.token_hash = $1
         AND s.expires_at::timestamptz > now()
         AND COALESCE(u.is_suspended,false)=false
         AND COALESCE(u.account_status,'active') <> 'banned'
-        AND COALESCE(s.last_activity, s.created_at::timestamptz) > $2::timestamptz
       LIMIT 1`,
-    [hashToken(rawToken), idleCutoff],
+    [hashToken(rawToken)],
   );
-  return result.rows[0] ? toPublicUser(result.rows[0]) : null;
+  const row = result.rows[0];
+  if (!row || isSessionIdleExpired(row)) return null;
+  return toPublicUser(row);
 };
 
 export const touchSessionActivity = async (rawToken: string) => {
   if (!hasDatabase() || !rawToken) return false;
-  const idleCutoff = new Date(Date.now() - SESSION_IDLE_TIMEOUT_MS).toISOString();
+  const tokenHash = hashToken(rawToken);
+  const current = await query(
+    `SELECT s.token_hash,
+            s.last_activity AS session_last_activity,
+            s.created_at AS session_created_at,
+            COALESCE(pref.preferences,'{}'::jsonb) AS session_preferences
+       FROM room_sessions s
+       LEFT JOIN room_user_preferences pref ON pref.user_id=s.user_id
+      WHERE s.token_hash=$1
+        AND s.expires_at::timestamptz > now()
+      LIMIT 1`,
+    [tokenHash],
+  );
+  const row = current.rows[0];
+  if (!row || isSessionIdleExpired(row)) return false;
   const result = await query(
-    `UPDATE room_sessions
-        SET last_activity=now()
-      WHERE token_hash=$1
-        AND expires_at::timestamptz > now()
-        AND COALESCE(last_activity, created_at::timestamptz) > $2::timestamptz
+    `UPDATE room_sessions SET last_activity=now()
+      WHERE token_hash=$1 AND expires_at::timestamptz > now()
       RETURNING token_hash`,
-    [hashToken(rawToken), idleCutoff],
+    [tokenHash],
   );
   return Boolean(result.rows[0]);
 };
