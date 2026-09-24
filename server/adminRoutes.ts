@@ -49,6 +49,24 @@ const rowToHomeSlide = (row: any) => ({
   updatedAt: new Date(row.updated_at).toISOString(),
 });
 
+const rowToLoginBranding = (row: any) => ({
+  wordmarkUrl: String(row?.wordmark_url || '/icons/mboteroom-wordmark.png'),
+  illustrationUrl: String(row?.illustration_url || '/images/meeting-black-team.svg'),
+  updatedAt: row?.updated_at ? new Date(row.updated_at).toISOString() : new Date().toISOString(),
+});
+
+const safeManagedImageUrl = (value: unknown) => {
+  const imageUrl = String(value || '').trim().slice(0, 1000);
+  if (!imageUrl) return '';
+  if (imageUrl.startsWith('/') && !imageUrl.startsWith('//') && !imageUrl.includes('\\')) return imageUrl;
+  try {
+    const parsed = new URL(imageUrl);
+    return parsed.protocol === 'https:' ? parsed.href : '';
+  } catch {
+    return '';
+  }
+};
+
 const safeHomeSlidePath = (value: unknown) => {
   const path = String(value || '').trim().slice(0, 300);
   if (!path) return '';
@@ -273,6 +291,42 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
     try{const result=await query(`UPDATE room_dashboard_tips SET title=$2,body=$3,action_label=$4,action_path=$5,is_active=$6,updated_at=now() WHERE id=$1 RETURNING *`,[request.params.tipId,normalizeText(request.body?.title).slice(0,160),normalizeText(request.body?.body).slice(0,1000),normalizeText(request.body?.actionLabel).slice(0,80),String(request.body?.actionPath||'').slice(0,300),request.body?.isActive!==false]);if(!result.rows[0])return sendApiError(response,404,'TIP_NOT_FOUND','Astuce introuvable.');const tip=rowToTip(result.rows[0]);io.emit('dashboard:tips-updated',tip);response.json(tip);}catch(error){next(error);}
   });
   app.delete('/api/admin/dashboard-tips/:tipId', ...adminApi, async (request,response,next)=>{try{await query('DELETE FROM room_dashboard_tips WHERE id=$1',[request.params.tipId]);io.emit('dashboard:tips-updated');response.status(204).end();}catch(error){next(error);}});
+
+  app.get('/api/public/login-branding', requireDatabase, async (_request,response,next)=>{
+    try {
+      const result = await query('SELECT * FROM room_login_branding WHERE id=1 LIMIT 1');
+      response.setHeader('Cache-Control','no-store');
+      response.json(rowToLoginBranding(result.rows[0]));
+    } catch (error) { next(error); }
+  });
+
+  app.get('/api/admin/login-branding', ...adminApi, async (_request,response,next)=>{
+    try {
+      const result = await query('SELECT * FROM room_login_branding WHERE id=1 LIMIT 1');
+      response.setHeader('Cache-Control','no-store');
+      response.json(rowToLoginBranding(result.rows[0]));
+    } catch (error) { next(error); }
+  });
+
+  app.put('/api/admin/login-branding', ...adminApi, async (request,response,next)=>{
+    try {
+      const wordmarkUrl = safeManagedImageUrl(request.body?.wordmarkUrl);
+      const illustrationUrl = safeManagedImageUrl(request.body?.illustrationUrl);
+      if (!wordmarkUrl || !illustrationUrl) {
+        return sendApiError(response,400,'LOGIN_BRANDING_IMAGE_INVALID','Utilisez un chemin interne valide ou une URL HTTPS pour chaque image.');
+      }
+      const result = await query(
+        `INSERT INTO room_login_branding (id,wordmark_url,illustration_url,updated_at)
+         VALUES (1,$1,$2,now())
+         ON CONFLICT (id) DO UPDATE SET wordmark_url=excluded.wordmark_url,illustration_url=excluded.illustration_url,updated_at=now()
+         RETURNING *`,
+        [wordmarkUrl,illustrationUrl],
+      );
+      const branding = rowToLoginBranding(result.rows[0]);
+      io.emit('login:branding-updated', branding);
+      response.json(branding);
+    } catch (error) { next(error); }
+  });
 
   app.get('/api/dashboard/slides', requireDatabase, authenticateToken, async (_request,response,next)=>{
     try {
