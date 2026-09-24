@@ -382,11 +382,18 @@ try {
   assert.ok(relayDiagnostics.host.relayCandidates > 0);
   assert.ok(relayDiagnostics.guest.relayCandidates > 0);
 
-  const chat = await api(`/api/meetings/${meeting.id}/messages`, {
+  const guestChat = await api(`/api/meetings/${meeting.id}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ text: 'Ce message invité doit rester bloqué par défaut.' }),
+  }, guest.token);
+  assert.equal(guestChat.response.status, 403, JSON.stringify(guestChat.data));
+  assert.equal(guestChat.data.code, 'GUEST_CHAT_DISABLED');
+
+  const hostChat = await api(`/api/meetings/${meeting.id}/messages`, {
     method: 'POST',
     body: JSON.stringify({ text: 'Décision smoke: le test TURN et WebRTC de production est validé.' }),
-  }, guest.token);
-  assert.equal(chat.response.status, 201, JSON.stringify(chat.data));
+  }, host.token);
+  assert.equal(hostChat.response.status, 201, JSON.stringify(hostChat.data));
 
   const luna = await api('/api/ai/luna', {
     method: 'POST',
