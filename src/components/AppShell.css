@@ -165,3 +165,8 @@
 @media(prefers-reduced-motion:reduce){
   .app-shell-sidebar,.app-shell-nav a{transition:none}
 }
+
+/* GlobalHeader replaces the legacy AppShell header on every route. */
+.app-shell-header{display:none!important}
+.app-shell,.app-shell-workspace{min-height:calc(100dvh - 64px)}
+@media(max-width:500px){.app-shell,.app-shell-workspace{min-height:calc(100dvh - 58px)}}
