@@ -1570,7 +1570,7 @@ export default function MeetingRoomV2() {
           <span className="room-v2-secure-status"><ShieldCheck size={18}/> <i/> Connecté</span>
           <span className={meeting.is_active ? 'room-v2-live-pill is-live' : 'room-v2-live-pill'}>
             <Radio size={16}/>
-            <span>{meeting.is_active ? 'En cours' : 'Programmée'}<small>{meeting.is_active ? formatDuration(elapsedSeconds) : formatTime(meeting.start_time)}</small></span>
+            <span>{meeting.is_active ? 'En cours' : 'Programmée'}<small data-testid={meeting.is_active ? 'meeting-chrono' : undefined}>{meeting.is_active ? formatDuration(elapsedSeconds) : formatTime(meeting.start_time)}</small></span>
           </span>
           {isModerator && !meeting.is_active ? <button className="room-v2-start" type="button" onClick={startMeeting}>Démarrer</button> : null}
           <button className="room-v2-header-icon" type="button" aria-label="Participants" onClick={() => setPanel(panel === 'participants' ? null : 'participants')}><UsersRound/></button>
