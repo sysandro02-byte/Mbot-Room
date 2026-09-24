@@ -24,6 +24,7 @@ import { authService, type RoomUser } from '../services/authService';
 import { getStoredLanguage, persistAppLanguage, type AppLanguage } from '../lib/appLanguage';
 import { showAppMessage } from '../lib/appMessage';
 import './ProfilePage.css';
+import AppLoader from '../components/AppLoader';
 
 const initials=(name:string)=>name.split(/\s+/).filter(Boolean).slice(0,2).map((part)=>part[0]?.toUpperCase()).join('')||'MB';
 const languages:Record<AppLanguage,string>={fr:'Français (FR)',en:'English (EN)',ln:'Lingala',ar:'العربية'};
@@ -185,7 +186,7 @@ export default function ProfilePage(){
             <span className={profile.profileVisible===false?'profile-pro-visibility off':'profile-pro-visibility'}><Globe2/> {profile.profileVisible===false?'Profil privé':'Profil visible'}<small>{profile.profileVisible===false?'Seulement vous':'Visible par vos contacts'}</small></span>
           </header>
 
-          {loading?<div className="profile-pro-loading">Chargement du profil…</div>:<form ref={formRef} onSubmit={save}>
+          {loading?<AppLoader label="Chargement du profil…" />:<form ref={formRef} onSubmit={save}>
             <label>Nom complet<input value={profile.name||''} onChange={(event)=>update({name:event.target.value})} required/></label>
             <label>Nom d’utilisateur<input value={profile.username||''} onChange={(event)=>update({username:event.target.value})} required/></label>
             <label>E-mail<input value={profile.email||''} readOnly/><small>Adresse de connexion</small></label>
