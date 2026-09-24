@@ -34,7 +34,7 @@ export default function MobileSplash(){
     <div className="mobile-splash-orb two"/>
     <section className="mobile-splash-content">
       <div className="mobile-splash-logo-wrap">
-        <img src="/icons/mboteroom-192.png" alt="" className="mobile-splash-logo"/>
+        <img src="/icons/mboteroom-symbol.png" alt="" className="mobile-splash-logo"/>
         <span className="mobile-splash-ring"/>
       </div>
       <div className="mobile-splash-brand">
