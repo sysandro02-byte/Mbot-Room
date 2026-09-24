@@ -26,6 +26,7 @@ import {
 import { sendTransactionalEmail } from './emailDelivery.js';
 import { resolveAllowedClientOrigin } from './originPolicy.js';
 import { isPlatformFeatureEnabled } from './platformSettings.js';
+import { companyCategories, getRegistrationCountry, isRegistrationCity } from '../src/lib/registrationCatalog.js';
 
 const challenges = new Map<string, { profile: any; createdAt: number }>();
 const oauthStates = new Map<string, { redirectTo: string; clientOrigin: string; createdAt: number }>();
@@ -349,14 +350,31 @@ export const registerAuthRoutes = (app: express.Express) => {
         return sendApiError(response, 403, 'ADMIN_REGISTRATION_REQUIRED', 'Utilisez l’espace administrateur pour créer ce compte.');
       }
       const role = 'user';
+      const country = normalizeText(request.body?.country).slice(0, 120);
+      const city = normalizeText(request.body?.city).slice(0, 120);
+      const selectedCountry = getRegistrationCountry(country);
+      if (!selectedCountry) {
+        return sendApiError(response, 400, 'COUNTRY_REQUIRED', 'Sélectionnez un pays dans la liste.');
+      }
+      if (!city || !isRegistrationCity(country, city)) {
+        return sendApiError(response, 400, 'CITY_REQUIRED', 'Sélectionnez une ville correspondant au pays choisi.');
+      }
+      const organizationCategory = normalizeText(request.body?.organizationCategory).slice(0, 120);
+      if (organizationCategory && !(companyCategories as readonly string[]).includes(organizationCategory)) {
+        return sendApiError(response, 400, 'ORGANIZATION_CATEGORY_INVALID', 'Sélectionnez une catégorie d’entreprise valide.');
+      }
+      const phoneNumber = normalizeText(request.body?.phoneNumber).slice(0, 40);
+      if (phoneNumber && !phoneNumber.startsWith(selectedCountry.dialCode)) {
+        return sendApiError(response, 400, 'PHONE_COUNTRY_MISMATCH', 'L’indicatif du téléphone doit correspondre au pays sélectionné.');
+      }
       const birthDate = normalizeText(request.body?.birthDate).slice(0, 10);
       if (birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
         return sendApiError(response, 400, 'INVALID_BIRTH_DATE', 'La date de naissance est invalide.');
       }
       const inserted = await query(
         `INSERT INTO room_users
-          (name,username,email,avatar,password_hash,password_salt,is_guest,created_at,phone_number,organization,job_title,country,city,birth_date,birth_place,address,role,terms_accepted_at,terms_version)
-         VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,now(),$17) RETURNING *`,
+          (name,username,email,avatar,password_hash,password_salt,is_guest,created_at,phone_number,organization,organization_category,job_title,country,city,birth_date,birth_place,address,role,terms_accepted_at,terms_version)
+         VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,now(),$18) RETURNING *`,
         [
           name,
           username,
@@ -365,11 +383,12 @@ export const registerAuthRoutes = (app: express.Express) => {
           passwordData.hash,
           passwordData.salt,
           new Date().toISOString(),
-          normalizeText(request.body?.phoneNumber).slice(0, 40),
+          phoneNumber,
           normalizeText(request.body?.organization).slice(0, 120),
+          organizationCategory,
           normalizeText(request.body?.jobTitle).slice(0, 120),
-          normalizeText(request.body?.country).slice(0, 120),
-          normalizeText(request.body?.city).slice(0, 120),
+          country,
+          city,
           birthDate,
           normalizeText(request.body?.birthPlace).slice(0, 160),
           normalizeText(request.body?.address).slice(0, 240),
