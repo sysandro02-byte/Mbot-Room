@@ -141,13 +141,22 @@ button.settings-row:disabled{cursor:not-allowed;opacity:.62}
 .settings-switch{
   position:relative;
   width:50px;
-  height:29px;
-  padding:0;
+  min-width:50px;
+  max-width:50px;
+  height:29px!important;
+  min-height:29px!important;
+  max-height:29px;
+  flex:0 0 50px;
+  justify-self:end;
+  align-self:center;
+  box-sizing:border-box;
+  padding:0!important;
   border:0;
   border-radius:999px;
   background:#ccd6e2;
   cursor:pointer;
-  transition:.18s ease
+  overflow:hidden;
+  transition:background .18s ease
 }
 .settings-switch span{
   position:absolute;
@@ -158,7 +167,8 @@ button.settings-row:disabled{cursor:not-allowed;opacity:.62}
   border-radius:50%;
   background:#fff;
   box-shadow:0 2px 7px rgba(16,38,55,.18);
-  transition:.18s ease
+  pointer-events:none;
+  transition:transform .18s ease
 }
 .settings-switch.is-on{background:#079a98}
 .settings-switch.is-on span{transform:translateX(21px)}
