@@ -1620,7 +1620,7 @@ export default function MeetingRoomV2() {
 
       <nav className="room-v2-mode-tabs" aria-label="Affichage de la réunion">
         <button type="button" className={viewMode === 'participants' && !screenShareActive ? 'active' : ''} onClick={() => setViewMode('participants')} data-testid="participants-view-button"><UsersRound/><span>Participants</span></button>
-        <button type="button" className={viewMode === 'gallery' && !screenShareActive ? 'active' : ''} onClick={() => setViewMode('gallery')} data-testid="gallery-view-button"><span className="room-v2-grid-icon" aria-hidden="true"/><span>Galerie</span></button>
+        <button type="button" className={viewMode === 'gallery' && !screenShareActive ? 'active' : ''} onClick={() => setViewMode('gallery')} data-testid="gallery-view-button"><span>Galerie</span></button>
         <button type="button" className={viewMode === 'speaker' && !screenShareActive ? 'active' : ''} onClick={() => setViewMode('speaker')} data-testid="speaker-view-button"><span className="room-v2-speaker-icon" aria-hidden="true"/><span>Intervenant</span></button>
         {screenShareActive ? <button type="button" className="active room-v2-share-tab"><MonitorUp/><span>Partage d’écran</span></button> : null}
       </nav>
