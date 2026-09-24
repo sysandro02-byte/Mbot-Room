@@ -240,6 +240,45 @@ export const registerRealtime = (io: Server) => {
     socket.join(`user:${user.id}`);
     if (user.role === 'admin') socket.join('admins');
 
+    // Limitation par socket et par type d’événement. Les événements de
+    // signalisation WebRTC ont un quota plus élevé, les actions utilisateur
+    // (chat, réactions, modération) restent beaucoup plus strictes.
+    const realtimeRateBuckets = new Map<string, { count:number; resetAt:number }>();
+    socket.use(([rawEvent], next) => {
+      const eventName = String(rawEvent || '');
+      const now = Date.now();
+      const highVolumeSignal = new Set([
+        'meeting:offer',
+        'meeting:answer',
+        'meeting:ice-candidate',
+        'meeting:request-ice-restart',
+        'meeting:request-renegotiation',
+      ]).has(eventName);
+      const mediumVolume = new Set([
+        'meeting:media-updated',
+        'meeting:reaction',
+        'meeting:hand-raised',
+      ]).has(eventName);
+      const limit = highVolumeSignal ? 900 : mediumVolume ? 180 : 90;
+      const windowMs = 60_000;
+      const current = realtimeRateBuckets.get(eventName);
+      if (!current || current.resetAt <= now) {
+        realtimeRateBuckets.set(eventName, { count:1, resetAt:now + windowMs });
+        next();
+        return;
+      }
+      current.count += 1;
+      if (current.count > limit) {
+        socket.emit('meeting:rate-limited', {
+          event: eventName,
+          retryAfterSeconds: Math.max(1, Math.ceil((current.resetAt - now) / 1000)),
+        });
+        next(new Error('Trop d’actions en temps réel. Réessayez dans quelques instants.'));
+        return;
+      }
+      next();
+    });
+
     socket.on('meeting:join', async (payload: any, callback?: Ack) => {
       try {
         const meetingId = Number(payload?.meetingId);
@@ -468,6 +507,7 @@ export const registerRealtime = (io: Server) => {
     });
 
     socket.on('disconnect', () => {
+      realtimeRateBuckets.clear();
       void removeSocketFromMeeting(io, socket);
     });
   });
