@@ -984,9 +984,31 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');
       if(meeting.settings.lunaSummary===false&&!canModerateMeeting(meeting,request.user!))return sendApiError(response,403,'LUNA_DISABLED','Luna est désactivée pour les participants de cette réunion.');
       const since=new Date(Date.now()-minutes*60_000).toISOString();
+      const moderator=canModerateMeeting(meeting,request.user!);
       const [messages,captions]=await Promise.all([
         query(`SELECT sender,text,created_at FROM room_messages WHERE meeting_id=$1 AND deleted_at IS NULL AND created_at>=$2 ORDER BY created_at ASC LIMIT 250`,[meetingId,since]),
-        query(`SELECT speaker,text,created_at FROM room_captions WHERE meeting_id=$1 AND created_at>=$2 ORDER BY created_at ASC LIMIT 900`,[meetingId,since]),
+        moderator
+          ? query(`SELECT speaker,text,created_at FROM room_captions WHERE meeting_id=$1 AND created_at>=$2 ORDER BY created_at ASC LIMIT 900`,[meetingId,since])
+          : query(
+              `SELECT c.speaker,c.text,c.created_at
+                 FROM room_captions c
+                WHERE c.meeting_id=$1
+                  AND c.created_at>=$2
+                  AND (
+                    c.breakout_room_id IS NULL
+                    OR EXISTS (
+                      SELECT 1
+                        FROM room_breakout_members bm
+                        JOIN room_breakout_rooms br ON br.id=bm.breakout_room_id
+                       WHERE bm.breakout_room_id=c.breakout_room_id
+                         AND bm.user_id=$3
+                         AND br.meeting_id=$1
+                    )
+                  )
+                ORDER BY c.created_at ASC
+                LIMIT 900`,
+              [meetingId,since,request.user!.id],
+            ),
       ]);
       const rows=[
         ...messages.rows.map((row)=>({at:new Date(row.created_at).getTime(),line:`[Chat · ${row.sender}] ${row.text}`})),
