@@ -7,6 +7,7 @@ import { workspaceService, type WorkGroup, type WorkGroupCall, type WorkspaceFil
 import { showAppMessage } from '../lib/appMessage';
 import { getAppLocale } from '../lib/appLanguage';
 import './WorkGroupsPage.css';
+import AppLoader from '../components/AppLoader';
 
 const toLocalInput=(date:Date)=>new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);
 const parseEmails=(value:string)=>[...new Set(value.split(/[;,\n]+/).map((item)=>item.trim().toLowerCase()).filter(Boolean))];
@@ -167,7 +168,7 @@ export default function WorkGroupsPage(){
       <button type="button" onClick={()=>setCreateOpen(true)}><Plus size={18}/> Nouveau groupe</button>
     </header>
 
-    {loading?<div className="work-groups-loading"><LoaderCircle className="is-spinning" size={22}/> Chargement des groupes…</div>:null}
+    {loading?<AppLoader label="Chargement des groupes…" />:null}
 
     {!loading?<div className="work-groups-layout">
       <aside className="work-groups-list">
