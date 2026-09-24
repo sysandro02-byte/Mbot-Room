@@ -131,7 +131,7 @@ const postAuth = async (path: string, body: unknown): Promise<AuthResponse> => {
 };
 
 export const authService = {
-  async adminRegister(payload: { name: string; email: string; password: string; username?: string; phoneNumber?: string; organization?: string; jobTitle?: string }) {
+  async adminRegister(payload: { name: string; email: string; password: string; username?: string; phoneNumber?: string; organization?: string; jobTitle?: string; inviteToken?: string }) {
     const response = await fetchAuth(apiUrl('/api/auth/admin/register'), {
       method: 'POST',
       headers: authRequestHeaders(),
