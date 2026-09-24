@@ -37,6 +37,7 @@ import { useMeetingCaptions } from '../hooks/useMeetingCaptions';
 import { socket } from '../lib/socket';
 import { authService } from '../services/authService';
 import { appDataService, type ClientPlatformSettings } from '../services/appDataService';
+import { conversationService } from '../services/conversationService';
 import {
   BreakoutRoom,
   collaborationService,
@@ -326,6 +327,12 @@ export default function MeetingRoomV2() {
   const [catchUpMinutes, setCatchUpMinutes] = useState(15);
   const [catchUpDismissed, setCatchUpDismissed] = useState(false);
   const [menuUserId, setMenuUserId] = useState<number | null>(null);
+  const [privateMessageTarget, setPrivateMessageTarget] = useState<{ userId:number; name:string; avatar?:string } | null>(null);
+  const [privateMessageDraft, setPrivateMessageDraft] = useState('');
+  const [privateMessageSending, setPrivateMessageSending] = useState(false);
+  const [reportTarget, setReportTarget] = useState<{ userId:number; name:string } | null>(null);
+  const [reportReason, setReportReason] = useState('Comportement inapproprié pendant la réunion.');
+  const [reportSending, setReportSending] = useState(false);
   const [mediaTransportStatus, setMediaTransportStatus] = useState<MediaTransportStatus | null>(null);
   const [mediaTransportChecked, setMediaTransportChecked] = useState(false);
   const [platformSettings, setPlatformSettings] = useState<ClientPlatformSettings | null>(null);
@@ -1477,6 +1484,62 @@ export default function MeetingRoomV2() {
       await refreshParticipants();
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : 'Action de modération impossible.');
+    }
+  };
+
+  const openPrivateMessage = (member: MeetingParticipant) => {
+    setMenuUserId(null);
+    if (guestMode || member.isGuest) {
+      setNotice('Le message particulier est disponible uniquement entre comptes MBotéRoom.');
+      return;
+    }
+    setPrivateMessageTarget({ userId: member.userId, name: member.name, avatar: member.avatar });
+    setPrivateMessageDraft('');
+  };
+
+  const sendPrivateMessage = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!privateMessageTarget || privateMessageSending) return;
+    const text = privateMessageDraft.trim();
+    if (!text) return;
+    setPrivateMessageSending(true);
+    try {
+      const conversation = await conversationService.createDirect(privateMessageTarget.userId);
+      await conversationService.sendMessage(conversation.id, { text });
+      setNotice(`Message particulier envoyé à ${privateMessageTarget.name}.`);
+      setPrivateMessageTarget(null);
+      setPrivateMessageDraft('');
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Message particulier non envoyé.');
+    } finally {
+      setPrivateMessageSending(false);
+    }
+  };
+
+  const openReportParticipant = (member: MeetingParticipant) => {
+    setMenuUserId(null);
+    setReportTarget({ userId: member.userId, name: member.name });
+    setReportReason('Comportement inapproprié pendant la réunion.');
+  };
+
+  const submitParticipantReport = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!meeting?.id || !reportTarget || reportSending) return;
+    const reason = reportReason.trim();
+    if (reason.length < 8) {
+      setNotice('Précisez brièvement la raison du signalement.');
+      return;
+    }
+    setReportSending(true);
+    try {
+      await meetingService.reportParticipant(meeting.id, reportTarget.userId, reportTarget.name, reason);
+      setNotice('Le compte a été signalé à l’équipe de modération.');
+      setReportTarget(null);
+      setReportReason('Comportement inapproprié pendant la réunion.');
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Signalement impossible.');
+    } finally {
+      setReportSending(false);
     }
   };
 
