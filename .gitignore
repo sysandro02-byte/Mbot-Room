@@ -33,3 +33,11 @@ storage/private/
 .vercel
 .env*
 !.env.example
+
+# Android release signing (private — never commit)
+*.jks
+*.keystore
+android/app/mboteroom-release.jks
+signing/
+android-signing/
+github-secrets.txt
