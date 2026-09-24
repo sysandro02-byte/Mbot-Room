@@ -23,6 +23,14 @@
 .real-dashboard-error{
   padding:13px 15px;border:1px solid #ffd8dc;border-radius:14px;background:#fff2f3;color:#a92f3e;font-size:13px
 }
+.home-data-progress{
+  position:sticky;top:0;z-index:30;height:3px;margin-bottom:-3px;overflow:hidden;border-radius:999px;background:rgba(8,166,166,.08);pointer-events:none
+}
+.home-data-progress>span{
+  display:block;width:42%;height:100%;border-radius:inherit;background:linear-gradient(90deg,transparent,var(--home-teal),transparent);
+  animation:home-data-progress 1.05s ease-in-out infinite
+}
+@keyframes home-data-progress{from{transform:translateX(-110%)}to{transform:translateX(340%)}}
 
 /* Hero */
 .home-hero{
