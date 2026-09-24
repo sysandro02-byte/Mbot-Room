@@ -337,6 +337,19 @@ try {
   assert.equal(health.media?.topology, 'mesh');
   assert.equal(health.media?.turnConfigured, false);
 
+  const publicTerms = await jsonRequest('/api/public/legal/terms');
+  assert.equal(publicTerms.response.status, 200, JSON.stringify(publicTerms.data));
+  assert.equal(publicTerms.data.version, '2026-09-24');
+  assert.ok(String(publicTerms.data.body||'').length > 80);
+
+  const registrationWithoutTerms = await jsonRequest('/api/auth/register', {
+    method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+    body: JSON.stringify({ name: 'Sans Conditions', email: 'sans.conditions@mbote.test', password: 'Password2026!' }),
+  });
+  assert.equal(registrationWithoutTerms.response.status, 400, JSON.stringify(registrationWithoutTerms.data));
+  assert.equal(registrationWithoutTerms.data.code, 'TERMS_NOT_ACCEPTED');
+
   const previewOrigin = 'https://mbote-room-pr-123.vercel.app';
   const corsPreflight = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'OPTIONS',
@@ -524,6 +537,42 @@ try {
   const outsider = await register('Participant Bloqué', 'outsider.integration@mbote.test');
   assert.equal(outsider.user.role, 'user');
 
+  const quarantineOutsider = await jsonRequest('/api/admin/users/'+outsider.user.id, {
+    method: 'PUT',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ accountStatus: 'quarantined' }),
+  });
+  assert.equal(quarantineOutsider.response.status, 200, JSON.stringify(quarantineOutsider.data));
+  assert.equal(quarantineOutsider.data.accountStatus, 'quarantined');
+  const quarantinedCreateMeeting = await jsonRequest('/api/meetings', {
+    method: 'POST',
+    headers: authHeaders(outsider.token),
+    body: JSON.stringify({ title: 'Doit être bloquée', startTime: new Date().toISOString(), duration: 30 }),
+  });
+  assert.equal(quarantinedCreateMeeting.response.status, 403, JSON.stringify(quarantinedCreateMeeting.data));
+  assert.equal(quarantinedCreateMeeting.data.code, 'ACCOUNT_QUARANTINED');
+
+  const restrictOutsider = await jsonRequest('/api/admin/users/'+outsider.user.id, {
+    method: 'PUT',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ accountStatus: 'active', featureRestrictions: ['meetings'] }),
+  });
+  assert.equal(restrictOutsider.response.status, 200, JSON.stringify(restrictOutsider.data));
+  assert.deepEqual(restrictOutsider.data.featureRestrictions, ['meetings']);
+  const restrictedCreateMeeting = await jsonRequest('/api/meetings', {
+    method: 'POST',
+    headers: authHeaders(outsider.token),
+    body: JSON.stringify({ title: 'Toujours bloquée', startTime: new Date().toISOString(), duration: 30 }),
+  });
+  assert.equal(restrictedCreateMeeting.response.status, 403, JSON.stringify(restrictedCreateMeeting.data));
+  assert.equal(restrictedCreateMeeting.data.code, 'FEATURE_RESTRICTED');
+  const restoreOutsider = await jsonRequest('/api/admin/users/'+outsider.user.id, {
+    method: 'PUT',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ accountStatus: 'active', featureRestrictions: [] }),
+  });
+  assert.equal(restoreOutsider.response.status, 200, JSON.stringify(restoreOutsider.data));
+
   const hostMe = await jsonRequest('/api/auth/me', { headers: authHeaders(host.token) });
   assert.equal(hostMe.response.status, 200);
   assert.equal(hostMe.data.user.email, 'host.integration@mbote.test');
@@ -576,6 +625,27 @@ try {
   assert.ok(meeting.meeting_link);
   assert.equal(meeting.settings?.passwordHash, undefined);
   assert.equal(meeting.settings?.passwordSalt, undefined);
+
+  const reportMailCount = mailRelayRequests.length;
+  const report = await jsonRequest('/api/reports', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({
+      type: 'meeting',
+      meetingId: meeting.id,
+      title: 'Réunion à vérifier',
+      description: 'Le participant signale un problème de modération pendant cette réunion.',
+      pageUrl: baseUrl+'/reunions/'+meeting.meeting_link,
+    }),
+  });
+  assert.equal(report.response.status, 201, JSON.stringify(report.data));
+  assert.equal(report.data.type, 'meeting');
+  const reportMails = mailRelayRequests.slice(reportMailCount);
+  assert.ok(reportMails.some((mail)=>mail.body?.to==='contacts@loukatech.com'), 'Support mailbox must receive the report');
+  assert.ok(reportMails.some((mail)=>mail.body?.to==='host.integration@mbote.test'), 'Application admin must receive a report copy');
+  const adminReports = await jsonRequest('/api/admin/reports', { headers: authHeaders(host.token) });
+  assert.equal(adminReports.response.status, 200, JSON.stringify(adminReports.data));
+  assert.ok(adminReports.data.some((item)=>item.id===report.data.id));
 
   const wrongPassword = await jsonRequest('/api/meetings/join-lookup', {
     method: 'POST',
