@@ -3,7 +3,7 @@ import { Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { appDataService, type ClientPlatformSettings, type Contact, type Recording } from '../../services/appDataService';
-import { HomeSlide, Meeting, meetingService } from '../../services/meetingService';
+import { getMeetingPhase, HomeSlide, Meeting, meetingService } from '../../services/meetingService';
 import { notificationService, RoomNotification } from '../../services/notificationService';
 import { socket } from '../../lib/socket';
 import HomeHero from './components/HomeHero';
@@ -59,6 +59,25 @@ export default function RealDashboardPage() {
 
   useEffect(() => { void load(); }, []);
 
+  useEffect(() => {
+    const refreshMeetings = () => void meetingService.getMeetings()
+      .then((rows) => setMeetings(Array.isArray(rows) ? rows : []))
+      .catch(() => undefined);
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshMeetings(); };
+    const timer = window.setInterval(refreshMeetings, 30_000);
+    ['meeting:created','meeting:updated','meeting:started','meeting:ended','meeting:cancelled','meeting:restarted']
+      .forEach((eventName) => socket.on(eventName, refreshMeetings));
+    window.addEventListener('focus', refreshMeetings);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(timer);
+      ['meeting:created','meeting:updated','meeting:started','meeting:ended','meeting:cancelled','meeting:restarted']
+        .forEach((eventName) => socket.off(eventName, refreshMeetings));
+      window.removeEventListener('focus', refreshMeetings);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+
   const heroSlides = useMemo(() => homeSlides.filter((slide) => slide.slot >= 1 && slide.slot <= 3 && slide.isActive !== false), [homeSlides]);
   const bannerSlide = useMemo(() => homeSlides.find((slide) => slide.slot === 4 && slide.isActive !== false) || null, [homeSlides]);
 
@@ -79,11 +98,16 @@ export default function RealDashboardPage() {
 
   const now = Date.now();
   const upcoming = useMemo(() => meetings
-    .filter((meeting) => meeting.status !== 'ended' && meeting.status !== 'cancelled' && (meeting.is_active || new Date(meeting.start_time).getTime() + meeting.duration * 60000 >= now))
-    .sort((left, right) => new Date(left.start_time).getTime() - new Date(right.start_time).getTime()), [meetings, now]);
+    .filter((meeting) => getMeetingPhase(meeting, now) !== 'ended')
+    .sort((left, right) => {
+      const leftPhase = getMeetingPhase(left, now);
+      const rightPhase = getMeetingPhase(right, now);
+      if (leftPhase !== rightPhase) return leftPhase === 'live' ? -1 : 1;
+      return new Date(left.start_time).getTime() - new Date(right.start_time).getTime();
+    }), [meetings, now]);
 
   const recent = useMemo(() => meetings
-    .filter((meeting) => meeting.status === 'ended')
+    .filter((meeting) => getMeetingPhase(meeting, now) === 'ended')
     .sort((left, right) => new Date(right.start_time).getTime() - new Date(left.start_time).getTime())
     .slice(0, 3), [meetings]);
 
@@ -116,12 +140,13 @@ export default function RealDashboardPage() {
   ));
 
   const openMeeting = async (meeting: Meeting) => {
-    if (meeting.status === 'ended' || meeting.status === 'cancelled') {
+    const phase = getMeetingPhase(meeting);
+    if (phase === 'ended') {
       navigate('/reunions/' + meeting.meeting_link + '/terminee', { state: { meeting } });
       return;
     }
     const moderator = Number(meeting.host_id) === Number(user?.id) || Number(meeting.co_host_id || 0) === Number(user?.id) || user?.role === 'admin';
-    if (moderator && !meeting.is_active) {
+    if (moderator && phase === 'upcoming') {
       try {
         const result = await meetingService.startMeetingAndNotify(meeting.id);
         navigate('/reunions/' + meeting.meeting_link, { state: { meeting: result.meeting || meeting } });
@@ -150,7 +175,7 @@ export default function RealDashboardPage() {
   };
 
   const openLunaTarget = (meeting: Meeting) => {
-    if (meeting.status === 'ended' || meeting.status === 'cancelled') {
+    if (getMeetingPhase(meeting) === 'ended') {
       navigate(`/reunions/${meeting.meeting_link}/terminee`, { state: { meeting } });
       return;
     }

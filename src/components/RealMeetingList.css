@@ -121,3 +121,15 @@
 @media(max-width:760px){.meeting-pro-page{padding:14px}.meeting-pro-hero{align-items:flex-start}.meeting-pro-title>span{width:52px;height:52px}.meeting-pro-title h1{font-size:24px}.real-meeting-page button.meeting-pro-new{min-height:44px;padding:0 12px;font-size:9px}.meeting-pro-side{grid-template-columns:1fr}.meeting-pro-row{grid-template-columns:58px minmax(0,1fr);align-items:start}.meeting-pro-date{width:52px;height:64px;margin-left:4px}.meeting-pro-participants{grid-column:2}.meeting-pro-row-actions{grid-column:1/-1;justify-content:flex-start;overflow-x:auto}.meeting-pro-row-actions>button{flex:0 0 auto}.meeting-pro-search{width:100%}}
 @media(max-width:560px){.meeting-pro-shortcuts,.meeting-pro-stats{grid-template-columns:1fr}.meeting-pro-hero{flex-direction:column}.meeting-pro-hero>button{width:100%}.meeting-pro-shortcuts>button{min-height:94px}.meeting-pro-tabs{padding-bottom:6px}.meeting-pro-row-actions .secondary{display:none}}
 @media(prefers-reduced-motion:reduce){.meeting-pro-shortcuts>button,.meeting-pro-row{transition:none}.meeting-pro-shortcuts>button:hover{transform:none}}
+
+
+/* Meeting creation: optional participant capacity and selectable public ID. */
+.real-meeting-field-help{display:block;margin-top:1px;color:#8492a3;font-size:9px;line-height:1.45}
+.real-meeting-optional{color:#92a0af;font-size:9px;font-weight:600}
+.real-meeting-form input[type="number"]{appearance:textfield}
+.real-meeting-form input[type="number"]::-webkit-inner-spin-button,
+.real-meeting-form input[type="number"]::-webkit-outer-spin-button{appearance:none;margin:0}
+@media(max-width:720px){
+  .real-meeting-form{padding:17px}
+  .real-meeting-field-help{font-size:10px}
+}

@@ -2,15 +2,17 @@ import { Clock3, Copy, EllipsisVertical, ExternalLink, Play, Share2, UsersRound,
 import { useState } from 'react';
 import type { Meeting } from '../../../services/meetingService';
 import type { Recording } from '../../../services/appDataService';
-import { getMeetingJoinUrl } from '../../../services/meetingService';
+import { getMeetingJoinUrl, getMeetingPhase } from '../../../services/meetingService';
 import { getAppLocale } from '../../../lib/appLanguage';
 
 const formatDate = (value: string) => new Intl.DateTimeFormat(getAppLocale(), { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value));
 const formatTime = (value: string) => new Intl.DateTimeFormat(getAppLocale(), { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 
 const timeUntil = (meeting: Meeting) => {
+  const phase = getMeetingPhase(meeting);
+  if (phase === 'live') return 'En direct';
+  if (phase === 'ended') return meeting.status === 'cancelled' ? 'Annulée' : 'Terminée';
   const minutes = Math.max(0, Math.ceil((new Date(meeting.start_time).getTime() - Date.now()) / 60000));
-  if (meeting.is_active) return 'En direct';
   if (minutes < 60) return `Dans ${minutes} min`;
   if (minutes < 1440) return `Dans ${Math.ceil(minutes / 60)} h`;
   return `Dans ${Math.ceil(minutes / 1440)} j`;
@@ -26,6 +28,7 @@ type NextProps = {
 
 export function NextMeetingCard({ meeting, canManage, onOpen, onManage, onPlan }: NextProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const phase = meeting ? getMeetingPhase(meeting) : null;
 
   const copy = async () => {
     if (!meeting) return;
@@ -53,7 +56,7 @@ export function NextMeetingCard({ meeting, canManage, onOpen, onManage, onPlan }
         <p>{meeting.description || 'Réunion MBotéRoom'}</p>
         <div className="home-next-meeting-footer">
           <div className="home-participant-preview"><span>{meeting.host_avatar ? <img src={meeting.host_avatar} alt="" /> : <UsersRound size={17}/>}</span><small>{meeting.host_name}</small></div>
-          <button className="home-join-button" type="button" onClick={() => onOpen(meeting)}><Video size={18}/>{meeting.is_active ? 'Rejoindre maintenant' : 'Ouvrir'}</button>
+          <button className="home-join-button" type="button" onClick={() => onOpen(meeting)}><Video size={18}/>{phase === 'live' ? 'Rejoindre maintenant' : phase === 'ended' ? 'Voir le résumé' : 'Ouvrir'}</button>
           <div className="home-meeting-menu-wrap">
             <button className="home-more-button" type="button" aria-label="Options de la réunion" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}><EllipsisVertical size={19}/></button>
             {menuOpen ? <div className="home-meeting-menu" role="menu">

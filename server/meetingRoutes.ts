@@ -66,9 +66,11 @@ const meetingRole = (meeting: Meeting, user: NonNullable<AuthedRequest['user']>)
 };
 
 const meetingCapacity = (meeting: Meeting) => {
-  const configured = Number(meeting.settings.participantCapacity || 100);
-  if (!Number.isFinite(configured)) return 100;
-  return Math.max(2, Math.min(1000, Math.floor(configured)));
+  const configured = meeting.settings.participantCapacity;
+  if (configured === null || configured === undefined || configured === '') return 100;
+  const numeric = Number(configured);
+  if (!Number.isFinite(numeric)) return 100;
+  return Math.max(2, Math.min(1000, Math.floor(numeric)));
 };
 
 const acceptedMemberCount = async (meetingId: number) => {
@@ -158,6 +160,113 @@ const buildSettings = (body: any, existing?: Meeting) => {
   }
   if (!settings.meetingAccessId) settings.meetingAccessId = createMeetingAccessId();
   return { settings, invitationEmails, plainPassword };
+};
+
+type MeetingSettingsValidationError = { code: string; error: string };
+
+const applyMeetingCreationPreferences = async (
+  settings: MeetingSettings,
+  body: any,
+  user: NonNullable<AuthedRequest['user']>,
+  existing?: Meeting,
+): Promise<MeetingSettingsValidationError | null> => {
+  const incoming = (body?.settings || {}) as MeetingSettings & Record<string, unknown>;
+
+  if (Object.prototype.hasOwnProperty.call(incoming, 'participantCapacity')) {
+    const rawCapacity = incoming.participantCapacity;
+    if (rawCapacity === null || rawCapacity === undefined || rawCapacity === '') {
+      settings.participantCapacity = null;
+    } else {
+      const capacity = Number(rawCapacity);
+      if (!Number.isInteger(capacity) || capacity < 2 || capacity > 1000) {
+        return { code: 'MEETING_CAPACITY_INVALID', error: 'Le nombre maximal de participants doit être compris entre 2 et 1000.' };
+      }
+      settings.participantCapacity = capacity;
+    }
+  }
+
+  const requestedMode = incoming.meetingIdMode;
+  const incomingHasAccessId = Object.prototype.hasOwnProperty.call(incoming, 'meetingAccessId');
+
+  if (requestedMode === 'system') {
+    const existingWasPersonal = Boolean(existing && (
+      existing.settings.meetingIdMode === 'personal'
+      || (user.personalMeetingId && existing.settings.meetingAccessId === user.personalMeetingId)
+    ));
+    settings.meetingIdMode = 'system';
+    if (!existing || existingWasPersonal) settings.meetingAccessId = createMeetingAccessId();
+    return null;
+  }
+
+  if (requestedMode === 'personal') {
+    const personalId = String(incoming.meetingAccessId || user.personalMeetingId || '').replace(/\s+/g, '').trim();
+    if (!/^\d{6,12}$/.test(personalId)) {
+      return { code: 'PERSONAL_MEETING_ID_INVALID', error: 'L’ID personnel doit contenir entre 6 et 12 chiffres.' };
+    }
+
+    const duplicateUser = await query(
+      'SELECT 1 FROM room_users WHERE personal_meeting_id=$1 AND id<>$2 LIMIT 1',
+      [personalId, user.id],
+    );
+    if (duplicateUser.rows[0]) {
+      return { code: 'PERSONAL_MEETING_ID_ALREADY_USED', error: 'Cet ID personnel est déjà utilisé par un autre compte.' };
+    }
+
+    const activeMeetings = await query(
+      "SELECT * FROM room_meetings WHERE status IN ('scheduled','live') ORDER BY id DESC",
+    );
+    const conflictingMeeting = activeMeetings.rows
+      .map(mapMeeting)
+      .find((meeting) => meeting.id !== existing?.id
+        && meeting.host_id !== user.id
+        && String(meeting.settings.meetingAccessId || '') === personalId);
+    if (conflictingMeeting) {
+      return { code: 'PERSONAL_MEETING_ID_ALREADY_USED', error: 'Cet ID personnel est déjà utilisé pour une autre réunion active.' };
+    }
+
+    settings.meetingIdMode = 'personal';
+    settings.meetingAccessId = personalId;
+    return null;
+  }
+
+  // Legacy/API compatibility: callers that do not send a mode keep the historical personal-ID behavior.
+  if (!existing && user.personalMeetingId && !incomingHasAccessId) {
+    settings.meetingIdMode = 'personal';
+    settings.meetingAccessId = user.personalMeetingId;
+  }
+  return null;
+};
+
+const reconcileStaleLiveMeetings = async () => {
+  const liveRows = await query("SELECT * FROM room_meetings WHERE (status='live' OR is_active=true) AND ended_at IS NULL");
+  const now = Date.now();
+
+  for (const row of liveRows.rows) {
+    const meeting = mapMeeting(row);
+    const plannedEnd = new Date(meeting.start_time).getTime() + Math.max(15, Number(meeting.duration || 60)) * 60_000;
+    const hardExpired = Number.isFinite(plannedEnd) && now > plannedEnd + 60 * 60_000;
+    const startedAt = meeting.started_at ? new Date(meeting.started_at).getTime() : 0;
+    const canCheckPresence = startedAt > 0 && now - startedAt > 45_000;
+    let noActiveParticipant = false;
+
+    if (canCheckPresence) {
+      const activeMember = await query(
+        `SELECT 1 FROM room_meeting_members
+          WHERE meeting_id=$1 AND joined_at IS NOT NULL AND left_at IS NULL AND status='accepted'
+          LIMIT 1`,
+        [meeting.id],
+      );
+      noActiveParticipant = !activeMember.rows[0];
+    }
+
+    if (!hardExpired && !noActiveParticipant) continue;
+    await query(
+      `UPDATE room_meetings
+          SET status='ended',is_active=false,ended_at=COALESCE(ended_at,now()),temporary_host_id=NULL,updated_at=now()
+        WHERE id=$1 AND status<>'ended' AND status<>'cancelled'`,
+      [meeting.id],
+    );
+  }
 };
 
 const insertChatMessage = async (meetingId: number, user: NonNullable<AuthedRequest['user']>, textValue: unknown) => {
@@ -305,6 +414,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
 
   app.get('/api/meetings', ...protectedApi, async (request: AuthedRequest, response, next) => {
     try {
+      await reconcileStaleLiveMeetings();
       const result = await query('SELECT * FROM room_meetings WHERE status <> \'cancelled\' ORDER BY start_time ASC');
       const visible: Meeting[] = [];
       for (const row of result.rows) {
@@ -325,9 +435,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const start = new Date(request.body?.startTime || request.body?.start_time || Date.now());
       const duration = Math.max(15, Math.min(1440, Number(request.body?.duration || 60)));
       const { settings, invitationEmails, plainPassword } = buildSettings(request.body);
-      if (request.user!.personalMeetingId && !Object.prototype.hasOwnProperty.call(request.body?.settings || {}, 'meetingAccessId')) {
-        settings.meetingAccessId = request.user!.personalMeetingId;
-      }
+      const settingsError = await applyMeetingCreationPreferences(settings, request.body, request.user!);
+      if (settingsError) return sendApiError(response, 400, settingsError.code, settingsError.error);
       const requestedCoHostId = Number(request.body?.coHostId || 0) || null;
       if (requestedCoHostId === request.user!.id) return sendApiError(response, 400, 'VALIDATION_ERROR', 'L’hôte principal ne peut pas être son propre co-hôte.');
       if (requestedCoHostId) {
@@ -363,6 +472,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
 
   app.post('/api/meetings/join-lookup', ...protectedApi, async (request: AuthedRequest, response, next) => {
     try {
+      await reconcileStaleLiveMeetings();
       const meeting = await findMeetingByValue(request.body?.value);
       if (!meeting || meeting.status === 'cancelled') return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
       if (meeting.status === 'ended') return sendApiError(response, 410, 'MEETING_ENDED', 'Cette réunion est terminée.');
@@ -375,6 +485,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
 
   app.get('/api/meetings/link/:meetingLink', ...protectedApi, async (request: AuthedRequest, response, next) => {
     try {
+      await reconcileStaleLiveMeetings();
       const result = await query('SELECT * FROM room_meetings WHERE meeting_link=$1 AND status<>\'cancelled\' LIMIT 1', [request.params.meetingLink]);
       if (!result.rows[0]) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
       const meeting = mapMeeting(result.rows[0]);
@@ -407,6 +518,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       }
 
       const { settings } = buildSettings(request.body, meeting);
+      const settingsError = await applyMeetingCreationPreferences(settings, request.body, request.user!, meeting);
+      if (settingsError) return sendApiError(response, 400, settingsError.code, settingsError.error);
       const updated = await query(
         `UPDATE room_meetings SET title=$2,description=$3,start_time=$4,duration=$5,co_host_id=$6,settings=$7::jsonb,updated_at=now() WHERE id=$1 RETURNING *`,
         [meeting.id, normalizeText(request.body?.title || meeting.title).slice(0,160), normalizeText(request.body?.description ?? meeting.description).slice(0,1500), new Date(request.body?.startTime || request.body?.start_time || meeting.start_time).toISOString(), Math.max(15,Number(request.body?.duration || meeting.duration)), nextCoHostId, JSON.stringify(settings)],
@@ -1383,7 +1496,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
   });
 
   app.get('/api/actus/events', ...protectedApi, async (request:AuthedRequest,response,next)=>{
-    try{const result=await query(`SELECT * FROM room_meetings WHERE status<>'cancelled' ORDER BY start_time DESC LIMIT 100`);const values: ActusMeetingPayload[]=[];for(const row of result.rows){const meeting=mapMeeting(row);if(await visibleToUser(meeting,request.user!))values.push({...meeting,settings:sanitizeMeetingSettings(meeting.settings),is_public:Boolean(meeting.settings.isPublic||meeting.settings.visibility==='public'),is_invited:(meeting.settings.participants||[]).some((v)=>normalizeEmail(v)===normalizeEmail(request.user!.email)),my_lobby_status:null,relevance_reason:canModerateMeeting(meeting,request.user!)?'created_by_me':'registered'});}response.json(values);}catch(error){next(error);}
+    try{await reconcileStaleLiveMeetings();const result=await query(`SELECT * FROM room_meetings WHERE status<>'cancelled' ORDER BY start_time DESC LIMIT 100`);const values: ActusMeetingPayload[]=[];for(const row of result.rows){const meeting=mapMeeting(row);if(await visibleToUser(meeting,request.user!))values.push({...meeting,settings:sanitizeMeetingSettings(meeting.settings),is_public:Boolean(meeting.settings.isPublic||meeting.settings.visibility==='public'),is_invited:(meeting.settings.participants||[]).some((v)=>normalizeEmail(v)===normalizeEmail(request.user!.email)),my_lobby_status:null,relevance_reason:canModerateMeeting(meeting,request.user!)?'created_by_me':'registered'});}response.json(values);}catch(error){next(error);}
   });
 };
 

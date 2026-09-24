@@ -25,8 +25,9 @@ export interface MeetingSettings {
   coverImage?: string;
   timeZone?: string;
   participants?: string[];
-  participantCapacity?: number;
+  participantCapacity?: number | null;
   meetingAccessId?: string;
+  meetingIdMode?: 'system' | 'personal';
   waitingRoom?: boolean;
   participantAudio?: boolean;
   participantVideo?: boolean;
@@ -69,6 +70,26 @@ export const getMeetingAccessCode = (meeting: Pick<Meeting, 'meeting_link'>) =>
 
 export const getMeetingJoinUrl = (meeting: Pick<Meeting, 'meeting_link'>) =>
   `${window.location.origin}/join/${meeting.meeting_link}`;
+
+export type MeetingPhase = 'upcoming' | 'live' | 'ended';
+
+export const getMeetingPhase = (meeting: Meeting, now = Date.now()): MeetingPhase => {
+  if (meeting.status === 'ended' || meeting.status === 'cancelled' || Boolean(meeting.ended_at)) return 'ended';
+
+  const startAt = new Date(meeting.start_time).getTime();
+  const durationMs = Math.max(15, Number(meeting.duration || 60)) * 60_000;
+  const plannedEndAt = Number.isFinite(startAt) ? startAt + durationMs : Number.POSITIVE_INFINITY;
+  const liveSignal = meeting.status === 'live' || meeting.is_active === true;
+
+  // Safety net for legacy/stale records that remained "live" after every participant left.
+  if (liveSignal && Number.isFinite(plannedEndAt) && now > plannedEndAt + 60 * 60_000) return 'ended';
+  if (liveSignal) return 'live';
+  if (Number.isFinite(plannedEndAt) && now > plannedEndAt) return 'ended';
+  return 'upcoming';
+};
+
+export const canJoinMeetingNow = (meeting: Meeting, now = Date.now()) =>
+  getMeetingPhase(meeting, now) === 'live';
 
 export interface LobbyParticipant {
   meeting_id: number;

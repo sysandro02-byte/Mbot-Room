@@ -41,8 +41,9 @@ export type MeetingSettings = {
   coverImage?: string;
   timeZone?: string;
   participants?: string[];
-  participantCapacity?: number;
+  participantCapacity?: number | null;
   meetingAccessId?: string;
+  meetingIdMode?: 'system' | 'personal';
   waitingRoom?: boolean;
   participantAudio?: boolean;
   participantVideo?: boolean;
