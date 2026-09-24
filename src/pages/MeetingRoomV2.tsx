@@ -478,7 +478,18 @@ export default function MeetingRoomV2() {
     setClockTick(Date.now());
     const timer = window.setInterval(() => setClockTick(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [meeting?.is_active, meeting?.id]);
+  }, [meeting?.is_active, meeting?.id, meeting?.started_at]);
+
+  useEffect(() => {
+    if (!meeting?.id) return undefined;
+    const keepSessionAlive = () => {
+      if (!navigator.onLine) return;
+      void authService.touchActivity().catch(() => undefined);
+    };
+    keepSessionAlive();
+    const timer = window.setInterval(keepSessionAlive, 2 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, [meeting?.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1490,7 +1501,11 @@ export default function MeetingRoomV2() {
   const screenShareActive = Boolean(screenSharing || remoteScreenParticipant);
   const screenPresenterName = screenSharing ? localName : remoteScreenParticipant?.name || '';
   const speakerViewEnabled = (viewMode === 'speaker' || viewMode === 'participants') && Boolean(featuredParticipant);
-  const elapsedSeconds = meeting.is_active ? Math.max(0, Math.floor((clockTick - new Date(meeting.start_time).getTime()) / 1000)) : 0;
+  const meetingStartedAt = meeting.started_at || meeting.start_time;
+  const meetingStartedAtMs = new Date(meetingStartedAt).getTime();
+  const elapsedSeconds = meeting.is_active && Number.isFinite(meetingStartedAtMs)
+    ? Math.max(0, Math.floor((clockTick - meetingStartedAtMs) / 1000))
+    : 0;
   const raisedMembers = activeMembers.filter((member) => raisedHands.has(member.userId));
   const normalizedParticipantSearch = participantSearch.trim().toLowerCase();
   const visibleMembers = normalizedParticipantSearch
