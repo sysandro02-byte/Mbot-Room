@@ -1,11 +1,13 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import {
-  Bell, CalendarDays, CalendarSync, ChevronLeft, ChevronRight, Clock3, Link2,
-  Plus, RefreshCw, Repeat2, ShieldCheck, Trash2, Unlink, UsersRound, Video,
+  Bell, CalendarDays, CalendarSync, ChevronLeft, ChevronRight, Clock3, Copy, Eye, Link2,
+  MoreVertical, Pencil, Play, Plus, RefreshCw, Repeat2, ShieldCheck, Trash2, Unlink,
+  UserPlus, UsersRound, Video, X,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { appDataService, type CalendarEvent } from '../services/appDataService';
-import { meetingService, type Meeting } from '../services/meetingService';
+import { getMeetingJoinUrl, meetingService, type Meeting } from '../services/meetingService';
 import { workspaceService, type GoogleCalendarStatus } from '../services/workspaceService';
 import { readCachedPreferences } from '../lib/userPreferences';
 import { showAppMessage } from '../lib/appMessage';
@@ -87,6 +89,7 @@ const eventColor=(item:CalendarItem)=>{
 };
 
 export default function CalendarPage(){
+  const navigate=useNavigate();
   const [events,setEvents]=useState<CalendarEvent[]>([]);
   const [meetings,setMeetings]=useState<Meeting[]>([]);
   const [google,setGoogle]=useState<GoogleCalendarStatus>({configured:false,connected:false,scope:''});
@@ -98,6 +101,10 @@ export default function CalendarPage(){
   const [cursor,setCursor]=useState(()=>new Date());
   const [selectedDate,setSelectedDate]=useState(()=>new Date());
   const [form,setForm]=useState<CalendarForm>(makeInitialForm);
+  const [openMenuId,setOpenMenuId]=useState<string|null>(null);
+  const [detailItem,setDetailItem]=useState<CalendarItem|null>(null);
+  const [editingItem,setEditingItem]=useState<CalendarItem|null>(null);
+  const [deleteBusyId,setDeleteBusyId]=useState('');
 
   const load=async()=>{
     setLoading(true);setError('');
@@ -116,6 +123,14 @@ export default function CalendarPage(){
   };
 
   useEffect(()=>{void load();},[]);
+
+  useEffect(()=>{
+    const closeMenu=(event:MouseEvent)=>{
+      if(!(event.target as HTMLElement).closest('.calendar-event-menu'))setOpenMenuId(null);
+    };
+    document.addEventListener('mousedown',closeMenu);
+    return()=>document.removeEventListener('mousedown',closeMenu);
+  },[]);
 
   useEffect(()=>{
     const status=new URLSearchParams(window.location.search).get('google');
@@ -230,6 +245,50 @@ export default function CalendarPage(){
     setSaving(true);setError('');
     try{
       const participants=form.participants.split(/[;,\n]+/).map((value)=>value.trim().toLowerCase()).filter(Boolean);
+      const metadata={
+        eventType:form.eventType,
+        participants,
+        reminderEnabled:form.reminder,
+        reminderMinutes:form.reminder?form.reminderMinutes:0,
+        waitingRoom:form.waitingRoom,
+        recurrence:form.recurrence,
+      };
+
+      if(editingItem){
+        let updatedMeeting:Meeting|undefined;
+        if(editingItem.meetingId){
+          const existingMeeting=meetings.find((meeting)=>meeting.id===editingItem.meetingId);
+          if(existingMeeting){
+            updatedMeeting=await meetingService.updateMeeting(existingMeeting.id,{
+              title:form.title.trim(),
+              description:form.description.trim(),
+              startTime:startsAt.toISOString(),
+              duration:Math.max(15,Math.round((endsAt.getTime()-startsAt.getTime())/60_000)),
+              participants,
+              settings:{
+                ...(existingMeeting.settings||{}),
+                participants,
+                waitingRoom:form.waitingRoom,
+              },
+            });
+            setMeetings((current)=>current.map((meeting)=>meeting.id===updatedMeeting!.id?updatedMeeting!:meeting));
+          }
+        }
+        if(editingItem.calendarId){
+          const updated=await appDataService.updateCalendarEvent(editingItem.calendarId,{
+            title:form.title.trim(),
+            description:form.description.trim(),
+            startsAt:startsAt.toISOString(),
+            endsAt:endsAt.toISOString(),
+            metadata,
+          });
+          setEvents((current)=>current.map((item)=>item.id===updated.id?updated:item).sort((a,b)=>new Date(a.starts_at).getTime()-new Date(b.starts_at).getTime()));
+        }
+        setSelectedDate(startsAt);setCursor(startsAt);setEditingItem(null);setForm(makeInitialForm());
+        showAppMessage('Événement mis à jour.',{tone:'success'});
+        return;
+      }
+
       let meeting:Meeting|undefined;
       if(form.eventType==='meeting'){
         const duration=Math.max(15,Math.round((endsAt.getTime()-startsAt.getTime())/60_000));
@@ -263,32 +322,92 @@ export default function CalendarPage(){
         startsAt:startsAt.toISOString(),
         endsAt:endsAt.toISOString(),
         meetingId:meeting?.id,
-        metadata:{
-          eventType:form.eventType,
-          participants,
-          reminderEnabled:form.reminder,
-          reminderMinutes:form.reminder?form.reminderMinutes:0,
-          waitingRoom:form.waitingRoom,
-          recurrence:form.recurrence,
-        },
+        metadata,
       });
       setEvents((current)=>[...current,created].sort((a,b)=>new Date(a.starts_at).getTime()-new Date(b.starts_at).getTime()));
-      setSelectedDate(startsAt);
-      setCursor(startsAt);
-      setForm(makeInitialForm());
+      setSelectedDate(startsAt);setCursor(startsAt);setForm(makeInitialForm());
       showAppMessage(form.eventType==='meeting'?'Réunion planifiée et ajoutée au calendrier.':'Événement enregistré.',{tone:'success'});
     }catch(cause){
       setError(cause instanceof Error?cause.message:'Création impossible.');
     }finally{setSaving(false);}
   };
 
-  const deleteEvent=async(item:CalendarItem)=>{
-    if(!item.calendarId)return;
+  const meetingFor=(item:CalendarItem)=>item.meetingId?meetings.find((meeting)=>meeting.id===item.meetingId):undefined;
+
+  const openDetails=(item:CalendarItem)=>{setOpenMenuId(null);setDetailItem(item);};
+
+  const joinItem=(item:CalendarItem)=>{
+    const meeting=meetingFor(item);
+    setOpenMenuId(null);
+    if(!meeting){showAppMessage('Cet événement n’est pas associé à une réunion MBotéRoom.',{tone:'info'});return;}
+    navigate('/join/'+meeting.meeting_link);
+  };
+
+  const copyMeetingLink=async(item:CalendarItem)=>{
+    const meeting=meetingFor(item);
+    setOpenMenuId(null);
+    if(!meeting){showAppMessage('Aucun lien de réunion disponible pour cet événement.',{tone:'info'});return;}
     try{
-      await appDataService.deleteCalendarEvent(item.calendarId);
-      setEvents((current)=>current.filter((event)=>event.id!==item.calendarId));
-      showAppMessage('Événement supprimé du calendrier.',{tone:'success'});
+      await navigator.clipboard.writeText(getMeetingJoinUrl(meeting));
+      showAppMessage('Lien de réunion copié.',{tone:'success'});
+    }catch{showAppMessage('Impossible de copier le lien.',{tone:'error'});}
+  };
+
+  const inviteToMeeting=async(item:CalendarItem)=>{
+    const meeting=meetingFor(item);
+    setOpenMenuId(null);
+    if(!meeting){showAppMessage('Cet événement n’est pas associé à une réunion MBotéRoom.',{tone:'info'});return;}
+    const url=getMeetingJoinUrl(meeting);
+    const shareData={title:meeting.title,text:'Invitation à rejoindre la réunion MBotéRoom « '+meeting.title+' »',url};
+    try{
+      if(navigator.share){await navigator.share(shareData);}
+      else{await navigator.clipboard.writeText(url);showAppMessage('Lien d’invitation copié.',{tone:'success'});}
+    }catch(cause){
+      if(cause instanceof DOMException&&cause.name==='AbortError')return;
+      showAppMessage('Impossible de partager cette invitation.',{tone:'error'});
+    }
+  };
+
+  const editItem=(item:CalendarItem)=>{
+    const meeting=meetingFor(item);
+    const metadata=item.metadata||{};
+    const metadataParticipants=Array.isArray(metadata.participants)?metadata.participants.map(String):[];
+    setOpenMenuId(null);
+    setEditingItem(item);
+    setForm({
+      title:item.title,
+      description:item.description||'',
+      startDate:dateInput(item.start),
+      startTime:timeInput(item.start),
+      endDate:dateInput(item.end),
+      endTime:timeInput(item.end),
+      eventType:item.meetingId?'meeting':(metadata.eventType==='meeting'?'meeting':'event'),
+      participants:(meeting?.settings?.participants||metadataParticipants).join('; '),
+      reminder:metadata.reminderEnabled!==false,
+      reminderMinutes:Number(metadata.reminderMinutes||15),
+      waitingRoom:meeting?.settings?.waitingRoom!==false&&metadata.waitingRoom!==false,
+      recurrence:(['daily','weekly','monthly'].includes(String(metadata.recurrence))?metadata.recurrence:'none') as Recurrence,
+    });
+    window.setTimeout(()=>document.querySelector('.calendar-create-card')?.scrollIntoView({behavior:'smooth',block:'start'}),40);
+  };
+
+  const deleteEvent=async(item:CalendarItem)=>{
+    if(!window.confirm('Supprimer « '+item.title+' » ? Cette action est définitive.'))return;
+    setOpenMenuId(null);setDeleteBusyId(item.id);
+    try{
+      if(item.meetingId){
+        await meetingService.deleteMeeting(item.meetingId);
+        setMeetings((current)=>current.filter((meeting)=>meeting.id!==item.meetingId));
+      }
+      if(item.calendarId){
+        await appDataService.deleteCalendarEvent(item.calendarId);
+        setEvents((current)=>current.filter((event)=>event.id!==item.calendarId));
+      }
+      setDetailItem((current)=>current?.id===item.id?null:current);
+      if(editingItem?.id===item.id){setEditingItem(null);setForm(makeInitialForm());}
+      showAppMessage(item.meetingId?'Réunion supprimée.':'Événement supprimé du calendrier.',{tone:'success'});
     }catch(cause){showAppMessage(cause instanceof Error?cause.message:'Suppression impossible.',{tone:'error'});}
+    finally{setDeleteBusyId('');}
   };
 
   const shiftCursor=(direction:number)=>{
@@ -326,7 +445,7 @@ export default function CalendarPage(){
 
       <div className="calendar-pro-grid">
         <section className="calendar-create-card">
-          <header><span><Plus/></span><div><h2>Créer un événement</h2><p>Planifiez une réunion ou un événement pour vous et votre équipe.</p></div></header>
+          <header><span>{editingItem?<Pencil/>:<Plus/>}</span><div><h2>{editingItem?'Modifier l’événement':'Créer un événement'}</h2><p>{editingItem?'Mettez à jour les informations puis enregistrez vos modifications.':'Planifiez une réunion ou un événement pour vous et votre équipe.'}</p></div>{editingItem?<button className="calendar-edit-cancel" type="button" onClick={()=>{setEditingItem(null);setForm(makeInitialForm());}}><X/> Annuler</button>:null}</header>
           <form onSubmit={createEvent}>
             <label>Titre *<input value={form.title} onChange={(event)=>setForm((current)=>({...current,title:event.target.value}))} placeholder="Ex. Réunion d’équipe, Formation, etc." required/></label>
             <label>Description<textarea value={form.description} onChange={(event)=>setForm((current)=>({...current,description:event.target.value}))} placeholder="Ajoutez une description (ordre du jour, objectifs…)"/></label>
@@ -344,7 +463,7 @@ export default function CalendarPage(){
               <article><div><ShieldCheck/><span><strong>Salle d’attente</strong><small>Les participants attendent votre admission.</small></span><button type="button" className={form.waitingRoom?'switch on':'switch'} onClick={()=>setForm((current)=>({...current,waitingRoom:!current.waitingRoom}))}><i/></button></div></article>
               <article><div><Repeat2/><span><strong>Répétition</strong><small>{form.recurrence==='none'?'Aucune répétition':form.recurrence==='daily'?'Chaque jour':form.recurrence==='weekly'?'Chaque semaine':'Chaque mois'}</small></span></div><select value={form.recurrence} onChange={(event)=>setForm((current)=>({...current,recurrence:event.target.value as Recurrence}))}><option value="none">Aucune répétition</option><option value="daily">Chaque jour</option><option value="weekly">Chaque semaine</option><option value="monthly">Chaque mois</option></select></article>
             </div>
-            <button className="calendar-create-submit" disabled={saving}>{saving?<><RefreshCw className="spin"/> Enregistrement…</>:<><CalendarDays/> Enregistrer l’événement</>}</button>
+            <button className="calendar-create-submit" disabled={saving}>{saving?<><RefreshCw className="spin"/> Enregistrement…</>:editingItem?<><Pencil/> Enregistrer les modifications</>:<><CalendarDays/> Enregistrer l’événement</>}</button>
           </form>
         </section>
 
@@ -372,16 +491,46 @@ export default function CalendarPage(){
 
           <section className="calendar-upcoming-card">
             <header><span><CalendarDays/></span><h2>Prochains événements</h2><button onClick={()=>setView('day')}>Voir tout <ChevronRight/></button></header>
-            {upcoming.length?<div>{upcoming.slice(0,5).map((item)=><article key={item.id}>
-              <time><strong>{pad(item.start.getDate())}</strong><small>{new Intl.DateTimeFormat('fr-FR',{month:'short'}).format(item.start).replace('.','')}</small></time>
-              <div><strong>{item.title}</strong><small><Clock3/>{formatTime(item.start)} – {formatTime(item.end)}</small></div>
-              <span>{item.participants?<><UsersRound/>{item.participants} participant{item.participants>1?'s':''}</>:item.source==='google'?'Google Calendar':'MBotéRoom'}</span>
-              <b className={item.start.getTime()>Date.now()?'upcoming':'active'}>{item.start.getTime()>Date.now()?'À venir':'En cours'}</b>
-              {item.calendarId?<button aria-label="Supprimer" onClick={()=>void deleteEvent(item)}><Trash2/></button>:null}
-            </article>)}</div>:<p className="calendar-upcoming-empty">Aucun événement à venir.</p>}
+            {upcoming.length?<div>{upcoming.slice(0,5).map((item)=>{
+              const meeting=meetingFor(item);
+              return <article key={item.id}>
+                <time><strong>{pad(item.start.getDate())}</strong><small>{new Intl.DateTimeFormat('fr-FR',{month:'short'}).format(item.start).replace('.','')}</small></time>
+                <div><strong>{item.title}</strong><small><Clock3/>{formatTime(item.start)} – {formatTime(item.end)}</small></div>
+                <span>{item.participants?<><UsersRound/>{item.participants} participant{item.participants>1?'s':''}</>:item.source==='google'?'Google Calendar':'MBotéRoom'}</span>
+                <b className={item.start.getTime()>Date.now()?'upcoming':'active'}>{item.start.getTime()>Date.now()?'À venir':'En cours'}</b>
+                <div className="calendar-event-menu">
+                  <button className="calendar-event-menu-trigger" type="button" aria-label={'Options pour '+item.title} aria-expanded={openMenuId===item.id} onClick={(event)=>{event.stopPropagation();setOpenMenuId((current)=>current===item.id?null:item.id);}}><MoreVertical/></button>
+                  {openMenuId===item.id?<div className="calendar-event-menu-popover" role="menu" onMouseDown={(event)=>event.stopPropagation()}>
+                    <button role="menuitem" onClick={()=>openDetails(item)}><Eye/> Voir les détails</button>
+                    {meeting?<button role="menuitem" onClick={()=>joinItem(item)}><Play/> Rejoindre</button>:null}
+                    {meeting?<button role="menuitem" onClick={()=>void copyMeetingLink(item)}><Link2/> Copier le lien</button>:null}
+                    {meeting?<button role="menuitem" onClick={()=>void inviteToMeeting(item)}><UserPlus/> Inviter des participants</button>:null}
+                    <div/>
+                    <button role="menuitem" onClick={()=>editItem(item)}><Pencil/> Modifier</button>
+                    <button role="menuitem" className="danger" disabled={deleteBusyId===item.id} onClick={()=>void deleteEvent(item)}><Trash2/> {deleteBusyId===item.id?'Suppression…':'Supprimer'}</button>
+                  </div>:null}
+                </div>
+              </article>;
+            })}</div>:<p className="calendar-upcoming-empty">Aucun événement à venir.</p>}
           </section>
         </div>
       </div>
+      {detailItem?<div className="calendar-event-detail-backdrop" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)setDetailItem(null);}}>
+        <section className="calendar-event-detail-modal" role="dialog" aria-modal="true" aria-labelledby="calendar-event-detail-title">
+          <header><div><span><CalendarDays/></span><div><small>Détails de l’événement</small><h2 id="calendar-event-detail-title">{detailItem.title}</h2></div></div><button onClick={()=>setDetailItem(null)} aria-label="Fermer"><X/></button></header>
+          <div className="calendar-event-detail-body">
+            <article><Clock3/><div><small>Date et horaire</small><strong>{formatDate(detailItem.start)} · {formatTime(detailItem.start)} – {formatTime(detailItem.end)}</strong></div></article>
+            <article><UsersRound/><div><small>Participants</small><strong>{detailItem.participants||0} participant{detailItem.participants>1?'s':''}</strong></div></article>
+            <article><ShieldCheck/><div><small>Type</small><strong>{detailItem.meetingId?'Réunion MBotéRoom':detailItem.source==='google'?'Google Calendar':'Événement MBotéRoom'}</strong></div></article>
+            {detailItem.description?<p>{detailItem.description}</p>:null}
+          </div>
+          <footer>
+            <button className="secondary" onClick={()=>{setDetailItem(null);editItem(detailItem);}}><Pencil/> Modifier</button>
+            {meetingFor(detailItem)?<button className="secondary" onClick={()=>void copyMeetingLink(detailItem)}><Copy/> Copier le lien</button>:null}
+            {meetingFor(detailItem)?<button className="primary" onClick={()=>joinItem(detailItem)}><Play/> Rejoindre</button>:null}
+          </footer>
+        </section>
+      </div>:null}
       {loading?<div className="calendar-loading">Chargement du calendrier…</div>:null}
     </main>
   </AppShell>;
