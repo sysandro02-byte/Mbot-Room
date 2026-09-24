@@ -1615,3 +1615,102 @@
   .mbote-auth-button:hover:not(:disabled){transform:none!important}
   .join-meeting-arrow{transition:none!important}
 }
+
+
+/* Public Android APK download on the login page */
+.android-download-card{
+  display:grid;
+  gap:13px;
+  margin-top:14px;
+  padding:15px;
+  border:1px solid #d8e5e4;
+  border-radius:16px;
+  background:linear-gradient(135deg,#f7fbfb 0%,#eef8f7 100%);
+  box-shadow:0 10px 24px rgba(0,126,131,.07);
+}
+.android-download-heading{
+  display:grid;
+  grid-template-columns:42px minmax(0,1fr);
+  align-items:center;
+  gap:11px;
+  min-width:0;
+}
+.android-download-icon{
+  display:grid;
+  width:42px;
+  height:42px;
+  place-items:center;
+  border-radius:13px;
+  background:#e2f4f2;
+  color:#007e83;
+}
+.android-download-heading strong,
+.android-download-heading small{
+  display:block;
+}
+.android-download-heading strong{
+  color:#18334a;
+  font-size:14px;
+  line-height:1.25;
+}
+.android-download-heading small{
+  margin-top:4px;
+  color:#66778c;
+  font-size:11px;
+  line-height:1.4;
+}
+.android-download-actions{
+  display:grid;
+  grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);
+  gap:9px;
+}
+.android-download-primary,
+.android-download-share{
+  display:flex;
+  min-width:0;
+  min-height:46px;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:0 12px;
+  border-radius:12px;
+  font:inherit;
+  font-size:12px;
+  font-weight:850;
+  text-decoration:none;
+  cursor:pointer;
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
+}
+.android-download-primary{
+  border:1px solid #007e83;
+  background:#007e83;
+  color:#fff;
+  box-shadow:0 9px 20px rgba(0,126,131,.16);
+}
+.android-download-share{
+  border:1px solid #cddbdc;
+  background:#fff;
+  color:#145f63;
+}
+.android-download-primary:hover,
+.android-download-primary:focus-visible,
+.android-download-share:hover,
+.android-download-share:focus-visible{
+  transform:translateY(-1px);
+  box-shadow:0 11px 23px rgba(0,126,131,.13);
+}
+.android-download-message{
+  color:#27716d;
+  font-size:11px;
+  font-weight:750;
+  line-height:1.35;
+  text-align:center;
+}
+html[data-native-app="android"] .android-download-card{
+  display:none!important;
+}
+@media(max-width:430px){
+  .android-download-card{padding:13px}
+  .android-download-actions{grid-template-columns:1fr}
+  .android-download-primary,.android-download-share{min-height:48px}
+}
