@@ -1971,7 +1971,7 @@ export default function MeetingRoomV2() {
               return <article key={member.userId}>
                 <div className="room-v2-person-avatar is-online">{member.avatar?<img src={member.avatar} alt=""/>:initials(member.name)}</div>
                 <div><strong>{member.name}</strong><small>a levé la main et souhaite prendre la parole.{raisedAt ? ' · '+formatTime(raisedAt) : ''}</small></div>
-                {remote ? <button type="button" aria-label={`Mettre ${member.name} en avant`} onClick={() => { setPinnedSocketId(remote.socketId); setViewMode('speaker'); }}><Hand/></button> : null}
+                {remote ? <button type="button" aria-label={pinnedSocketId===remote.socketId?`Désépingler ${member.name}`:`Épingler ${member.name}`} onClick={() => togglePinnedParticipant(remote.socketId)}>{pinnedSocketId===remote.socketId?<PinOff/>:<Pin/>}</button> : null}
               </article>;
             })}
           </section> : null}
