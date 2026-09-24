@@ -213,6 +213,15 @@ if (!indexHtml.includes('rel="manifest"') || !indexHtml.includes('theme-color'))
   throw new Error('PWA metadata is missing from index.html');
 }
 
+const pwaExperience = fs.readFileSync(new URL('../src/components/PwaExperience.tsx', import.meta.url), 'utf8');
+const responsiveHardening = fs.readFileSync(new URL('../src/styles/responsive-hardening.css', import.meta.url), 'utf8');
+if (!pwaExperience.includes('MBoteRoomAndroid') || !pwaExperience.includes('nativeAndroid') || !pwaExperience.includes('!nativeAndroid&&showInstall')) {
+  throw new Error('Native Android APK must never display the PWA installation prompt');
+}
+if (!responsiveHardening.includes('Mobile/Android touch ergonomics') || !responsiveHardening.includes('min-height:48px') || !responsiveHardening.includes('data-native-app="android"')) {
+  throw new Error('Mobile controls must expose larger touch targets and hide install UI inside the native APK');
+}
+
 const pwaRuntime = fs.readFileSync(new URL('../src/lib/pwa.ts', import.meta.url), 'utf8');
 if (!pwaRuntime.includes("postMessage({ type: 'SKIP_WAITING' })") || !pwaRuntime.includes('isLiveMeetingRoute') || !pwaRuntime.includes('60 * 1000')) {
   throw new Error('Published web updates must auto-activate while deferring reload during a live meeting');
