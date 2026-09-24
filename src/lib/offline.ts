@@ -1,5 +1,6 @@
 const API_CACHE_PREFIX = 'mboteroom-api-v2';
-const QUEUE_KEY = 'mboteroom-offline-queue-v2';
+const LEGACY_QUEUE_KEY = 'mboteroom-offline-queue-v2';
+const QUEUE_KEY_PREFIX = 'mboteroom-offline-queue-v3';
 const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_QUEUE = 100;
 
@@ -29,6 +30,7 @@ const currentUserId = () => {
 };
 
 const cacheName = () => `${API_CACHE_PREFIX}-${currentUserId()}`;
+const queueKey = () => `${QUEUE_KEY_PREFIX}-${currentUserId()}`;
 
 const syntheticCacheKey = (input: RequestInfo | URL) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
@@ -85,7 +87,7 @@ export const readCachedApiResponse = async (input: RequestInfo | URL) => {
 const readQueue = (): OfflineQueueEntry[] => {
   if (!safeWindow()) return [];
   try {
-    const parsed = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
+    const parsed = JSON.parse(localStorage.getItem(queueKey()) || '[]');
     return Array.isArray(parsed) ? parsed.slice(-MAX_QUEUE) : [];
   } catch {
     return [];
@@ -94,7 +96,7 @@ const readQueue = (): OfflineQueueEntry[] => {
 
 const writeQueue = (entries: OfflineQueueEntry[]) => {
   if (!safeWindow()) return;
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(entries.slice(-MAX_QUEUE)));
+  localStorage.setItem(queueKey(), JSON.stringify(entries.slice(-MAX_QUEUE)));
   window.dispatchEvent(new CustomEvent('mbote-room-offline-queue-changed', { detail: { pending: entries.length } }));
 };
 
@@ -137,12 +139,20 @@ export const flushOfflineQueue = async () => {
         headers.set('X-MBoteRoom-Offline-Replay', '1');
         const authHeaders = currentAuthHeaders();
         if ('Authorization' in authHeaders && authHeaders.Authorization) headers.set('Authorization', authHeaders.Authorization);
-        const response = await fetch(entry.url, {
-          method: entry.method,
-          credentials: 'include',
-          headers,
-          body: ['GET', 'HEAD'].includes(entry.method) ? undefined : entry.body,
-        });
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), 30_000);
+        let response: Response;
+        try {
+          response = await fetch(entry.url, {
+            method: entry.method,
+            credentials: 'include',
+            headers,
+            body: ['GET', 'HEAD'].includes(entry.method) ? undefined : entry.body,
+            signal: controller.signal,
+          });
+        } finally {
+          window.clearTimeout(timer);
+        }
         if (response.ok || response.status === 404) {
           synced += 1;
           continue;
@@ -175,13 +185,16 @@ export const clearOfflinePrivateData = async () => {
     const name = cacheName();
     await caches.delete(name);
   } catch {}
-  localStorage.removeItem(QUEUE_KEY);
+  localStorage.removeItem(queueKey());
+  localStorage.removeItem(LEGACY_QUEUE_KEY);
 };
 
 let initialized = false;
 export const initOfflineMode = () => {
   if (!safeWindow() || initialized) return;
   initialized = true;
+  // Never replay legacy cross-account mutations created before queues were user-scoped.
+  localStorage.removeItem(LEGACY_QUEUE_KEY);
   const sync = () => void flushOfflineQueue();
   window.addEventListener('online', sync);
   window.addEventListener('focus', sync);
