@@ -111,11 +111,11 @@ const runCase = async ({ name, browserType, device, session }) => {
   assert.ok((await page.locator('body').innerText()).length > 40, `${name}: empty application`);
   assert.ok(!page.url().includes('/login'), `${name}: authenticated session redirected to login`);
 
-  const avatar = page.locator('.app-shell-header-avatar');
+  const avatar = page.locator('.global-header-avatar:visible');
   if (await avatar.count()) {
     await avatar.click();
     await page.waitForTimeout(100);
-    assert.equal(await page.locator('.app-shell-profile-dropdown').count(), 1, `${name}: profile menu did not open`);
+    assert.equal(await page.locator('.global-header-profile-menu:visible').count(), 1, `${name}: profile menu did not open`);
     const dropdownMetrics = await page.evaluate(() => ({
       viewport: window.innerWidth,
       root: document.documentElement.scrollWidth,
