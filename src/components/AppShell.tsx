@@ -187,7 +187,6 @@ export default function AppShell({ children }: AppShellProps) {
               </div>
             </section>
           </div>
-          </div>
         </div>
       </aside> : null}
 
