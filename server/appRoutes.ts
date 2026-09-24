@@ -476,6 +476,11 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
       const userAgent=String(request.headers['user-agent']||'').slice(0,500);
       if(!endpoint||!p256dh||!auth)return sendApiError(response,400,'PUSH_SUBSCRIPTION_INVALID','Abonnement push invalide.');
       if(!/^https:\/\//i.test(endpoint))return sendApiError(response,400,'PUSH_ENDPOINT_INVALID','Endpoint push invalide.');
+      const p256dhBytes=Buffer.from(p256dh,'base64url');
+      const authBytes=Buffer.from(auth,'base64url');
+      if(p256dhBytes.length!==65||p256dhBytes[0]!==4||authBytes.length<16){
+        return sendApiError(response,400,'PUSH_SUBSCRIPTION_INVALID','Clés de notification invalides. Réactivez les notifications sur cet appareil.');
+      }
       const id=createId();
       const result=await query(
         `INSERT INTO room_push_subscriptions (id,user_id,endpoint,p256dh,auth,expiration_time,user_agent,platform)
@@ -509,7 +514,16 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
         data:{source:'settings'},
       });
       io.to(`user:${request.user!.id}`).emit('notification:new',notification);
-      response.json({success:true});
+      const delivery=notification.pushDelivery||{sent:0,failed:0,stale:0};
+      if(delivery.sent<1){
+        return sendApiError(
+          response,
+          409,
+          'PUSH_DELIVERY_FAILED',
+          'Aucun appareil n’a reçu la notification. Réactivez les notifications sur cet appareil puis réessayez.',
+        );
+      }
+      response.json({success:true,delivery});
     }catch(error){next(error);}
   });
 
