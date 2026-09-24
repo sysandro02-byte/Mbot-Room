@@ -191,7 +191,8 @@ try {
   for (const width of responsiveWidths) {
     await responsivePage.setViewportSize({ width, height: width <= 430 ? 844 : 1000 });
     await responsivePage.goto(`${baseUrl}/app`, { waitUntil: 'domcontentloaded' });
-    await responsivePage.waitForLoadState('networkidle');
+    await responsivePage.locator('.global-app-header').waitFor({ state: 'visible', timeout: 10_000 });
+    await responsivePage.waitForTimeout(250);
     const metrics = await responsivePage.evaluate(() => ({
       viewport: window.innerWidth,
       root: document.documentElement.scrollWidth,
