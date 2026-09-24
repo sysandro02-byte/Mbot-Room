@@ -55,6 +55,8 @@ export type MeetingSettings = {
   isPublic?: boolean;
   locked?: boolean;
   visibility?: string;
+  /** Identifiant interne de l’hôte de secours pendant l’absence temporaire de l’hôte principal. */
+  actingHostId?: number;
 };
 
 export type Meeting = {
@@ -336,7 +338,10 @@ export const createSession = async (userId: number, rememberMe = false) => {
 };
 
 export const canModerateMeeting = (meeting: Meeting, user: PublicUser) =>
-  meeting.host_id === user.id || meeting.co_host_id === user.id || user.role === 'admin';
+  meeting.host_id === user.id
+  || meeting.co_host_id === user.id
+  || Number(meeting.settings?.actingHostId || 0) === user.id
+  || user.role === 'admin';
 
 export const hasMeetingAccess = async (meetingId: number, user: PublicUser) => {
   if (user.role === 'admin') return true;
