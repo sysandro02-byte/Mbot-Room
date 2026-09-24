@@ -62,6 +62,7 @@ app.use((request, response, next) => {
   response.setHeader('X-XSS-Protection', '0');
   response.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=(), usb=(), serial=(), bluetooth=()');
   response.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  response.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   response.setHeader('Content-Security-Policy', [
     "default-src 'self'",
     "script-src 'self'",
@@ -78,6 +79,10 @@ app.use((request, response, next) => {
     "form-action 'self'"
   ].join('; '));
   if (process.env.NODE_ENV === 'production') response.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  if (request.path.startsWith('/api/')) {
+    response.setHeader('Cache-Control', 'no-store, max-age=0');
+    response.setHeader('Pragma', 'no-cache');
+  }
   if (request.method === 'OPTIONS') return response.sendStatus(isAllowedOrigin(origin) ? 204 : 403);
   if (origin && !isAllowedOrigin(origin)) return response.status(403).json({ error: 'Origin non autorisée.', code: 'ORIGIN_DENIED' });
   next();
