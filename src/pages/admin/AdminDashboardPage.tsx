@@ -611,6 +611,7 @@ function AdminSidebar({ userName, open, onClose }: { userName: string; open: boo
     { label: 'Tableau de bord', icon: Home, path: '/admin', active: true },
     { label: 'Réglages généraux', icon: Settings, path: '/admin#admin-controls' },
     { label: 'Utilisateurs', icon: UsersRound, path: '/admin#admin-users' },
+    { label: 'Administrateurs', icon: ShieldCheck, path: '/admin#admin-admin-invites' },
     { label: 'Slider accueil', icon: CirclePlay, path: '/admin#admin-home-slides' },
     { label: 'Page de connexion', icon: ImageIcon, path: '/admin#admin-login-branding' },
     { label: 'Accueil des invités', icon: Video, path: '/admin#admin-guest-slides' },
