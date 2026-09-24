@@ -265,6 +265,7 @@ export const registerRealtime = (io: Server) => {
         }
         const requestedMedia = cleanMedia(payload?.media);
         const guestScreenAllowed = !user.isGuest || await isPlatformFeatureEnabled('guestScreenShareEnabled');
+        const accountScreenAllowed = canUseAccountFeature(user, 'screenShare');
         const allowedMedia: MediaState = {
           audio: (moderator || meeting.settings.participantAudio !== false) ? requestedMedia.audio : false,
           video: (moderator || meeting.settings.participantVideo !== false) ? requestedMedia.video : false,
@@ -327,7 +328,7 @@ export const registerRealtime = (io: Server) => {
       participant.media = {
         audio: (moderator || meeting.settings.participantAudio !== false) ? requestedMedia.audio : false,
         video: (moderator || meeting.settings.participantVideo !== false) ? requestedMedia.video : false,
-        screen: guestScreenAllowed && (moderator || meeting.settings.screenShare !== false) ? requestedMedia.screen : false,
+        screen: accountScreenAllowed && guestScreenAllowed && (moderator || meeting.settings.screenShare !== false) ? requestedMedia.screen : false,
       };
       if (participant.media.audio || participant.media.video) {
         await query(
