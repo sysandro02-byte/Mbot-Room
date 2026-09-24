@@ -1,0 +1,105 @@
+export type RegistrationCountry = {
+  code: string;
+  name: string;
+  dialCode: string;
+  cities: string[];
+};
+
+export const companyCategories = [
+  'Technologie & numérique',
+  'Télécommunications',
+  'Banque, finance & assurance',
+  'Commerce & distribution',
+  'Industrie & production',
+  'BTP & immobilier',
+  'Transport & logistique',
+  'Énergie & mines',
+  'Santé',
+  'Éducation & formation',
+  'Agriculture & agroalimentaire',
+  'Médias & communication',
+  'Conseil & services professionnels',
+  'Hôtellerie & tourisme',
+  'Administration publique',
+  'ONG & association',
+  'Startup',
+  'Autre',
+] as const;
+
+export const registrationCountries: RegistrationCountry[] = [
+  { code:'CG', name:'Congo-Brazzaville', dialCode:'+242', cities:['Brazzaville','Pointe-Noire','Dolisie','Nkayi','Ouesso','Oyo','Impfondo','Sibiti','Kinkala'] },
+  { code:'CD', name:'République démocratique du Congo', dialCode:'+243', cities:['Kinshasa','Lubumbashi','Goma','Kisangani','Bukavu','Matadi','Mbuji-Mayi','Kananga'] },
+  { code:'GA', name:'Gabon', dialCode:'+241', cities:['Libreville','Port-Gentil','Franceville','Oyem','Moanda'] },
+  { code:'CM', name:'Cameroun', dialCode:'+237', cities:['Yaoundé','Douala','Garoua','Bafoussam','Bamenda','Maroua'] },
+  { code:'CF', name:'République centrafricaine', dialCode:'+236', cities:['Bangui','Bimbo','Berbérati','Bambari'] },
+  { code:'GQ', name:'Guinée équatoriale', dialCode:'+240', cities:['Malabo','Bata','Ebebiyín','Mongomo'] },
+  { code:'AO', name:'Angola', dialCode:'+244', cities:['Luanda','Cabinda','Benguela','Huambo','Lubango'] },
+  { code:'RW', name:'Rwanda', dialCode:'+250', cities:['Kigali','Huye','Musanze','Rubavu'] },
+  { code:'BI', name:'Burundi', dialCode:'+257', cities:['Bujumbura','Gitega','Ngozi','Rumonge'] },
+  { code:'BJ', name:'Bénin', dialCode:'+229', cities:['Cotonou','Porto-Novo','Parakou','Abomey-Calavi'] },
+  { code:'TG', name:'Togo', dialCode:'+228', cities:['Lomé','Sokodé','Kara','Atakpamé'] },
+  { code:'GH', name:'Ghana', dialCode:'+233', cities:['Accra','Kumasi','Tamale','Takoradi','Cape Coast'] },
+  { code:'CI', name:'Côte d’Ivoire', dialCode:'+225', cities:['Abidjan','Bouaké','Yamoussoukro','San-Pédro','Korhogo'] },
+  { code:'SN', name:'Sénégal', dialCode:'+221', cities:['Dakar','Thiès','Saint-Louis','Kaolack','Ziguinchor'] },
+  { code:'NG', name:'Nigeria', dialCode:'+234', cities:['Lagos','Abuja','Kano','Ibadan','Port Harcourt'] },
+  { code:'KE', name:'Kenya', dialCode:'+254', cities:['Nairobi','Mombasa','Kisumu','Nakuru','Eldoret'] },
+  { code:'ZA', name:'Afrique du Sud', dialCode:'+27', cities:['Johannesburg','Le Cap','Durban','Pretoria','Gqeberha'] },
+  { code:'MA', name:'Maroc', dialCode:'+212', cities:['Casablanca','Rabat','Marrakech','Fès','Tanger'] },
+  { code:'DZ', name:'Algérie', dialCode:'+213', cities:['Alger','Oran','Constantine','Annaba'] },
+  { code:'TN', name:'Tunisie', dialCode:'+216', cities:['Tunis','Sfax','Sousse','Bizerte'] },
+  { code:'EG', name:'Égypte', dialCode:'+20', cities:['Le Caire','Alexandrie','Gizeh','Louxor'] },
+  { code:'ET', name:'Éthiopie', dialCode:'+251', cities:['Addis-Abeba','Dire Dawa','Mekele','Bahir Dar'] },
+  { code:'TZ', name:'Tanzanie', dialCode:'+255', cities:['Dar es Salaam','Dodoma','Arusha','Mwanza','Zanzibar'] },
+  { code:'UG', name:'Ouganda', dialCode:'+256', cities:['Kampala','Entebbe','Jinja','Gulu'] },
+  { code:'ZM', name:'Zambie', dialCode:'+260', cities:['Lusaka','Ndola','Kitwe','Livingstone'] },
+  { code:'ZW', name:'Zimbabwe', dialCode:'+263', cities:['Harare','Bulawayo','Mutare','Gweru'] },
+  { code:'MZ', name:'Mozambique', dialCode:'+258', cities:['Maputo','Matola','Beira','Nampula'] },
+  { code:'MG', name:'Madagascar', dialCode:'+261', cities:['Antananarivo','Toamasina','Antsirabe','Mahajanga'] },
+  { code:'MU', name:'Maurice', dialCode:'+230', cities:['Port-Louis','Beau Bassin-Rose Hill','Curepipe','Quatre Bornes'] },
+  { code:'SC', name:'Seychelles', dialCode:'+248', cities:['Victoria','Anse Boileau','Beau Vallon'] },
+  { code:'ML', name:'Mali', dialCode:'+223', cities:['Bamako','Sikasso','Mopti','Kayes'] },
+  { code:'BF', name:'Burkina Faso', dialCode:'+226', cities:['Ouagadougou','Bobo-Dioulasso','Koudougou','Ouahigouya'] },
+  { code:'NE', name:'Niger', dialCode:'+227', cities:['Niamey','Zinder','Maradi','Agadez'] },
+  { code:'TD', name:'Tchad', dialCode:'+235', cities:['N’Djamena','Moundou','Sarh','Abéché'] },
+  { code:'SD', name:'Soudan', dialCode:'+249', cities:['Khartoum','Omdourman','Port-Soudan','Kassala'] },
+  { code:'SS', name:'Soudan du Sud', dialCode:'+211', cities:['Djouba','Wau','Malakal','Yei'] },
+  { code:'DJ', name:'Djibouti', dialCode:'+253', cities:['Djibouti','Ali Sabieh','Tadjourah'] },
+  { code:'ER', name:'Érythrée', dialCode:'+291', cities:['Asmara','Keren','Massaoua'] },
+  { code:'MW', name:'Malawi', dialCode:'+265', cities:['Lilongwe','Blantyre','Mzuzu','Zomba'] },
+  { code:'BW', name:'Botswana', dialCode:'+267', cities:['Gaborone','Francistown','Maun','Molepolole'] },
+  { code:'NA', name:'Namibie', dialCode:'+264', cities:['Windhoek','Walvis Bay','Swakopmund','Rundu'] },
+  { code:'LS', name:'Lesotho', dialCode:'+266', cities:['Maseru','Teyateyaneng','Mafeteng'] },
+  { code:'SZ', name:'Eswatini', dialCode:'+268', cities:['Mbabane','Manzini','Lobamba'] },
+  { code:'GM', name:'Gambie', dialCode:'+220', cities:['Banjul','Serekunda','Brikama'] },
+  { code:'GN', name:'Guinée', dialCode:'+224', cities:['Conakry','Nzérékoré','Kankan','Kindia'] },
+  { code:'GW', name:'Guinée-Bissau', dialCode:'+245', cities:['Bissau','Bafatá','Gabú'] },
+  { code:'SL', name:'Sierra Leone', dialCode:'+232', cities:['Freetown','Bo','Kenema','Makeni'] },
+  { code:'LR', name:'Liberia', dialCode:'+231', cities:['Monrovia','Gbarnga','Buchanan'] },
+  { code:'CV', name:'Cap-Vert', dialCode:'+238', cities:['Praia','Mindelo','Espargos'] },
+  { code:'KM', name:'Comores', dialCode:'+269', cities:['Moroni','Mutsamudu','Fomboni'] },
+  { code:'ST', name:'São Tomé-et-Príncipe', dialCode:'+239', cities:['São Tomé','Santo António','Neves'] },
+  { code:'FR', name:'France', dialCode:'+33', cities:['Paris','Lyon','Marseille','Toulouse','Bordeaux','Lille'] },
+  { code:'BE', name:'Belgique', dialCode:'+32', cities:['Bruxelles','Anvers','Liège','Gand','Charleroi'] },
+  { code:'CH', name:'Suisse', dialCode:'+41', cities:['Genève','Zurich','Lausanne','Berne','Bâle'] },
+  { code:'GB', name:'Royaume-Uni', dialCode:'+44', cities:['Londres','Manchester','Birmingham','Liverpool','Édimbourg'] },
+  { code:'US', name:'États-Unis', dialCode:'+1', cities:['New York','Los Angeles','Chicago','Houston','Washington'] },
+  { code:'CA', name:'Canada', dialCode:'+1', cities:['Montréal','Toronto','Ottawa','Vancouver','Québec'] },
+  { code:'BR', name:'Brésil', dialCode:'+55', cities:['São Paulo','Rio de Janeiro','Brasília','Salvador'] },
+  { code:'AE', name:'Émirats arabes unis', dialCode:'+971', cities:['Dubaï','Abou Dabi','Sharjah','Ajman'] },
+  { code:'CN', name:'Chine', dialCode:'+86', cities:['Pékin','Shanghai','Guangzhou','Shenzhen'] },
+  { code:'IN', name:'Inde', dialCode:'+91', cities:['Delhi','Mumbai','Bengaluru','Hyderabad','Chennai'] },
+  { code:'TR', name:'Turquie', dialCode:'+90', cities:['Istanbul','Ankara','Izmir','Bursa'] },
+  { code:'PT', name:'Portugal', dialCode:'+351', cities:['Lisbonne','Porto','Braga','Coimbra'] },
+  { code:'DE', name:'Allemagne', dialCode:'+49', cities:['Berlin','Hambourg','Munich','Cologne','Francfort'] },
+  { code:'IT', name:'Italie', dialCode:'+39', cities:['Rome','Milan','Naples','Turin','Bologne'] },
+  { code:'ES', name:'Espagne', dialCode:'+34', cities:['Madrid','Barcelone','Valence','Séville','Bilbao'] },
+  { code:'NL', name:'Pays-Bas', dialCode:'+31', cities:['Amsterdam','Rotterdam','La Haye','Utrecht'] },
+].sort((a,b)=>a.name.localeCompare(b.name,'fr'));
+
+export const getRegistrationCountry = (countryName: string) =>
+  registrationCountries.find((country) => country.name === countryName) || null;
+
+export const isRegistrationCity = (countryName: string, city: string) => {
+  const country = getRegistrationCountry(countryName);
+  return Boolean(country && (country.cities.includes(city) || city === 'Autre ville'));
+};
