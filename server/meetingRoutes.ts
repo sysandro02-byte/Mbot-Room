@@ -877,9 +877,16 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       }
       const user = await query('SELECT name,avatar FROM room_users WHERE id=$1 LIMIT 1',[userId]);
       if (!user.rows[0]) return sendApiError(response,404,'PARTICIPANT_NOT_FOUND','Participant introuvable.');
-      await query(`INSERT INTO room_lobby (meeting_id,user_id,status,name,avatar) VALUES ($1,$2,'requested',$3,$4) ON CONFLICT (meeting_id,user_id) DO UPDATE SET status='requested'`, [meeting.id,userId,user.rows[0].name,user.rows[0].avatar]);
+      await query(`INSERT INTO room_lobby (meeting_id,user_id,status,name,avatar) VALUES ($1,$2,'requested',$3,$4) ON CONFLICT (meeting_id,user_id) DO UPDATE SET status='requested',name=excluded.name,avatar=excluded.avatar`, [meeting.id,userId,user.rows[0].name,user.rows[0].avatar]);
       await query(`UPDATE room_meeting_members SET role='participant',status='left',left_at=now(),updated_at=now() WHERE meeting_id=$1 AND user_id=$2`, [meeting.id,userId]);
       io.to(`user:${userId}`).emit('meeting:moved-to-lobby', { meetingId: meeting.id });
+      io.to(`meeting:${meeting.id}:moderators`).emit('meeting:lobby-updated', {
+        meetingId: meeting.id,
+        userId,
+        status: 'requested',
+        name: user.rows[0].name,
+        avatar: user.rows[0].avatar,
+      });
       response.json({ success:true });
     } catch (error) { next(error); }
   });
