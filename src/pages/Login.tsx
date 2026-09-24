@@ -29,6 +29,7 @@ import { authService } from '../services/authService';
 import { sanitizeInternalPath } from '../lib/navigationSecurity';
 import { apiFetch, apiUrl } from '../lib/api';
 import { getStoredLanguage, persistAppLanguage, type AppLanguage } from '../lib/appLanguage';
+import TermsConsent from '../components/TermsConsent';
 import './Login.css';
 
 type AuthView = 'login' | 'register' | 'guest' | 'forgot';
@@ -283,6 +284,8 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [birthDate, setBirthDate] = useState('');
   const [birthPlace, setBirthPlace] = useState('');
   const [address, setAddress] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsVersion, setTermsVersion] = useState('');
   const [isRegisterModalOpen, setRegisterModalOpen] = useState(false);
   const [forgotMessage, setForgotMessage] = useState('');
   const [resetComplete, setResetComplete] = useState(false);
@@ -492,6 +495,10 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       if (passwordError) nextErrors.password = passwordError;
     }
     if (phoneNumber.trim() && phoneNumber.trim().length < 6) nextErrors.phoneNumber = 'Le numéro de téléphone est trop court.';
+    if (!termsAccepted || !termsVersion) {
+      setFormError("Vous devez lire et accepter les conditions d’utilisation avant de créer votre compte.");
+      return;
+    }
 
     setFieldErrors(nextErrors);
     setFormError('');
@@ -511,6 +518,8 @@ export default function Login({ initialView = 'login' }: LoginProps) {
         birthDate,
         birthPlace: birthPlace.trim(),
         address: address.trim(),
+        termsAccepted,
+        termsVersion,
       });
       setPassword('');
       setRegisterModalOpen(false);
@@ -530,6 +539,10 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     if (!guestName.trim()) nextErrors.name = 'Votre nom est obligatoire.';
     if (!meetingCode.trim()) nextErrors.meetingCode = "L'ID ou le lien de réunion est obligatoire.";
     if (!meetingPassword.trim()) nextErrors.meetingPassword = 'Le mot de passe de réunion est obligatoire.';
+    if (!termsAccepted || !termsVersion) {
+      setFormError("Vous devez lire et accepter les conditions d’utilisation avant de rejoindre en invité.");
+      return;
+    }
 
     setFieldErrors(nextErrors);
     setFormError('');
@@ -541,6 +554,8 @@ export default function Login({ initialView = 'login' }: LoginProps) {
         name: guestName.trim(),
         meetingCode: meetingCode.trim(),
         password: meetingPassword,
+        termsAccepted,
+        termsVersion,
       });
       setMeetingPassword('');
       const target = result.meeting?.meeting_link ? `/join/${result.meeting.meeting_link}` : '/join';
@@ -858,6 +873,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
               footer={<AuthFooterAction label="Déjà un compte ?" action="Se connecter" onClick={() => navigate('/connexion')} />}
             >
               {renderRegistrationFields()}
+              <TermsConsent accepted={termsAccepted} version={termsVersion} onAccepted={(accepted,version)=>{setTermsAccepted(accepted);setTermsVersion(version);setFormError('');}} />
             </CompactAuthCard>
           )}
 
@@ -881,6 +897,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
               <FormField id="guest-password" label="Mot de passe de réunion" icon={<Lock size={21} aria-hidden="true" />} error={fieldErrors.meetingPassword}>
                 <input id="guest-password" type="password" value={meetingPassword} placeholder="Code donné par l'hôte" autoComplete="off" onChange={(event) => { setMeetingPassword(event.target.value); clearErrors(); }} />
               </FormField>
+              <TermsConsent accepted={termsAccepted} version={termsVersion} onAccepted={(accepted,version)=>{setTermsAccepted(accepted);setTermsVersion(version);setFormError('');}} />
             </CompactAuthCard>
           )}
 
@@ -986,8 +1003,9 @@ export default function Login({ initialView = 'login' }: LoginProps) {
               <div className="registration-modal-grid">
                 {renderRegistrationFields()}
               </div>
+              <TermsConsent accepted={termsAccepted} version={termsVersion} onAccepted={(accepted,version)=>{setTermsAccepted(accepted);setTermsVersion(version);setFormError('');}} />
               {formError && <p className="auth-error" role="alert">{formError}</p>}
-              <button className="primary-login-button" type="submit" disabled={isLoading}>
+              <button className="primary-login-button" type="submit" disabled={isLoading || !termsAccepted || !termsVersion}>
                 {isLoading ? 'Création en cours...' : 'Créer le compte'}
               </button>
             </form>
