@@ -325,6 +325,32 @@ export const authenticateToken: express.RequestHandler = async (request: AuthedR
   }
 };
 
+export type AccountFeature = 'meetings' | 'messages' | 'groups' | 'files' | 'recording' | 'luna' | 'screenShare';
+
+export const canUseAccountFeature = (user: PublicUser | undefined, feature: AccountFeature) => {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  if (user.accountStatus === 'banned' || user.accountStatus === 'quarantined') return false;
+  return !(user.featureRestrictions || []).includes(feature);
+};
+
+export const requireAccountFeature = (feature: AccountFeature): express.RequestHandler =>
+  (request: AuthedRequest, response, next) => {
+    if (!canUseAccountFeature(request.user, feature)) {
+      sendApiError(
+        response,
+        403,
+        request.user?.accountStatus === 'quarantined' ? 'ACCOUNT_QUARANTINED' : 'FEATURE_RESTRICTED',
+        request.user?.accountStatus === 'quarantined'
+          ? 'Ce compte est actuellement en quarantaine. Cette action est temporairement indisponible.'
+          : 'Cette fonctionnalité a été désactivée pour ce compte.',
+        { feature },
+      );
+      return;
+    }
+    next();
+  };
+
 export const requireAdmin: express.RequestHandler = (request: AuthedRequest, response, next) => {
   if (request.user?.role !== 'admin') {
     sendApiError(response, 403, 'ADMIN_ACCESS_DENIED', 'Accès administrateur refusé.');
