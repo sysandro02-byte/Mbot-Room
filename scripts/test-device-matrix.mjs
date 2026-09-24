@@ -60,6 +60,8 @@ const register = async () => {
       name: 'Device Matrix',
       email: 'device.matrix@mbote.test',
       password: 'Password2026!',
+      termsAccepted: true,
+      termsVersion: '2026-09-24',
     }),
   });
   const data = await response.json();
