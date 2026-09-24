@@ -192,6 +192,8 @@ const canModerate = async (meetingId: number, userId: number, role: string) => {
 };
 
 const canRecordMeeting = async (meetingId: number, user: NonNullable<AuthedRequest['user']>) => {
+  if (user.role !== 'admin' && !(await isPlatformFeatureEnabled('recordingEnabled'))) return false;
+  if (user.isGuest && !(await isPlatformFeatureEnabled('guestRecordingEnabled'))) return false;
   const result = await query('SELECT host_id,co_host_id,settings FROM room_meetings WHERE id=$1 LIMIT 1', [meetingId]);
   const row = result.rows[0];
   if (!row) return false;
@@ -338,6 +340,9 @@ export const registerRecordingRoutes = (app: express.Express, io: Server) => {
     try {
       if (!(await isPlatformFeatureEnabled('recordingEnabled')) && request.user?.role !== 'admin') {
         return sendApiError(response,403,'RECORDING_DISABLED','L’enregistrement est temporairement désactivé.');
+      }
+      if (request.user?.isGuest && !(await isPlatformFeatureEnabled('guestRecordingEnabled'))) {
+        return sendApiError(response,403,'GUEST_RECORDING_DISABLED','Les invités ne sont pas autorisés à enregistrer une réunion.');
       }
       const meetingId = Number(request.params.meetingId);
       if (!meetingId || !(await canModerate(meetingId, request.user!.id, request.user!.role))) {
