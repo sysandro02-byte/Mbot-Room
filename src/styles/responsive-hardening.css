@@ -3,7 +3,8 @@ html,body,#root{width:100%;max-width:100%;overflow-x:clip}
 body{min-width:0}
 main,section,article,aside,header,footer,nav,form,fieldset,div{min-width:0}
 img,video,canvas{max-width:100%}
-p,h1,h2,h3,h4,h5,h6,span,strong,small,label,a,button{overflow-wrap:anywhere}
+p,h1,h2,h3,h4,h5,h6,span,strong,small,label,button{overflow-wrap:break-word;word-break:normal}
+a{overflow-wrap:anywhere}
 input,select,textarea,button{max-width:100%}
 textarea{resize:vertical}
 table{max-width:100%}
@@ -133,6 +134,12 @@ table{max-width:100%}
 
 /* Mobile/Android touch ergonomics */
 @media(max-width:800px){
+  h1,h2,h3,h4,h5,h6,strong,small,label,
+  button,[role="button"]{
+    word-break:normal;
+    hyphens:none;
+  }
+
   button,
   [role="button"]{
     min-height:48px;
