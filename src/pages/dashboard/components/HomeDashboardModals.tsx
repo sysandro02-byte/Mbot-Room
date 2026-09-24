@@ -118,11 +118,14 @@ export function StorageDataModal({open,onClose}:{open:boolean;onClose:()=>void})
   const refresh=async()=>{
     setLoading(true);
     try{
+      const storageEstimate=navigator.storage?.estimate
+        ? navigator.storage.estimate().catch(()=>({usage:0,quota:0}))
+        : Promise.resolve({usage:0,quota:0});
       const [recordings,fileRows,prefs,estimate]=await Promise.all([
         appDataService.getRecordingStats().catch(()=>null),
         workspaceService.getFiles().catch(()=>[]),
         appDataService.getPreferences().catch(()=>({} as Preferences)),
-        navigator.storage?.estimate?.().catch(()=>({usage:0,quota:0}))||Promise.resolve({usage:0,quota:0}),
+        storageEstimate,
       ]);
       setRecordingStats(recordings);
       setFiles(Array.isArray(fileRows)?fileRows:[]);
