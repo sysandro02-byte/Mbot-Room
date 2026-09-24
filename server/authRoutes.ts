@@ -278,9 +278,25 @@ const issueLoginOtp = async (user: any, rememberMe = false) => {
   return { otpRequired: true as const, challengeId, emailHint, expiresInSeconds: expiresMinutes * 60 };
 };
 
-const canRegisterAdminEmail = async (email: string) => {
+const canRegisterAdminEmail = async (email: string, inviteToken = '') => {
+  const normalizedEmail = normalizeEmail(email);
   const allowedAdmins = getConfiguredAdminEmails();
-  if (allowedAdmins.length > 0) return allowedAdmins.includes(email);
+  if (allowedAdmins.includes(normalizedEmail)) return true;
+
+  if (inviteToken) {
+    const invite = await query(
+      `SELECT id
+         FROM room_admin_invites
+        WHERE lower(email)=lower($1)
+          AND token_hash=$2
+          AND consumed_at IS NULL
+          AND expires_at>now()
+        LIMIT 1`,
+      [normalizedEmail, hashToken(inviteToken)],
+    );
+    if (invite.rows[0]) return true;
+  }
+
   const activeAdmins = await query(
     "SELECT COUNT(*)::int AS count FROM room_users WHERE role='admin' AND COALESCE(is_suspended,false)=false",
   );
@@ -365,9 +381,10 @@ export const registerAuthRoutes = (app: express.Express) => {
       const name = normalizeText(request.body?.name).slice(0, 120);
       const email = normalizeEmail(request.body?.email);
       const password = String(request.body?.password || '');
+      const inviteToken = String(request.body?.inviteToken || '').trim();
       if (!name || !email || !password) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Nom, e-mail et mot de passe sont requis.');
-      if (!(await canRegisterAdminEmail(email))) {
-        return sendApiError(response, 403, 'ADMIN_EMAIL_NOT_ALLOWED', 'La création d’un autre compte administrateur doit être autorisée depuis la configuration ou le backoffice.');
+      if (!(await canRegisterAdminEmail(email, inviteToken))) {
+        return sendApiError(response, 403, 'ADMIN_INVITE_REQUIRED', 'Un compte administrateur existe déjà. Demandez une invitation administrateur depuis le backoffice, ou utilisez le compte administrateur existant.');
       }
       const passwordError = validatePasswordStrength(password);
       if (passwordError) return sendApiError(response, 400, 'PASSWORD_WEAK', passwordError);
@@ -454,11 +471,16 @@ export const registerAuthRoutes = (app: express.Express) => {
         return sendApiError(response, 401, 'OTP_INVALID', 'Code incorrect. Vérifiez l’e-mail reçu.');
       }
       if (challenge.purpose === 'admin_register') {
-        if (!(await canRegisterAdminEmail(normalizeEmail(challenge.email)))) {
-          return sendApiError(response, 403, 'ADMIN_EMAIL_NOT_ALLOWED', 'Cette création de compte administrateur n’est plus autorisée.');
-        }
         const activated = await query("UPDATE room_users SET is_suspended=false WHERE id=$1 AND role='admin' AND is_suspended=true RETURNING id", [challenge.user_id]);
         if (!activated.rows[0]) return sendApiError(response, 403, 'ADMIN_REGISTRATION_INVALID', 'Cette création de compte n’est plus disponible.');
+        await query(
+          `UPDATE room_admin_invites
+              SET consumed_at=COALESCE(consumed_at,now())
+            WHERE lower(email)=lower($1)
+              AND consumed_at IS NULL
+              AND expires_at>now()`,
+          [normalizeEmail(challenge.email)],
+        );
         const appUrl = String(process.env.MBOTE_ROOM_APP_URL || resolveAllowedClientOrigin(request.headers.origin, getOrigin(request))).replace(/\/+$/, '');
         await sendWelcomeEmail(String(challenge.email), String(challenge.name), appUrl).catch(() => false);
       }
