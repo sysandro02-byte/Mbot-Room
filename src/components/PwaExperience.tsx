@@ -15,6 +15,8 @@ const isStandalone=()=>window.matchMedia?.('(display-mode: standalone)').matches
   || window.matchMedia?.('(display-mode: fullscreen)').matches
   || Boolean((navigator as Navigator & {standalone?:boolean}).standalone);
 
+const isNativeAndroidApp=()=>/MBoteRoomAndroid\/\d+(?:\.\d+)*/i.test(navigator.userAgent);
+
 const platform=()=>{
   const ua=navigator.userAgent.toLowerCase();
   if(/iphone|ipad|ipod/.test(ua)||(/macintosh/.test(ua)&&navigator.maxTouchPoints>1))return 'ios';
@@ -30,11 +32,19 @@ export default function PwaExperience(){
   const [pendingSync,setPendingSync]=useState(getOfflineQueueCount());
   const [syncNotice,setSyncNotice]=useState('');
   const device=useMemo(platform,[]);
+  const nativeAndroid=useMemo(isNativeAndroidApp,[]);
 
   useEffect(()=>{
     const standalone=isStandalone();
     document.documentElement.dataset.platform=device;
     document.documentElement.dataset.standalone=standalone?'true':'false';
+    document.documentElement.dataset.nativeApp=nativeAndroid?'android':'web';
+    if(nativeAndroid){
+      localStorage.setItem('mboteroom-installed','1');
+      setShowInstall(false);
+      setShowHelp(false);
+      setDeferredPrompt(null);
+    }
     const installed=()=>{document.documentElement.dataset.standalone='true';setShowInstall(false);localStorage.setItem('mboteroom-installed','1');};
     const online=()=>{setOffline(false);void flushOfflineQueue();};
     const offlineHandler=()=>setOffline(true);
@@ -48,11 +58,15 @@ export default function PwaExperience(){
     window.addEventListener('online',online);
     window.addEventListener('offline',offlineHandler);
     window.addEventListener('mbote-room-offline-queue-changed',queueChanged);
-    const installRequested=()=>{setShowInstall(true);setShowHelp(false);};
+    const installRequested=()=>{
+      if(nativeAndroid||isStandalone())return;
+      setShowInstall(true);
+      setShowHelp(false);
+    };
     window.addEventListener('mbote-room-offline-synced',synced);
     window.addEventListener('mboteroom-install-request',installRequested);
 
-    if(!standalone){
+    if(!standalone&&!nativeAndroid){
       const onBeforeInstall=(event:Event)=>{
         const installEvent=event as InstallPromptEvent;
         installEvent.preventDefault();
@@ -88,7 +102,7 @@ export default function PwaExperience(){
       window.removeEventListener('mbote-room-offline-synced',synced);
       window.removeEventListener('mboteroom-install-request',installRequested);
     };
-  },[device]);
+  },[device,nativeAndroid]);
 
   const dismiss=()=>{
     localStorage.setItem('mboteroom-install-dismissed-at',String(Date.now()));
@@ -108,7 +122,7 @@ export default function PwaExperience(){
     {offline?<div className="pwa-offline-pill" role="status"><WifiOff size={15}/> Mode hors connexion{pendingSync? ` · ${pendingSync} en attente` : ''}</div>:null}
     {!offline&&pendingSync?<button className="pwa-sync-pill" type="button" onClick={()=>void flushOfflineQueue()}><RefreshCw size={14}/> Synchroniser {pendingSync}</button>:null}
     {syncNotice?<div className="pwa-sync-success" role="status"><CheckCircle2 size={15}/>{syncNotice}</div>:null}
-    {showInstall?<div className="pwa-install-backdrop">
+    {!nativeAndroid&&showInstall?<div className="pwa-install-backdrop">
       <section className="pwa-install-sheet" role="dialog" aria-modal="true" aria-labelledby="pwa-install-title">
         <button className="pwa-install-close" type="button" aria-label="Fermer" onClick={dismiss}><X size={19}/></button>
         <div className="pwa-install-icon"><Smartphone size={30}/></div>
