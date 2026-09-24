@@ -173,9 +173,13 @@ export default function GuestJoinPage() {
             </header>
 
             <div className="guest-trust-strip" aria-label="Avantages de l'accès invité">
-              <span><ShieldCheck size={16}/> Accès sécurisé</span>
-              <span><MonitorSmartphone size={16}/> Tous appareils</span>
-              <span><Video size={16}/> Prévisualisation avant entrée</span>
+              <div className="guest-trust-button">
+                <span><ShieldCheck size={16}/> Accès sécurisé</span>
+                <i aria-hidden="true" />
+                <span><MonitorSmartphone size={16}/> Tous appareils</span>
+                <i aria-hidden="true" />
+                <span><Video size={16}/> Prévisualisation avant entrée</span>
+              </div>
             </div>
 
             <form className="guest-join-form" onSubmit={submitJoin} noValidate>
