@@ -11,6 +11,7 @@ import { workspaceService, type GoogleCalendarStatus } from '../services/workspa
 import { showAppMessage } from '../lib/appMessage';
 import SettingsWorkspace from './settings/SettingsWorkspace';
 import './RealFeaturePage.css';
+import AppLoader from '../components/AppLoader';
 
 type FeatureKind = 'calendar' | 'recordings' | 'messages' | 'contacts' | 'whiteboard' | 'polls' | 'settings' | 'profile';
 type Props = { kind: FeatureKind };
@@ -212,7 +213,7 @@ export default function RealFeaturePage({kind}:Props){
     <section className="real-feature-page">
       {kind!=='settings'?<header className="real-feature-hero"><span>{icons[kind]}</span><div><h1>{titles[kind]}</h1><p>Retrouvez ici vos informations MBotéRoom.</p></div></header>:null}
       {notice?<div className="real-feature-notice">{notice}</div>:null}{error?<div className="real-feature-error">{error}</div>:null}
-      {loading?<p className="real-feature-loading">Chargement…</p>:null}
+      {loading?<AppLoader label="Chargement…" />:null}
 
       {!loading&&kind==='calendar'?<div className="real-calendar-page">
         <section className="real-card real-google-calendar-card">
