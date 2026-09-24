@@ -274,10 +274,30 @@
   .home-hero-slider-controls{left:50%;bottom:6px;transform:translateX(-50%)}
   .home-quick-actions-desktop{display:none}
   .home-quick-actions-mobile{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-  .home-quick-actions>button{min-height:112px;grid-template-columns:48px minmax(0,1fr) 28px;padding:14px;border-radius:17px}
+  .home-quick-actions>button{
+    min-height:112px;
+    grid-template-columns:48px minmax(0,1fr);
+    gap:10px;
+    padding:14px 44px 14px 14px;
+    border-radius:17px;
+  }
   .home-quick-actions>button>span{width:48px;height:48px;border-radius:14px}
-  .home-quick-actions strong{font-size:13px}
-  .home-quick-actions small{font-size:9px}
+  .home-quick-actions>button>svg{
+    position:absolute;
+    right:12px;
+    top:50%;
+    width:28px;
+    height:28px;
+    transform:translateY(-50%);
+  }
+  .home-quick-actions strong,
+  .home-quick-actions small{
+    overflow-wrap:normal;
+    word-break:normal;
+    hyphens:none;
+  }
+  .home-quick-actions strong{font-size:13px;line-height:1.15}
+  .home-quick-actions small{font-size:9px;line-height:1.25}
   .home-stats-card{padding:14px}
   .home-section-head h2{font-size:16px}
   .home-stats-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -309,8 +329,13 @@
   .home-hero-mobile-greeting{font-size:22px}
   .home-hero-brand{font-size:27px}
   .home-hero-actions button{font-size:11px}
-  .home-quick-actions>button{grid-template-columns:44px minmax(0,1fr) 26px;gap:8px;padding:12px}
+  .home-quick-actions>button{
+    grid-template-columns:44px minmax(0,1fr);
+    gap:8px;
+    padding:12px 40px 12px 12px;
+  }
   .home-quick-actions>button>span{width:44px;height:44px}
+  .home-quick-actions>button>svg{right:10px;width:26px;height:26px}
   .home-next-meeting-footer{grid-template-columns:1fr auto}
   .home-participant-preview{display:none}
 }
@@ -476,7 +501,13 @@
   .home-stats-grid article>span{width:34px;height:34px}
   .home-stats-grid article>span svg{width:18px}
   .home-stats-grid strong{font-size:20px}
-  .home-stats-grid small{font-size:8.5px;line-height:1.2}
+  .home-stats-grid small{
+    font-size:clamp(7px,2.15vw,8.5px);
+    line-height:1.25;
+    overflow-wrap:normal;
+    word-break:normal;
+    hyphens:none;
+  }
 
   .home-luna-actions{
     display:grid;
@@ -508,8 +539,9 @@
   .home-hero-copy>p{max-width:60%;font-size:12px}
   .home-hero-visual{right:10px;width:38%;height:132px}
   .home-hero-slogan{right:12px;font-size:12px}
-  .home-stats-grid article{padding:9px 6px}
+  .home-stats-grid article{padding:9px 5px}
   .home-stats-grid strong{font-size:18px}
+  .home-stats-grid small{font-size:clamp(6.8px,2.05vw,7.8px)}
   .home-luna-actions{
     display:flex;
     overflow-x:auto;
