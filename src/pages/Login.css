@@ -361,7 +361,8 @@
   position: relative;
 }
 
-.input-shell input {
+.input-shell input,
+.input-shell select {
   width: 100%;
   height: 54px;
   padding: 0 51px;
@@ -370,19 +371,34 @@
   outline: 0;
   color: #18213e;
   background: #ffffff;
+  font: inherit;
   transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.input-shell select {
+  padding-right: 42px;
+  cursor: pointer;
+}
+
+.input-shell input:disabled,
+.input-shell select:disabled {
+  color: #8b95aa;
+  background: #f5f7fb;
+  cursor: not-allowed;
 }
 
 .input-shell input::placeholder {
   color: #808ba7;
 }
 
-.input-shell input:focus {
+.input-shell input:focus,
+.input-shell select:focus {
   border-color: #5273f1;
   box-shadow: 0 0 0 4px rgba(44, 86, 238, 0.1);
 }
 
-.input-shell.has-error input {
+.input-shell.has-error input,
+.input-shell.has-error select {
   border-color: var(--login-danger);
 }
 
