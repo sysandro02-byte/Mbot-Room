@@ -29,6 +29,28 @@ import { isPlatformFeatureEnabled } from './platformSettings.js';
 
 const challenges = new Map<string, { profile: any; createdAt: number }>();
 const oauthStates = new Map<string, { redirectTo: string; clientOrigin: string; createdAt: number }>();
+const TEMP_AUTH_STATE_TTL_MS = 10 * 60_000;
+const MAX_TEMP_AUTH_STATES = 5_000;
+
+const pruneTemporaryAuthStates = () => {
+  const cutoff = Date.now() - TEMP_AUTH_STATE_TTL_MS;
+  for (const [key, value] of challenges) {
+    if (value.createdAt < cutoff) challenges.delete(key);
+  }
+  for (const [key, value] of oauthStates) {
+    if (value.createdAt < cutoff) oauthStates.delete(key);
+  }
+  while (challenges.size > MAX_TEMP_AUTH_STATES) {
+    const oldest = challenges.keys().next().value;
+    if (!oldest) break;
+    challenges.delete(oldest);
+  }
+  while (oauthStates.size > MAX_TEMP_AUTH_STATES) {
+    const oldest = oauthStates.keys().next().value;
+    if (!oldest) break;
+    oauthStates.delete(oldest);
+  }
+};
 
 const sessionCookieOptions = (expiresAt?: string) => {
   const sameSiteValue = String(process.env.MBOTE_ROOM_COOKIE_SAMESITE || 'lax').trim().toLowerCase();
@@ -631,6 +653,7 @@ export const registerAuthRoutes = (app: express.Express) => {
         if (profileResponse?.ok) profile = normalizeExternalProfile(await profileResponse.json().catch(() => null));
       }
       if (!profile) return sendApiError(response, 502, 'EXTERNAL_AUTH_PROFILE_UNAVAILABLE', 'Profil MBoté indisponible.');
+      pruneTemporaryAuthStates();
       const challengeId = createToken();
       challenges.set(challengeId, { profile, createdAt: Date.now() });
       response.json({ challengeId, profile });
@@ -656,6 +679,7 @@ export const registerAuthRoutes = (app: express.Express) => {
     const clientId = String(process.env.MBOTE_AUTH_CLIENT_ID || '').trim();
     const redirectUri = String(process.env.MBOTE_AUTH_REDIRECT_URI || `${getOrigin(request)}/api/auth/mbote/callback`).trim();
     if (!authorizeUrl || !clientId) return sendApiError(response, 503, 'MBOTE_AUTH_NOT_CONFIGURED', 'OAuth MBoté non configuré.');
+    pruneTemporaryAuthStates();
     const state = createToken();
     const redirectTo = safeRedirectPath(request.query.redirect);
     const clientOrigin = resolveAllowedClientOrigin(
