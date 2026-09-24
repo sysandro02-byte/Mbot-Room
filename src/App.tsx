@@ -11,6 +11,7 @@ import { sanitizeInternalPath } from './lib/navigationSecurity';
 import { AppLanguageBridge } from './lib/appLanguage';
 import { lazyWithRetry } from './lib/lazyWithRetry';
 import AppErrorBoundary from './components/AppErrorBoundary';
+import AppLoader from './components/AppLoader';
 import GlobalHeader from './components/GlobalHeader';
 
 const RealMeetingList = lazyWithRetry(() => import('./components/RealMeetingList'));
@@ -66,7 +67,7 @@ function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: bo
     };
   }, []);
 
-  if (checking) return <main className="route-loading" role="status">Vérification de la session…</main>;
+  if (checking) return <AppLoader label="Vérification de la session…" fullScreen />;
   if (!isAuthenticated) {
     const redirect = sanitizeInternalPath(`${location.pathname}${location.search}`);
     sessionStorage.setItem('mboteroom-login-redirect', redirect);
@@ -116,7 +117,7 @@ function AdminRoute({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  if (checking) return <main className="route-loading" role="status">Vérification de la session…</main>;
+  if (checking) return <AppLoader label="Vérification de la session…" fullScreen />;
   if (!isAuthenticated) {
     return <Navigate to="/admin/login" replace />;
   }
@@ -141,7 +142,7 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  return <AppErrorBoundary><><AppLanguageBridge/><UserPreferencesRuntime/><AppMessageModal/><MobileSplash/><PwaExperience/><SessionSecurity/><GlobalHeader/><Suspense fallback={<main className="route-loading" role="status" aria-live="polite">Chargement de MBotéRoom…</main>}><Routes>
+  return <AppErrorBoundary><><AppLanguageBridge/><UserPreferencesRuntime/><AppMessageModal/><MobileSplash/><PwaExperience/><SessionSecurity/><GlobalHeader/><Suspense fallback={<AppLoader label="Chargement de MBotéRoom…" fullScreen />}><Routes>
     <Route path="/login" element={<Login />} />
     <Route path="/connexion" element={<Login />} />
     <Route path="/inscription" element={<Login initialView="register" />} />
