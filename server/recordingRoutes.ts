@@ -186,9 +186,10 @@ const buildRecordingPatch = (info: EgressInfo) => {
 
 const canModerate = async (meetingId: number, userId: number, role: string) => {
   if (role === 'admin') return true;
-  const result = await query('SELECT host_id,co_host_id FROM room_meetings WHERE id=$1 LIMIT 1', [meetingId]);
+  const result = await query('SELECT host_id,co_host_id,settings FROM room_meetings WHERE id=$1 LIMIT 1', [meetingId]);
   const row = result.rows[0];
-  return Boolean(row && (Number(row.host_id) === userId || Number(row.co_host_id || 0) === userId));
+  const settings = typeof row?.settings === 'string' ? JSON.parse(row.settings || '{}') : (row?.settings || {});
+  return Boolean(row && (Number(row.host_id) === userId || Number(row.co_host_id || 0) === userId || Number(settings.actingHostId || 0) === userId));
 };
 
 const canRecordMeeting = async (meetingId: number, user: NonNullable<AuthedRequest['user']>) => {
@@ -197,8 +198,8 @@ const canRecordMeeting = async (meetingId: number, user: NonNullable<AuthedReque
   const result = await query('SELECT host_id,co_host_id,settings FROM room_meetings WHERE id=$1 LIMIT 1', [meetingId]);
   const row = result.rows[0];
   if (!row) return false;
-  if (user.role === 'admin' || Number(row.host_id) === user.id || Number(row.co_host_id || 0) === user.id) return true;
   const settings = typeof row.settings === 'string' ? JSON.parse(row.settings || '{}') : (row.settings || {});
+  if (user.role === 'admin' || Number(row.host_id) === user.id || Number(row.co_host_id || 0) === user.id || Number(settings.actingHostId || 0) === user.id) return true;
   return settings.recording === true && hasMeetingAccess(meetingId, user);
 };
 

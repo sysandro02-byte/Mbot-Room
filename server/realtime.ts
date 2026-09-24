@@ -39,15 +39,152 @@ const participantForSocket = (meetingId: number, socketId: string) => meetings.g
 const mediaRoomName = (meetingId: number, breakoutRoomId: string | null) =>
   breakoutRoomId ? `meeting:${meetingId}:breakout:${breakoutRoomId}` : `meeting:${meetingId}:main`;
 
+const setLiveRole = (meetingId: number, userId: number, role: string) => {
+  const participants = meetings.get(meetingId);
+  if (!participants) return;
+  for (const participant of participants.values()) {
+    if (participant.userId === userId) participant.role = role;
+  }
+};
+
+const persistActingHost = async (meetingId: number, settings: Record<string, unknown>) => {
+  await query(
+    'UPDATE room_meetings SET settings=$2::jsonb,updated_at=now() WHERE id=$1',
+    [meetingId, JSON.stringify(settings)],
+  );
+};
+
+const rebalanceActingHost = async (io: Server, meetingId: number) => {
+  const meeting = await getMeetingById(meetingId);
+  if (!meeting || (!meeting.is_active && meeting.status !== 'live')) return;
+
+  const participants = meetings.get(meetingId);
+  const liveParticipants = [...(participants?.values() || [])];
+  const onlineUserIds = new Set(liveParticipants.map((item) => item.userId));
+  const primaryHostId = Number(meeting.host_id);
+  const configuredCoHostId = Number(meeting.co_host_id || 0);
+  const previousActingHostId = Number(meeting.settings?.actingHostId || 0);
+  const primaryHostOnline = onlineUserIds.has(primaryHostId);
+
+  if (primaryHostOnline) {
+    if (previousActingHostId && previousActingHostId !== primaryHostId) {
+      const restoredRole = previousActingHostId === configuredCoHostId ? 'cohost' : 'participant';
+      await query(
+        `UPDATE room_meeting_members SET role=$3,updated_at=now()
+          WHERE meeting_id=$1 AND user_id=$2`,
+        [meetingId, previousActingHostId, restoredRole],
+      ).catch((error) => warnPersistenceFailure('restore-temporary-host', error));
+      setLiveRole(meetingId, previousActingHostId, restoredRole);
+      if (restoredRole !== 'cohost') {
+        io.in(`user:${previousActingHostId}`).socketsLeave(`meeting:${meetingId}:moderators`);
+      }
+      io.to(`user:${previousActingHostId}`).emit('meeting:moderation', {
+        meetingId,
+        role: restoredRole,
+        temporaryHost: false,
+      });
+    }
+
+    if (previousActingHostId) {
+      const nextSettings = { ...(meeting.settings || {}) } as Record<string, unknown>;
+      delete nextSettings.actingHostId;
+      await persistActingHost(meetingId, nextSettings)
+        .catch((error) => warnPersistenceFailure('clear-temporary-host', error));
+    }
+
+    await query(
+      `UPDATE room_meeting_members SET role='host',updated_at=now()
+        WHERE meeting_id=$1 AND user_id=$2`,
+      [meetingId, primaryHostId],
+    ).catch((error) => warnPersistenceFailure('restore-primary-host', error));
+    setLiveRole(meetingId, primaryHostId, 'host');
+    io.in(`user:${primaryHostId}`).socketsJoin(`meeting:${meetingId}:moderators`);
+
+    if (previousActingHostId) {
+      io.to(`meeting:${meetingId}`).emit('meeting:host-changed', {
+        meetingId,
+        hostUserId: primaryHostId,
+        previousHostUserId: previousActingHostId,
+        acting: false,
+        reason: 'primary-returned',
+      });
+    }
+    return;
+  }
+
+  let nextActingHostId = previousActingHostId && onlineUserIds.has(previousActingHostId)
+    ? previousActingHostId
+    : 0;
+
+  if (!nextActingHostId && configuredCoHostId && onlineUserIds.has(configuredCoHostId)) {
+    nextActingHostId = configuredCoHostId;
+  }
+
+  if (!nextActingHostId) {
+    const mainRoomCandidate = liveParticipants.find((item) => item.userId !== primaryHostId && item.breakoutRoomId === null);
+    const anyCandidate = liveParticipants.find((item) => item.userId !== primaryHostId);
+    nextActingHostId = Number((mainRoomCandidate || anyCandidate)?.userId || 0);
+  }
+
+  if (!nextActingHostId) return;
+
+  if (previousActingHostId && previousActingHostId !== nextActingHostId) {
+    const restoredRole = previousActingHostId === configuredCoHostId ? 'cohost' : 'participant';
+    await query(
+      `UPDATE room_meeting_members SET role=$3,updated_at=now()
+        WHERE meeting_id=$1 AND user_id=$2`,
+      [meetingId, previousActingHostId, restoredRole],
+    ).catch((error) => warnPersistenceFailure('replace-temporary-host', error));
+    setLiveRole(meetingId, previousActingHostId, restoredRole);
+    if (restoredRole !== 'cohost') {
+      io.in(`user:${previousActingHostId}`).socketsLeave(`meeting:${meetingId}:moderators`);
+    }
+  }
+
+  if (previousActingHostId !== nextActingHostId) {
+    const nextSettings = {
+      ...(meeting.settings || {}),
+      actingHostId: nextActingHostId,
+    } as Record<string, unknown>;
+    await persistActingHost(meetingId, nextSettings);
+  }
+
+  await query(
+    `UPDATE room_meeting_members
+        SET role='host',status='accepted',left_at=NULL,updated_at=now()
+      WHERE meeting_id=$1 AND user_id=$2`,
+    [meetingId, nextActingHostId],
+  ).catch((error) => warnPersistenceFailure('promote-temporary-host', error));
+  setLiveRole(meetingId, nextActingHostId, 'host');
+  io.in(`user:${nextActingHostId}`).socketsJoin(`meeting:${meetingId}:moderators`);
+
+  if (previousActingHostId !== nextActingHostId) {
+    io.to(`user:${nextActingHostId}`).emit('meeting:moderation', {
+      meetingId,
+      role: 'host',
+      temporaryHost: true,
+    });
+    io.to(`meeting:${meetingId}`).emit('meeting:host-changed', {
+      meetingId,
+      hostUserId: nextActingHostId,
+      previousHostUserId: primaryHostId,
+      acting: true,
+      reason: configuredCoHostId === nextActingHostId ? 'cohost-failover' : 'participant-failover',
+    });
+  }
+};
+
 const removeSocketFromMeeting = async (io: Server, socket: Socket) => {
   const meetingId = Number(socket.data.meetingId || 0);
   if (!meetingId) return;
   const participants = meetings.get(meetingId);
   const participant = participants?.get(socket.id);
   participants?.delete(socket.id);
+  let participantFullyOffline = false;
   if (participant) {
     io.to(mediaRoomName(meetingId, participant.breakoutRoomId)).emit('meeting:participant-left', { socketId: socket.id, userId: participant.userId });
     const otherDeviceOnline = [...(participants?.values() || [])].some((item) => item.userId === participant.userId);
+    participantFullyOffline = !otherDeviceOnline;
     if (!otherDeviceOnline) {
       await query(`UPDATE room_meeting_members SET left_at=now(),updated_at=now() WHERE meeting_id=$1 AND user_id=$2`, [meetingId, participant.userId])
         .catch((error) => warnPersistenceFailure('participant-left', error));
@@ -64,6 +201,12 @@ const removeSocketFromMeeting = async (io: Server, socket: Socket) => {
       if (meetingHands && meetingHands.size === 0) raisedHands.delete(meetingId);
     }
   }
+
+  if (participantFullyOffline) {
+    await rebalanceActingHost(io, meetingId)
+      .catch((error) => warnPersistenceFailure('host-failover', error));
+  }
+
   if (participants && participants.size === 0) meetings.delete(meetingId);
   socket.leave(`meeting:${meetingId}`);
   if (participant) socket.leave(mediaRoomName(meetingId, participant.breakoutRoomId));
@@ -97,6 +240,45 @@ export const registerRealtime = (io: Server) => {
     socket.join(`user:${user.id}`);
     if (user.role === 'admin') socket.join('admins');
 
+    // Limitation par socket et par type d’événement. Les événements de
+    // signalisation WebRTC ont un quota plus élevé, les actions utilisateur
+    // (chat, réactions, modération) restent beaucoup plus strictes.
+    const realtimeRateBuckets = new Map<string, { count:number; resetAt:number }>();
+    socket.use(([rawEvent], next) => {
+      const eventName = String(rawEvent || '');
+      const now = Date.now();
+      const highVolumeSignal = new Set([
+        'meeting:offer',
+        'meeting:answer',
+        'meeting:ice-candidate',
+        'meeting:request-ice-restart',
+        'meeting:request-renegotiation',
+      ]).has(eventName);
+      const mediumVolume = new Set([
+        'meeting:media-updated',
+        'meeting:reaction',
+        'meeting:hand-raised',
+      ]).has(eventName);
+      const limit = highVolumeSignal ? 900 : mediumVolume ? 180 : 90;
+      const windowMs = 60_000;
+      const current = realtimeRateBuckets.get(eventName);
+      if (!current || current.resetAt <= now) {
+        realtimeRateBuckets.set(eventName, { count:1, resetAt:now + windowMs });
+        next();
+        return;
+      }
+      current.count += 1;
+      if (current.count > limit) {
+        socket.emit('meeting:rate-limited', {
+          event: eventName,
+          retryAfterSeconds: Math.max(1, Math.ceil((current.resetAt - now) / 1000)),
+        });
+        next(new Error('Trop d’actions en temps réel. Réessayez dans quelques instants.'));
+        return;
+      }
+      next();
+    });
+
     socket.on('meeting:join', async (payload: any, callback?: Ack) => {
       try {
         const meetingId = Number(payload?.meetingId);
@@ -116,7 +298,7 @@ export const registerRealtime = (io: Server) => {
         if (socket.data.meetingId && Number(socket.data.meetingId) !== meetingId) await removeSocketFromMeeting(io, socket);
 
         const roleResult = await query(`SELECT role FROM room_meeting_members WHERE meeting_id=$1 AND user_id=$2 LIMIT 1`, [meetingId, user.id]);
-        const role = moderator ? (meeting.host_id === user.id ? 'host' : 'cohost') : String(roleResult.rows[0]?.role || 'participant');
+        const role = moderator ? (meeting.host_id === user.id || Number(meeting.settings?.actingHostId || 0) === user.id ? 'host' : 'cohost') : String(roleResult.rows[0]?.role || 'participant');
         const requestedBreakoutId = payload?.breakoutRoomId ? String(payload.breakoutRoomId) : null;
         let breakoutRoomId: string | null = null;
         if (requestedBreakoutId) {
@@ -161,6 +343,8 @@ export const registerRealtime = (io: Server) => {
         if (moderator) socket.join(`meeting:${meetingId}:moderators`);
         roomParticipants.set(socket.id, participant);
         meetings.set(meetingId, roomParticipants);
+        await rebalanceActingHost(io, meetingId)
+          .catch((error) => warnPersistenceFailure('host-rebalance-on-join', error));
         const count = new Set([...roomParticipants.values()].map((item) => item.userId)).size;
         await query('UPDATE room_meetings SET participant_count=GREATEST(participant_count,$2),updated_at=now() WHERE id=$1', [meetingId, count])
           .catch((error) => warnPersistenceFailure('participant-count', error));
@@ -323,6 +507,7 @@ export const registerRealtime = (io: Server) => {
     });
 
     socket.on('disconnect', () => {
+      realtimeRateBuckets.clear();
       void removeSocketFromMeeting(io, socket);
     });
   });
