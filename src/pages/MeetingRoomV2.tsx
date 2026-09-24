@@ -1147,9 +1147,29 @@ export default function MeetingRoomV2() {
   const stopScreenShare = useCallback(() => {
     screenStreamRef.current?.getTracks().forEach((track) => track.stop());
     screenStreamRef.current = null;
+
+    const cameraStream = cameraStreamRef.current;
+    const audioActive = Boolean(
+      canUseMic
+      && micEnabled
+      && cameraStream?.getAudioTracks().some((track) => track.readyState === 'live' && track.enabled),
+    );
+    const videoActive = Boolean(
+      canUseCamera
+      && cameraEnabled
+      && cameraStream?.getVideoTracks().some((track) => track.readyState === 'live' && track.enabled),
+    );
+
+    if (meeting?.id && socket.connected) {
+      socket.emit('meeting:media-updated', {
+        meetingId: meeting.id,
+        media: { audio: audioActive, video: videoActive, screen: false },
+      });
+    }
+
     setScreenSharing(false);
-    setLocalStream(cameraStreamRef.current);
-  }, []);
+    setLocalStream(cameraStream);
+  }, [cameraEnabled, canUseCamera, canUseMic, meeting?.id, micEnabled]);
 
   useEffect(() => {
     if (!meeting) return;
