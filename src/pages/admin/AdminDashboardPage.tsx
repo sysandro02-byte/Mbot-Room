@@ -13,6 +13,7 @@ import {
   Clock3,
   Flag,
   Home,
+  ImageIcon,
   LogOut,
   Menu,
   MessageCircle,
@@ -33,6 +34,7 @@ import {
   AdminDashboardStat,
   GuestAccessSlide,
   HomeSlide,
+  LoginBranding,
   adminDashboardService,
 } from '../../services/adminDashboardService';
 import { DashboardTip, getMeetingAccessCode, Meeting } from '../../services/meetingService';
@@ -45,6 +47,12 @@ type ActivityTone = 'green' | 'blue' | 'orange' | 'red' | 'violet';
 type DashboardTipDraft = Pick<DashboardTip, 'title' | 'body' | 'actionLabel' | 'actionPath' | 'isActive'>;
 
 type HomeSlideDraft = Omit<HomeSlide, 'slot' | 'updatedAt'>;
+type LoginBrandingDraft = Pick<LoginBranding, 'wordmarkUrl' | 'illustrationUrl'>;
+
+const defaultLoginBrandingDraft: LoginBrandingDraft = {
+  wordmarkUrl: '/icons/mboteroom-wordmark.png',
+  illustrationUrl: '/images/meeting-black-team.svg',
+};
 
 const defaultHomeSlideDraft = (slot: HomeSlide['slot']): HomeSlideDraft => ({
   title: slot === 1
@@ -179,6 +187,8 @@ export default function AdminDashboardPage() {
   const [selectedHomeSlot, setSelectedHomeSlot] = useState<HomeSlide['slot']>(1);
   const [homeSlideDraft, setHomeSlideDraft] = useState<HomeSlideDraft>(() => defaultHomeSlideDraft(1));
   const [isSavingHomeSlide, setIsSavingHomeSlide] = useState(false);
+  const [loginBrandingDraft, setLoginBrandingDraft] = useState<LoginBrandingDraft>(defaultLoginBrandingDraft);
+  const [isSavingLoginBranding, setIsSavingLoginBranding] = useState(false);
   const [toast, setToast] = useState('');
   const abortRef = useRef<AbortController | null>(null);
 
@@ -213,12 +223,19 @@ export default function AdminDashboardPage() {
 
   const loadManagedSlides = async () => {
     try {
-      const [guestRows, homeRows] = await Promise.all([
+      const [guestRows, homeRows, loginBranding] = await Promise.all([
         adminDashboardService.getGuestAccessSlides().catch(() => []),
         adminDashboardService.getHomeSlides(),
+        adminDashboardService.getLoginBranding().catch(() => null),
       ]);
       setGuestSlides(guestRows);
       setHomeSlides(homeRows);
+      if (loginBranding) {
+        setLoginBrandingDraft({
+          wordmarkUrl: loginBranding.wordmarkUrl,
+          illustrationUrl: loginBranding.illustrationUrl,
+        });
+      }
       const first = homeRows.find((slide) => slide.slot === selectedHomeSlot) || homeRows.find((slide) => slide.slot === 1);
       if (first) {
         setSelectedHomeSlot(first.slot);
@@ -274,6 +291,20 @@ export default function AdminDashboardPage() {
       setToast(slideError instanceof Error ? slideError.message : 'Enregistrement du slide impossible.');
     } finally {
       setIsSavingHomeSlide(false);
+    }
+  };
+
+  const saveLoginBranding = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSavingLoginBranding(true);
+    try {
+      const saved = await adminDashboardService.saveLoginBranding(loginBrandingDraft);
+      setLoginBrandingDraft({ wordmarkUrl: saved.wordmarkUrl, illustrationUrl: saved.illustrationUrl });
+      setToast('Les images de la page de connexion ont été mises à jour.');
+    } catch (brandingError) {
+      setToast(brandingError instanceof Error ? brandingError.message : 'Mise à jour des images de connexion impossible.');
+    } finally {
+      setIsSavingLoginBranding(false);
     }
   };
 
@@ -532,6 +563,13 @@ export default function AdminDashboardPage() {
               onDraftChange={setHomeSlideDraft}
               onSubmit={saveHomeSlide}
             />
+            <LoginBrandingCard
+              draft={loginBrandingDraft}
+              saving={isSavingLoginBranding}
+              onDraftChange={setLoginBrandingDraft}
+              onSubmit={saveLoginBranding}
+              onReset={() => setLoginBrandingDraft(defaultLoginBrandingDraft)}
+            />
             <GuestAccessSlidesCard slides={guestSlides} draft={guestDraft} editingId={editingGuestSlideId} onDraftChange={setGuestDraft} onEdit={(slide) => { setEditingGuestSlideId(slide.id); setGuestDraft({ title: slide.title, body: slide.body, imageUrl: slide.imageUrl, isActive: slide.isActive }); }} onCancel={() => { setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); }} onSubmit={async (event) => { event.preventDefault(); try { await adminDashboardService.saveGuestAccessSlide(guestDraft, editingGuestSlideId || undefined); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); setToast('Slide enregistre.'); } catch (saveError) { setToast(saveError instanceof Error ? saveError.message : 'Enregistrement impossible.'); } }} onDelete={async (id) => { try { await adminDashboardService.deleteGuestAccessSlide(id); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setToast('Slide supprime.'); } catch (deleteError) { setToast(deleteError instanceof Error ? deleteError.message : 'Suppression impossible.'); } }} />
             <DashboardTipsCard
               tips={dashboardTips}
@@ -574,6 +612,7 @@ function AdminSidebar({ userName, open, onClose }: { userName: string; open: boo
     { label: 'Réglages généraux', icon: Settings, path: '/admin#admin-controls' },
     { label: 'Utilisateurs', icon: UsersRound, path: '/admin#admin-users' },
     { label: 'Slider accueil', icon: CirclePlay, path: '/admin#admin-home-slides' },
+    { label: 'Page de connexion', icon: ImageIcon, path: '/admin#admin-login-branding' },
     { label: 'Accueil des invités', icon: Video, path: '/admin#admin-guest-slides' },
     { label: 'Conseils d’accueil', icon: CircleHelp, path: '/admin#admin-tips' },
     { label: 'Réunions', icon: CalendarDays, path: '/app/meetings' },
@@ -740,6 +779,66 @@ function HomeSlidesCard({ slides, selectedSlot, draft, saving, onSelect, onDraft
         <label className="admin-tip-toggle"><input type="checkbox" checked={draft.isActive} onChange={(event) => onDraftChange({ ...draft, isActive: event.target.checked })}/><span>{selectedSlot === 4 ? 'Afficher la bannière' : 'Afficher ce slide'}</span></label>
         {draft.imageUrl ? <div className="admin-home-slide-preview"><img src={draft.imageUrl} alt={selectedSlot === 4 ? 'Aperçu de la bannière' : `Aperçu du slide ${selectedSlot}`} /></div> : null}
         <div className="admin-tip-actions"><button type="submit" disabled={saving}>{saving ? 'Enregistrement...' : selectedSlot === 4 ? 'Enregistrer la bannière' : `Enregistrer le slide ${selectedSlot}`}</button></div>
+      </form>
+    </section>
+  );
+}
+
+function LoginBrandingCard({ draft, saving, onDraftChange, onSubmit, onReset }: {
+  draft: LoginBrandingDraft;
+  saving: boolean;
+  onDraftChange: (draft: LoginBrandingDraft) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onReset: () => void;
+}) {
+  return (
+    <section className="admin-tips-card admin-login-branding-card" id="admin-login-branding">
+      <header>
+        <div>
+          <h2>Images de la page de connexion</h2>
+          <p>Modifiez le logo principal et l’illustration de visioconférence affichés sur la page Login, sur PC comme sur mobile.</p>
+        </div>
+        <span>Connexion</span>
+      </header>
+      <form className="admin-tip-form admin-login-branding-form" onSubmit={onSubmit}>
+        <div className="admin-login-branding-grid">
+          <label>
+            <span>Logo / wordmark MBotéRoom</span>
+            <input
+              value={draft.wordmarkUrl}
+              maxLength={1000}
+              required
+              placeholder="/icons/mboteroom-wordmark.png ou https://..."
+              onChange={(event) => onDraftChange({ ...draft, wordmarkUrl: event.target.value })}
+            />
+            <small className="admin-field-help">Cette image remplace le logo visible en haut de la page de connexion.</small>
+            <div className="admin-login-branding-preview is-logo">
+              <img src={draft.wordmarkUrl || defaultLoginBrandingDraft.wordmarkUrl} alt="Aperçu du logo de connexion" />
+            </div>
+          </label>
+          <label>
+            <span>Illustration de visioconférence</span>
+            <input
+              value={draft.illustrationUrl}
+              maxLength={1000}
+              required
+              placeholder="/images/meeting-black-team.svg ou https://..."
+              onChange={(event) => onDraftChange({ ...draft, illustrationUrl: event.target.value })}
+            />
+            <small className="admin-field-help">Cette image est utilisée dans le visuel principal de connexion en desktop et en mobile.</small>
+            <div className="admin-login-branding-preview">
+              <img src={draft.illustrationUrl || defaultLoginBrandingDraft.illustrationUrl} alt="Aperçu de l’illustration de connexion" />
+            </div>
+          </label>
+        </div>
+        <div className="admin-login-branding-note">
+          <ShieldCheck size={17}/>
+          <span>Les modifications sont enregistrées en base de données et appliquées à la page de connexion sans modifier le code. Seuls les chemins internes et les URL HTTPS sont acceptés.</span>
+        </div>
+        <div className="admin-tip-actions">
+          <button type="button" onClick={onReset} disabled={saving}>Valeurs par défaut</button>
+          <button type="submit" disabled={saving}>{saving ? 'Enregistrement...' : 'Enregistrer les images'}</button>
+        </div>
       </form>
     </section>
   );
