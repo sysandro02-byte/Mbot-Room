@@ -1155,3 +1155,447 @@
   .registration-modal-header{padding-right:38px}
   .join-meeting-card{min-height:96px!important;padding:15px!important}
 }
+
+
+/* Final responsive login mockups */
+.login-page{
+  --auth-navy:#082f57;
+  --auth-teal:#078f8d;
+  --auth-teal-2:#12b0a8;
+  --auth-blue:#2f68f2;
+  background:
+    radial-gradient(circle at 88% 8%,rgba(58,158,223,.12),transparent 24%),
+    radial-gradient(circle at 10% 10%,rgba(80,86,230,.06),transparent 28%),
+    linear-gradient(180deg,#fbfdff 0%,#f4fbfb 100%);
+}
+.login-shell{
+  min-height:calc(100dvh - 42px);
+  grid-template-columns:minmax(500px,44%) minmax(0,1fr);
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.82),rgba(246,252,252,.92));
+}
+.brand-panel{
+  min-height:760px;
+  padding:54px 52px 34px;
+  border-right:1px solid rgba(219,230,237,.82);
+  background:
+    radial-gradient(circle at 84% 26%,rgba(13,176,168,.1),transparent 25%),
+    radial-gradient(circle at 18% 8%,rgba(79,91,243,.08),transparent 30%),
+    linear-gradient(145deg,#ffffff 0%,#f8fbff 44%,#eaf8f6 100%);
+}
+.brand-panel::before{
+  content:"";
+  position:absolute;
+  inset:auto -120px -160px auto;
+  width:520px;
+  height:520px;
+  border-radius:50%;
+  background:linear-gradient(145deg,rgba(69,117,247,.1),rgba(7,164,157,.08));
+  filter:blur(.2px);
+}
+.brand-panel::after{
+  top:92px;
+  right:-185px;
+  width:360px;
+  height:560px;
+  border-radius:50%;
+  background:rgba(228,236,255,.7);
+  transform:rotate(18deg);
+}
+.brand-dots{
+  top:54px;
+  right:46px;
+  width:90px;
+  height:72px;
+  opacity:.55;
+  background-image:radial-gradient(circle,#9edbd5 2px,transparent 2.4px);
+  background-size:18px 18px;
+}
+.mbote-logo.admin-entry{
+  position:relative;
+  z-index:4;
+  width:min(320px,72%);
+}
+.mboteroom-wordmark{display:block;width:100%;height:auto;object-fit:contain}
+.language-selector{
+  top:28px;
+  right:26px;
+  width:142px;
+}
+.brand-panel-copy{
+  margin-top:74px;
+  max-width:410px;
+}
+.brand-panel-copy h2{
+  font-size:clamp(38px,3vw,54px);
+  line-height:1.04;
+  letter-spacing:-.03em;
+}
+.brand-panel-copy h2 span:last-child{color:var(--auth-teal)}
+.brand-panel-copy p{
+  max-width:390px;
+  margin-top:18px;
+  font-size:18px;
+  line-height:1.6;
+}
+.feature-list{
+  display:none;
+}
+.meeting-illustration{
+  right:42px;
+  bottom:38px;
+  width:min(430px,calc(100% - 84px));
+  border:0;
+  border-radius:26px;
+  background:transparent;
+  box-shadow:0 28px 60px rgba(24,58,84,.16);
+  overflow:visible;
+}
+.meeting-illustration::before{
+  content:"";
+  position:absolute;
+  inset:-22px -18px -28px -28px;
+  z-index:-1;
+  border-radius:40px;
+  background:
+    radial-gradient(circle at 30% 50%,rgba(7,178,166,.18),transparent 50%),
+    radial-gradient(circle at 75% 20%,rgba(69,111,240,.16),transparent 40%);
+  filter:blur(6px);
+}
+.meeting-illustration img{
+  border-radius:24px;
+  box-shadow:0 24px 45px rgba(12,47,72,.18);
+}
+.auth-showcase-badge{
+  position:absolute;
+  z-index:5;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:11px 13px;
+  border:1px solid rgba(255,255,255,.8);
+  border-radius:15px;
+  background:rgba(255,255,255,.82);
+  color:#29445f;
+  box-shadow:0 12px 30px rgba(16,57,81,.09);
+  backdrop-filter:blur(12px);
+  font-size:10px;
+  font-weight:800;
+  line-height:1.35;
+}
+.auth-showcase-badge svg{
+  width:22px;
+  height:22px;
+  padding:3px;
+  border-radius:7px;
+  color:#fff;
+}
+.auth-showcase-badge-team{
+  right:52px;
+  bottom:320px;
+}
+.auth-showcase-badge-team svg{background:linear-gradient(145deg,#4e72f6,#8250e8)}
+.auth-showcase-badge-security{
+  right:22px;
+  bottom:250px;
+}
+.auth-showcase-badge-security svg{background:linear-gradient(145deg,#07928e,#13aaa3)}
+.auth-showcase-note{
+  position:absolute;
+  z-index:5;
+  right:18px;
+  bottom:80px;
+  color:#078f8d;
+  font-size:13px;
+  line-height:1.35;
+  font-weight:800;
+  font-style:italic;
+  transform:rotate(-7deg);
+}
+.auth-side{
+  min-height:760px;
+  padding:70px 56px 36px;
+  background:
+    radial-gradient(circle at 86% 18%,rgba(9,157,150,.08),transparent 26%),
+    linear-gradient(180deg,#fbfdff 0%,#f5fbfb 100%);
+}
+.login-card{
+  width:min(100%,720px);
+  padding:34px 54px 38px;
+  border:1px solid #dbe5eb;
+  border-radius:22px;
+  background:rgba(255,255,255,.96);
+  box-shadow:0 26px 70px rgba(24,55,80,.12),0 2px 8px rgba(24,55,80,.04);
+  animation:auth-card-enter .48s cubic-bezier(.2,.8,.2,1) both;
+}
+.login-card::before{
+  height:3px;
+  background:linear-gradient(90deg,var(--auth-teal),#6d4df5,#4d80ff);
+}
+.login-card-header{margin-bottom:24px}
+.auth-card-kicker{
+  margin-bottom:10px;
+  padding:7px 12px;
+  background:#e8f7f5;
+  color:#087f7d;
+  font-size:10px;
+}
+.login-card-header h1{font-size:32px;letter-spacing:-.02em}
+.login-card-header p{font-size:14px}
+.auth-security-badges{gap:7px;margin-top:13px}
+.auth-security-badges span{
+  padding:6px 9px;
+  border-color:#dce5ef;
+  background:#fbfdff;
+  font-size:9px;
+}
+.form-group{margin-bottom:18px}
+.form-group label{margin-bottom:8px;font-size:13px}
+.input-shell input{
+  height:48px;
+  border-radius:10px;
+  background:#fbfdff;
+  font-size:13px;
+}
+.input-shell input:focus{
+  border-color:#0b9994;
+  box-shadow:0 0 0 4px rgba(10,153,148,.1);
+  background:#fff;
+}
+.form-options{margin-bottom:22px}
+.remember-control{font-size:12px}
+.auth-text-link{font-size:12px}
+.primary-login-button,
+.google-login-button{
+  position:relative;
+  overflow:hidden;
+  min-height:46px;
+  border-radius:10px;
+}
+.primary-login-button{
+  isolation:isolate;
+  background:linear-gradient(105deg,#07928e 0%,#0c7f87 50%,#0b5a67 100%);
+  box-shadow:0 13px 27px rgba(7,133,132,.24);
+}
+.primary-login-button::before{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  top:-40%;
+  bottom:-40%;
+  left:-35%;
+  width:30%;
+  transform:skewX(-18deg);
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.75),transparent);
+  animation:auth-button-shine 2.8s ease-in-out infinite;
+}
+.primary-login-button:hover:not(:disabled){
+  transform:translateY(-2px) scale(1.008);
+  box-shadow:0 18px 34px rgba(7,133,132,.32);
+}
+.primary-login-button:active:not(:disabled){transform:translateY(0) scale(.985)}
+.primary-login-button:disabled::before{display:none}
+.primary-login-button svg{transition:transform .18s ease}
+.primary-login-button:hover:not(:disabled) svg{transform:translateX(3px)}
+.mbote-auth-button{
+  min-height:43px;
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease,background .18s ease;
+}
+.mbote-auth-button:hover:not(:disabled){
+  transform:translateY(-1px);
+  border-color:#49b8b3;
+  box-shadow:0 10px 24px rgba(11,126,131,.1);
+  background:#f5fbfa;
+}
+.mbote-auth-button:active:not(:disabled){transform:scale(.99)}
+.auth-separator{margin:20px 0}
+.join-meeting-card{
+  min-height:84px!important;
+  margin-top:18px!important;
+  border:1px solid rgba(8,157,153,.32)!important;
+  border-radius:16px!important;
+  background:linear-gradient(135deg,#eefaf8,#e6f7f5 55%,#f4fbff)!important;
+  box-shadow:0 12px 28px rgba(0,126,131,.1)!important;
+  transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease!important;
+}
+.join-meeting-card:hover,.join-meeting-card:focus-visible{
+  transform:translateY(-2px)!important;
+  box-shadow:0 18px 38px rgba(0,126,131,.16)!important;
+}
+.join-meeting-arrow{transition:transform .18s ease}
+.join-meeting-card:hover .join-meeting-arrow,
+.join-meeting-card:focus-visible .join-meeting-arrow{transform:translateX(6px)}
+.create-account-copy{margin-top:22px;font-size:12px}
+.login-benefits{
+  min-height:42px;
+  padding:8px 20px;
+  background:rgba(255,255,255,.96);
+}
+.login-created-by{
+  margin-top:0;
+  color:#8090a2;
+  font-size:10px;
+}
+.login-created-by strong{color:#536981}
+
+/* tablet */
+@media(max-width:1100px){
+  .login-shell{grid-template-columns:minmax(360px,38%) minmax(0,1fr)}
+  .brand-panel{padding:46px 32px 28px}
+  .brand-panel-copy{margin-top:62px}
+  .brand-panel-copy h2{font-size:38px}
+  .brand-panel-copy p{font-size:16px}
+  .meeting-illustration{right:28px;width:calc(100% - 56px)}
+  .auth-showcase-badge{display:none}
+  .auth-showcase-note{display:none}
+  .auth-side{padding:70px 30px 32px}
+  .login-card{padding:32px 36px 36px}
+}
+
+/* mobile mockup */
+@media(max-width:790px){
+  .login-page{min-height:100dvh;background:linear-gradient(180deg,#f9fcff,#eff9f8)}
+  .login-shell{display:block;min-height:auto;background:transparent}
+  .brand-panel{
+    min-height:auto;
+    padding:24px 18px 26px;
+    border:0;
+    overflow:visible;
+    background:
+      radial-gradient(circle at 75% 35%,rgba(8,170,162,.11),transparent 30%),
+      radial-gradient(circle at 25% 3%,rgba(80,96,240,.08),transparent 24%),
+      linear-gradient(145deg,#ffffff,#f5fbff 55%,#eef9f8);
+  }
+  .brand-panel::before{
+    width:300px;
+    height:300px;
+    right:-140px;
+    bottom:-70px;
+  }
+  .brand-panel::after{
+    width:220px;
+    height:360px;
+    right:-135px;
+    top:120px;
+    opacity:.6;
+  }
+  .brand-dots{display:block;top:74px;right:28px;width:78px;height:60px;background-size:16px 16px}
+  .mbote-logo.admin-entry{width:min(260px,68%);margin-top:12px}
+  .language-selector{
+    top:20px;
+    right:18px;
+    width:132px;
+  }
+  .language-selector>button{height:42px;border-radius:12px}
+  .brand-panel-copy{
+    margin-top:88px;
+    max-width:320px;
+  }
+  .brand-panel-copy h2{
+    font-size:clamp(32px,10vw,44px);
+    line-height:1.03;
+  }
+  .brand-panel-copy p{
+    max-width:310px;
+    margin-top:14px;
+    font-size:16px;
+    line-height:1.55;
+  }
+  .feature-list{display:none}
+  .meeting-illustration{
+    position:relative;
+    right:auto;
+    bottom:auto;
+    width:min(390px,92%);
+    margin:24px auto 0;
+    display:block;
+  }
+  .meeting-illustration img{border-radius:20px}
+  .auth-showcase-badge{
+    display:flex;
+    position:absolute;
+    transform:scale(.88);
+    transform-origin:center;
+    padding:9px 10px;
+    font-size:8px;
+  }
+  .auth-showcase-badge-team{right:28px;bottom:250px}
+  .auth-showcase-badge-security{right:10px;bottom:200px}
+  .auth-showcase-note{display:none}
+  .auth-side{
+    min-height:auto;
+    padding:0 12px 24px;
+    background:transparent;
+  }
+  .login-card{
+    width:100%;
+    margin-top:-2px;
+    padding:28px 18px 30px;
+    border-radius:22px;
+    box-shadow:0 22px 54px rgba(24,55,80,.12);
+  }
+  .login-card-header{text-align:center}
+  .auth-card-kicker{margin-left:auto;margin-right:auto}
+  .login-card-header h1{font-size:30px}
+  .login-card-header p{font-size:13px}
+  .auth-security-badges{justify-content:center;gap:6px}
+  .auth-security-badges span{font-size:8px;padding:6px 7px}
+  .form-options{
+    flex-direction:row;
+    align-items:center;
+    gap:10px;
+  }
+  .remember-control,.auth-text-link{font-size:11px}
+  .primary-login-button{min-height:48px}
+  .join-meeting-card{
+    grid-template-columns:44px minmax(0,1fr) 20px!important;
+    min-height:92px!important;
+    padding:13px!important;
+  }
+  .join-meeting-copy strong{font-size:14px}
+  .join-meeting-copy small{font-size:11px}
+  .login-benefits{
+    min-height:48px;
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+  }
+  .login-created-by{font-size:9px}
+}
+
+/* small mobile */
+@media(max-width:430px){
+  .brand-panel{padding:18px 14px 22px}
+  .mbote-logo.admin-entry{width:min(230px,66%);margin-top:14px}
+  .language-selector{top:14px;right:14px;width:120px}
+  .language-selector>button{height:38px;padding:0 8px;font-size:11px}
+  .brand-panel-copy{margin-top:72px}
+  .brand-panel-copy h2{font-size:32px}
+  .brand-panel-copy p{font-size:14px}
+  .meeting-illustration{width:96%;margin-top:18px}
+  .auth-showcase-badge{display:none}
+  .auth-side{padding-inline:8px}
+  .login-card{padding:24px 14px 26px;border-radius:20px}
+  .login-card-header h1{font-size:27px}
+  .auth-security-badges span{font-size:7.5px}
+  .form-options{align-items:flex-start;flex-direction:column}
+  .auth-text-link{align-self:flex-end;margin-top:-28px}
+  .create-account-copy{gap:6px;margin-top:18px}
+}
+
+@keyframes auth-card-enter{
+  from{opacity:0;transform:translateY(16px) scale(.99)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes auth-button-shine{
+  0%,18%{left:-35%;opacity:0}
+  28%{opacity:1}
+  52%{left:120%;opacity:.95}
+  62%,100%{left:120%;opacity:0}
+}
+@media(prefers-reduced-motion:reduce){
+  .login-card{animation:none!important}
+  .primary-login-button::before{animation:none!important}
+  .primary-login-button:hover:not(:disabled),
+  .join-meeting-card:hover,
+  .mbote-auth-button:hover:not(:disabled){transform:none!important}
+  .join-meeting-arrow{transition:none!important}
+}
