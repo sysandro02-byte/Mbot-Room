@@ -259,3 +259,5 @@ button.settings-row:disabled{cursor:not-allowed;opacity:.62}
 .settings-session-list article>b{padding:5px 8px;border-radius:999px;background:#e6f8ed;color:#177948;font-size:9px}
 .settings-session-empty{margin:0;padding:20px;color:#8091a1;text-align:center;font-size:11px}
 @media(max-width:620px){.settings-modal-backdrop{padding:10px}.settings-modal{width:100%;max-height:calc(100dvh - 20px);border-radius:18px}.settings-security-summary{align-items:stretch;flex-direction:column}.settings-session-list article{grid-template-columns:38px minmax(0,1fr)}.settings-session-list article>b,.settings-session-list article>button{grid-column:2;justify-self:start}}
+
+.settings-panel:target{border-color:#16aaa4;box-shadow:0 0 0 4px rgba(22,170,164,.11),0 14px 36px rgba(6,59,99,.08)}
