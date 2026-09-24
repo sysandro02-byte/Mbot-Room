@@ -1448,50 +1448,43 @@ export default function MeetingRoomV2() {
   return (
     <main className="room-v2-shell">
       <header className="room-v2-header">
-        <div>
+        <div className="room-v2-brand">
+          <img src="/icons/mboteroom-wordmark.png" alt="MBotéRoom"/>
+        </div>
+        <div className="room-v2-meeting-heading">
           <strong>{meeting.title}</strong>
           <span>ID {meeting.settings?.meetingAccessId || getMeetingAccessCode(meeting)}</span>
         </div>
-        <div className="room-v2-live-state">
-          {meeting.is_active ? <><Radio size={16} /> En direct</> : <span>Programmée</span>}
-          <span>{galleryCount} connecté{galleryCount > 1 ? 's' : ''}</span>
-          {breakoutRoomName ? <span className="room-v2-breakout-status">Sous-salle : {breakoutRoomName}</span> : null}
-          <span
-            className={`room-v2-media-transport ${liveKitMedia.connected ? 'sfu-active' : liveKitDesired ? 'sfu-connecting' : 'mesh-active'}`}
-            data-testid="media-transport-status"
-            data-transport={liveKitMedia.connected ? 'livekit' : 'mesh'}
-            title={liveKitMedia.connected
-              ? 'Connexion audio et vidéo active.'
-              : liveKitDesired
-                ? 'Optimisation de la connexion en cours.'
-                : liveKitFailed
-                  ? 'La réunion utilise automatiquement un mode de connexion de secours.'
-                  : 'Connexion de la réunion active.'}
-          >
-            {liveKitMedia.connected ? 'Connexion optimisée' : liveKitDesired ? 'Optimisation…' : 'Connexion active'}
-            {!liveKitMedia.connected && mediaTransportStatus?.livekitReady && !liveKitFailed ? <small> · Connexion prête</small> : null}
-            {liveKitFailed ? <small> · secours</small> : null}
-            {mediaTransportStatus?.serverRecordingReady ? <small> · Enregistrement disponible</small> : null}
+        <div className="room-v2-meeting-status">
+          <span className="room-v2-secure-status"><ShieldCheck size={18}/> <i/> Connecté</span>
+          <span className={meeting.is_active ? 'room-v2-live-pill is-live' : 'room-v2-live-pill'}>
+            <Radio size={16}/>
+            <span>{meeting.is_active ? 'En cours' : 'Programmée'}<small>{meeting.is_active ? formatDuration(elapsedSeconds) : formatTime(meeting.start_time)}</small></span>
           </span>
-          <span
-            className={`room-v2-network ${networkQuality.level}`}
-            data-testid="network-quality"
-            data-level={networkQuality.level}
-            title={`${networkQuality.connectedPeers} participant(s) connecté(s) · Qualité du réseau ${networkQuality.level === 'excellent' ? 'excellente' : networkQuality.level === 'good' ? 'correcte' : 'faible'}`}
-          >
-            {networkQuality.level === 'offline' ? <WifiOff size={15} /> : <Wifi size={15} />}
-            {networkQuality.level === 'excellent' ? 'Réseau excellent' : networkQuality.level === 'good' ? 'Réseau correct' : networkQuality.level === 'poor' ? 'Réseau faible' : 'Hors ligne'}
-            {networkQuality.rttMs !== null ? <small>{networkQuality.rttMs} ms</small> : null}
-          </span>
-        </div>
-        <div className="room-v2-header-actions">
-          <div className="room-v2-view-switch" role="group" aria-label="Mode d’affichage">
-            <button type="button" className={viewMode === 'gallery' ? 'active' : ''} onClick={() => setViewMode('gallery')} data-testid="gallery-view-button">Galerie</button>
-            <button type="button" className={viewMode === 'speaker' ? 'active' : ''} onClick={() => setViewMode('speaker')} data-testid="speaker-view-button">Intervenant</button>
-          </div>
           {isModerator && !meeting.is_active ? <button className="room-v2-start" type="button" onClick={startMeeting}>Démarrer</button> : null}
+          <button className="room-v2-header-icon" type="button" aria-label="Participants" onClick={() => setPanel(panel === 'participants' ? null : 'participants')}><UsersRound/></button>
+          <button className="room-v2-header-icon" type="button" aria-label="Discussion" onClick={() => setPanel(panel === 'chat' ? null : 'chat')}><MessageCircle/></button>
+          <button className="room-v2-header-icon" type="button" aria-label="Périphériques" onClick={() => { setDevicePanelOpen((current) => !current); if (!devicePanelOpen) void refreshMediaDevices(); }}><Settings2/></button>
+          <div className="room-v2-technical-status" aria-label="État technique de la réunion">
+            <span
+              className={`room-v2-media-transport ${liveKitMedia.connected ? 'sfu-active' : liveKitDesired ? 'sfu-connecting' : 'mesh-active'}`}
+              data-testid="media-transport-status"
+              data-transport={liveKitMedia.connected ? 'livekit' : 'mesh'}
+            >{liveKitMedia.connected ? 'Connexion optimisée' : liveKitDesired ? 'Optimisation…' : 'Connexion active'}</span>
+            <span className={`room-v2-network ${networkQuality.level}`} data-testid="network-quality" data-level={networkQuality.level}>
+              {networkQuality.level === 'offline' ? <WifiOff size={14}/> : <Wifi size={14}/>}
+              {networkQuality.rttMs !== null ? <small>{networkQuality.rttMs} ms</small> : null}
+            </span>
+          </div>
         </div>
       </header>
+
+      <nav className="room-v2-mode-tabs" aria-label="Affichage de la réunion">
+        <button type="button" className={viewMode === 'participants' && !screenShareActive ? 'active' : ''} onClick={() => setViewMode('participants')} data-testid="participants-view-button"><UsersRound/><span>Participants</span></button>
+        <button type="button" className={viewMode === 'gallery' && !screenShareActive ? 'active' : ''} onClick={() => setViewMode('gallery')} data-testid="gallery-view-button"><span className="room-v2-grid-icon" aria-hidden="true"/><span>Galerie</span></button>
+        <button type="button" className={viewMode === 'speaker' && !screenShareActive ? 'active' : ''} onClick={() => setViewMode('speaker')} data-testid="speaker-view-button"><span className="room-v2-speaker-icon" aria-hidden="true"/><span>Intervenant</span></button>
+        {screenShareActive ? <button type="button" className="active room-v2-share-tab"><MonitorUp/><span>Partage d’écran</span></button> : null}
+      </nav>
 
       {notice ? <div className="room-v2-notice" role="status"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Fermer"><X size={16}/></button></div> : null}
 
