@@ -14,8 +14,9 @@ const passwordMessage=(value:string)=>{
 
 export default function AdminAuthPage({mode='login'}:{mode?:Mode}){
   const navigate=useNavigate();
+  const [inviteToken]=useState(()=>new URLSearchParams(window.location.search).get('invite')||'');
   const [name,setName]=useState('');
-  const [email,setEmail]=useState('');
+  const [email,setEmail]=useState(()=>new URLSearchParams(window.location.search).get('email')||'');
   const [password,setPassword]=useState('');
   const [confirmPassword,setConfirmPassword]=useState('');
   const [showPassword,setShowPassword]=useState(false);
@@ -57,7 +58,7 @@ export default function AdminAuthPage({mode='login'}:{mode?:Mode}){
         if(!name.trim()||!email.trim()||!password)throw new Error('Nom, adresse e-mail et mot de passe sont requis.');
         const passwordError=passwordMessage(password);
         if(passwordError)throw new Error(passwordError);
-        const session=await authService.adminRegister({name:name.trim(),email:email.trim(),password});
+        const session=await authService.adminRegister({name:name.trim(),email:email.trim(),password,inviteToken:inviteToken||undefined});
         setChallengeId(session.challengeId);setEmailHint(session.emailHint);setPassword('');
         return;
       }
@@ -85,7 +86,13 @@ export default function AdminAuthPage({mode='login'}:{mode?:Mode}){
   };
 
   const title=mode==='register'?'Créer le compte administrateur':mode==='forgot'?(resetToken?'Nouveau mot de passe':'Mot de passe oublié'):'Connexion administrateur';
-  const subtitle=mode==='register'?'Le premier administrateur peut être créé ici. Les suivants doivent être autorisés depuis la configuration ou le backoffice.':mode==='forgot'?(resetToken?'Choisissez un nouveau mot de passe pour votre compte administrateur.':'Recevez un lien sécurisé pour choisir un nouveau mot de passe.'):'Accédez au backoffice sécurisé de MBotéRoom.';
+  const subtitle=mode==='register'
+    ? inviteToken
+      ? 'Invitation administrateur valide. Créez votre compte puis confirmez le code reçu par e-mail.'
+      : 'Le premier administrateur peut être créé ici. Si un administrateur existe déjà, utilisez une invitation créée depuis le backoffice.'
+    : mode==='forgot'
+      ? (resetToken?'Choisissez un nouveau mot de passe pour votre compte administrateur.':'Recevez un lien sécurisé pour choisir un nouveau mot de passe.')
+      : 'Accédez au backoffice sécurisé de MBotéRoom.';
 
   return <main className="admin-auth-page">
     <section className="admin-auth-visual">
@@ -99,6 +106,7 @@ export default function AdminAuthPage({mode='login'}:{mode?:Mode}){
       <div className="admin-auth-card">
         <span className="admin-auth-icon"><LockKeyhole size={26}/></span>
         <h2>{title}</h2><p>{subtitle}</p>
+        {mode==='register'&&inviteToken&&<div className="admin-auth-message" role="status">Invitation administrateur détectée pour <strong>{email||'cette adresse'}</strong>.</div>}
         <form onSubmit={submit}>
           {mode==='register'&&<label><span>Nom complet</span><div><UserRound size={18}/><input value={name} autoComplete="name" onChange={e=>setName(e.target.value)} placeholder="Nom de l’administrateur"/></div></label>}
           {!(mode==='forgot'&&resetToken)&&<label><span>Adresse e-mail</span><div><Mail size={18}/><input value={email} type="email" autoComplete="email" onChange={e=>setEmail(e.target.value)} placeholder="admin@exemple.com"/></div></label>}
