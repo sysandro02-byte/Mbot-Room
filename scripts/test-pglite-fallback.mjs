@@ -74,6 +74,8 @@ try {
       name: 'Test pg-mem',
       email: 'pglite.test@mbote.test',
       password: 'Password2026!',
+      termsAccepted: true,
+      termsVersion: '2026-09-24',
     }),
   });
   assert.equal(register.response.status, 201, JSON.stringify(register.data));
