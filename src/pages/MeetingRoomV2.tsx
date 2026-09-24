@@ -438,9 +438,38 @@ export default function MeetingRoomV2() {
   });
 
   const usingLiveKit = liveKitDesired && !liveKitMedia.failed;
-  const remoteParticipants = usingLiveKit ? liveKitMedia.remoteParticipants : meshMedia.remoteParticipants;
+  const remoteParticipants = useMemo(() => {
+    if (!usingLiveKit) return meshMedia.remoteParticipants;
+    const realtimeByUser = new Map(
+      meshMedia.remoteParticipants.map((participant) => [String(participant.userId), participant] as const),
+    );
+    return liveKitMedia.remoteParticipants.map((participant) => {
+      const realtime = realtimeByUser.get(String(participant.userId));
+      if (!realtime) return participant;
+      return {
+        ...participant,
+        media: {
+          ...participant.media,
+          screen: Boolean(realtime.media.screen),
+        },
+      };
+    });
+  }, [liveKitMedia.remoteParticipants, meshMedia.remoteParticipants, usingLiveKit]);
   const networkQuality = usingLiveKit ? liveKitMedia.networkQuality : meshMedia.networkQuality;
   const activeSpeakerSocketId = usingLiveKit ? liveKitMedia.activeSpeakerSocketId : meshMedia.activeSpeakerSocketId;
+
+  const togglePinnedParticipant = useCallback((socketId: string) => {
+    const nextPinned = pinnedSocketId === socketId ? null : socketId;
+    setPinnedSocketId(nextPinned);
+    if (nextPinned) setViewMode('speaker');
+  }, [pinnedSocketId]);
+
+  useEffect(() => {
+    if (!pinnedSocketId) return;
+    if (!remoteParticipants.some((participant) => participant.socketId === pinnedSocketId)) {
+      setPinnedSocketId(null);
+    }
+  }, [pinnedSocketId, remoteParticipants]);
 
   const summaryTranscriptionEnabled = Boolean(meeting?.id && meeting.settings?.lunaSummary !== false && canUseTranscription);
   const liveCaptions = useMeetingCaptions({
@@ -1789,7 +1818,7 @@ export default function MeetingRoomV2() {
                     activeSpeaker={!screenSharing && activeSpeakerSocketId === remoteScreenParticipant?.socketId}
                     pinned={!screenSharing && pinnedSocketId === remoteScreenParticipant?.socketId}
                     reaction={!screenSharing && remoteScreenParticipant ? reactions[Number(remoteScreenParticipant.userId)] : undefined}
-                    onPin={!screenSharing && remoteScreenParticipant ? () => setPinnedSocketId((current) => current === remoteScreenParticipant.socketId ? null : remoteScreenParticipant.socketId) : undefined}
+                    onPin={!screenSharing && remoteScreenParticipant ? () => togglePinnedParticipant(remoteScreenParticipant.socketId) : undefined}
                   />
                   {screenSharing && cameraEnabled ? <div className="room-v2-presenter-pip">
                     <VideoTile name={localName} stream={cameraStreamRef.current} avatar={currentUser?.avatar} muted={!micEnabled} videoEnabled={cameraEnabled} local badge={isHost?'Hôte':isCoHost?'Co-hôte':undefined}/>
@@ -1817,7 +1846,7 @@ export default function MeetingRoomV2() {
                     pinned={pinnedSocketId === participant.socketId}
                     handRaised={raisedHands.has(Number(participant.userId))}
                     reaction={reactions[Number(participant.userId)]}
-                    onPin={() => setPinnedSocketId((current) => current === participant.socketId ? null : participant.socketId)}
+                    onPin={() => togglePinnedParticipant(participant.socketId)}
                   />
                 ))}
                 <button type="button" className="room-v2-invite-tile" onClick={() => void inviteParticipants()}><UsersRound/><span>Inviter des participants</span></button>
@@ -1826,7 +1855,7 @@ export default function MeetingRoomV2() {
           ) : speakerViewEnabled && featuredParticipant ? (
             <div className="room-v2-speaker-layout" data-testid="speaker-layout">
               <div className="room-v2-speaker-main">
-                <span className="room-v2-featured-label"><Pin size={14}/> Intervenant actif</span>
+                <span className="room-v2-featured-label"><Pin size={14}/> {pinnedSocketId === featuredParticipant.socketId ? 'Épinglé' : 'Intervenant actif'}</span>
                 <VideoTile
                   name={featuredParticipant.name}
                   stream={featuredParticipant.stream}
@@ -1871,7 +1900,7 @@ export default function MeetingRoomV2() {
                     pinned={pinnedSocketId === participant.socketId}
                     handRaised={raisedHands.has(Number(participant.userId))}
                     reaction={reactions[Number(participant.userId)]}
-                    onPin={() => setPinnedSocketId((current) => current === participant.socketId ? null : participant.socketId)}
+                    onPin={() => togglePinnedParticipant(participant.socketId)}
                   />
                 ))}
                 {viewMode === 'participants' ? <button type="button" className="room-v2-invite-tile" onClick={() => void inviteParticipants()}><UsersRound/><span>Inviter des participants</span></button> : null}
@@ -1906,7 +1935,7 @@ export default function MeetingRoomV2() {
                   pinned={pinnedSocketId === participant.socketId}
                   handRaised={raisedHands.has(Number(participant.userId))}
                   reaction={reactions[Number(participant.userId)]}
-                  onPin={() => setPinnedSocketId((current) => current === participant.socketId ? null : participant.socketId)}
+                  onPin={() => togglePinnedParticipant(participant.socketId)}
                 />
               ))}
             </div>
@@ -1963,7 +1992,7 @@ export default function MeetingRoomV2() {
                           </>
                         ):(
                           <>
-                            {remote?<button type="button" onClick={()=>{setMenuUserId(null);setPinnedSocketId(remote.socketId);setViewMode('speaker');}}>Mettre en avant</button>:null}
+                            {remote?<button type="button" onClick={()=>{setMenuUserId(null);togglePinnedParticipant(remote.socketId);}}>{pinnedSocketId===remote.socketId?'Désépingler':'Épingler'}</button>:null}
                             <button
                               type="button"
                               disabled={guestMode || member.isGuest}
