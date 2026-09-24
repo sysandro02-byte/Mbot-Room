@@ -47,6 +47,7 @@ import PushNotificationSettings from '../../components/PushNotificationSettings'
 import { authService } from '../../services/authService';
 import { appDataService, type ConnectedSession, type Preferences } from '../../services/appDataService';
 import './SettingsWorkspace.css';
+import AppLoader from '../../components/AppLoader';
 
 type SettingsWorkspaceProps = {
   preferences: Preferences;
@@ -475,7 +476,7 @@ export default function SettingsWorkspace({
           <button type="button" onClick={() => navigate('/mot-de-passe-oublie')}>Changer mon mot de passe</button>
         </div> : null}
         <div className="settings-sessions-head"><strong>Sessions actives</strong><button type="button" onClick={() => void revokeOthers()} disabled={sessionsBusy==='all'||sessionsLoading}>Fermer les autres sessions</button></div>
-        {sessionsLoading ? <p className="settings-session-empty">Chargement des sessions…</p> : sessions.length ? <div className="settings-session-list">
+        {sessionsLoading ? <AppLoader label="Chargement des sessions…" compact /> : sessions.length ? <div className="settings-session-list">
           {sessions.map((session) => <article key={session.id}>
             <span><Laptop size={20}/></span>
             <div><strong>{session.current ? 'Cet appareil' : session.label}</strong><small><Clock3 size={13}/> Dernière activité : {new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(session.lastActivity))}</small><small>Expiration : {new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium'}).format(new Date(session.expiresAt))}</small></div>
