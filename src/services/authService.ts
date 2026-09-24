@@ -17,6 +17,7 @@ export type RoomUser = {
   address?: string;
   bio?: string;
   profileVisible?: boolean;
+  personalMeetingId?: string;
   role?: 'admin' | 'user' | 'guest';
   permissions?: string[];
   isGuest?: boolean;
@@ -33,7 +34,7 @@ const USER_KEY = 'user';
 const TOKEN_KEY = 'token';
 const EXPIRY_KEY = 'sessionExpiresAt';
 
-type RawRoomUser = Partial<Record<keyof RoomUser | 'is_guest' | 'created_at' | 'phone_number' | 'job_title' | 'birth_date' | 'birth_place' | 'role' | 'permissions', unknown>>;
+type RawRoomUser = Partial<Record<keyof RoomUser | 'is_guest' | 'created_at' | 'phone_number' | 'job_title' | 'birth_date' | 'birth_place' | 'personal_meeting_id' | 'role' | 'permissions', unknown>>;
 
 const getStorage = (persist: boolean) => (persist ? localStorage : sessionStorage);
 
@@ -65,6 +66,7 @@ const normalizeUser = (user: RawRoomUser): RoomUser => ({
   address: String(user.address || ''),
   bio: String(user.bio || ''),
   profileVisible: user.profileVisible === undefined ? true : Boolean(user.profileVisible),
+  personalMeetingId: String(user.personalMeetingId || user.personal_meeting_id || ''),
   role: user.role === 'admin' || user.role === 'guest' ? user.role : user.isGuest || user.is_guest ? 'guest' : 'user',
   permissions: Array.isArray(user.permissions) ? user.permissions.filter((item): item is string => typeof item === 'string') : [],
   isGuest: Boolean(user.isGuest || user.is_guest),
