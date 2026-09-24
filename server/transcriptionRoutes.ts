@@ -115,14 +115,41 @@ export const registerTranscriptionRoutes = (app: express.Express, io: Server) =>
       if (!meetingId || !(await hasMeetingAccess(meetingId, request.user!))) {
         return sendApiError(response, 403, 'MEETING_ACCESS_DENIED', 'Accès refusé.');
       }
-      const rows = await query(
-        `SELECT id,meeting_id,user_id,speaker,text,breakout_room_id,provider,language,created_at
-           FROM room_captions
-          WHERE meeting_id=$1
-          ORDER BY created_at ASC
-          LIMIT 2000`,
+      const meeting = await query(
+        'SELECT host_id,co_host_id FROM room_meetings WHERE id=$1 LIMIT 1',
         [meetingId],
       );
+      const moderator = request.user!.role === 'admin'
+        || Number(meeting.rows[0]?.host_id || 0) === request.user!.id
+        || Number(meeting.rows[0]?.co_host_id || 0) === request.user!.id;
+      const rows = moderator
+        ? await query(
+            `SELECT id,meeting_id,user_id,speaker,text,breakout_room_id,provider,language,created_at
+               FROM room_captions
+              WHERE meeting_id=$1
+              ORDER BY created_at ASC
+              LIMIT 2000`,
+            [meetingId],
+          )
+        : await query(
+            `SELECT c.id,c.meeting_id,c.user_id,c.speaker,c.text,c.breakout_room_id,c.provider,c.language,c.created_at
+               FROM room_captions c
+              WHERE c.meeting_id=$1
+                AND (
+                  c.breakout_room_id IS NULL
+                  OR EXISTS (
+                    SELECT 1
+                      FROM room_breakout_members bm
+                      JOIN room_breakout_rooms br ON br.id=bm.breakout_room_id
+                     WHERE bm.breakout_room_id=c.breakout_room_id
+                       AND bm.user_id=$2
+                       AND br.meeting_id=$1
+                  )
+                )
+              ORDER BY c.created_at ASC
+              LIMIT 2000`,
+            [meetingId, request.user!.id],
+          );
       response.json(rows.rows.map((row) => ({
         id: row.id,
         meetingId: Number(row.meeting_id),
