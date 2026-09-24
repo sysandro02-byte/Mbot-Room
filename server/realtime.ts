@@ -24,6 +24,7 @@ type LiveParticipant = {
 type Ack = (payload: unknown) => void;
 
 const meetings = new Map<number, Map<string, LiveParticipant>>();
+const raisedHands = new Map<number, Map<number, { userId:number; name:string; raisedAt:string }>>();
 const cleanMedia = (value: any): MediaState => ({ audio: Boolean(value?.audio), video: Boolean(value?.video), screen: Boolean(value?.screen) });
 const fail = (code: string, error: string) => ({ ok: false, code, error });
 
@@ -50,6 +51,17 @@ const removeSocketFromMeeting = async (io: Server, socket: Socket) => {
     if (!otherDeviceOnline) {
       await query(`UPDATE room_meeting_members SET left_at=now(),updated_at=now() WHERE meeting_id=$1 AND user_id=$2`, [meetingId, participant.userId])
         .catch((error) => warnPersistenceFailure('participant-left', error));
+      const meetingHands = raisedHands.get(meetingId);
+      if (meetingHands?.delete(participant.userId)) {
+        io.to(`meeting:${meetingId}`).emit('meeting:hand-raised', {
+          meetingId,
+          userId: participant.userId,
+          name: participant.name,
+          raised: false,
+          raisedAt: null,
+        });
+      }
+      if (meetingHands && meetingHands.size === 0) raisedHands.delete(meetingId);
     }
   }
   if (participants && participants.size === 0) meetings.delete(meetingId);
@@ -152,7 +164,9 @@ export const registerRealtime = (io: Server) => {
         const count = new Set([...roomParticipants.values()].map((item) => item.userId)).size;
         await query('UPDATE room_meetings SET participant_count=GREATEST(participant_count,$2),updated_at=now() WHERE id=$1', [meetingId, count])
           .catch((error) => warnPersistenceFailure('participant-count', error));
-        callback?.({ ok: true, participants: existing });
+        const hands = [...(raisedHands.get(meetingId)?.values() || [])];
+        callback?.({ ok: true, participants: existing, raisedHands: hands });
+        socket.emit('meeting:hands-snapshot', { meetingId, hands });
         socket.to(mediaRoomName(meetingId, breakoutRoomId)).emit('meeting:participant-joined', participant);
         io.to(`meeting:${meetingId}`).emit('meeting:presence', { meetingId, count, participants: [...roomParticipants.values()] });
       } catch {
@@ -218,8 +232,24 @@ export const registerRealtime = (io: Server) => {
       if (raised && user.isGuest && !(await isPlatformFeatureEnabled('guestRaiseHandEnabled'))) {
         return callback?.(fail('GUEST_RAISE_HAND_DISABLED', 'Les invités ne sont pas autorisés à lever la main.'));
       }
-      io.to(`meeting:${meetingId}`).emit('meeting:hand-raised', { meetingId, userId: user.id, name: user.name, raised });
-      callback?.({ ok: true });
+      const meetingHands = raisedHands.get(meetingId) || new Map<number, { userId:number; name:string; raisedAt:string }>();
+      let raisedAt: string | null = null;
+      if (raised) {
+        raisedAt = new Date().toISOString();
+        meetingHands.set(user.id, { userId:user.id, name:user.name || user.email, raisedAt });
+        raisedHands.set(meetingId, meetingHands);
+      } else {
+        meetingHands.delete(user.id);
+        if (meetingHands.size === 0) raisedHands.delete(meetingId);
+      }
+      io.to(`meeting:${meetingId}`).emit('meeting:hand-raised', {
+        meetingId,
+        userId: user.id,
+        name: user.name || user.email,
+        raised,
+        raisedAt,
+      });
+      callback?.({ ok: true, raisedAt });
     });
 
     socket.on('meeting:reaction', async (payload: any, callback?: Ack) => {
