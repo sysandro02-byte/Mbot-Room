@@ -397,6 +397,28 @@ export const meetingService = {
     return response.json();
   },
 
+  async reportParticipant(meetingId: number, reportedUserId: number, reportedName: string, reason: string): Promise<void> {
+    const description = [
+      `Compte signalé : ${reportedName || 'Utilisateur'} (#${reportedUserId}).`,
+      reason.trim() || 'Signalement effectué depuis le menu participant pendant une réunion.',
+    ].join(' ');
+    const response = await apiFetch(apiUrl('/api/reports'), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        type: 'meeting',
+        meetingId,
+        title: `Compte signalé · ${reportedName || 'Utilisateur'}`,
+        description,
+        pageUrl: typeof window !== 'undefined' ? window.location.href : '',
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || 'Signalement impossible.');
+    }
+  },
+
   async getMediaRequests(meetingId: number): Promise<MeetingMediaRequest[]> {
     const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/media-requests`), {
       headers: getAuthHeaders(),
