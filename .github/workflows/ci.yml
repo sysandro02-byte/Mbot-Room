@@ -61,6 +61,8 @@ jobs:
         run: node scripts/test-integration.mjs
       - name: Breakout privacy and realtime isolation
         run: node scripts/test-breakouts.mjs
+      - name: Meeting scale 120 participants and simultaneous rooms
+        run: node scripts/test-meeting-scale.mjs
       - name: Authenticated multi-page application smoke
         run: node scripts/test-app-smoke.mjs
       - name: PC Android iPhone network recovery matrix
