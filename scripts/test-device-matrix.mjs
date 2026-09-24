@@ -60,7 +60,7 @@ const register = async () => {
       name: 'Device Matrix',
       email: 'device.matrix@mbote.test',
       password: 'Password2026!',
-      termsAccepted: true,
+      country: 'Congo-Brazzaville', city: 'Brazzaville', termsAccepted: true,
       termsVersion: '2026-09-24',
     }),
   });
