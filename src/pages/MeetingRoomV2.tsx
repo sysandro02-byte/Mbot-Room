@@ -394,6 +394,11 @@ export default function MeetingRoomV2() {
     && mediaTransportStatus.preferredMode === 'livekit'
     && !liveKitFailed
   );
+  const acceptedRealtimeParticipantCount = Math.max(
+    Number(meeting?.participant_count || 0),
+    participants.filter((participant) => participant.status === 'accepted').length,
+  );
+  const directMeshSafe = acceptedRealtimeParticipantCount <= 12;
 
   const handleLiveKitFailure = useCallback((message: string) => {
     setLiveKitFailed(true);
@@ -419,7 +424,7 @@ export default function MeetingRoomV2() {
     media: mediaState,
     breakoutRoomId,
     enabled: mediaEnabled,
-    peerConnectionsEnabled: mediaTransportChecked && !liveKitDesired,
+    peerConnectionsEnabled: mediaTransportChecked && !liveKitDesired && directMeshSafe,
     onNotice: setNotice,
   });
 
@@ -552,6 +557,11 @@ export default function MeetingRoomV2() {
   useEffect(() => {
     setLiveKitFailed(false);
   }, [meeting?.id]);
+
+  useEffect(() => {
+    if (!mediaEnabled || !mediaTransportChecked || liveKitDesired || directMeshSafe) return;
+    setNotice('Cette grande réunion nécessite la connexion média optimisée. Le mode direct est désactivé pour éviter une surcharge audio/vidéo.');
+  }, [directMeshSafe, liveKitDesired, mediaEnabled, mediaTransportChecked]);
 
 
   useEffect(() => {
