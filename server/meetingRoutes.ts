@@ -617,7 +617,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const inserted = await query(
         `INSERT INTO room_meetings
           (title,description,host_id,co_host_id,host_name,host_avatar,start_time,duration,meeting_link,is_active,settings,participant_count,status,started_at,ended_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10::jsonb,1,'live',$7,NULL) RETURNING *`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10::jsonb,1,'live',now(),NULL) RETURNING *`,
         [
           source.title,
           source.description,
