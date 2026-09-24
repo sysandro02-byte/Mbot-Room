@@ -8,15 +8,17 @@ type Props={
   version:string;
   onAccepted:(accepted:boolean,version:string)=>void;
   compact?:boolean;
+  autoOpen?:boolean;
 };
 
-export default function TermsConsent({accepted,version,onAccepted,compact=false}:Props){
+export default function TermsConsent({accepted,version,onAccepted,compact=false,autoOpen=false}:Props){
   const [open,setOpen]=useState(false);
   const [document,setDocument]=useState<LegalDocument|null>(null);
   const [loading,setLoading]=useState(false);
   const [readToEnd,setReadToEnd]=useState(false);
   const [checked,setChecked]=useState(false);
   const scrollRef=useRef<HTMLDivElement|null>(null);
+  const autoOpenedRef=useRef(false);
 
   const load=async()=>{
     if(document)return document;
@@ -32,6 +34,12 @@ export default function TermsConsent({accepted,version,onAccepted,compact=false}
     setReadToEnd(false);setChecked(false);setOpen(true);
     await load().catch(()=>undefined);
   };
+
+  useEffect(()=>{
+    if(!autoOpen||accepted||autoOpenedRef.current)return;
+    autoOpenedRef.current=true;
+    void openTerms();
+  },[accepted,autoOpen]);
 
   useEffect(()=>{
     if(!open)return;
