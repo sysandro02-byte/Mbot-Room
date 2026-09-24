@@ -10,6 +10,8 @@
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:usesCleartextTraffic="false"
+        android:icon="@drawable/mboteroom_logo"
+        android:roundIcon="@drawable/mboteroom_logo"
         android:label="MBotéRoom"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
