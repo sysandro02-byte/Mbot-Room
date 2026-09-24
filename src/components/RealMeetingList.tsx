@@ -7,6 +7,7 @@ import { readCachedPreferences } from '../lib/userPreferences';
 import { getMeetingAccessCode, getMeetingJoinUrl, getMeetingPhase, Meeting, type MeetingSettings, meetingService } from '../services/meetingService';
 import { getAppLocale } from '../lib/appLanguage';
 import './RealMeetingList.css';
+import AppLoader from './AppLoader';
 
 type MeetingForm = {
   title:string;description:string;startTime:string;duration:number;password:string;participants:string;
@@ -321,7 +322,7 @@ export default function RealMeetingList(){
           <label className="meeting-pro-search"><Search/><input value={searchQuery} onChange={(event)=>setSearchQuery(event.target.value)} placeholder="Rechercher une réunion…"/></label>
         </div>
 
-        {loading?<div className="real-meeting-empty">Chargement des réunions…</div>:null}
+        {loading?<AppLoader label="Chargement des réunions…" />:null}
         {!loading&&!visibleMeetings.length?<div className="real-meeting-empty"><Video size={42}/><h2>Aucune réunion</h2><p>{searchQuery?'Aucun résultat ne correspond à votre recherche.':'Aucune réunion dans cette catégorie.'}</p><button onClick={()=>{setEditingMeeting(null);setForm(defaultForm(preferences,user?.personalMeetingId||''));setShowCreate(true);}}><CalendarPlus size={17}/> Planifier une réunion</button></div>:null}
 
         <div className="meeting-pro-list">
