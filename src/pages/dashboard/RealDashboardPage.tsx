@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
-import { appDataService, type Contact, type Recording } from '../../services/appDataService';
+import { appDataService, type ClientPlatformSettings, type Contact, type Recording } from '../../services/appDataService';
 import { HomeSlide, Meeting, meetingService } from '../../services/meetingService';
 import { notificationService, RoomNotification } from '../../services/notificationService';
 import { socket } from '../../lib/socket';
@@ -10,6 +10,7 @@ import HomeHero from './components/HomeHero';
 import { HomeQuickActions, HomeStats, type HomeStatsData } from './components/HomeQuickActions';
 import { NextMeetingCard, RecentMeetings } from './components/HomeMeetings';
 import { HomeFeatureBanner, HomeFooter, HomeQuickAccess, LunaAssistantCard } from './components/HomeExtras';
+import { PremiumModal, StorageDataModal } from './components/HomeDashboardModals';
 import './RealDashboardPage.css';
 
 export default function RealDashboardPage() {
@@ -22,6 +23,9 @@ export default function RealDashboardPage() {
   const [tips, setTips] = useState<Array<{id:string;title:string;body:string;actionLabel:string;actionPath:string}>>([]);
   const [homeSlides, setHomeSlides] = useState<HomeSlide[]>([]);
   const [activeSlide, setActiveSlide] = useState(0);
+  const [premiumOpen, setPremiumOpen] = useState(false);
+  const [storageOpen, setStorageOpen] = useState(false);
+  const [platformSettings, setPlatformSettings] = useState<ClientPlatformSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -29,13 +33,14 @@ export default function RealDashboardPage() {
     setLoading(true);
     setError('');
     try {
-      const [meetingRows, contactRows, recordingRows, notificationRows, tipRows, slideRows] = await Promise.all([
+      const [meetingRows, contactRows, recordingRows, notificationRows, tipRows, slideRows, platformRows] = await Promise.all([
         meetingService.getMeetings(),
         appDataService.getContacts().catch(() => []),
         appDataService.getRecordings().catch(() => []),
         notificationService.list().catch(() => []),
         meetingService.getDashboardTips().catch(() => []),
         meetingService.getHomeSlides().catch(() => []),
+        appDataService.getPlatformSettings().catch(() => null),
       ]);
       setMeetings(Array.isArray(meetingRows) ? meetingRows : []);
       setContacts(Array.isArray(contactRows) ? contactRows : []);
@@ -43,6 +48,7 @@ export default function RealDashboardPage() {
       setNotifications(Array.isArray(notificationRows) ? notificationRows : []);
       setTips(Array.isArray(tipRows) ? tipRows : []);
       setHomeSlides(Array.isArray(slideRows) ? slideRows : []);
+      setPlatformSettings(platformRows);
       setActiveSlide(0);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossible de charger le tableau de bord.');
@@ -173,9 +179,9 @@ export default function RealDashboardPage() {
     {error ? <div className="real-dashboard-error">{error}</div> : null}
 
     <HomeQuickActions
-      onPremium={() => navigate('/app/settings#premium')}
+      onPremium={() => setPremiumOpen(true)}
       onCreateGroup={() => navigate('/app/groups?new=1')}
-      onStorageData={() => navigate('/app/settings#storage-data')}
+      onStorageData={() => setStorageOpen(true)}
       onShareScreen={() => navigate('/app/meetings?new=1&intent=screen-share')}
     />
 
@@ -238,5 +244,13 @@ export default function RealDashboardPage() {
       onTerms={() => navigate('/conditions')}
       onHelp={() => navigate('/aide')}
     />
+
+    <PremiumModal
+      open={premiumOpen}
+      paymentReady={Boolean(platformSettings?.premiumCheckoutReady)}
+      checkoutUrl={platformSettings?.premiumCheckoutUrl || ''}
+      onClose={() => setPremiumOpen(false)}
+    />
+    <StorageDataModal open={storageOpen} onClose={() => setStorageOpen(false)}/>
   </main>;
 }
