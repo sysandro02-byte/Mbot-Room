@@ -61,6 +61,17 @@ export const runExtraMigrations = async () => {
        SET image_url='/images/mboteroom-home-hero.svg', updated_at=now()
      WHERE slot=1 AND (image_url='' OR image_url='/images/meeting-black-team.svg');
 
+    CREATE TABLE IF NOT EXISTS room_admin_invites (
+      id uuid PRIMARY KEY,
+      email text NOT NULL,
+      token_hash text NOT NULL UNIQUE,
+      created_by bigint NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      expires_at timestamptz NOT NULL,
+      consumed_at timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_room_admin_invites_email ON room_admin_invites(lower(email),expires_at);
+
     CREATE TABLE IF NOT EXISTS room_login_branding (
       id smallint PRIMARY KEY DEFAULT 1 CHECK (id = 1),
       wordmark_url text NOT NULL DEFAULT '/icons/mboteroom-wordmark.png',
