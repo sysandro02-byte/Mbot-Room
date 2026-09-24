@@ -241,6 +241,8 @@ try {
       name: `Hôte Smoke ${runSuffix}`,
       email: hostEmail,
       password,
+      termsAccepted: true,
+      termsVersion: '2026-09-24',
     }),
   });
   assert.equal(register.response.status, 201, JSON.stringify(register.data));
@@ -307,6 +309,8 @@ try {
       name: guestName,
       meetingCode: meeting.meeting_link,
       password,
+      termsAccepted: true,
+      termsVersion: '2026-09-24',
     }),
   });
   assert.equal(guestJoin.response.status, 201, JSON.stringify(guestJoin.data));
