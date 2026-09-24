@@ -212,20 +212,20 @@ export interface EndedMeetingPayload {
 }
 
 export const meetingService = {
-  async getMeetings(): Promise<Meeting[]> {
-    const response = await apiFetch(apiUrl('/api/meetings'), { headers: getAuthHeaders() });
+  async getMeetings(timeoutMs = 45_000): Promise<Meeting[]> {
+    const response = await apiFetch(apiUrl('/api/meetings'), { headers: getAuthHeaders() }, timeoutMs);
     return response.json();
   },
 
-  async getDashboardTips(): Promise<DashboardTip[]> {
-    const response = await apiFetch(apiUrl('/api/dashboard/tips'), { headers: getAuthHeaders() });
+  async getDashboardTips(timeoutMs = 45_000): Promise<DashboardTip[]> {
+    const response = await apiFetch(apiUrl('/api/dashboard/tips'), { headers: getAuthHeaders() }, timeoutMs);
     if (!response.ok) return [];
     const data = await response.json().catch(() => []);
     return Array.isArray(data) ? data : [];
   },
 
-  async getHomeSlides(): Promise<HomeSlide[]> {
-    const response = await apiFetch(apiUrl('/api/dashboard/slides'), { headers: getAuthHeaders() });
+  async getHomeSlides(timeoutMs = 45_000): Promise<HomeSlide[]> {
+    const response = await apiFetch(apiUrl('/api/dashboard/slides'), { headers: getAuthHeaders() }, timeoutMs);
     if (!response.ok) return [];
     const data = await response.json().catch(() => []);
     return Array.isArray(data) ? data : [];
