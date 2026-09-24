@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import type express from 'express';
 import { isServerRecordingReady } from './recordingRoutes.js';
+import { isPlatformFeatureEnabled } from './platformSettings.js';
 import {
   AuthedRequest,
   authenticateToken,
@@ -112,12 +113,17 @@ export const registerSfuRoutes = (app: express.Express) => {
         return;
       }
       const moderator = canModerateMeeting(meeting, user);
+      const guestScreenAllowed = !user.isGuest || await isPlatformFeatureEnabled('guestScreenShareEnabled');
       const canPublishSources = moderator
-        ? ['camera', 'microphone', 'screen_share', 'screen_share_audio']
+        ? [
+            'camera',
+            'microphone',
+            ...(guestScreenAllowed ? ['screen_share', 'screen_share_audio'] : []),
+          ]
         : [
             ...(meeting.settings.participantVideo !== false ? ['camera'] : []),
             ...(meeting.settings.participantAudio !== false ? ['microphone'] : []),
-            ...(meeting.settings.screenShare !== false ? ['screen_share', 'screen_share_audio'] : []),
+            ...(guestScreenAllowed && meeting.settings.screenShare !== false ? ['screen_share', 'screen_share_audio'] : []),
           ];
 
       const mode = configuredMode();
