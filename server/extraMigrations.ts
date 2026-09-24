@@ -73,7 +73,13 @@ export const runExtraMigrations = async () => {
       ('lunaEnabled',true),
       ('recordingEnabled',true),
       ('publicMeetingsEnabled',true),
-      ('premiumPaymentEnabled',false)
+      ('premiumPaymentEnabled',false),
+      ('guestRaiseHandEnabled',false),
+      ('guestRecordingEnabled',false),
+      ('guestScreenShareEnabled',false),
+      ('guestLunaEnabled',false),
+      ('guestTranscriptionEnabled',false),
+      ('guestChatEnabled',false)
     ON CONFLICT (key) DO NOTHING;
 
     CREATE TABLE IF NOT EXISTS room_user_preferences (
