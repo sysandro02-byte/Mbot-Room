@@ -137,8 +137,8 @@ export default function CalendarPage(){
     const byMeeting=new Set(events.map((event)=>Number(event.meeting_id||0)).filter(Boolean));
     const fromEvents=events.map((event)=>{
       const meeting=event.meeting_id?meetings.find((item)=>item.id===Number(event.meeting_id)):undefined;
-      const participants=meeting?.participant_count
-        ?? (Array.isArray(event.metadata?.participants)?event.metadata!.participants!.length:0);
+      const metadataParticipants=Array.isArray(event.metadata?.participants)?event.metadata.participants:[];
+      const participants=meeting?.participant_count ?? metadataParticipants.length;
       return{
         id:'event-'+event.id,
         calendarId:event.id,
