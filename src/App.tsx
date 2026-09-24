@@ -11,6 +11,7 @@ import { sanitizeInternalPath } from './lib/navigationSecurity';
 import { AppLanguageBridge } from './lib/appLanguage';
 import { lazyWithRetry } from './lib/lazyWithRetry';
 import AppErrorBoundary from './components/AppErrorBoundary';
+import GlobalHeader from './components/GlobalHeader';
 
 const RealMeetingList = lazyWithRetry(() => import('./components/RealMeetingList'));
 const AppShell = lazyWithRetry(() => import('./components/AppShell'));
@@ -34,6 +35,7 @@ const ProfilePage = lazyWithRetry(() => import('./pages/ProfilePage'));
 const FilesPage = lazyWithRetry(() => import('./pages/FilesPage'));
 const WorkGroupsPage = lazyWithRetry(() => import('./pages/WorkGroupsPage'));
 const Login = lazyWithRetry(() => import('./pages/Login'));
+const TermsPage = lazyWithRetry(() => import('./pages/TermsPage'));
 
 function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: boolean }) {
   const location = useLocation();
@@ -139,7 +141,7 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  return <AppErrorBoundary><><AppLanguageBridge/><UserPreferencesRuntime/><AppMessageModal/><MobileSplash/><PwaExperience/><SessionSecurity/><Suspense fallback={<main className="route-loading" role="status" aria-live="polite">Chargement de MBotéRoom…</main>}><Routes>
+  return <AppErrorBoundary><><AppLanguageBridge/><UserPreferencesRuntime/><AppMessageModal/><MobileSplash/><PwaExperience/><SessionSecurity/><GlobalHeader/><Suspense fallback={<main className="route-loading" role="status" aria-live="polite">Chargement de MBotéRoom…</main>}><Routes>
     <Route path="/login" element={<Login />} />
     <Route path="/connexion" element={<Login />} />
     <Route path="/inscription" element={<Login initialView="register" />} />
@@ -155,7 +157,7 @@ export default function App() {
     <Route path="/securite" element={<SimpleInfoPage title="Sécurité MBotéRoom" description="Les réunions utilisent les protections disponibles dans l'application." />} />
     <Route path="/fonctionnalites" element={<SimpleInfoPage title="Fonctionnalités MBotéRoom" description="Créez un compte pour retrouver l'historique, organiser vos réunions et gérer les invitations." />} />
     <Route path="/confidentialite" element={<SimpleInfoPage title="Confidentialité" description="Consultez ici les informations de confidentialité applicables à votre espace MBotéRoom." />} />
-    <Route path="/conditions" element={<SimpleInfoPage title="Conditions d’utilisation" description="Consultez ici les conditions d’utilisation de MBotéRoom." />} />
+    <Route path="/conditions" element={<TermsPage />} />
     <Route path="/app/meetings" element={<ProtectedRoute><AppShell title="Réunions"><RealMeetingList /></AppShell></ProtectedRoute>} />
     <Route path="/app/search" element={<ProtectedRoute><AppShell title="Recherche"><GlobalSearchPage /></AppShell></ProtectedRoute>} />
     <Route path="/app/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
