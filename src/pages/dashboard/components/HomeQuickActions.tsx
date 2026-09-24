@@ -11,7 +11,7 @@ export function HomeQuickActions({ onPremium, onCreateGroup, onStorageData, onSh
   return (
     <>
       <section className="home-quick-actions home-quick-actions-desktop" aria-label="Actions rapides">
-        <button className="is-teal" type="button" onClick={onPremium}><span><Crown/></span><div><strong>Premium</strong><small>Découvrir les options Premium</small></div><ChevronRight/></button>
+        <button className="is-premium" type="button" onClick={onPremium}><span><Crown/></span><div><strong>Premium</strong><small>Découvrir les options Premium</small></div><ChevronRight/></button>
         <button className="is-blue" type="button" onClick={onCreateGroup}><span><UsersRound/></span><div><strong>Créer un groupe</strong><small>Collaborer avec votre équipe</small></div><ChevronRight/></button>
         <button className="is-purple" type="button" onClick={onStorageData}><span><Database/></span><div><strong>Stockage & données</strong><small>Gérer l’espace et les données</small></div><ChevronRight/></button>
         <button className="is-coral" type="button" onClick={onShareScreen}><span><MonitorUp/></span><div><strong>Partager un écran</strong><small>Présenter et collaborer</small></div><ChevronRight/></button>
