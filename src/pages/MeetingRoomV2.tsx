@@ -306,6 +306,7 @@ export default function MeetingRoomV2() {
   const reactionTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const [reactionPanelOpen, setReactionPanelOpen] = useState(false);
   const [participants, setParticipants] = useState<MeetingParticipant[]>([]);
+  const [onlineParticipantIds, setOnlineParticipantIds] = useState<Set<number>>(() => new Set());
   const [lobbyParticipants, setLobbyParticipants] = useState<LobbyParticipant[]>([]);
   const [lobbyAlert, setLobbyAlert] = useState<{ userId:number; name:string; avatar?:string } | null>(null);
   const [breakoutRooms, setBreakoutRooms] = useState<BreakoutRoom[]>([]);
@@ -712,7 +713,17 @@ export default function MeetingRoomV2() {
     const onChat = (message: MeetingMessage) => setMessages((current) => dedupeMessages([...current, message]));
     const onChatDeleted = ({ messageId }: { messageId: string }) => setMessages((current) => current.filter((message) => message.id !== messageId));
     const onPoll = (poll: MeetingPoll) => setPolls((current) => [poll, ...current.filter((item) => item.id !== poll.id)]);
-    const onPresence = () => void refreshParticipants();
+    const onPresence = (payload?: { meetingId?: number; participants?: Array<{ userId?: number | string }> }) => {
+      if (Number(payload?.meetingId || 0) !== id) return;
+      if (Array.isArray(payload?.participants)) {
+        setOnlineParticipantIds(new Set(
+          payload.participants
+            .map((participant) => Number(participant?.userId || 0))
+            .filter((userId) => userId > 0),
+        ));
+      }
+      void refreshParticipants();
+    };
     const onLobby = (payload?: { meetingId?: number; userId?: number; status?: string; name?:string; avatar?:string }) => {
       void refreshParticipants();
       void refreshLobby();
@@ -1543,7 +1554,13 @@ export default function MeetingRoomV2() {
     </main>
   );
 
-  const activeMembers = participants.filter((participant) => participant.status === 'accepted');
+  const activeMembers = participants.filter((participant) =>
+    participant.status === 'accepted'
+    && (
+      onlineParticipantIds.has(participant.userId)
+      || (participant.userId === Number(currentUser?.id || 0) && mediaEnabled)
+    )
+  );
   const roleBadgeFor = (userId: number | string) => {
     const role = activeMembers.find((member) => member.userId === Number(userId))?.role;
     return role === 'host' ? 'Hôte' : role === 'cohost' ? 'Co-hôte' : undefined;
@@ -1788,7 +1805,7 @@ export default function MeetingRoomV2() {
               const remote = remoteParticipants.find((participant) => Number(participant.userId) === member.userId);
               const raisedAt = raisedHandTimes[member.userId];
               return <article key={member.userId}>
-                <div className="room-v2-person-avatar">{member.avatar?<img src={member.avatar} alt=""/>:initials(member.name)}</div>
+                <div className="room-v2-person-avatar is-online">{member.avatar?<img src={member.avatar} alt=""/>:initials(member.name)}</div>
                 <div><strong>{member.name}</strong><small>a levé la main et souhaite prendre la parole.{raisedAt ? ' · '+formatTime(raisedAt) : ''}</small></div>
                 {remote ? <button type="button" aria-label={`Mettre ${member.name} en avant`} onClick={() => { setPinnedSocketId(remote.socketId); setViewMode('speaker'); }}><Hand/></button> : null}
               </article>;
@@ -1802,7 +1819,7 @@ export default function MeetingRoomV2() {
                 const remote = remoteParticipants.find((participant) => Number(participant.userId) === member.userId);
                 const isSelf = member.userId === Number(currentUser?.id || 0);
                 return <article key={member.userId}>
-                  <div className="room-v2-person-avatar">{member.avatar?<img src={member.avatar} alt=""/>:initials(member.name)}</div>
+                  <div className="room-v2-person-avatar is-online">{member.avatar?<img src={member.avatar} alt=""/>:initials(member.name)}</div>
                   <div><strong>{member.name}{isSelf?' (vous)':''}</strong><small>{member.role==='host'?'Hôte':member.role==='cohost'?'Co-hôte':member.isGuest?'Invité':'Participant'}</small></div>
                   {raisedHands.has(member.userId)?<Hand className="room-v2-rail-hand"/>:null}
                   {remote?.media.audio || (isSelf&&mediaState.audio)?<Mic className="room-v2-rail-mic"/>:<MicOff className="room-v2-rail-muted"/>}
@@ -1849,8 +1866,8 @@ export default function MeetingRoomV2() {
                   const isSelf = member.userId === Number(currentUser?.id || 0);
                   return (
                     <article key={member.userId}>
-                      <div className="room-v2-person-avatar">{member.avatar ? <img src={member.avatar} alt=""/> : initials(member.name)}</div>
-                      <div><strong>{member.name}{isSelf ? ' (vous)' : ''}{raisedHands.has(member.userId) || (isSelf && handRaised) ? <span className="room-v2-raised-inline"> · ✋</span> : null}</strong><small>{member.role === 'host' ? 'Hôte' : member.role === 'cohost' ? 'Co-hôte' : member.isGuest ? 'Invité' : 'Participant'}{remote || isSelf ? ' · En ligne' : ''}</small></div>
+                      <div className="room-v2-person-avatar is-online">{member.avatar ? <img src={member.avatar} alt=""/> : initials(member.name)}</div>
+                      <div><strong>{member.name}{isSelf ? ' (vous)' : ''}{raisedHands.has(member.userId) || (isSelf && handRaised) ? <span className="room-v2-raised-inline"> · ✋</span> : null}</strong><small>{member.role === 'host' ? 'Hôte' : member.role === 'cohost' ? 'Co-hôte' : member.isGuest ? 'Invité' : 'Participant'} · En ligne</small></div>
                       {isModerator && !isSelf && member.role !== 'host' && (isHost || member.role !== 'cohost') ? (
                         <div className="room-v2-person-menu-wrap">
                           <button type="button" onClick={() => setMenuUserId(menuUserId === member.userId ? null : member.userId)}><MoreVertical size={18}/></button>
