@@ -651,7 +651,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     try {
       const meeting = await getMeetingById(Number(request.params.meetingId));
       if (!meeting) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
-      if (meeting.host_id !== request.user!.id && request.user!.role !== 'admin') return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte principal peut terminer la réunion pour tout le monde.');
+      const actingHostId = Number(meeting.settings?.actingHostId || 0);
+      if (meeting.host_id !== request.user!.id && actingHostId !== request.user!.id && request.user!.role !== 'admin') return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte actif peut terminer la réunion pour tout le monde.');
       const updated = await query(`UPDATE room_meetings SET status='ended',is_active=false,ended_at=now(),updated_at=now() WHERE id=$1 RETURNING *`, [meeting.id]);
       if (meeting.settings.lunaSummary !== false) await generateSummary(mapMeeting(updated.rows[0])).catch(() => null);
       io.to(`meeting:${meeting.id}`).emit('meeting:ended', { meetingId: meeting.id, endedBy: request.user!.id });
