@@ -38,7 +38,7 @@ export default function GlobalHeader(){
   },[]);
 
   useEffect(()=>{
-    if(!authenticated||guestMode){setUnread(0);return;}
+    if(!authenticated||guestMode){setUnread(0);return undefined;}
     const refresh=()=>void notificationService.list().then((rows)=>setUnread(rows.filter((item)=>!item.readAt).length)).catch(()=>undefined);
     const onNotification=()=>refresh();
     const onRestrictionsUpdated=()=>void authService.refreshCurrentUser().then(()=>setUser(authService.getCurrentUser())).catch(()=>undefined);
