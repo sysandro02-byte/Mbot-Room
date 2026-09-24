@@ -30,7 +30,8 @@ import { recordingStorageBucket, toSupabaseRecordingMarker } from './supabaseRec
 const findMeetingByValue = async (value: unknown): Promise<Meeting | null> => {
   const normalized = String(value || '').replace(/\s+/g, '').toLowerCase();
   if (!normalized) return null;
-  const rows = await query('SELECT * FROM room_meetings ORDER BY id DESC');
+  const rows = await query(`SELECT * FROM room_meetings
+    ORDER BY CASE status WHEN 'live' THEN 0 WHEN 'scheduled' THEN 1 ELSE 2 END, id DESC`);
   return rows.rows.map(mapMeeting).find((meeting) =>
     String(meeting.id) === normalized
     || meeting.meeting_link.toLowerCase() === normalized
@@ -323,6 +324,9 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const start = new Date(request.body?.startTime || request.body?.start_time || Date.now());
       const duration = Math.max(15, Math.min(1440, Number(request.body?.duration || 60)));
       const { settings, invitationEmails, plainPassword } = buildSettings(request.body);
+      if (request.user!.personalMeetingId && !Object.prototype.hasOwnProperty.call(request.body?.settings || {}, 'meetingAccessId')) {
+        settings.meetingAccessId = request.user!.personalMeetingId;
+      }
       const requestedCoHostId = Number(request.body?.coHostId || 0) || null;
       if (requestedCoHostId === request.user!.id) return sendApiError(response, 400, 'VALIDATION_ERROR', 'L’hôte principal ne peut pas être son propre co-hôte.');
       if (requestedCoHostId) {
@@ -594,6 +598,71 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const value = publicMeeting(updated.rows[0]);
       io.to(`meeting:${meeting.id}`).emit('meeting:locked', { meetingId: meeting.id, locked });
       response.json({ success: true, locked, meeting: value });
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/meetings/:meetingId/restart', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const source = await getMeetingById(Number(request.params.meetingId));
+      if (!source) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
+      if (!canModerateMeeting(source, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte ou le co-hôte peut relancer cette réunion.');
+      if (source.status !== 'ended' && source.status !== 'cancelled') return sendApiError(response, 409, 'MEETING_NOT_ENDED', 'Cette réunion peut déjà être démarrée normalement.');
+
+      const now = new Date();
+      const nextSettings: MeetingSettings = {
+        ...source.settings,
+        locked: false,
+        meetingAccessId: request.user!.personalMeetingId || source.settings.meetingAccessId || createMeetingAccessId(),
+      };
+      const inserted = await query(
+        `INSERT INTO room_meetings
+          (title,description,host_id,co_host_id,host_name,host_avatar,start_time,duration,meeting_link,is_active,settings,participant_count,status,started_at,ended_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10::jsonb,1,'live',$7,NULL) RETURNING *`,
+        [
+          source.title,
+          source.description,
+          source.host_id,
+          source.co_host_id || null,
+          source.host_name,
+          source.host_avatar,
+          now.toISOString(),
+          source.duration,
+          createMeetingLink(),
+          JSON.stringify(nextSettings),
+        ],
+      );
+      const meeting = mapMeeting(inserted.rows[0]);
+
+      const previousMembers = await query(
+        `SELECT user_id,role FROM room_meeting_members
+          WHERE meeting_id=$1 AND status<>'removed'
+          ORDER BY CASE role WHEN 'host' THEN 0 WHEN 'cohost' THEN 1 ELSE 2 END,user_id`,
+        [source.id],
+      );
+      const copied = new Set<number>();
+      for (const row of previousMembers.rows) {
+        const userId = Number(row.user_id);
+        if (!userId || copied.has(userId)) continue;
+        copied.add(userId);
+        const role = userId === source.host_id ? 'host' : userId === Number(source.co_host_id || 0) ? 'cohost' : 'participant';
+        await query(
+          `INSERT INTO room_meeting_members (meeting_id,user_id,role,status,joined_at,left_at,updated_at)
+           VALUES ($1,$2,$3,'accepted',NULL,NULL,now())
+           ON CONFLICT (meeting_id,user_id) DO UPDATE SET role=excluded.role,status='accepted',left_at=NULL,updated_at=now()`,
+          [meeting.id, userId, role],
+        );
+      }
+      if (!copied.has(source.host_id)) {
+        await query(`INSERT INTO room_meeting_members (meeting_id,user_id,role,status) VALUES ($1,$2,'host','accepted') ON CONFLICT DO NOTHING`, [meeting.id, source.host_id]);
+      }
+      if (source.co_host_id && !copied.has(source.co_host_id)) {
+        await query(`INSERT INTO room_meeting_members (meeting_id,user_id,role,status) VALUES ($1,$2,'cohost','accepted') ON CONFLICT DO NOTHING`, [meeting.id, source.co_host_id]);
+      }
+
+      const value = { ...meeting, settings: sanitizeMeetingSettings(meeting.settings) };
+      io.to('admins').emit('meeting:created', value);
+      io.to(`meeting:${source.id}`).emit('meeting:restarted', { sourceMeetingId: source.id, meeting: value });
+      response.status(201).json({ success: true, sourceMeetingId: source.id, meeting: value });
     } catch (error) { next(error); }
   });
 
