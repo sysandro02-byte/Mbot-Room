@@ -167,11 +167,26 @@ try {
       address: 'Brazzaville, Congo',
       bio: 'Profil utilisé pour valider MBotéRoom.',
       profileVisible: true,
+      personalMeetingId: '9876543210',
     }),
   });
   assert.equal(updateProfile.response.status, 200, JSON.stringify(updateProfile.data));
   assert.equal(updateProfile.data.user?.bio, 'Profil utilisé pour valider MBotéRoom.');
   assert.equal(updateProfile.data.user?.profileVisible, true);
+  assert.equal(updateProfile.data.user?.personalMeetingId, '9876543210');
+
+  const personalMeeting = await jsonRequest('/api/meetings', {
+    method: 'POST',
+    headers: authHeaders(verified.data.token),
+    body: JSON.stringify({
+      title: 'Réunion avec ID personnel',
+      startTime: new Date(Date.now() + 90 * 60_000).toISOString(),
+      duration: 30,
+      settings: { waitingRoom: true, chat: true },
+    }),
+  });
+  assert.equal(personalMeeting.response.status, 201, JSON.stringify(personalMeeting.data));
+  assert.equal(personalMeeting.data.settings?.meetingAccessId, '9876543210');
 
   const updatePreferences = await jsonRequest('/api/preferences', {
     method: 'PUT',
