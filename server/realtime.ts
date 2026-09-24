@@ -26,6 +26,13 @@ const meetings = new Map<number, Map<string, LiveParticipant>>();
 const cleanMedia = (value: any): MediaState => ({ audio: Boolean(value?.audio), video: Boolean(value?.video), screen: Boolean(value?.screen) });
 const fail = (code: string, error: string) => ({ ok: false, code, error });
 
+const warnPersistenceFailure = (operation: string, error: unknown) => {
+  console.warn('[MBotéRoom realtime] persistence failed', {
+    operation,
+    reason: error instanceof Error ? error.message.slice(0, 240) : String(error).slice(0, 240),
+  });
+};
+
 const participantForSocket = (meetingId: number, socketId: string) => meetings.get(meetingId)?.get(socketId) || null;
 const mediaRoomName = (meetingId: number, breakoutRoomId: string | null) =>
   breakoutRoomId ? `meeting:${meetingId}:breakout:${breakoutRoomId}` : `meeting:${meetingId}:main`;
@@ -40,7 +47,8 @@ const removeSocketFromMeeting = async (io: Server, socket: Socket) => {
     io.to(mediaRoomName(meetingId, participant.breakoutRoomId)).emit('meeting:participant-left', { socketId: socket.id, userId: participant.userId });
     const otherDeviceOnline = [...(participants?.values() || [])].some((item) => item.userId === participant.userId);
     if (!otherDeviceOnline) {
-      await query(`UPDATE room_meeting_members SET left_at=now(),updated_at=now() WHERE meeting_id=$1 AND user_id=$2`, [meetingId, participant.userId]).catch(() => undefined);
+      await query(`UPDATE room_meeting_members SET left_at=now(),updated_at=now() WHERE meeting_id=$1 AND user_id=$2`, [meetingId, participant.userId])
+        .catch((error) => warnPersistenceFailure('participant-left', error));
     }
   }
   if (participants && participants.size === 0) meetings.delete(meetingId);
@@ -127,15 +135,21 @@ export const registerRealtime = (io: Server) => {
         };
         const roomParticipants = meetings.get(meetingId) || new Map<string, LiveParticipant>();
         const existing = [...roomParticipants.values()].filter((item) => item.breakoutRoomId === breakoutRoomId);
+        await query(
+          `UPDATE room_meeting_members
+              SET status='accepted',joined_at=COALESCE(joined_at,now()),left_at=NULL,updated_at=now()
+            WHERE meeting_id=$1 AND user_id=$2`,
+          [meetingId, user.id],
+        );
         socket.data.meetingId = meetingId;
         socket.join(`meeting:${meetingId}`);
         socket.join(mediaRoomName(meetingId, breakoutRoomId));
         if (moderator) socket.join(`meeting:${meetingId}:moderators`);
         roomParticipants.set(socket.id, participant);
         meetings.set(meetingId, roomParticipants);
-        await query(`UPDATE room_meeting_members SET status='accepted',joined_at=COALESCE(joined_at,now()),left_at=NULL,updated_at=now() WHERE meeting_id=$1 AND user_id=$2`, [meetingId, user.id]).catch(() => undefined);
         const count = new Set([...roomParticipants.values()].map((item) => item.userId)).size;
-        await query('UPDATE room_meetings SET participant_count=GREATEST(participant_count,$2),updated_at=now() WHERE id=$1', [meetingId, count]).catch(() => undefined);
+        await query('UPDATE room_meetings SET participant_count=GREATEST(participant_count,$2),updated_at=now() WHERE id=$1', [meetingId, count])
+          .catch((error) => warnPersistenceFailure('participant-count', error));
         callback?.({ ok: true, participants: existing });
         socket.to(mediaRoomName(meetingId, breakoutRoomId)).emit('meeting:participant-joined', participant);
         io.to(`meeting:${meetingId}`).emit('meeting:presence', { meetingId, count, participants: [...roomParticipants.values()] });
@@ -170,7 +184,7 @@ export const registerRealtime = (io: Server) => {
                   updated_at=now()
             WHERE meeting_id=$1 AND user_id=$2`,
           [meetingId, user.id, participant.media.audio, participant.media.video],
-        ).catch(() => undefined);
+        ).catch((error) => warnPersistenceFailure('participant-media', error));
       }
       socket.to(mediaRoomName(meetingId, participant.breakoutRoomId)).emit('meeting:participant-media-updated', participant);
       callback?.({ ok: true, media: participant.media });
