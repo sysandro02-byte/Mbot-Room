@@ -1499,7 +1499,61 @@ export default function MeetingRoomV2() {
 
       <section className="room-v2-body">
         <div className={`room-v2-stage ${speakerViewEnabled ? 'speaker-mode' : ''}`}>
-          {speakerViewEnabled && featuredParticipant ? (
+          {screenShareActive ? (
+            <div className="room-v2-screen-layout" data-testid="screen-share-layout">
+              <section className="room-v2-screen-card">
+                <header>
+                  <span><MonitorUp/> Écran partagé</span>
+                  <strong>{screenPresenterName} partage son écran</strong>
+                </header>
+                <div className="room-v2-screen-canvas">
+                  <VideoTile
+                    name={screenPresenterName}
+                    stream={screenSharing ? localStream : remoteScreenParticipant?.stream || null}
+                    avatar={screenSharing ? currentUser?.avatar : remoteScreenParticipant?.avatar}
+                    muted={screenSharing ? !mediaState.audio : !remoteScreenParticipant?.media.audio}
+                    videoEnabled
+                    screen
+                    local={screenSharing}
+                    audioOutputId={selectedAudioOutputId}
+                    activeSpeaker={!screenSharing && activeSpeakerSocketId === remoteScreenParticipant?.socketId}
+                    pinned={!screenSharing && pinnedSocketId === remoteScreenParticipant?.socketId}
+                    reaction={!screenSharing && remoteScreenParticipant ? reactions[Number(remoteScreenParticipant.userId)] : undefined}
+                    onPin={!screenSharing && remoteScreenParticipant ? () => setPinnedSocketId((current) => current === remoteScreenParticipant.socketId ? null : remoteScreenParticipant.socketId) : undefined}
+                  />
+                  {screenSharing && cameraEnabled ? <div className="room-v2-presenter-pip">
+                    <VideoTile name={localName} stream={cameraStreamRef.current} avatar={currentUser?.avatar} muted={!micEnabled} videoEnabled={cameraEnabled} local badge={isHost?'Hôte':isCoHost?'Co-hôte':undefined}/>
+                  </div> : null}
+                </div>
+                <footer>
+                  <span><Radio size={15}/> Partage en cours</span>
+                  <strong>{screenPresenterName}</strong>
+                  {screenSharing ? <button type="button" onClick={() => void toggleScreenShare()}><Square/> Arrêter le partage</button> : null}
+                </footer>
+              </section>
+              <div className="room-v2-screen-strip">
+                {screenSharing ? null : <VideoTile name={localName} stream={localStream} avatar={currentUser?.avatar} muted={!mediaState.audio} videoEnabled={mediaState.video} local badge={isHost?'Hôte':isCoHost?'Co-hôte':currentUser?.isGuest?'Invité':'Participant'}/>}
+                {remoteParticipants.filter((participant) => participant.socketId !== remoteScreenParticipant?.socketId).map((participant) => (
+                  <VideoTile
+                    key={participant.socketId}
+                    name={participant.name}
+                    stream={participant.stream}
+                    avatar={participant.avatar}
+                    muted={!participant.media.audio}
+                    videoEnabled={participant.media.video}
+                    badge={activeMembers.find((member) => member.userId === Number(participant.userId))?.role === 'cohost' ? 'Co-hôte' : undefined}
+                    audioOutputId={selectedAudioOutputId}
+                    activeSpeaker={activeSpeakerSocketId === participant.socketId}
+                    pinned={pinnedSocketId === participant.socketId}
+                    handRaised={raisedHands.has(Number(participant.userId))}
+                    reaction={reactions[Number(participant.userId)]}
+                    onPin={() => setPinnedSocketId((current) => current === participant.socketId ? null : participant.socketId)}
+                  />
+                ))}
+                <button type="button" className="room-v2-invite-tile" onClick={() => void inviteParticipants()}><UsersRound/><span>Inviter des participants</span></button>
+              </div>
+            </div>
+          ) : speakerViewEnabled && featuredParticipant ? (
             <div className="room-v2-speaker-layout" data-testid="speaker-layout">
               <div className="room-v2-speaker-main">
                 <VideoTile
