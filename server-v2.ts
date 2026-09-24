@@ -149,7 +149,7 @@ app.use('/api/meetings', rateLimit(240, 60_000));
 app.use('/api/ai', rateLimit(30, 60_000));
 app.use('/api', rateLimit(600, 60_000));
 
-registerAuthRoutes(app);
+registerAuthRoutes(app, io);
 registerMeetingRoutes(app, io);
 registerAdminRoutes(app, io);
 registerAppRoutes(app, io);
