@@ -63,6 +63,7 @@ type SettingsCardProps = {
   children: ReactNode;
   className?: string;
   badge?: string;
+  id?: string;
 };
 
 type SettingRowProps = {
@@ -87,8 +88,8 @@ const formatBytes = (value: number) => {
   return `${amount >= 10 || index < 2 ? Math.round(amount) : amount.toFixed(1)} ${units[index]}`;
 };
 
-function SettingsCard({ title, subtitle, icon, children, className = '', badge }: SettingsCardProps) {
-  return <section className={`settings-panel ${className}`.trim()}>
+function SettingsCard({ title, subtitle, icon, children, className = '', badge, id }: SettingsCardProps) {
+  return <section id={id} className={`settings-panel ${className}`.trim()}>
     <header className="settings-panel-head">
       <span>{icon}</span>
       <div><h2>{title}</h2><p>{subtitle}</p></div>
@@ -153,6 +154,15 @@ export default function SettingsWorkspace({
       setStorageUsage(typeof estimate.usage === 'number' ? estimate.usage : null);
       setStorageQuota(typeof estimate.quota === 'number' ? estimate.quota : null);
     }).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    const target = window.location.hash.replace('#', '').trim();
+    if (!target) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+    return () => window.clearTimeout(timer);
   }, []);
   useEffect(() => {
     void appDataService.getConnectedSessions().then(setSessions).catch(() => undefined);
@@ -320,7 +330,7 @@ export default function SettingsWorkspace({
           </div>
         </SettingsCard>
 
-        <SettingsCard title="Stockage & données" subtitle="Gérez l’espace et la consommation" icon={<Database/>}>
+        <SettingsCard id="storage-data" title="Stockage & données" subtitle="Gérez l’espace et la consommation" icon={<Database/>}>
           <SettingRow icon={<HardDrive/>} label="Utilisation du stockage" value={storageLabel}/>
           <SettingRow icon={<Trash2/>} label="Nettoyer le cache" description="Supprimer les fichiers temporaires MBotéRoom" onClick={() => void clearMboteCache()} disabled={storageBusy}/>
           <SettingRow icon={<Save/>} label="Sauvegarde locale" description="Exporter vos préférences sur cet appareil" onClick={backupPreferences}/>
@@ -329,7 +339,7 @@ export default function SettingsWorkspace({
           </SettingRow>
         </SettingsCard>
 
-        <SettingsCard title="Localiser mon appareil" subtitle="Retrouvez et sécurisez vos appareils" icon={<MapPin/>} badge="Premium">
+        <SettingsCard id="premium" title="Localiser mon appareil" subtitle="Retrouvez et sécurisez vos appareils" icon={<MapPin/>} badge="Premium">
           <SettingRow icon={<MapPin/>} label="Retrouver mes appareils" description="Voir la dernière activité de vos sessions MBotéRoom" value="Premium" onClick={() => void loadSessions('sessions')}/>
         </SettingsCard>
       </div>
