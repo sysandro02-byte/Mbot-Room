@@ -206,27 +206,44 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
     try {
       const search = normalizeText(request.query.q).toLowerCase().slice(0,120);
       const term = search ? `%${search}%` : '%';
+      const limit = Math.max(1, Math.min(5000, Number(request.query.limit || 1000)));
+      const offset = Math.max(0, Number(request.query.offset || 0));
       const result = await query(
-        `SELECT id,name,username,email,phone_number,organization,job_title,role,is_guest,is_suspended,created_at
+        `SELECT id,name,username,email,phone_number,organization,job_title,country,city,birth_date,role,is_guest,is_suspended,
+                COALESCE(account_status,'active') AS account_status,
+                COALESCE(feature_restrictions,'[]'::jsonb) AS feature_restrictions,
+                created_at
            FROM room_users
-          WHERE (lower(name) LIKE $1 OR lower(email) LIKE $1 OR lower(username) LIKE $1)
+          WHERE (lower(name) LIKE $1 OR lower(email) LIKE $1 OR lower(username) LIKE $1
+                 OR lower(COALESCE(organization,'')) LIKE $1 OR lower(COALESCE(country,'')) LIKE $1 OR lower(COALESCE(city,'')) LIKE $1)
           ORDER BY is_guest ASC, created_at::timestamptz DESC
-          LIMIT 250`,
-        [term],
+          LIMIT $2 OFFSET $3`,
+        [term, limit, offset],
       );
-      response.json(result.rows.map((row)=>({
-        id:Number(row.id),
-        name:String(row.name||''),
-        username:String(row.username||''),
-        email:String(row.email||''),
-        phoneNumber:String(row.phone_number||''),
-        organization:String(row.organization||''),
-        jobTitle:String(row.job_title||''),
-        role:String(row.role||'user'),
-        isGuest:Boolean(row.is_guest),
-        isSuspended:Boolean(row.is_suspended),
-        createdAt:new Date(row.created_at).toISOString(),
-      })));
+      response.json(result.rows.map((row)=>{
+        const birthDate=String(row.birth_date||'');
+        const birthTime=birthDate?new Date(birthDate+'T00:00:00Z').getTime():NaN;
+        const age=Number.isFinite(birthTime)?Math.max(0,Math.floor((Date.now()-birthTime)/31557600000)):null;
+        return {
+          id:Number(row.id),
+          name:String(row.name||''),
+          username:String(row.username||''),
+          email:String(row.email||''),
+          phoneNumber:String(row.phone_number||''),
+          organization:String(row.organization||''),
+          jobTitle:String(row.job_title||''),
+          country:String(row.country||''),
+          city:String(row.city||''),
+          birthDate,
+          age,
+          role:String(row.role||'user'),
+          isGuest:Boolean(row.is_guest),
+          isSuspended:Boolean(row.is_suspended),
+          accountStatus:['active','quarantined','banned'].includes(String(row.account_status))?String(row.account_status):'active',
+          featureRestrictions:Array.isArray(row.feature_restrictions)?row.feature_restrictions.filter((item:unknown)=>typeof item==='string'):[],
+          createdAt:new Date(row.created_at).toISOString(),
+        };
+      }));
     } catch (error) { next(error); }
   });
 
@@ -237,38 +254,61 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
       const current = await query('SELECT * FROM room_users WHERE id=$1 LIMIT 1',[userId]);
       const row = current.rows[0];
       if (!row) return sendApiError(response,404,'USER_NOT_FOUND','Utilisateur introuvable.');
+
       const requestedSuspended = typeof request.body?.isSuspended === 'boolean' ? request.body.isSuspended : Boolean(row.is_suspended);
-      if (userId === request.user!.id && requestedSuspended) {
-        return sendApiError(response,400,'ADMIN_SELF_SUSPEND_FORBIDDEN','Vous ne pouvez pas suspendre votre propre compte.');
+      const requestedStatus = ['active','quarantined','banned'].includes(String(request.body?.accountStatus))
+        ? String(request.body.accountStatus)
+        : (['active','quarantined','banned'].includes(String(row.account_status)) ? String(row.account_status) : 'active');
+      if (userId === request.user!.id && (requestedSuspended || requestedStatus !== 'active')) {
+        return sendApiError(response,400,'ADMIN_SELF_RESTRICT_FORBIDDEN','Vous ne pouvez pas suspendre, mettre en quarantaine ou bannir votre propre compte.');
       }
+
+      const allowedRestrictions = new Set(['meetings','messages','groups','files','recording','luna','screenShare']);
+      const requestedRestrictions = Array.isArray(request.body?.featureRestrictions)
+        ? [...new Set(request.body.featureRestrictions.map((value:unknown)=>String(value)).filter((value:string)=>allowedRestrictions.has(value)))]
+        : (Array.isArray(row.feature_restrictions) ? row.feature_restrictions : []);
+
       const name = normalizeText(request.body?.name ?? row.name).slice(0,120) || String(row.name);
       const organization = normalizeText(request.body?.organization ?? row.organization).slice(0,120);
       const jobTitle = normalizeText(request.body?.jobTitle ?? row.job_title).slice(0,120);
       const phoneNumber = normalizeText(request.body?.phoneNumber ?? row.phone_number).slice(0,40);
+      const country = normalizeText(request.body?.country ?? row.country).slice(0,120);
+      const city = normalizeText(request.body?.city ?? row.city).slice(0,120);
       const updated = await query(
         `UPDATE room_users
-            SET name=$2,organization=$3,job_title=$4,phone_number=$5,is_suspended=$6
+            SET name=$2,organization=$3,job_title=$4,phone_number=$5,is_suspended=$6,
+                country=$7,city=$8,account_status=$9,feature_restrictions=$10::jsonb
           WHERE id=$1
-          RETURNING id,name,username,email,phone_number,organization,job_title,role,is_guest,is_suspended,created_at`,
-        [userId,name,organization,jobTitle,phoneNumber,requestedSuspended],
+          RETURNING id,name,username,email,phone_number,organization,job_title,country,city,birth_date,role,is_guest,is_suspended,
+                    account_status,feature_restrictions,created_at`,
+        [userId,name,organization,jobTitle,phoneNumber,requestedSuspended,country,city,requestedStatus,JSON.stringify(requestedRestrictions)],
       );
-      if (requestedSuspended) {
+      if (requestedSuspended || requestedStatus === 'banned') {
         await query('DELETE FROM room_sessions WHERE user_id=$1',[userId]);
         io.in(`user:${userId}`).disconnectSockets(true);
       }
-      io.emit('admin:user-updated',{userId,isSuspended:requestedSuspended});
+      io.emit('admin:user-updated',{userId,isSuspended:requestedSuspended,accountStatus:requestedStatus,featureRestrictions:requestedRestrictions});
+      const resultRow=updated.rows[0];
+      const birthDate=String(resultRow.birth_date||'');
+      const birthTime=birthDate?new Date(birthDate+'T00:00:00Z').getTime():NaN;
       response.json({
-        id:Number(updated.rows[0].id),
-        name:String(updated.rows[0].name||''),
-        username:String(updated.rows[0].username||''),
-        email:String(updated.rows[0].email||''),
-        phoneNumber:String(updated.rows[0].phone_number||''),
-        organization:String(updated.rows[0].organization||''),
-        jobTitle:String(updated.rows[0].job_title||''),
-        role:String(updated.rows[0].role||'user'),
-        isGuest:Boolean(updated.rows[0].is_guest),
-        isSuspended:Boolean(updated.rows[0].is_suspended),
-        createdAt:new Date(updated.rows[0].created_at).toISOString(),
+        id:Number(resultRow.id),
+        name:String(resultRow.name||''),
+        username:String(resultRow.username||''),
+        email:String(resultRow.email||''),
+        phoneNumber:String(resultRow.phone_number||''),
+        organization:String(resultRow.organization||''),
+        jobTitle:String(resultRow.job_title||''),
+        country:String(resultRow.country||''),
+        city:String(resultRow.city||''),
+        birthDate,
+        age:Number.isFinite(birthTime)?Math.max(0,Math.floor((Date.now()-birthTime)/31557600000)):null,
+        role:String(resultRow.role||'user'),
+        isGuest:Boolean(resultRow.is_guest),
+        isSuspended:Boolean(resultRow.is_suspended),
+        accountStatus:String(resultRow.account_status||'active'),
+        featureRestrictions:Array.isArray(resultRow.feature_restrictions)?resultRow.feature_restrictions:[],
+        createdAt:new Date(resultRow.created_at).toISOString(),
       });
     } catch (error) { next(error); }
   });
