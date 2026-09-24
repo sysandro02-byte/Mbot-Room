@@ -53,10 +53,40 @@ export type AdminManagedUser = {
   phoneNumber: string;
   organization: string;
   jobTitle: string;
+  country: string;
+  city: string;
+  birthDate: string;
+  age: number|null;
   role: 'admin'|'user'|'guest';
   isGuest: boolean;
   isSuspended: boolean;
+  accountStatus: 'active'|'quarantined'|'banned';
+  featureRestrictions: string[];
   createdAt: string;
+};
+
+export type AdminLegalDocument = {
+  key: string;
+  title: string;
+  body: string;
+  version: string;
+  updatedAt: string;
+};
+
+export type AdminReport = {
+  id: string;
+  reporterUserId: number|null;
+  reporterName: string;
+  reporterEmail: string;
+  type: 'bug'|'meeting';
+  meetingId: number|null;
+  meetingTitle: string;
+  title: string;
+  description: string;
+  pageUrl: string;
+  status: 'open'|'reviewing'|'resolved'|'dismissed';
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type AdminDashboardStat = {
@@ -158,13 +188,14 @@ export const adminDashboardService = {
   },
 
   async getUsers(query = ''): Promise<AdminManagedUser[]> {
-    const response = await apiFetch(apiUrl(`/api/admin/users?q=${encodeURIComponent(query)}`), {
+    const response = await apiFetch(apiUrl(`/api/admin/users?q=${encodeURIComponent(query)}&limit=5000`), {
       headers: getAuthHeaders(),
+      cache: 'no-store',
     });
     return readJson<AdminManagedUser[]>(response);
   },
 
-  async updateUser(userId: number, payload: Partial<Pick<AdminManagedUser,'name'|'phoneNumber'|'organization'|'jobTitle'|'isSuspended'>>): Promise<AdminManagedUser> {
+  async updateUser(userId: number, payload: Partial<Pick<AdminManagedUser,'name'|'phoneNumber'|'organization'|'jobTitle'|'country'|'city'|'isSuspended'|'accountStatus'|'featureRestrictions'>>): Promise<AdminManagedUser> {
     const response = await apiFetch(apiUrl(`/api/admin/users/${userId}`), {
       method: 'PUT',
       headers: getAuthHeaders(),
@@ -178,6 +209,35 @@ export const adminDashboardService = {
       method: 'POST', headers: getAuthHeaders(),
     });
     await readJson<{ success: boolean }>(response);
+  },
+
+  async getTerms(): Promise<AdminLegalDocument> {
+    const response=await apiFetch(apiUrl('/api/admin/legal/terms'),{headers:getAuthHeaders(),cache:'no-store'});
+    return readJson<AdminLegalDocument>(response);
+  },
+
+  async updateTerms(payload:{title:string;body:string}): Promise<AdminLegalDocument> {
+    const response=await apiFetch(apiUrl('/api/admin/legal/terms'),{
+      method:'PUT',
+      headers:{...getAuthHeaders(),'Content-Type':'application/json'},
+      body:JSON.stringify(payload),
+    });
+    return readJson<AdminLegalDocument>(response);
+  },
+
+  async getReports(status=''): Promise<AdminReport[]> {
+    const suffix=status?`?status=${encodeURIComponent(status)}`:'';
+    const response=await apiFetch(apiUrl('/api/admin/reports'+suffix),{headers:getAuthHeaders(),cache:'no-store'});
+    return readJson<AdminReport[]>(response);
+  },
+
+  async updateReport(reportId:string,status:AdminReport['status']): Promise<AdminReport> {
+    const response=await apiFetch(apiUrl(`/api/admin/reports/${encodeURIComponent(reportId)}`),{
+      method:'PUT',
+      headers:{...getAuthHeaders(),'Content-Type':'application/json'},
+      body:JSON.stringify({status}),
+    });
+    return readJson<AdminReport>(response);
   },
 
   async getDashboard(period: string): Promise<AdminDashboardPayload> {
