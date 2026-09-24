@@ -5,7 +5,10 @@ import {
   adminPermissions,
   authenticateToken,
   createId,
+  createToken,
+  hashToken,
   mapMeeting,
+  normalizeEmail,
   normalizeText,
   publicMeeting,
   query,
@@ -126,6 +129,76 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
       });
       io.emit('admin:settings-updated', settings);
       response.json(settings);
+    } catch (error) { next(error); }
+  });
+
+  app.get('/api/admin/admin-invites', ...adminApi, async (_request: AuthedRequest, response, next) => {
+    try {
+      await query("DELETE FROM room_admin_invites WHERE consumed_at IS NULL AND expires_at<=now()-interval '7 days'");
+      const result = await query(
+        `SELECT id,email,expires_at,consumed_at,created_at
+           FROM room_admin_invites
+          ORDER BY created_at DESC
+          LIMIT 100`,
+      );
+      response.json(result.rows.map((row) => ({
+        id: String(row.id),
+        email: String(row.email || ''),
+        expiresAt: new Date(row.expires_at).toISOString(),
+        consumedAt: row.consumed_at ? new Date(row.consumed_at).toISOString() : null,
+        createdAt: new Date(row.created_at).toISOString(),
+      })));
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/admin/admin-invites', ...adminApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const email = normalizeEmail(request.body?.email);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return sendApiError(response,400,'ADMIN_INVITE_EMAIL_INVALID','Saisissez une adresse e-mail valide.');
+      }
+      const existing = await query('SELECT id,role FROM room_users WHERE lower(email)=lower($1) LIMIT 1',[email]);
+      if (existing.rows[0]?.role === 'admin') {
+        return sendApiError(response,409,'ADMIN_ALREADY_EXISTS','Cette adresse appartient déjà à un compte administrateur.');
+      }
+      const token = createToken();
+      const id = createId();
+      await query(
+        `UPDATE room_admin_invites
+            SET consumed_at=COALESCE(consumed_at,now())
+          WHERE lower(email)=lower($1) AND consumed_at IS NULL`,
+        [email],
+      );
+      const result = await query(
+        `INSERT INTO room_admin_invites (id,email,token_hash,created_by,expires_at)
+         VALUES ($1,$2,$3,$4,now()+interval '24 hours')
+         RETURNING id,email,expires_at,consumed_at,created_at`,
+        [id,email,hashToken(token),request.user!.id],
+      );
+      const invitePath = '/admin/inscription?invite='+encodeURIComponent(token)+'&email='+encodeURIComponent(email);
+      io.to(`user:${request.user!.id}`).emit('admin:invite-created',{id,email,expiresAt:result.rows[0].expires_at});
+      response.status(201).json({
+        id:String(result.rows[0].id),
+        email:String(result.rows[0].email),
+        invitePath,
+        expiresAt:new Date(result.rows[0].expires_at).toISOString(),
+        consumedAt:null,
+        createdAt:new Date(result.rows[0].created_at).toISOString(),
+      });
+    } catch (error) { next(error); }
+  });
+
+  app.delete('/api/admin/admin-invites/:inviteId', ...adminApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const result = await query(
+        `UPDATE room_admin_invites
+            SET consumed_at=COALESCE(consumed_at,now())
+          WHERE id=$1
+          RETURNING id`,
+        [request.params.inviteId],
+      );
+      if (!result.rows[0]) return sendApiError(response,404,'ADMIN_INVITE_NOT_FOUND','Invitation introuvable.');
+      response.status(204).end();
     } catch (error) { next(error); }
   });
 
