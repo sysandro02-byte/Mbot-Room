@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, FileText, X } from 'lucide-react';
 import { legalService, type LegalDocument } from '../services/legalService';
 import './TermsConsent.css';
+import AppLoader from './AppLoader';
 
 type Props={
   accepted:boolean;
@@ -71,7 +72,7 @@ export default function TermsConsent({accepted,version,onAccepted,compact=false,
       <section className="terms-modal" role="dialog" aria-modal="true" aria-labelledby="terms-modal-title">
         <header><div><FileText size={22}/><div><h2 id="terms-modal-title">{document?.title||'Conditions d’utilisation'}</h2><small>{document?.version?'Version '+document.version:'Chargement…'}</small></div></div><button type="button" aria-label="Fermer" onClick={()=>setOpen(false)}><X size={19}/></button></header>
         <div className="terms-modal-body" ref={scrollRef} onScroll={onScroll}>
-          {loading?<p>Chargement des conditions…</p>:document?.body.split(/\n{2,}/).map((paragraph,index)=><p key={index}>{paragraph}</p>)}
+          {loading?<AppLoader label="Chargement des conditions…" compact />:document?.body.split(/\n{2,}/).map((paragraph,index)=><p key={index}>{paragraph}</p>)}
         </div>
         <div className="terms-modal-footer">
           <label className={!readToEnd?'is-disabled':''}><input type="checkbox" checked={checked} disabled={!readToEnd} onChange={(event)=>setChecked(event.target.checked)}/><span>J’ai lu ces conditions jusqu’à la fin et je les accepte.</span></label>
