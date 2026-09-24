@@ -1,28 +1,26 @@
-import { CalendarDays, ChevronRight, Clock3, MessageCircle, MonitorUp, Plus, Video } from 'lucide-react';
+import { ChevronRight, Crown, Database, MonitorUp, UsersRound, CalendarDays, Clock3, MessageCircle, Video } from 'lucide-react';
 
 type Props = {
-  onNewMeeting: () => void;
-  onJoin: () => void;
-  onPlan: () => void;
+  onPremium: () => void;
+  onCreateGroup: () => void;
+  onStorageData: () => void;
   onShareScreen: () => void;
-  onCalendar: () => void;
-  onMessages: () => void;
 };
 
-export function HomeQuickActions({ onNewMeeting, onJoin, onPlan, onShareScreen, onCalendar, onMessages }: Props) {
+export function HomeQuickActions({ onPremium, onCreateGroup, onStorageData, onShareScreen }: Props) {
   return (
     <>
       <section className="home-quick-actions home-quick-actions-desktop" aria-label="Actions rapides">
-        <button className="is-teal" type="button" onClick={onNewMeeting}><span><Video/></span><div><strong>Nouvelle réunion</strong><small>Démarrer maintenant</small></div><ChevronRight/></button>
-        <button className="is-blue" type="button" onClick={onJoin}><span><Plus/></span><div><strong>Rejoindre</strong><small>Avec un code ou un lien</small></div><ChevronRight/></button>
-        <button className="is-purple" type="button" onClick={onPlan}><span><CalendarDays/></span><div><strong>Planifier</strong><small>Programmer plus tard</small></div><ChevronRight/></button>
+        <button className="is-teal" type="button" onClick={onPremium}><span><Crown/></span><div><strong>Premium</strong><small>Découvrir les options Premium</small></div><ChevronRight/></button>
+        <button className="is-blue" type="button" onClick={onCreateGroup}><span><UsersRound/></span><div><strong>Créer un groupe</strong><small>Collaborer avec votre équipe</small></div><ChevronRight/></button>
+        <button className="is-purple" type="button" onClick={onStorageData}><span><Database/></span><div><strong>Stockage & données</strong><small>Gérer l’espace et les données</small></div><ChevronRight/></button>
         <button className="is-coral" type="button" onClick={onShareScreen}><span><MonitorUp/></span><div><strong>Partager un écran</strong><small>Présenter et collaborer</small></div><ChevronRight/></button>
       </section>
       <section className="home-quick-actions home-quick-actions-mobile" aria-label="Actions rapides">
-        <button className="is-teal" type="button" onClick={onNewMeeting}><span><Video/></span><div><strong>Nouvelle réunion</strong><small>Démarrer maintenant</small></div><ChevronRight/></button>
-        <button className="is-purple" type="button" onClick={onPlan}><span><CalendarDays/></span><div><strong>Planifier</strong><small>Programmer plus tard</small></div><ChevronRight/></button>
-        <button className="is-coral" type="button" onClick={onCalendar}><span><Clock3/></span><div><strong>Calendrier</strong><small>Voir mes réunions</small></div><ChevronRight/></button>
-        <button className="is-blue" type="button" onClick={onMessages}><span><MessageCircle/></span><div><strong>Messages</strong><small>Échanger avec mon équipe</small></div><ChevronRight/></button>
+        <button className="is-teal" type="button" onClick={onPremium}><span><Crown/></span><div><strong>Premium</strong><small>Options Premium</small></div><ChevronRight/></button>
+        <button className="is-blue" type="button" onClick={onCreateGroup}><span><UsersRound/></span><div><strong>Créer un groupe</strong><small>Votre équipe</small></div><ChevronRight/></button>
+        <button className="is-purple" type="button" onClick={onStorageData}><span><Database/></span><div><strong>Stockage & données</strong><small>Gérer vos données</small></div><ChevronRight/></button>
+        <button className="is-coral" type="button" onClick={onShareScreen}><span><MonitorUp/></span><div><strong>Partager l’écran</strong><small>Présenter</small></div><ChevronRight/></button>
       </section>
     </>
   );
