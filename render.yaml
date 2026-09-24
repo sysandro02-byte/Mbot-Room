@@ -133,7 +133,7 @@ services:
       - key: LIVEKIT_EGRESS_S3_FORCE_PATH_STYLE
         value: "true"
       - key: MBOTE_SUPABASE_RECORDING_SIGNER_URL
-        value: https://zipzrfyqkokfjuqbnszl.supabase.co/functions/v1/mboteroom-recording-storage
+        value: https://jyaqdzkkxvrxxrseqyhy.supabase.co/functions/v1/mboteroom-recording-storage
       - key: MBOTE_SUPABASE_RECORDING_BUCKET
         value: mboteroom-recordings
       - key: MBOTE_RECORDING_MAX_BYTES
