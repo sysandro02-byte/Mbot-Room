@@ -8,19 +8,30 @@ import {
 import { authService } from '../../services/authService';
 import './AdminControlCenter.css';
 
-const labels: Array<{key:keyof AdminPlatformSettings;title:string;description:string;danger?:boolean}>=[
+const generalLabels: Array<{key:keyof AdminPlatformSettings;title:string;description:string}>=[
   {key:'registrationEnabled',title:'Création de comptes',description:'Autoriser ou fermer les nouvelles inscriptions.'},
   {key:'guestAccessEnabled',title:'Accès sans compte',description:'Autoriser les invités à rejoindre une réunion.'},
   {key:'meetingCreationEnabled',title:'Création de réunions',description:'Autoriser les utilisateurs à créer de nouvelles réunions.'},
   {key:'publicMeetingsEnabled',title:'Réunions publiques',description:'Afficher ou masquer les réunions accessibles publiquement.'},
   {key:'lunaEnabled',title:'Luna',description:'Autoriser l’assistance Luna dans les réunions.'},
-  {key:'recordingEnabled',title:'Enregistrement',description:'Autoriser les utilisateurs à enregistrer une réunion.'},
+  {key:'recordingEnabled',title:'Enregistrement',description:'Autoriser les utilisateurs autorisés à enregistrer une réunion.'},
   {key:'premiumPaymentEnabled',title:'Paiement Premium',description:'Activer uniquement lorsque le système de paiement Premium est réellement raccordé.'},
+];
+
+const guestLabels: Array<{key:keyof AdminPlatformSettings;title:string;description:string}>=[
+  {key:'guestRaiseHandEnabled',title:'Invités · Lever la main',description:'Autoriser les invités sans compte à lever ou baisser la main.'},
+  {key:'guestRecordingEnabled',title:'Invités · Enregistrement',description:'Autoriser les invités sans compte à utiliser l’enregistrement lorsque la réunion le permet.'},
+  {key:'guestScreenShareEnabled',title:'Invités · Partage d’écran',description:'Autoriser les invités sans compte à partager leur écran.'},
+  {key:'guestLunaEnabled',title:'Invités · Luna IA',description:'Autoriser les invités sans compte à ouvrir et utiliser Luna IA.'},
+  {key:'guestTranscriptionEnabled',title:'Invités · Transcription',description:'Autoriser les invités sans compte à utiliser les sous-titres et la transcription.'},
+  {key:'guestChatEnabled',title:'Invités · Messages',description:'Autoriser les invités sans compte à envoyer des messages pendant la réunion.'},
 ];
 
 const emptySettings:AdminPlatformSettings={
   registrationEnabled:true,guestAccessEnabled:true,meetingCreationEnabled:true,
   lunaEnabled:true,recordingEnabled:true,publicMeetingsEnabled:true,premiumPaymentEnabled:false,
+  guestRaiseHandEnabled:false,guestRecordingEnabled:false,guestScreenShareEnabled:false,
+  guestLunaEnabled:false,guestTranscriptionEnabled:false,guestChatEnabled:false,
 };
 
 export default function AdminControlCenter(){
@@ -108,13 +119,25 @@ export default function AdminControlCenter(){
       {error&&<div className="admin-control-error" role="alert">{error}</div>}
       {message&&<div className="admin-control-message" role="status">{message}</div>}
       <div className="admin-control-grid">
-        {labels.map(item=><article key={item.key} className={settings[item.key]?'is-enabled':'is-disabled'}>
+        {generalLabels.map(item=><article key={item.key} className={settings[item.key]?'is-enabled':'is-disabled'}>
           <span>{settings[item.key]?<CheckCircle2 size={19}/>:<LockKeyhole size={19}/>}</span>
           <div><strong>{item.title}</strong><small>{item.description}</small></div>
           <button type="button" role="switch" aria-label={item.title} aria-checked={settings[item.key]} onClick={()=>void toggle(item.key)} disabled={busy}><i/></button>
         </article>)}
       </div>
-      <div className="admin-control-note"><ShieldCheck size={17}/><span>Ces réglages sont appliqués côté application et côté serveur : ils ne sont pas seulement visuels.</span></div>
+
+      <div className="admin-control-subsection">
+        <div><span className="admin-control-icon guest"><UsersRound size={18}/></span><div><h3>Droits des invités en réunion</h3><p>Par défaut, ces actions sont bloquées pour les personnes qui rejoignent MBotéRoom sans compte. Vous pouvez les autoriser individuellement.</p></div></div>
+        <span className="admin-control-default-badge">Par défaut : bloqués</span>
+      </div>
+      <div className="admin-control-grid admin-control-guest-grid">
+        {guestLabels.map(item=><article key={item.key} className={settings[item.key]?'is-enabled':'is-disabled'}>
+          <span>{settings[item.key]?<CheckCircle2 size={19}/>:<LockKeyhole size={19}/>}</span>
+          <div><strong>{item.title}</strong><small>{item.description}</small></div>
+          <button type="button" role="switch" aria-label={item.title} aria-checked={settings[item.key]} onClick={()=>void toggle(item.key)} disabled={busy}><i/></button>
+        </article>)}
+      </div>
+      <div className="admin-control-note"><ShieldCheck size={17}/><span>Ces réglages sont appliqués côté interface, API, temps réel et médias : masquer un bouton ne suffit pas à contourner la restriction.</span></div>
     </section>
 
     <section className="admin-users-card" id="admin-users">
