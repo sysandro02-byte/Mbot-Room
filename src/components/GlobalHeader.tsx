@@ -25,6 +25,7 @@ export default function GlobalHeader(){
   const [reportMessage,setReportMessage]=useState('');
   const profileRef=useRef<HTMLDivElement|null>(null);
   const authenticated=Boolean(user&&authService.isAuthenticated());
+  const guestMode=user?.isGuest===true;
   const isAdmin=user?.role==='admin';
 
   const initials=useMemo(()=>String(user?.name||user?.email||'MB').split(/\s+/).filter(Boolean).slice(0,2).map((part)=>part[0]?.toUpperCase()).join('')||'MB',[user]);
@@ -37,7 +38,7 @@ export default function GlobalHeader(){
   },[]);
 
   useEffect(()=>{
-    if(!authenticated){setUnread(0);return;}
+    if(!authenticated||guestMode){setUnread(0);return;}
     const refresh=()=>void notificationService.list().then((rows)=>setUnread(rows.filter((item)=>!item.readAt).length)).catch(()=>undefined);
     const onNotification=()=>refresh();
     const onRestrictionsUpdated=()=>void authService.refreshCurrentUser().then(()=>setUser(authService.getCurrentUser())).catch(()=>undefined);
@@ -51,7 +52,7 @@ export default function GlobalHeader(){
       socket.off('account:restrictions-updated',onRestrictionsUpdated);
       window.removeEventListener('focus',refresh);
     };
-  },[authenticated]);
+  },[authenticated,guestMode]);
 
   useEffect(()=>{
     const close=(event:MouseEvent)=>{if(profileRef.current&&!profileRef.current.contains(event.target as Node))setProfileOpen(false);};
@@ -106,7 +107,7 @@ export default function GlobalHeader(){
   return <>
     <header className="global-app-header">
       <div className="global-header-left">
-        {authenticated?<button className="global-header-menu" type="button" aria-label="Ouvrir ou fermer le menu" onClick={()=>window.dispatchEvent(new CustomEvent('mboteroom-toggle-sidebar'))}><Menu size={21}/></button>:null}
+        {authenticated&&!guestMode?<button className="global-header-menu" type="button" aria-label="Ouvrir ou fermer le menu" onClick={()=>window.dispatchEvent(new CustomEvent('mboteroom-toggle-sidebar'))}><Menu size={21}/></button>:null}
         <Link className="global-header-brand" to={authenticated?'/app':'/connexion'} aria-label="MBotéRoom">
           <img src="/icons/mboteroom-wordmark.png" alt="MBotéRoom"/>
         </Link>
@@ -123,14 +124,14 @@ export default function GlobalHeader(){
         {authenticated?<>
           <button type="button" className="global-header-action" onClick={()=>void openReport()} title="Signaler un problème"><Flag size={19}/><span>Signaler</span></button>
           <button type="button" className="global-header-icon" onClick={()=>navigate('/aide')} aria-label="Aide"><CircleHelp size={19}/></button>
-          <button type="button" className="global-header-icon" onClick={()=>navigate('/app/notifications')} aria-label="Notifications"><Bell size={19}/>{unread>0?<b>{Math.min(99,unread)}</b>:null}</button>
+          {!guestMode?<button type="button" className="global-header-icon" onClick={()=>navigate('/app/notifications')} aria-label="Notifications"><Bell size={19}/>{unread>0?<b>{Math.min(99,unread)}</b>:null}</button>:null}
           <div className="global-header-profile" ref={profileRef}>
             <button type="button" className="global-header-avatar" onClick={()=>setProfileOpen((value)=>!value)} aria-expanded={profileOpen}>
               <span>{user?.avatar?<img src={user.avatar} alt=""/>:<b>{initials}</b>}</span>
               <strong>{user?.name||'Utilisateur'}</strong>
             </button>
             {profileOpen?<div className="global-header-profile-menu">
-              <button type="button" onClick={()=>{setProfileOpen(false);navigate('/app/profile');}}><UserRound size={16}/> Mon profil</button>
+              {!guestMode?<button type="button" onClick={()=>{setProfileOpen(false);navigate('/app/profile');}}><UserRound size={16}/> Mon profil</button>:null}
               {isAdmin?<button type="button" onClick={()=>{setProfileOpen(false);navigate('/admin');}}><ShieldCheck size={16}/> Administration</button>:null}
               <button className="danger" type="button" onClick={()=>void authService.logout()}><LogOut size={16}/> Se déconnecter</button>
             </div>:null}
