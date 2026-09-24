@@ -594,3 +594,40 @@
 @media(max-width:420px){
   .room-v2-mode-tabs button{min-width:102px;height:34px;font-size:9px}
 }
+
+/* Participant actions menu in the desktop rail */
+.room-v2-rail-participants article{position:relative}
+.room-v2-rail-menu-wrap{position:relative;display:grid;place-items:center}
+.room-v2-rail-more:hover,.room-v2-rail-more[aria-expanded="true"]{background:#12324d;color:#10e0e8}
+.room-v2-rail-menu{
+  position:absolute;
+  z-index:125;
+  right:0;
+  top:32px;
+  width:210px;
+  max-height:300px;
+  overflow:auto;
+  padding:6px;
+  border:1px solid rgba(107,171,214,.25);
+  border-radius:11px;
+  background:#0a2037;
+  box-shadow:0 16px 38px rgba(0,0,0,.42);
+}
+.room-v2-rail-menu button{
+  width:100%;
+  min-height:34px;
+  display:flex;
+  align-items:center;
+  padding:0 10px;
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  color:#e7f2f8;
+  font-size:9.5px;
+  font-weight:750;
+  text-align:left;
+  cursor:pointer;
+}
+.room-v2-rail-menu button:hover{background:#12324d}
+.room-v2-rail-menu button.danger{color:#ff747a}
+.room-v2-rail-menu span{display:block;padding:9px 10px;color:#8197aa;font-size:9px}
