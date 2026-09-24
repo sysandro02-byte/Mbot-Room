@@ -87,7 +87,7 @@ export default function RealMeetingList(){
   const meetingPhase=(meeting:Meeting):'upcoming'|'live'|'ended'=> {
     const startAt=new Date(meeting.start_time).getTime();
     const cancelled=meeting.status==='cancelled';
-    const ended=meeting.status==='ended'||cancelled||(startAt+(meeting.duration||60)*60_000<Date.now()&&!meeting.is_active&&meeting.status!=='scheduled');
+    const ended=meeting.status==='ended'||cancelled||(startAt+(meeting.duration||60)*60_000<Date.now()&&!meeting.is_active);
     if(ended)return 'ended';
     if(meeting.is_active||meeting.status==='live')return 'live';
     return 'upcoming';
