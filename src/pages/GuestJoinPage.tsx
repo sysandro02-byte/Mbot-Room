@@ -279,6 +279,7 @@ export default function GuestJoinPage() {
               <TermsConsent
                 accepted={termsAccepted}
                 version={termsVersion}
+                autoOpen
                 onAccepted={(accepted,version)=>{setTermsAccepted(accepted);setTermsVersion(version);setErrors((current)=>({...current,global:undefined}));}}
               />
 
