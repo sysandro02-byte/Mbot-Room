@@ -157,6 +157,13 @@ const removeSocketFromMeeting = async (io: Server, socket: Socket) => {
       if (meetingHands && meetingHands.size === 0) raisedHands.delete(meetingId);
     }
   }
+  const remainingParticipants = participants ? [...participants.values()] : [];
+  const remainingCount = new Set(remainingParticipants.map((item) => item.userId)).size;
+  io.to(`meeting:${meetingId}`).emit('meeting:presence', {
+    meetingId,
+    count: remainingCount,
+    participants: remainingParticipants,
+  });
   if (participants && participants.size === 0) meetings.delete(meetingId);
   socket.leave(`meeting:${meetingId}`);
   if (participant) socket.leave(mediaRoomName(meetingId, participant.breakoutRoomId));
