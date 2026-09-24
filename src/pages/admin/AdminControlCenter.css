@@ -4,3 +4,193 @@
 .admin-control-subsection>div{display:flex;align-items:flex-start;gap:10px}.admin-control-subsection h3{margin:0;color:#173953;font-size:14px}.admin-control-subsection p{margin:4px 0 0;max-width:760px;color:#718397;font-size:10px;line-height:1.5}.admin-control-icon.guest{background:#e6f7f4;color:#078f8c}.admin-control-default-badge{flex:0 0 auto;padding:7px 10px;border-radius:999px;background:#fff0f1;color:#c74854;font-size:8px;font-weight:850}
 .admin-control-guest-grid article.is-disabled{border-color:#eadfe2;background:linear-gradient(145deg,#fff,#fffafa)}.admin-control-guest-grid article.is-enabled{border-color:#cfe9df;background:linear-gradient(145deg,#fff,#f5fbf8)}
 @media(max-width:720px){.admin-control-subsection{align-items:flex-start;flex-direction:column}.admin-control-default-badge{align-self:flex-start}}
+
+
+.admin-admin-invites-card{
+  margin-top:18px;
+  padding:18px;
+  border:1px solid #dce7eb;
+  border-radius:18px;
+  background:linear-gradient(180deg,#fff,#fbfefd);
+  box-shadow:0 10px 30px rgba(18,54,80,.045);
+}
+.admin-admin-invites-card>header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:14px;
+}
+.admin-admin-invites-card>header>div{
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+}
+.admin-admin-invites-card h2{
+  margin:0;
+  color:#173953;
+  font-size:17px;
+}
+.admin-admin-invites-card header p{
+  margin:4px 0 0;
+  color:#73869a;
+  font-size:10px;
+}
+.admin-admin-invites-card>header>strong{
+  flex:0 0 auto;
+  padding:7px 10px;
+  border-radius:999px;
+  background:#e8f7f4;
+  color:#078a86;
+  font-size:9px;
+}
+.admin-admin-invite-form{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:end;
+  gap:10px;
+  padding:13px;
+  border:1px solid #e2e9ed;
+  border-radius:13px;
+  background:#f8fbfc;
+}
+.admin-admin-invite-form label{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+  color:#526b81;
+  font-size:9px;
+  font-weight:800;
+}
+.admin-admin-invite-form input{
+  width:100%;
+  min-height:40px;
+  box-sizing:border-box;
+  padding:0 11px;
+  border:1px solid #d7e2e8;
+  border-radius:10px;
+  background:#fff;
+  color:#29465e;
+  outline:0;
+}
+.admin-admin-invite-form input:focus{
+  border-color:#07948f;
+  box-shadow:0 0 0 3px rgba(7,148,143,.08);
+}
+.admin-admin-invite-form button,
+.admin-admin-invite-created button,
+.admin-admin-invite-list button{
+  min-height:38px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  padding:0 11px;
+  border:1px solid #d8e3e8;
+  border-radius:10px;
+  background:#fff;
+  color:#48647a;
+  font-size:9px;
+  font-weight:850;
+  cursor:pointer;
+}
+.admin-admin-invite-form>button{
+  border:0;
+  background:linear-gradient(135deg,#078f8c,#0aa49d);
+  color:#fff;
+}
+.admin-admin-invite-form button:disabled,
+.admin-admin-invite-list button:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+}
+.admin-admin-invite-created{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-top:10px;
+  padding:11px 12px;
+  border:1px solid #cce9dd;
+  border-radius:12px;
+  background:#effaf5;
+}
+.admin-admin-invite-created strong,
+.admin-admin-invite-created small{
+  display:block;
+}
+.admin-admin-invite-created strong{
+  color:#197c55;
+  font-size:10px;
+}
+.admin-admin-invite-created small{
+  max-width:720px;
+  margin-top:3px;
+  overflow:hidden;
+  color:#5f7b70;
+  font-size:8px;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+.admin-admin-invite-list{
+  display:grid;
+  gap:7px;
+  margin-top:11px;
+}
+.admin-admin-invite-list article{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto auto;
+  align-items:center;
+  gap:8px;
+  padding:9px 10px;
+  border:1px solid #e4eaee;
+  border-radius:11px;
+  background:#fff;
+}
+.admin-admin-invite-list article.is-inactive{
+  opacity:.58;
+  background:#f7f9fa;
+}
+.admin-admin-invite-list strong,
+.admin-admin-invite-list small{
+  display:block;
+}
+.admin-admin-invite-list strong{
+  color:#2b4961;
+  font-size:9px;
+}
+.admin-admin-invite-list small{
+  margin-top:3px;
+  color:#8493a1;
+  font-size:8px;
+}
+.admin-admin-invite-list button.is-danger{
+  border-color:#f0d8db;
+  background:#fff5f6;
+  color:#c83b49;
+}
+@media(max-width:720px){
+  .admin-admin-invites-card>header{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+  .admin-admin-invite-form{
+    grid-template-columns:1fr;
+  }
+  .admin-admin-invite-form>button{
+    width:100%;
+  }
+  .admin-admin-invite-created{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+  .admin-admin-invite-created button{
+    width:100%;
+  }
+  .admin-admin-invite-list article{
+    grid-template-columns:1fr 1fr;
+  }
+  .admin-admin-invite-list article>div{
+    grid-column:1/-1;
+  }
+}
