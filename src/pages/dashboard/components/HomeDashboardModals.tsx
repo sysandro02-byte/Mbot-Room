@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Bot, Check, Cloud, Crown, Database, Download, FileVideo, Gauge, HardDrive,
-  Languages, LoaderCircle, LocateFixed, RefreshCw, ShieldCheck, Sparkles,
+  Languages, LocateFixed, RefreshCw, ShieldCheck, Sparkles,
   Star, Trash2, UsersRound, X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { appDataService, type Preferences, type RecordingStats } from '../../../services/appDataService';
 import { workspaceService, type WorkspaceFile } from '../../../services/workspaceService';
 import { showAppMessage } from '../../../lib/appMessage';
+import AppLoader from '../../../components/AppLoader';
 
 const formatBytes=(value:number)=>{
   if(!Number.isFinite(value)||value<=0)return '0 Mo';
@@ -182,7 +183,7 @@ export function StorageDataModal({open,onClose}:{open:boolean;onClose:()=>void})
         <button type="button" aria-label="Fermer" onClick={onClose}><X/></button>
       </header>
 
-      {loading?<div className="home-storage-loading"><LoaderCircle className="spin"/> Mise à jour des informations…</div>:<>
+      {loading?<AppLoader label="Mise à jour des informations…" />:<>
         <div className="home-storage-overview">
           <article>
             <span><HardDrive/></span>
