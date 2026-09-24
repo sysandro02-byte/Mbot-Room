@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { CalendarDays, CalendarPlus, CheckCircle2, CirclePlay, Clock3, Copy, CopyPlus, Database, ExternalLink, Link2, Lock, MoreVertical, Pencil, Play, Plus, RefreshCw, Search, Share2, Trash2, UserPlus, UsersRound, Video, X } from 'lucide-react';
+import { CalendarDays, CalendarPlus, CheckCircle2, ChevronRight, CirclePlay, Clock3, Copy, CopyPlus, Database, ExternalLink, Link2, Lock, MoreVertical, Pencil, Play, Plus, RefreshCw, Search, Share2, Trash2, UserPlus, UsersRound, Video, X } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../services/authService';
 import { appDataService, type Preferences, type RecordingStats } from '../services/appDataService';
@@ -29,6 +29,8 @@ const defaultForm=(preferences:Preferences=readCachedPreferences()):MeetingForm=
   };
 };
 const formatDate=(value:string)=>new Intl.DateTimeFormat(getAppLocale(),{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
+const formatTime=(value:Date)=>new Intl.DateTimeFormat(getAppLocale(),{hour:'2-digit',minute:'2-digit'}).format(value);
+const pad=(value:number)=>String(value).padStart(2,'0');
 
 export default function RealMeetingList(){
   const navigate=useNavigate();
