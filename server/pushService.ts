@@ -199,8 +199,15 @@ export const sendPushToUsers = async (userIds: number[], payload: PushPayload) =
         await query('DELETE FROM room_push_subscriptions WHERE id=$1', [row.id]);
       }
     } catch (error) {
+      const message=error instanceof Error?error.message:String(error);
+      if(message.includes('Invalid push subscription keys')){
+        stale += 1;
+        await query('DELETE FROM room_push_subscriptions WHERE id=$1',[row.id]).catch(()=>undefined);
+        console.warn('[MBotéRoom push] removed invalid subscription:', row.id);
+        continue;
+      }
       failed += 1;
-      console.warn('[MBotéRoom push] delivery failed:', error instanceof Error ? error.message : error);
+      console.warn('[MBotéRoom push] delivery failed:', message);
     }
   }
   return { sent, failed, stale };
@@ -218,7 +225,7 @@ export const createNotificationAndPush = async (
      RETURNING *`,
     [id, userId, payload.type, payload.title, payload.body, JSON.stringify(data)],
   );
-  await sendPushToUsers([userId], {
+  const pushDelivery=await sendPushToUsers([userId], {
     title: payload.title,
     body: payload.body,
     url: String(data.url || '/app/notifications'),
@@ -226,7 +233,10 @@ export const createNotificationAndPush = async (
     icon: payload.icon || '/icons/mbote-room-192.png',
     badge: payload.badge || '/icons/mbote-room-192.png',
     data,
-  }).catch(() => undefined);
+  }).catch((error)=>{
+    console.warn('[MBotéRoom push] delivery pipeline failed:',error instanceof Error?error.message:error);
+    return {sent:0,failed:1,stale:0};
+  });
 
   if (payload.type !== 'PUSH_TEST') {
     const recipient = await query(
@@ -255,5 +265,6 @@ export const createNotificationAndPush = async (
     ...row,
     createdAt: row?.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
     readAt: row?.read_at ? new Date(row.read_at).toISOString() : null,
+    pushDelivery,
   };
 };
