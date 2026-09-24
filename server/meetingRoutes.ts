@@ -1424,13 +1424,54 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
         [feedbackId,meeting.id,request.user!.id,rating,comment],
       );
       const row=result.rows[0];
-      io.to('admins').emit('meeting:feedback-submitted',{meetingId:meeting.id,userId:request.user!.id,rating});
+      const feedbackRecipient=String(process.env.MBOTE_ROOM_FEEDBACK_EMAIL||'contacts@loukatech.com').trim();
+      let emailSent=false;
+      if(feedbackRecipient){
+        const submittedAt=new Date(row.updated_at||row.created_at||Date.now()).toISOString();
+        emailSent=await sendTransactionalEmail({
+          to:feedbackRecipient,
+          subject:`Avis MBotéRoom · ${rating}/5 · ${meeting.title}`,
+          text:[
+            'Nouvel avis reçu après une réunion MBotéRoom.',
+            '',
+            `Réunion : ${meeting.title}`,
+            `ID de réunion : ${String(meeting.settings.meetingAccessId||meeting.id)}`,
+            `Participant : ${request.user!.name||request.user!.username||'Utilisateur'}`,
+            `E-mail participant : ${request.user!.email||'Non renseigné'}`,
+            `Note : ${rating}/5`,
+            `Commentaire : ${comment}`,
+            `Envoyé le : ${submittedAt}`,
+          ].join('\n'),
+          html:`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;background:#f4f8f8;font-family:Inter,Arial,sans-serif;color:#173653">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:28px 12px;background:#f4f8f8"><tr><td align="center">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#fff;border:1px solid #dfe9e9;border-radius:22px;overflow:hidden;box-shadow:0 16px 48px rgba(16,61,76,.08)">
+<tr><td style="padding:25px 30px;background:linear-gradient(135deg,#087f83,#09a09a);color:#fff"><div style="font-size:23px;font-weight:850">MBotéRoom</div><div style="margin-top:5px;font-size:13px;opacity:.88">Nouvel avis après réunion</div></td></tr>
+<tr><td style="padding:30px">
+<div style="font-size:12px;font-weight:850;color:#078d8e;text-transform:uppercase;letter-spacing:.08em">Satisfaction participant</div>
+<h1 style="margin:8px 0 20px;font-size:28px;color:#15344a">${rating}/5 ★</h1>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e1e9eb;border-radius:14px;background:#fafcfc;padding:10px 16px">
+<tr><td style="padding:7px 0;color:#728695;font-size:13px">Réunion</td><td align="right" style="padding:7px 0;font-weight:800;color:#24465c">${escapeHtml(meeting.title)}</td></tr>
+<tr><td style="padding:7px 0;color:#728695;font-size:13px">ID</td><td align="right" style="padding:7px 0;font-weight:800;color:#24465c">${escapeHtml(String(meeting.settings.meetingAccessId||meeting.id))}</td></tr>
+<tr><td style="padding:7px 0;color:#728695;font-size:13px">Participant</td><td align="right" style="padding:7px 0;font-weight:800;color:#24465c">${escapeHtml(request.user!.name||request.user!.username||'Utilisateur')}</td></tr>
+<tr><td style="padding:7px 0;color:#728695;font-size:13px">E-mail</td><td align="right" style="padding:7px 0;font-weight:800;color:#24465c">${escapeHtml(request.user!.email||'Non renseigné')}</td></tr>
+</table>
+<div style="margin-top:20px;padding:18px;border-radius:14px;background:#eef9f8;color:#2d5365;line-height:1.65"><strong style="display:block;margin-bottom:7px;color:#126f72">Commentaire</strong>${escapeHtml(comment)}</div>
+<p style="margin:18px 0 0;color:#82929d;font-size:12px">Envoyé le ${escapeHtml(submittedAt)}</p>
+</td></tr>
+<tr><td style="padding:17px 30px;border-top:1px solid #edf2f2;background:#fafcfc;color:#84949f;font-size:11px">Copie automatique des avis MBotéRoom · LoukaTech</td></tr>
+</table></td></tr></table></body></html>`,
+        }).catch(()=>false);
+        if(!emailSent)console.warn('[MBotéRoom feedback] feedback email delivery failed',{meetingId:meeting.id,userId:request.user!.id});
+      }
+      io.to('admins').emit('meeting:feedback-submitted',{meetingId:meeting.id,userId:request.user!.id,rating,emailSent});
       response.json({
         submitted:true,
         rating:Number(row.rating),
         comment:String(row.comment||''),
         createdAt:new Date(row.created_at).toISOString(),
         updatedAt:new Date(row.updated_at).toISOString(),
+        emailSent,
       });
     }catch(error){next(error);}
   });

@@ -76,6 +76,8 @@ services:
         value: contacts@loukatech.com
       - key: BREVO_SENDER_NAME
         value: MBotéRoom
+      - key: MBOTE_ROOM_FEEDBACK_EMAIL
+        value: contacts@loukatech.com
       - key: EMAIL_REPLY_TO
         value: nzotocare@gmail.com
       - key: RESEND_API_KEY
