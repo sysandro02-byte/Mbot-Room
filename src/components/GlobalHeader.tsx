@@ -137,8 +137,8 @@ export default function GlobalHeader(){
             </div>:null}
           </div>
         </>:<>
-          <Link className="global-header-login" to="/connexion"><LogIn size={16}/> Se connecter</Link>
-          <Link className="global-header-register" to="/inscription"><UserPlus size={16}/> Créer un compte</Link>
+          <Link className="global-header-login" to="/connexion" aria-label="Se connecter"><LogIn size={16}/><span>Se connecter</span></Link>
+          <Link className="global-header-register" to="/inscription" aria-label="Créer un compte"><UserPlus size={16}/><span>Créer un compte</span></Link>
         </>}
       </div>
     </header>
