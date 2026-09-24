@@ -1824,7 +1824,53 @@ export default function MeetingRoomV2() {
                   <div><strong>{member.name}{isSelf?' (vous)':''}</strong><small>{member.role==='host'?'Hôte':member.role==='cohost'?'Co-hôte':member.isGuest?'Invité':'Participant'}</small></div>
                   {raisedHands.has(member.userId)?<Hand className="room-v2-rail-hand"/>:null}
                   {remote?.media.audio || (isSelf&&mediaState.audio)?<Mic className="room-v2-rail-mic"/>:<MicOff className="room-v2-rail-muted"/>}
-                  {remote ? <button type="button" className="room-v2-rail-more" aria-label={`Mettre ${member.name} en avant`} onClick={()=>{setPinnedSocketId(remote.socketId);setViewMode('speaker');}}><MoreVertical/></button>:null}
+                  <div className="room-v2-rail-menu-wrap">
+                    <button
+                      type="button"
+                      className="room-v2-rail-more"
+                      aria-label={`Actions pour ${member.name}`}
+                      aria-expanded={menuUserId===member.userId}
+                      onClick={()=>setMenuUserId(menuUserId===member.userId?null:member.userId)}
+                    ><MoreVertical/></button>
+                    {menuUserId===member.userId?(
+                      <div className="room-v2-rail-menu" role="menu">
+                        {isSelf?(
+                          <>
+                            <button type="button" onClick={()=>{setMenuUserId(null);void toggleMic();}}>{micEnabled?'Couper mon micro':'Activer mon micro'}</button>
+                            {meeting.settings?.callType!=='audio'?<button type="button" onClick={()=>{setMenuUserId(null);void toggleCamera();}}>{cameraEnabled?'Couper ma caméra':'Activer ma caméra'}</button>:null}
+                            {guestRaiseHandAllowed?<button type="button" onClick={()=>{
+                              setMenuUserId(null);
+                              const raised=!handRaised;
+                              setHandRaised(raised);
+                              setRaisedHands((current)=>{const next=new Set(current);if(raised)next.add(Number(currentUser?.id||0));else next.delete(Number(currentUser?.id||0));return next;});
+                              socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised});
+                            }}>{handRaised?'Baisser la main':'Lever la main'}</button>:null}
+                            <button type="button" className="danger" onClick={()=>{setMenuUserId(null);void leaveMeeting(false);}}>Quitter la réunion</button>
+                          </>
+                        ):(
+                          <>
+                            {remote?<button type="button" onClick={()=>{setMenuUserId(null);setPinnedSocketId(remote.socketId);setViewMode('speaker');}}>Mettre en avant</button>:null}
+                            {isModerator&&member.role!=='host'&&(isHost||member.role!=='cohost')?(
+                              <>
+                                {remote?.media.audio
+                                  ? <button type="button" onClick={()=>void moderateParticipant(member.userId,'mute')}>Couper le micro</button>
+                                  : <button type="button" onClick={()=>void moderateParticipant(member.userId,'request-mic')}>Demander d’activer le micro</button>}
+                                {remote?.media.video
+                                  ? <button type="button" onClick={()=>void moderateParticipant(member.userId,'camera')}>Couper la caméra</button>
+                                  : <button type="button" onClick={()=>void moderateParticipant(member.userId,'request-camera')}>Demander d’activer la caméra</button>}
+                                {isHost&&member.role!=='cohost'?<button type="button" onClick={()=>void moderateParticipant(member.userId,'cohost')}>Nommer co-hôte</button>:null}
+                                {isHost&&member.role==='cohost'?<button type="button" onClick={()=>void moderateParticipant(member.userId,'participant')}>Retirer le rôle co-hôte</button>:null}
+                                <button type="button" onClick={()=>void moderateParticipant(member.userId,'lobby')}>Mettre en salle d’attente</button>
+                                <button type="button" onClick={()=>void moderateParticipant(member.userId,'remove')}>Retirer de la réunion</button>
+                                <button type="button" className="danger" onClick={()=>void moderateParticipant(member.userId,'ban')}>Exclure et bannir</button>
+                              </>
+                            ):null}
+                            {!remote&&!isModerator?<span>Participant indisponible</span>:null}
+                          </>
+                        )}
+                      </div>
+                    ):null}
+                  </div>
                 </article>;
               })}
             </div>
