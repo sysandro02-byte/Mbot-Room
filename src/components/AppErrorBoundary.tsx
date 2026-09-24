@@ -25,7 +25,14 @@ const refreshServiceWorker = async () => {
 };
 
 export default class AppErrorBoundary extends Component<Props, State> {
+  declare props: Readonly<Props>;
+  declare setState: (state: Partial<State>) => void;
+
   state: State = { error: null, recovering: false };
+
+  constructor(props: Props) {
+    super(props);
+  }
 
   static getDerivedStateFromError(error: Error): State {
     return { error, recovering: false };
