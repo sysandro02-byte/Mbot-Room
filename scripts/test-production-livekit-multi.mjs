@@ -140,6 +140,8 @@ try{
       name:'Hôte LiveKit '+suffix,
       email:'prod.livekit.host+'+suffix+'@mbote.test',
       password,
+      country:'Congo-Brazzaville',
+      city:'Brazzaville',
       termsAccepted:true,
       termsVersion:legal.data.version,
     }),
