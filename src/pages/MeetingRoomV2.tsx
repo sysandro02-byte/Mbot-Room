@@ -2057,6 +2057,7 @@ export default function MeetingRoomV2() {
       </div> : null}
 
       <footer className="room-v2-controls">
+        <div className="room-v2-control-strip">
         <Control active={micEnabled} disabled={!canUseMic} title={!canUseMic ? 'Microphone désactivé par l’hôte' : undefined} label={micEnabled ? 'Micro' : 'Micro coupé'} onClick={() => void toggleMic()}>{micEnabled ? <Mic/> : <MicOff/>}</Control>
         <Control active={cameraEnabled} disabled={!canUseCamera} title={!canUseCamera ? 'Caméra désactivée par l’hôte' : undefined} label={cameraEnabled ? 'Caméra' : 'Caméra coupée'} onClick={() => void toggleCamera()}>{cameraEnabled ? <Camera/> : <CameraOff/>}</Control>
         <Control active={screenSharing} disabled={!canShareScreen} title={!canShareScreen ? (guestMode && !guestScreenShareAllowed ? 'Partage d’écran non autorisé pour les invités' : 'Partage d’écran désactivé par l’hôte') : undefined} label="Partager" onClick={() => void toggleScreenShare()}><MonitorUp/></Control>
@@ -2099,6 +2100,7 @@ export default function MeetingRoomV2() {
             <button type="button" className="danger" onClick={() => void leaveMeeting(false)}><LogOut/><span>Quitter la réunion</span></button>
             {canEndForAll ? <button type="button" className="danger" onClick={() => void leaveMeeting(true)}><PhoneOff/><span>Terminer pour tous</span></button> : null}
           </div> : null}
+        </div>
         </div>
 
         <div className="room-v2-leave-actions">
