@@ -108,8 +108,8 @@ export type Preferences = {
 };
 
 export const appDataService = {
-  async getPlatformSettings() {
-    return readJson<ClientPlatformSettings>(await apiFetch(apiUrl('/api/platform/settings'),{headers:getAuthHeaders(),cache:'no-store'}));
+  async getPlatformSettings(timeoutMs = 45_000) {
+    return readJson<ClientPlatformSettings>(await apiFetch(apiUrl('/api/platform/settings'),{headers:getAuthHeaders()},timeoutMs));
   },
   async getCalendar() {
     return readJson<CalendarEvent[]>(await apiFetch(apiUrl('/api/calendar/events'), { headers:getAuthHeaders() }));
@@ -141,11 +141,11 @@ export const appDataService = {
       window.dispatchEvent(new CustomEvent('mbote-room-offline-saved',{detail:{url,method:'DELETE'}}));
     }
   },
-  async getContacts() {
-    return readJson<Contact[]>(await apiFetch(apiUrl('/api/contacts'),{headers:getAuthHeaders()}));
+  async getContacts(timeoutMs = 45_000) {
+    return readJson<Contact[]>(await apiFetch(apiUrl('/api/contacts'),{headers:getAuthHeaders()},timeoutMs));
   },
-  async getRecordings() {
-    return readJson<Recording[]>(await apiFetch(apiUrl('/api/recordings'),{headers:getAuthHeaders(),cache:'no-store'}));
+  async getRecordings(timeoutMs = 45_000) {
+    return readJson<Recording[]>(await apiFetch(apiUrl('/api/recordings'),{headers:getAuthHeaders()},timeoutMs));
   },
   async getRecordingStats() {
     return readJson<RecordingStats>(await apiFetch(apiUrl('/api/recordings/stats'),{headers:getAuthHeaders(),cache:'no-store'}));
