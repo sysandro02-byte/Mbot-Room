@@ -648,7 +648,7 @@ try {
   assert.ok(adminReports.data.some((item)=>item.id===report.data.id));
   const adminNotifications = await jsonRequest('/api/notifications', { headers: authHeaders(host.token) });
   assert.equal(adminNotifications.response.status, 200, JSON.stringify(adminNotifications.data));
-  assert.ok(adminNotifications.data.some((item)=>item.type==='USER_REPORT'&&String(item.tag||'')==='report-'+report.data.id), 'Admin should receive an in-app notification for a new report');
+  assert.ok(adminNotifications.data.some((item)=>item.type==='USER_REPORT'&&String(item.data?.reportId||'')===String(report.data.id)), 'Admin should receive an in-app notification for a new report');
 
   const wrongPassword = await jsonRequest('/api/meetings/join-lookup', {
     method: 'POST',
