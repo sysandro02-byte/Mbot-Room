@@ -241,7 +241,7 @@ try {
       name: `Hôte Smoke ${runSuffix}`,
       email: hostEmail,
       password,
-      termsAccepted: true,
+      country: 'Congo-Brazzaville', city: 'Brazzaville', termsAccepted: true,
       termsVersion: '2026-09-24',
     }),
   });
@@ -309,7 +309,7 @@ try {
       name: guestName,
       meetingCode: meeting.meeting_link,
       password,
-      termsAccepted: true,
+      country: 'Congo-Brazzaville', city: 'Brazzaville', termsAccepted: true,
       termsVersion: '2026-09-24',
     }),
   });
