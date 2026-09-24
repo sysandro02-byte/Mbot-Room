@@ -22,6 +22,12 @@ export type AdminPlatformSettings = {
   recordingEnabled: boolean;
   publicMeetingsEnabled: boolean;
   premiumPaymentEnabled: boolean;
+  guestRaiseHandEnabled: boolean;
+  guestRecordingEnabled: boolean;
+  guestScreenShareEnabled: boolean;
+  guestLunaEnabled: boolean;
+  guestTranscriptionEnabled: boolean;
+  guestChatEnabled: boolean;
 };
 
 export type AdminManagedUser = {
