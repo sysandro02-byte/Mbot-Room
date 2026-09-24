@@ -188,11 +188,18 @@ export const adminDashboardService = {
   },
 
   async getUsers(query = ''): Promise<AdminManagedUser[]> {
-    const response = await apiFetch(apiUrl(`/api/admin/users?q=${encodeURIComponent(query)}&limit=5000`), {
-      headers: getAuthHeaders(),
-      cache: 'no-store',
-    });
-    return readJson<AdminManagedUser[]>(response);
+    const rows:AdminManagedUser[]=[];
+    const pageSize=1000;
+    for(let offset=0;offset<100000;offset+=pageSize){
+      const response=await apiFetch(apiUrl(`/api/admin/users?q=${encodeURIComponent(query)}&limit=${pageSize}&offset=${offset}`),{
+        headers:getAuthHeaders(),
+        cache:'no-store',
+      });
+      const page=await readJson<AdminManagedUser[]>(response);
+      rows.push(...page);
+      if(page.length<pageSize)break;
+    }
+    return rows;
   },
 
   async updateUser(userId: number, payload: Partial<Pick<AdminManagedUser,'name'|'phoneNumber'|'organization'|'jobTitle'|'country'|'city'|'isSuspended'|'accountStatus'|'featureRestrictions'>>): Promise<AdminManagedUser> {
