@@ -95,9 +95,10 @@ export default function AdminControlCenter(){
   };
   useEffect(()=>{void load();},[]);
 
-  const countries=useMemo<string[]>(()=>Array.from(new Set(users.map(user=>String(user.country||'')).filter(value=>value.length>0))).sort((a,b)=>a.localeCompare(b)),[users]);
-  const cities=useMemo<string[]>(()=>Array.from(new Set(users.filter(user=>!countryFilter||user.country===countryFilter).map(user=>String(user.city||'')).filter(value=>value.length>0))).sort((a,b)=>a.localeCompare(b)),[countryFilter,users]);
-  const organizations=useMemo<string[]>(()=>Array.from(new Set(users.map(user=>String(user.organization||'')).filter(value=>value.length>0))).sort((a,b)=>a.localeCompare(b)),[users]);
+  const uniqueSortedStrings=(values:string[])=>Array.from(new Set<string>(values)).sort((left:string,right:string)=>left.localeCompare(right));
+  const countries=useMemo<string[]>(()=>uniqueSortedStrings(users.map(user=>String(user.country||'')).filter((value:string)=>value.length>0)),[users]);
+  const cities=useMemo<string[]>(()=>uniqueSortedStrings(users.filter(user=>!countryFilter||user.country===countryFilter).map(user=>String(user.city||'')).filter((value:string)=>value.length>0)),[countryFilter,users]);
+  const organizations=useMemo<string[]>(()=>uniqueSortedStrings(users.map(user=>String(user.organization||'')).filter((value:string)=>value.length>0)),[users]);
 
   const filtered=useMemo(()=>{
     const q=search.trim().toLowerCase();
