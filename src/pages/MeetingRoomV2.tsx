@@ -31,7 +31,7 @@ import {
   WifiOff,
   X,
 } from 'lucide-react';
-import { useMeetingMeshWebRTC } from '../hooks/useMeetingMeshWebRTC';
+import { useMeetingMeshWebRTC, type RemoteMeetingParticipant } from '../hooks/useMeetingMeshWebRTC';
 import { useMeetingLiveKit } from '../hooks/useMeetingLiveKit';
 import { useMeetingCaptions } from '../hooks/useMeetingCaptions';
 import { socket } from '../lib/socket';
@@ -440,8 +440,8 @@ export default function MeetingRoomV2() {
   const usingLiveKit = liveKitDesired && !liveKitMedia.failed;
   const remoteParticipants = useMemo(() => {
     if (!usingLiveKit) return meshMedia.remoteParticipants;
-    const realtimeByUser = new Map(
-      meshMedia.remoteParticipants.map((participant) => [String(participant.userId), participant] as const),
+    const realtimeByUser = new Map<string, RemoteMeetingParticipant>(
+      meshMedia.remoteParticipants.map((participant): [string, RemoteMeetingParticipant] => [String(participant.userId), participant]),
     );
     return liveKitMedia.remoteParticipants.map((participant) => {
       const realtime = realtimeByUser.get(String(participant.userId));
