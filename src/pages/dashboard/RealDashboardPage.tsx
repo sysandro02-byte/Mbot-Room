@@ -122,7 +122,7 @@ export default function RealDashboardPage() {
   }, [heroSlides.length]);
 
   useEffect(() => {
-    const refreshSlides = () => void meetingService.getHomeSlides()
+    const refreshSlides = () => void meetingService.getHomeSlides(8_000)
       .then((rows) => { setHomeSlides(rows); setActiveSlide(0); })
       .catch(() => undefined);
     if (!socket.connected) socket.connect();
