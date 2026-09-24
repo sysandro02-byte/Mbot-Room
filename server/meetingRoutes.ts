@@ -517,6 +517,38 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     } catch (error) { next(error); }
   });
 
+  app.post('/api/meetings/:meetingId/lobby/cancel', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const meeting = await getMeetingById(Number(request.params.meetingId));
+      if (!meeting) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
+
+      const userId = Number(request.user!.id);
+      const cancelled = await query(
+        `DELETE FROM room_lobby
+          WHERE meeting_id=$1 AND user_id=$2 AND status='requested'
+          RETURNING user_id,name,avatar`,
+        [meeting.id, userId],
+      );
+
+      if (cancelled.rows[0]) {
+        io.to(`meeting:${meeting.id}:moderators`).emit('meeting:lobby-updated', {
+          meetingId: meeting.id,
+          userId,
+          status: 'cancelled',
+          name: cancelled.rows[0].name,
+          avatar: cancelled.rows[0].avatar,
+        });
+        io.to(`meeting:${meeting.id}`).emit('meeting:lobby-updated', {
+          meetingId: meeting.id,
+          userId,
+          status: 'cancelled',
+        });
+      }
+
+      response.json({ success: true, cancelled: Boolean(cancelled.rows[0]) });
+    } catch (error) { next(error); }
+  });
+
   app.post('/api/meetings/:meetingId/lobby/respond', ...protectedApi, async (request: AuthedRequest, response, next) => {
     try {
       const meeting = await getMeetingById(Number(request.params.meetingId));
