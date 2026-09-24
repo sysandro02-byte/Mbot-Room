@@ -6,6 +6,7 @@ export interface Meeting {
   description: string;
   host_id: number;
   co_host_id?: number;
+  temporary_host_id?: number;
   host_name: string;
   host_avatar: string;
   start_time: string;
