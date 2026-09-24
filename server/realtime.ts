@@ -6,6 +6,7 @@ import {
   getUserByRawToken,
   hasMeetingAccess,
   query,
+  touchSessionActivity,
 } from './core.js';
 import { getMeetingById, insertChatMessage } from './meetingRoutes.js';
 import { isPlatformFeatureEnabled } from './platformSettings.js';
@@ -177,6 +178,7 @@ export const registerRealtime = (io: Server) => {
         return;
       }
       socket.data.user = user;
+      socket.data.rawSessionToken = rawToken;
       next();
     } catch (cause) {
       next(cause instanceof Error ? cause : new Error('Authentification temps réel impossible.'));
@@ -185,6 +187,12 @@ export const registerRealtime = (io: Server) => {
 
   io.on('connection', (socket) => {
     const user = socket.data.user as PublicUser;
+    const meetingSessionKeepAlive = setInterval(() => {
+      const token = String(socket.data.rawSessionToken || '');
+      if (socket.data.meetingId && token) {
+        void touchSessionActivity(token).catch(() => undefined);
+      }
+    }, 2 * 60 * 1000);
     socket.join(`user:${user.id}`);
     if (user.role === 'admin') socket.join('admins');
 
