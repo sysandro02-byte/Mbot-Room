@@ -367,6 +367,16 @@ try {
   const participant = await register('Participant Vidéo', 'participant.video@mbote.test');
   const participantTwo = await register('Participant Deux', 'participant.two@mbote.test');
 
+  for (const session of [host, participant, participantTwo]) {
+    const preferences = await jsonRequest('/api/preferences', {
+      method: 'PUT',
+      headers: authHeaders(session.token),
+      body: JSON.stringify({ lunaRealtimeTranslation: true }),
+    });
+    assert.equal(preferences.response.status, 200, JSON.stringify(preferences.data));
+    assert.equal(preferences.data.lunaRealtimeTranslation, true, 'Realtime captions preference must be enabled for the video E2E scenario');
+  }
+
   const created = await jsonRequest('/api/meetings', {
     method: 'POST',
     headers: authHeaders(host.token),
