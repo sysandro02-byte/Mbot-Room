@@ -16,6 +16,8 @@ export interface Meeting {
   settings?: MeetingSettings;
   participant_count?: number;
   status?: 'scheduled' | 'live' | 'ended' | 'cancelled';
+  started_at?: string | null;
+  ended_at?: string | null;
 }
 
 export interface MeetingSettings {
