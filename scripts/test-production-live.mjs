@@ -342,6 +342,10 @@ try {
     return urls.some((url) => String(url).startsWith('turn:') || String(url).startsWith('turns:'));
   }));
 
+  const mediaStatus = await api('/api/media/status');
+  assert.equal(mediaStatus.response.status, 200, JSON.stringify(mediaStatus.data));
+  assert.ok(['mesh', 'livekit'].includes(String(mediaStatus.data.preferredMode || '')));
+  if (mediaStatus.data.preferredMode === 'livekit') assert.equal(mediaStatus.data.livekitReady, true);
   const start = await api(`/api/meetings/${meeting.id}/start-notify`, {
     method: 'POST',
   }, host.token);
@@ -366,12 +370,15 @@ try {
     waitForRemoteMedia(guestRoom.page, host.user.name),
   ]);
 
-  await Promise.all([
-    hostRoom.page.waitForFunction(() => (window.__mboteSmokeIceCandidates || []).some((value) => /\btyp relay\b/.test(value)), undefined, { timeout: 30_000 }),
-    guestRoom.page.waitForFunction(() => (window.__mboteSmokeIceCandidates || []).some((value) => /\btyp relay\b/.test(value)), undefined, { timeout: 30_000 }),
-  ]);
+  if (mediaStatus.data.preferredMode === 'mesh') {
+    await Promise.all([
+      hostRoom.page.waitForFunction(() => (window.__mboteSmokeIceCandidates || []).some((value) => /\btyp relay\b/.test(value)), undefined, { timeout: 30_000 }),
+      guestRoom.page.waitForFunction(() => (window.__mboteSmokeIceCandidates || []).some((value) => /\btyp relay\b/.test(value)), undefined, { timeout: 30_000 }),
+    ]);
+  }
 
   const relayDiagnostics = {
+    transport: mediaStatus.data.preferredMode,
     host: await hostRoom.page.evaluate(() => ({
       peerConnections: window.__mboteSmokePeerConnections || 0,
       relayCandidates: (window.__mboteSmokeIceCandidates || []).filter((value) => /\btyp relay\b/.test(value)).length,
@@ -381,10 +388,15 @@ try {
       relayCandidates: (window.__mboteSmokeIceCandidates || []).filter((value) => /\btyp relay\b/.test(value)).length,
     })),
   };
+  console.log('PRODUCTION_MEDIA_DIAGNOSTICS', JSON.stringify(relayDiagnostics));
   assert.ok(relayDiagnostics.host.peerConnections > 0);
   assert.ok(relayDiagnostics.guest.peerConnections > 0);
-  assert.ok(relayDiagnostics.host.relayCandidates > 0);
-  assert.ok(relayDiagnostics.guest.relayCandidates > 0);
+  if (mediaStatus.data.preferredMode === 'mesh') {
+    assert.ok(relayDiagnostics.host.relayCandidates > 0);
+    assert.ok(relayDiagnostics.guest.relayCandidates > 0);
+  } else {
+    assert.equal(mediaStatus.data.livekitReady, true);
+  }
 
   const guestChat = await api(`/api/meetings/${meeting.id}/messages`, {
     method: 'POST',
