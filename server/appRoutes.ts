@@ -225,7 +225,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
         },
         readiness:getRuntimeReadiness(databaseType),
         deployment:{
-          commit:String(process.env.RENDER_GIT_COMMIT||'').slice(0,12),
+          commit:String(process.env.RENDER_GIT_COMMIT||'').slice(0,40),
           branch:String(process.env.RENDER_GIT_BRANCH||'').slice(0,80),
         },
         serverTime:result.rows[0].now,
@@ -237,7 +237,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
         database:{configured:true,connected:false,type:databaseType},
         readiness:getRuntimeReadiness(databaseType),
         deployment:{
-          commit:String(process.env.RENDER_GIT_COMMIT||'').slice(0,12),
+          commit:String(process.env.RENDER_GIT_COMMIT||'').slice(0,40),
           branch:String(process.env.RENDER_GIT_BRANCH||'').slice(0,80),
         },
         error:process.env.NODE_ENV==='production'?'Database unavailable':error instanceof Error?error.message:'Database unavailable',
