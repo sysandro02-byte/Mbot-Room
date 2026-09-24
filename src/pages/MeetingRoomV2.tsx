@@ -446,10 +446,13 @@ export default function MeetingRoomV2() {
     return liveKitMedia.remoteParticipants.map((participant) => {
       const realtime = realtimeByUser.get(String(participant.userId));
       if (!realtime) return participant;
+      const screenStoppedRealtime = participant.media.screen && !realtime.media.screen;
       return {
         ...participant,
+        stream: screenStoppedRealtime ? null : participant.stream,
         media: {
           ...participant.media,
+          video: screenStoppedRealtime ? false : participant.media.video,
           screen: Boolean(realtime.media.screen),
         },
       };
