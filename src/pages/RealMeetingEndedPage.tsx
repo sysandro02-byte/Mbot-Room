@@ -62,8 +62,8 @@ export default function RealMeetingEndedPage(){
     try{
       const value=await meetingService.getEndedMeeting(meetingId);
       setPayload(value);
-      setFeedbackRating(value.feedback.rating||0);
-      setFeedbackComment(value.feedback.comment||'');
+      setFeedbackRating(value.feedback?.rating||0);
+      setFeedbackComment(value.feedback?.comment||'');
       setMessages(await collaborationService.getMessages(value.meeting.id).catch(()=>[]));
     }catch(cause){
       setError(cause instanceof Error?cause.message:'Impossible de charger le compte rendu.');
@@ -168,7 +168,7 @@ export default function RealMeetingEndedPage(){
 
   if(!payload)return null;
 
-  if(payload.permissions.canRate&&!payload.feedback.submitted)return (
+  if(payload.permissions.canRate&&!payload.feedback?.submitted)return (
     <main className="real-ended-feedback-stage">
       <div className="real-ended-feedback-backdrop">
         <form className="real-ended-feedback-modal" onSubmit={submitFeedback} aria-labelledby="meeting-feedback-title">
