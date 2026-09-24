@@ -150,7 +150,7 @@ const openMeeting = async (browser, session, meetingId, label) => {
 
   await page.goto(`${appUrl}/reunions/${meetingId}`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
   try {
-    await page.locator('.room-v2-shell').waitFor({ state: 'visible', timeout: 30_000 });
+    await page.locator('.room-v2-shell').waitFor({ state: 'attached', timeout: 30_000 });
   } catch (error) {
     const diagnostics = await page.evaluate(() => ({
       href: location.href,
