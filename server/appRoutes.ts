@@ -421,7 +421,8 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
   app.put('/api/calendar/events/:eventId', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
       const startsAt=parseDate(request.body?.startsAt);const endsAt=parseDate(request.body?.endsAt);if(!startsAt||!endsAt||endsAt<=startsAt)return sendApiError(response,400,'VALIDATION_ERROR','Horaires invalides.');
-      const result=await query(`UPDATE room_calendar_events SET title=$3,description=$4,starts_at=$5,ends_at=$6,updated_at=now() WHERE id=$1 AND user_id=$2 RETURNING *`,[request.params.eventId,request.user!.id,String(request.body?.title||'').trim().slice(0,200),String(request.body?.description||'').trim().slice(0,1000),startsAt.toISOString(),endsAt.toISOString()]);
+      const metadata=request.body?.metadata&&typeof request.body.metadata==='object'&&!Array.isArray(request.body.metadata)?request.body.metadata:{};
+      const result=await query(`UPDATE room_calendar_events SET title=$3,description=$4,starts_at=$5,ends_at=$6,metadata=$7::jsonb,updated_at=now() WHERE id=$1 AND user_id=$2 RETURNING *`,[request.params.eventId,request.user!.id,String(request.body?.title||'').trim().slice(0,200),String(request.body?.description||'').trim().slice(0,1000),startsAt.toISOString(),endsAt.toISOString(),JSON.stringify(metadata)]);
       if(!result.rows[0])return sendApiError(response,404,'CALENDAR_EVENT_NOT_FOUND','Événement introuvable.');
       const synced=await syncCalendarEventToGoogle(request.user!.id,result.rows[0]);
       io.to(`user:${request.user!.id}`).emit('calendar:event-updated',synced);
