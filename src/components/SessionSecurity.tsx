@@ -58,14 +58,15 @@ export default function SessionSecurity(){
     if(!localStorage.getItem(LAST_ACTIVITY_KEY))localStorage.setItem(LAST_ACTIVITY_KEY,String(Date.now()));
 
     const touch=()=>{
-      if(!authService.isAuthenticated())return;
+      const locallyAvailable=navigator.onLine?authService.isAuthenticated():Boolean(authService.getCurrentUser());
+      if(!locallyAvailable)return;
       const now=Date.now();
       localStorage.setItem(LAST_ACTIVITY_KEY,String(now));
       setSecondsLeft(null);
-      if(now-lastPingRef.current>30_000){
+      if(now-lastPingRef.current>30_000&&navigator.onLine){
         lastPingRef.current=now;
         void authService.touchActivity().catch(async()=>{
-          if(loggingOutRef.current)return;
+          if(authService.isAuthenticated()||loggingOutRef.current)return;
           loggingOutRef.current=true;
           sessionStorage.setItem('mboteroom-auth-notice','Votre session a expiré après 5 minutes d’inactivité.');
           await authService.logout(false);
@@ -80,6 +81,10 @@ export default function SessionSecurity(){
     document.addEventListener('visibilitychange',visibility);
 
     const timer=window.setInterval(async()=>{
+      if(!navigator.onLine){
+        setSecondsLeft(null);
+        return;
+      }
       if(!authService.isAuthenticated())return;
       const elapsed=Date.now()-nowActivity();
       const remain=IDLE_MS-elapsed;
