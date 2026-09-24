@@ -356,7 +356,7 @@ try {
     ['/app/whiteboard', 'Tableau blanc'],
     ['/app/polls', 'Sondages'],
     ['/app/settings', 'Paramètres'],
-    ['/app/profile', 'Mon profil'],
+    ['/app/profile', 'Modifier le profil'],
     ['/join', 'Rejoindre'],
     ['/admin', 'Tableau de bord'],
     ['/aide', 'Centre d’aide MBotéRoom'],
