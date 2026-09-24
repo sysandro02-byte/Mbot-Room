@@ -23,6 +23,7 @@ export type PublicUser = {
   bio?: string;
   profileVisible?: boolean;
   mboteUserId?: string;
+  personalMeetingId?: string;
   isGuest: boolean;
   role: UserRole;
   permissions: string[];
@@ -184,6 +185,7 @@ export const toPublicUser = (row: any): PublicUser => {
     bio: String(row.bio || ''),
     profileVisible: row.profile_visible !== false,
     mboteUserId: String(row.mbote_user_id || ''),
+    personalMeetingId: String(row.personal_meeting_id || ''),
     isGuest: Boolean(row.is_guest),
     role,
     permissions: role === 'admin' ? adminPermissions : [],
@@ -391,6 +393,7 @@ export const runMigrations = async () => {
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS bio text NOT NULL DEFAULT '';
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS profile_visible boolean NOT NULL DEFAULT true;
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS mbote_user_id text NOT NULL DEFAULT '';
+    ALTER TABLE room_users ADD COLUMN IF NOT EXISTS personal_meeting_id text NOT NULL DEFAULT '';
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'user';
     ALTER TABLE room_users ADD COLUMN IF NOT EXISTS is_suspended boolean NOT NULL DEFAULT false;
 
