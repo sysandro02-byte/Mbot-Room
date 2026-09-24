@@ -115,6 +115,14 @@ export const appDataService = {
       metadata:payload.metadata||{},created_at:new Date().toISOString(),updated_at:new Date().toISOString(),
     }));
   },
+  async updateCalendarEvent(id:string,payload:{title:string;description?:string;startsAt:string;endsAt:string;metadata?:Record<string,unknown>}) {
+    const url=apiUrl(`/api/calendar/events/${encodeURIComponent(id)}`);
+    return safeOfflineMutation<CalendarEvent>(url,'PUT',payload,()=>({
+      id,user_id:Number(localStoredUser().id||0),meeting_id:null,
+      title:payload.title,description:payload.description||'',starts_at:payload.startsAt,ends_at:payload.endsAt,
+      metadata:payload.metadata||{},created_at:new Date().toISOString(),updated_at:new Date().toISOString(),
+    }));
+  },
   async deleteCalendarEvent(id:string) {
     const url=apiUrl(`/api/calendar/events/${encodeURIComponent(id)}`);
     try{
