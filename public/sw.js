@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'mboteroom-shell-v6-full-offline';
+const CACHE_VERSION = 'mboteroom-shell-v7-resilient-offline';
 const SHELL = [
   '/',
   '/app',
@@ -8,6 +8,8 @@ const SHELL = [
   '/app/contacts',
   '/app/files',
   '/app/settings',
+  '/app/notifications',
+  '/join',
   '/manifest.webmanifest',
   '/icons/mboteroom-symbol.png',
   '/icons/mboteroom-install.svg',
