@@ -925,7 +925,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       </section>
 
       <footer className="login-benefits" aria-label="Créateur de MBotéRoom">
-        <div className="login-created-by">MBotéRoom est une application créée par <strong>LoukaTech</strong>.</div>
+        <div className="login-created-by">MBotéRoom application créé par <strong>LoukaTech</strong></div>
       </footer>
 
       {isRegisterModalOpen && !registrationSuccess && (
@@ -1153,6 +1153,15 @@ function AuthBrandPanel({
       </div>
 
       <MeetingIllustration />
+      <div className="auth-showcase-badge auth-showcase-badge-team" aria-hidden="true">
+        <UsersRound size={18} />
+        <span>Réunions plus<br/>productives</span>
+      </div>
+      <div className="auth-showcase-badge auth-showcase-badge-security" aria-hidden="true">
+        <Lock size={18} />
+        <span>Vos données<br/>en sécurité</span>
+      </div>
+      <span className="auth-showcase-note" aria-hidden="true">Travailler<br/>ensemble,<br/>simplement.</span>
     </aside>
   );
 }
