@@ -259,5 +259,45 @@ export const runExtraMigrations = async () => {
     );
     CREATE INDEX IF NOT EXISTS room_conversation_messages_conversation_idx
       ON room_conversation_messages(conversation_id, created_at DESC);
+
+
+    ALTER TABLE room_users ADD COLUMN IF NOT EXISTS account_status text NOT NULL DEFAULT 'active';
+    ALTER TABLE room_users ADD COLUMN IF NOT EXISTS feature_restrictions jsonb NOT NULL DEFAULT '[]'::jsonb;
+    ALTER TABLE room_users ADD COLUMN IF NOT EXISTS terms_accepted_at timestamptz;
+    ALTER TABLE room_users ADD COLUMN IF NOT EXISTS terms_version text NOT NULL DEFAULT '';
+    ALTER TABLE room_users DROP CONSTRAINT IF EXISTS room_users_account_status_check;
+    ALTER TABLE room_users ADD CONSTRAINT room_users_account_status_check CHECK (account_status IN ('active','quarantined','banned'));
+
+    CREATE TABLE IF NOT EXISTS room_legal_documents (
+      key text PRIMARY KEY,
+      title text NOT NULL,
+      body text NOT NULL,
+      version text NOT NULL,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    INSERT INTO room_legal_documents (key,title,body,version)
+    VALUES (
+      'terms',
+      'Conditions d’utilisation MBotéRoom',
+      'Bienvenue sur MBotéRoom. En utilisant l’application, vous vous engagez à utiliser le service de manière licite, respectueuse et conforme aux règles de sécurité. Vous restez responsable des contenus, invitations et actions effectués depuis votre compte.\n\nVous ne devez pas utiliser MBotéRoom pour harceler, tromper, usurper l’identité d’autrui, diffuser des contenus illégaux, contourner les mesures de sécurité ou perturber le fonctionnement du service.\n\nLes fonctionnalités de réunion, messagerie, fichiers, enregistrement et intelligence artificielle peuvent évoluer. Les administrateurs peuvent limiter ou suspendre certaines fonctions lorsqu’un usage abusif, risqué ou contraire aux présentes conditions est détecté.\n\nLa version applicable est celle affichée au moment de votre acceptation. Une nouvelle acceptation pourra être demandée si ces conditions sont modifiées de manière importante.',
+      '2026-09-24'
+    )
+    ON CONFLICT (key) DO NOTHING;
+
+    CREATE TABLE IF NOT EXISTS room_reports (
+      id uuid PRIMARY KEY,
+      reporter_user_id integer REFERENCES room_users(id) ON DELETE SET NULL,
+      report_type text NOT NULL CHECK (report_type IN ('bug','meeting')),
+      meeting_id integer REFERENCES room_meetings(id) ON DELETE SET NULL,
+      title text NOT NULL,
+      description text NOT NULL,
+      page_url text NOT NULL DEFAULT '',
+      status text NOT NULL DEFAULT 'open' CHECK (status IN ('open','reviewing','resolved','dismissed')),
+      metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS room_reports_status_created_idx ON room_reports(status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS room_reports_meeting_idx ON room_reports(meeting_id, created_at DESC);
   `);
 };
