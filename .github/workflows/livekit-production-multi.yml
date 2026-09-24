@@ -1,0 +1,40 @@
+name: MBoteRoom LiveKit Production Multi-Meeting
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/test-production-livekit-multi.mjs'
+      - '.github/workflows/livekit-production-multi.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mboteroom-livekit-production
+  cancel-in-progress: true
+
+jobs:
+  livekit-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Test multiple production LiveKit meetings
+        env:
+          MBOTE_ROOM_FRONTEND_URL: https://mbote-room.vercel.app
+          MBOTE_ROOM_BACKEND_URL: https://mbote-room-api.onrender.com
+          MBOTE_ROOM_SMOKE_APP_URL: https://mboteroom.loukatech.com
+        run: node scripts/test-production-livekit-multi.mjs
