@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarClock, FileImage, FileText, LoaderCircle, Mail, Plus, Trash2, Upload, UsersRound, Video, Mic2, PhoneCall, Clock3, Eye, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { appDataService } from '../services/appDataService';
 import { meetingService } from '../services/meetingService';
 import { workspaceService, type WorkGroup, type WorkGroupCall, type WorkspaceFile } from '../services/workspaceService';
@@ -15,6 +15,7 @@ const formatBytes=(value:number)=>value<1024*1024?`${Math.max(1,Math.round(value
 
 export default function WorkGroupsPage(){
   const navigate=useNavigate();
+  const location=useLocation();
   const fileInputRef=useRef<HTMLInputElement|null>(null);
   const [groups,setGroups]=useState<WorkGroup[]>([]);
   const [selectedId,setSelectedId]=useState('');
@@ -45,6 +46,10 @@ export default function WorkGroupsPage(){
   };
 
   useEffect(()=>{void load();},[]);
+  useEffect(()=>{
+    const params=new URLSearchParams(location.search);
+    if(params.get('new')==='1')setCreateOpen(true);
+  },[location.search]);
   const selected=useMemo(()=>groups.find((item)=>item.id===selectedId)||null,[groups,selectedId]);
 
   const createGroup=async(event:FormEvent)=>{
