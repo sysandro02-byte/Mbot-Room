@@ -169,7 +169,7 @@ export interface EndedMeetingPayload {
     sourceCounts: { chat: number; captions: number };
     lunaConfigured: boolean;
   };
-  feedback: {
+  feedback?: {
     submitted: boolean;
     rating: number | null;
     comment: string;
