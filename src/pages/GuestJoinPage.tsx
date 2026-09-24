@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRightToLine,
   ChevronRight,
-  CircleHelp,
   Eye,
   EyeOff,
   Hash,
@@ -14,7 +13,6 @@ import {
   MonitorSmartphone,
   ShieldCheck,
   UserRound,
-  UsersRound,
   Video,
   XCircle,
   Zap,
@@ -404,34 +402,5 @@ function InformationCard({
         </Link>
       </div>
     </section>
-  );
-}
-
-function MeetingDevicesIllustration({ compact = false }: { compact?: boolean }) {
-  return (
-    <div className={compact ? 'meeting-devices is-compact' : 'meeting-devices'} aria-hidden="true">
-      <div className="devices-plant">
-        <span className="devices-leaf leaf-a" />
-        <span className="devices-leaf leaf-b" />
-        <span className="devices-leaf leaf-c" />
-        <span className="devices-leaf leaf-d" />
-        <span className="devices-stem" />
-        <span className="devices-pot" />
-      </div>
-      <div className="devices-laptop">
-        <div className="devices-screen">
-          <span className="device-person person-a"><UserRound size={27} /></span>
-          <span className="device-person person-b"><UserRound size={27} /></span>
-          <span className="device-person person-c"><UserRound size={27} /></span>
-          <span className="device-person person-d"><UserRound size={27} /></span>
-        </div>
-        <span className="devices-base" />
-      </div>
-      <div className="devices-phone">
-        <span className="devices-speaker" />
-        <span className="devices-phone-logo"><img src="/icons/mboteroom-symbol.png" alt="" /></span>
-        <strong>MBotéRoom</strong>
-      </div>
-    </div>
   );
 }
