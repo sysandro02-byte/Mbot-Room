@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import type express from 'express';
 import { isServerRecordingReady } from './recordingRoutes.js';
 import { isPlatformFeatureEnabled } from './platformSettings.js';
+import { isSupabaseRecordingStorageReady } from './supabaseRecordingStorage.js';
 import {
   AuthedRequest,
   authenticateToken,
@@ -90,6 +91,7 @@ export const registerSfuRoutes = (app: express.Express) => {
           && String(process.env.MBOTEROOM_TURN_CREDENTIAL || '').trim())
       ),
       serverRecordingReady: isServerRecordingReady(),
+      recordingStorageReady: isSupabaseRecordingStorageReady(),
     });
   });
 
