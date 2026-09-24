@@ -10,8 +10,14 @@ import {
   requireDatabase,
   sendApiError,
 } from './core.js';
+import { isPlatformFeatureEnabled } from './platformSettings.js';
 
 const protectedApi: express.RequestHandler[] = [requireDatabase, authenticateToken];
+
+const ensureGuestTranscriptionAllowed = async (request: AuthedRequest) => {
+  if (!request.user?.isGuest) return true;
+  return isPlatformFeatureEnabled('guestTranscriptionEnabled');
+};
 
 const allowedAudioTypes = new Set([
   'audio/webm',
@@ -115,6 +121,9 @@ export const registerTranscriptionRoutes = (app: express.Express, io: Server) =>
       if (!meetingId || !(await hasMeetingAccess(meetingId, request.user!))) {
         return sendApiError(response, 403, 'MEETING_ACCESS_DENIED', 'Accès refusé.');
       }
+      if (!(await ensureGuestTranscriptionAllowed(request))) {
+        return sendApiError(response, 403, 'GUEST_TRANSCRIPTION_DISABLED', 'La transcription n’est pas autorisée pour les invités.');
+      }
       const meeting = await query(
         'SELECT host_id,co_host_id FROM room_meetings WHERE id=$1 LIMIT 1',
         [meetingId],
@@ -171,6 +180,9 @@ export const registerTranscriptionRoutes = (app: express.Express, io: Server) =>
       const meetingId = Number(request.params.meetingId);
       if (!meetingId || !(await hasMeetingAccess(meetingId, request.user!))) {
         return sendApiError(response, 403, 'MEETING_ACCESS_DENIED', 'Accès refusé.');
+      }
+      if (!(await ensureGuestTranscriptionAllowed(request))) {
+        return sendApiError(response, 403, 'GUEST_TRANSCRIPTION_DISABLED', 'La transcription n’est pas autorisée pour les invités.');
       }
       const text = normalizeText(request.body?.text).slice(0, 1200);
       if (!text) return sendApiError(response, 400, 'CAPTION_EMPTY', 'Sous-titre vide.');
@@ -230,6 +242,9 @@ export const registerTranscriptionRoutes = (app: express.Express, io: Server) =>
         const meetingId = Number(request.params.meetingId);
         if (!meetingId || !(await hasMeetingAccess(meetingId, request.user!))) {
           return sendApiError(response, 403, 'MEETING_ACCESS_DENIED', 'Accès refusé.');
+        }
+        if (!(await ensureGuestTranscriptionAllowed(request))) {
+          return sendApiError(response, 403, 'GUEST_TRANSCRIPTION_DISABLED', 'La transcription n’est pas autorisée pour les invités.');
         }
 
         const mimeType = String(request.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
