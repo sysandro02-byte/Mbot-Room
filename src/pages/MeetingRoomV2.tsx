@@ -1869,7 +1869,7 @@ export default function MeetingRoomV2() {
                   pinned={pinnedSocketId === featuredParticipant.socketId}
                   handRaised={raisedHands.has(Number(featuredParticipant.userId))}
                   reaction={reactions[Number(featuredParticipant.userId)]}
-                  onPin={() => setPinnedSocketId((current) => current === featuredParticipant.socketId ? null : featuredParticipant.socketId)}
+                  onPin={() => togglePinnedParticipant(featuredParticipant.socketId)}
                 />
               </div>
               <div className={`room-v2-speaker-strip ${viewMode === 'participants' ? 'participant-mode' : ''}`}>
