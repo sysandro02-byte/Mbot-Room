@@ -1338,6 +1338,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const summaryRow=summaryResult.rows[0];
       const feedbackRow=feedbackResult.rows[0];
       const feedbackSubmitted=Boolean(feedbackRow);
+      const summaryUnlocked=!participated||feedbackSubmitted;
       const lunaConfigured=Boolean(String(process.env.GROQ_API_KEY||'').trim());
       const processingStatus=summaryRow
         ? 'ready'
@@ -1360,11 +1361,11 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
         userRole:meetingRole(meeting,request.user!),
         participants:members.rows.map((row)=>({id:String(row.user_id),name:row.name,role:row.role==='host'?'Hôte':row.role==='cohost'?'Co-hôte':row.is_guest?'Invité':'Participant',avatar:row.avatar})),
         summary:{
-          bullets:feedbackSubmitted?(summaryRow?.bullets||[]):[],
-          decisions:feedbackSubmitted?(summaryRow?.decisions||[]):[],
-          actions:feedbackSubmitted?(summaryRow?.actions||[]):[],
-          nextMeeting:feedbackSubmitted?(summaryRow?.next_meeting||''):'',
-          processingStatus:feedbackSubmitted?processingStatus:'pending',
+          bullets:summaryUnlocked?(summaryRow?.bullets||[]):[],
+          decisions:summaryUnlocked?(summaryRow?.decisions||[]):[],
+          actions:summaryUnlocked?(summaryRow?.actions||[]):[],
+          nextMeeting:summaryUnlocked?(summaryRow?.next_meeting||''):'',
+          processingStatus:summaryUnlocked?processingStatus:'pending',
           sourceCounts,
           lunaConfigured,
         },
