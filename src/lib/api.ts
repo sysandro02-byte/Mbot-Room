@@ -57,6 +57,11 @@ export const apiFetch = async (
   init: RequestInit = {},
   timeoutMs = 45_000,
 ) => {
+  const method = String(init.method || 'GET').toUpperCase();
+  if (typeof navigator !== 'undefined' && !navigator.onLine && isCacheableApiGet(input, method)) {
+    const cached = await readCachedApiResponse(input);
+    if (cached) return cached;
+  }
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -65,7 +70,6 @@ export const apiFetch = async (
       ...init,
       signal: init.signal || controller.signal,
     });
-    const method = String(init.method || 'GET').toUpperCase();
     if (isCacheableApiGet(input, method)) {
       if (response.ok) {
         void cacheApiResponse(input, response);
@@ -76,7 +80,6 @@ export const apiFetch = async (
     }
     return response;
   } catch (error) {
-    const method = String(init.method || 'GET').toUpperCase();
     if (isCacheableApiGet(input, method)) {
       const cached = await readCachedApiResponse(input);
       if (cached) return cached;
