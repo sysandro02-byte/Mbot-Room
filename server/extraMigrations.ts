@@ -61,6 +61,16 @@ export const runExtraMigrations = async () => {
        SET image_url='/images/mboteroom-home-hero.svg', updated_at=now()
      WHERE slot=1 AND (image_url='' OR image_url='/images/meeting-black-team.svg');
 
+    CREATE TABLE IF NOT EXISTS room_login_branding (
+      id smallint PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+      wordmark_url text NOT NULL DEFAULT '/icons/mboteroom-wordmark.png',
+      illustration_url text NOT NULL DEFAULT '/images/meeting-black-team.svg',
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    INSERT INTO room_login_branding (id,wordmark_url,illustration_url)
+    VALUES (1,'/icons/mboteroom-wordmark.png','/images/meeting-black-team.svg')
+    ON CONFLICT (id) DO NOTHING;
+
     CREATE TABLE IF NOT EXISTS room_platform_settings (
       key text PRIMARY KEY,
       enabled boolean NOT NULL DEFAULT true,
