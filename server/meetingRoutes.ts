@@ -58,9 +58,8 @@ const visibleToUser = async (meeting: Meeting, user: NonNullable<AuthedRequest['
 };
 
 const meetingRole = (meeting: Meeting, user: NonNullable<AuthedRequest['user']>) => {
-  if (meeting.host_id === user.id) return 'host';
+  if (meeting.host_id === user.id || meeting.temporary_host_id === user.id) return 'host';
   if (meeting.co_host_id === user.id) return 'cohost';
-  if (user.isGuest) return 'guest';
   return 'participant';
 };
 
@@ -494,7 +493,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
           [meeting.id, request.user!.id, meetingRole(meeting, request.user!)],
         );
       }
-      io.to(`meeting:${meeting.id}:moderators`).emit('meeting:lobby-updated', { meetingId: meeting.id, userId: request.user!.id, status });
+      io.to(`meeting:${meeting.id}:moderators`).emit('meeting:lobby-updated', { meetingId: meeting.id, userId: request.user!.id, status, name: request.user!.name, avatar: request.user!.avatar });
       if (status === 'requested') {
         const moderatorIds=[meeting.host_id,meeting.co_host_id].map(Number).filter((id)=>id&&id!==request.user!.id);
         await Promise.all(moderatorIds.map(async(userId)=>{
@@ -647,7 +646,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     try {
       const meeting = await getMeetingById(Number(request.params.meetingId));
       if (!meeting) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
-      if (meeting.host_id !== request.user!.id && request.user!.role !== 'admin') return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte principal peut terminer la réunion pour tout le monde.');
+      if (meeting.host_id !== request.user!.id && meeting.temporary_host_id !== request.user!.id && request.user!.role !== 'admin') return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte actif peut terminer la réunion pour tout le monde.');
       const updated = await query(`UPDATE room_meetings SET status='ended',is_active=false,ended_at=now(),updated_at=now() WHERE id=$1 RETURNING *`, [meeting.id]);
       if (meeting.settings.lunaSummary !== false) await generateSummary(mapMeeting(updated.rows[0])).catch(() => null);
       io.to(`meeting:${meeting.id}`).emit('meeting:ended', { meetingId: meeting.id, endedBy: request.user!.id });
