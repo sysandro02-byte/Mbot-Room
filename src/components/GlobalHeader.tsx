@@ -40,11 +40,17 @@ export default function GlobalHeader(){
     if(!authenticated){setUnread(0);return;}
     const refresh=()=>void notificationService.list().then((rows)=>setUnread(rows.filter((item)=>!item.readAt).length)).catch(()=>undefined);
     const onNotification=()=>refresh();
+    const onRestrictionsUpdated=()=>void authService.refreshCurrentUser().then(()=>setUser(authService.getCurrentUser())).catch(()=>undefined);
     refresh();
     if(!socket.connected)socket.connect();
     socket.on('notification:new',onNotification);
+    socket.on('account:restrictions-updated',onRestrictionsUpdated);
     window.addEventListener('focus',refresh);
-    return()=>{socket.off('notification:new',onNotification);window.removeEventListener('focus',refresh);};
+    return()=>{
+      socket.off('notification:new',onNotification);
+      socket.off('account:restrictions-updated',onRestrictionsUpdated);
+      window.removeEventListener('focus',refresh);
+    };
   },[authenticated]);
 
   useEffect(()=>{
