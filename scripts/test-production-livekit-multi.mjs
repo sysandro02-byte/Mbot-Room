@@ -29,6 +29,32 @@ const api=async(path,options={},token='')=>{
 
 const authBearer={'X-MBote-Room-Session-Mode':'bearer'};
 
+const waitForStableProduction=async()=>{
+  const expected=String(process.env.GITHUB_SHA||'').trim();
+  const deadline=Date.now()+8*60_000;
+  let stable=0;
+  let lastSeen='';
+  while(Date.now()<deadline){
+    try{
+      const response=await fetch(backendUrl+'/api/health',{headers:{Origin:frontendUrl},cache:'no-store'});
+      const data=await response.json().catch(()=>({}));
+      lastSeen=String(data?.deployment?.commit||'');
+      const commitReady=!expected||lastSeen===expected;
+      const ready=response.ok&&data?.ok===true&&data?.readiness?.productionReady===true&&data?.readiness?.integrations?.livekit===true;
+      if(commitReady&&ready){
+        stable+=1;
+        if(stable>=3)return data;
+      }else{
+        stable=0;
+      }
+    }catch{
+      stable=0;
+    }
+    await sleep(5000);
+  }
+  throw new Error('Production did not become stable for commit '+(expected||'current')+'. Last deployed commit: '+(lastSeen||'unknown'));
+};
+
 const waitForRemoteMedia=async(page,name,timeout=50000)=>{
   await page.waitForFunction((participantName)=>{
     const tiles=Array.from(document.querySelectorAll('.room-v2-tile'));
@@ -94,6 +120,10 @@ const meetings=[];
 let host=null;
 
 try{
+  const stableHealth=await waitForStableProduction();
+  assert.equal(stableHealth.readiness?.integrations?.livekit,true);
+  await sleep(5000);
+
   const before=await api('/api/health');
   assert.equal(before.response.status,200,JSON.stringify(before.data));
   assert.equal(before.data.ok,true);
