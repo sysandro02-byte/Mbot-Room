@@ -238,35 +238,36 @@ const applyMeetingCreationPreferences = async (
 };
 
 const reconcileStaleLiveMeetings = async () => {
-  const liveRows = await query("SELECT * FROM room_meetings WHERE (status='live' OR is_active=true) AND ended_at IS NULL");
-  const now = Date.now();
-
-  for (const row of liveRows.rows) {
-    const meeting = mapMeeting(row);
-    const plannedEnd = new Date(meeting.start_time).getTime() + Math.max(15, Number(meeting.duration || 60)) * 60_000;
-    const hardExpired = Number.isFinite(plannedEnd) && now > plannedEnd + 60 * 60_000;
-    const startedAt = meeting.started_at ? new Date(meeting.started_at).getTime() : 0;
-    const canCheckPresence = startedAt > 0 && now - startedAt > 45_000;
-    let noActiveParticipant = false;
-
-    if (canCheckPresence) {
-      const activeMember = await query(
-        `SELECT 1 FROM room_meeting_members
-          WHERE meeting_id=$1 AND joined_at IS NOT NULL AND left_at IS NULL AND status='accepted'
-          LIMIT 1`,
-        [meeting.id],
-      );
-      noActiveParticipant = !activeMember.rows[0];
-    }
-
-    if (!hardExpired && !noActiveParticipant) continue;
-    await query(
-      `UPDATE room_meetings
-          SET status='ended',is_active=false,ended_at=COALESCE(ended_at,now()),temporary_host_id=NULL,updated_at=now()
-        WHERE id=$1 AND status<>'ended' AND status<>'cancelled'`,
-      [meeting.id],
-    );
-  }
+  await query(
+    `UPDATE room_meetings m
+        SET status='ended',
+            is_active=false,
+            ended_at=COALESCE(m.ended_at,now()),
+            temporary_host_id=NULL,
+            updated_at=now()
+      WHERE (m.status='live' OR m.is_active=true)
+        AND m.ended_at IS NULL
+        AND (
+          (
+            NULLIF(m.start_time,'') IS NOT NULL
+            AND m.start_time::timestamptz
+                + (GREATEST(15,COALESCE(m.duration,60)) * interval '1 minute')
+                + interval '1 hour' < now()
+          )
+          OR (
+            m.started_at IS NOT NULL
+            AND m.started_at < now() - interval '45 seconds'
+            AND NOT EXISTS (
+              SELECT 1
+                FROM room_meeting_members mm
+               WHERE mm.meeting_id=m.id
+                 AND mm.joined_at IS NOT NULL
+                 AND mm.left_at IS NULL
+                 AND mm.status='accepted'
+            )
+          )
+        )`,
+  );
 };
 
 const insertChatMessage = async (meetingId: number, user: NonNullable<AuthedRequest['user']>, textValue: unknown) => {
@@ -415,13 +416,47 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
   app.get('/api/meetings', ...protectedApi, async (request: AuthedRequest, response, next) => {
     try {
       await reconcileStaleLiveMeetings();
-      const result = await query('SELECT * FROM room_meetings WHERE status <> \'cancelled\' ORDER BY start_time ASC');
-      const visible: Meeting[] = [];
-      for (const row of result.rows) {
-        const meeting = mapMeeting(row);
-        if (await visibleToUser(meeting, request.user!)) visible.push({ ...meeting, settings: sanitizeMeetingSettings(meeting.settings) });
-      }
-      response.json(visible);
+      const result = request.user!.role === 'admin'
+        ? await query("SELECT * FROM room_meetings WHERE status <> 'cancelled' ORDER BY start_time ASC")
+        : await query(
+          `SELECT DISTINCT m.*
+             FROM room_meetings m
+             LEFT JOIN room_meeting_members mm
+               ON mm.meeting_id=m.id
+              AND mm.user_id=$1
+              AND mm.status='accepted'
+             LEFT JOIN room_lobby l
+               ON l.meeting_id=m.id
+              AND l.user_id=$1
+              AND l.status IN ('requested','accepted')
+            WHERE m.status <> 'cancelled'
+              AND (
+                m.host_id=$1
+                OR m.co_host_id=$1
+                OR m.temporary_host_id=$1
+                OR COALESCE((m.settings->>'isPublic')::boolean,false)=true
+                OR m.settings->>'visibility'='public'
+                OR mm.user_id IS NOT NULL
+                OR l.user_id IS NOT NULL
+                OR EXISTS (
+                  SELECT 1
+                    FROM jsonb_array_elements_text(
+                      CASE
+                        WHEN jsonb_typeof(m.settings->'participants')='array'
+                          THEN m.settings->'participants'
+                        ELSE '[]'::jsonb
+                      END
+                    ) invited(email)
+                   WHERE lower(invited.email)=lower($2)
+                )
+              )
+            ORDER BY m.start_time ASC`,
+          [request.user!.id, request.user!.email],
+        );
+      response.json(result.rows.map((row)=> {
+        const meeting=mapMeeting(row);
+        return { ...meeting, settings:sanitizeMeetingSettings(meeting.settings) };
+      }));
     } catch (error) { next(error); }
   });
 
