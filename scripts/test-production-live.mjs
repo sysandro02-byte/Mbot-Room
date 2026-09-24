@@ -367,18 +367,18 @@ try {
   ]);
 
   await Promise.all([
-    hostRoom.page.waitForFunction(() => (window.__mboteSmokeIceCandidates || []).some((value) => value.includes(' typ relay ')), undefined, { timeout: 30_000 }),
-    guestRoom.page.waitForFunction(() => (window.__mboteSmokeIceCandidates || []).some((value) => value.includes(' typ relay ')), undefined, { timeout: 30_000 }),
+    hostRoom.page.waitForFunction(() => (window.__mboteSmokeIceCandidates || []).some((value) => /\btyp relay\b/.test(value)), undefined, { timeout: 30_000 }),
+    guestRoom.page.waitForFunction(() => (window.__mboteSmokeIceCandidates || []).some((value) => /\btyp relay\b/.test(value)), undefined, { timeout: 30_000 }),
   ]);
 
   const relayDiagnostics = {
     host: await hostRoom.page.evaluate(() => ({
       peerConnections: window.__mboteSmokePeerConnections || 0,
-      relayCandidates: (window.__mboteSmokeIceCandidates || []).filter((value) => value.includes(' typ relay ')).length,
+      relayCandidates: (window.__mboteSmokeIceCandidates || []).filter((value) => /\btyp relay\b/.test(value)).length,
     })),
     guest: await guestRoom.page.evaluate(() => ({
       peerConnections: window.__mboteSmokePeerConnections || 0,
-      relayCandidates: (window.__mboteSmokeIceCandidates || []).filter((value) => value.includes(' typ relay ')).length,
+      relayCandidates: (window.__mboteSmokeIceCandidates || []).filter((value) => /\btyp relay\b/.test(value)).length,
     })),
   };
   assert.ok(relayDiagnostics.host.peerConnections > 0);
