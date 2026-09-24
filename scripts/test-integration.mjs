@@ -286,6 +286,20 @@ const socketAck = (socket, event, payload) => new Promise((resolve, reject) => {
   });
 });
 
+const waitForSocketEvent = (socket, event, predicate = () => true) => new Promise((resolve, reject) => {
+  const timer = setTimeout(() => {
+    socket.off(event, handler);
+    reject(new Error(`Socket event timeout: ${event}`));
+  }, 7_000);
+  const handler = (payload) => {
+    if (!predicate(payload)) return;
+    clearTimeout(timer);
+    socket.off(event, handler);
+    resolve(payload);
+  };
+  socket.on(event, handler);
+});
+
 const expectRejectedSocket = (token = '') => new Promise((resolve, reject) => {
   const socket = createSocket(baseUrl, {
     auth: { token },
@@ -914,6 +928,71 @@ try {
     media: { audio: true, video: false, screen: false },
   });
   assert.equal(participantJoin.ok, true, JSON.stringify(participantJoin));
+
+
+  // L’hôte principal quitte : sans co-hôte configuré, le participant connecté
+  // devient hôte temporaire et conserve les contrôles de modération.
+  const failoverEventPromise = waitForSocketEvent(
+    participantSocket,
+    'meeting:host-changed',
+    (payload) => payload?.acting === true,
+  );
+  hostSocket.close();
+  hostSocket = null;
+  const failoverEvent = await failoverEventPromise;
+  assert.equal(Number(failoverEvent.hostUserId), Number(participant.user.id));
+  assert.equal(failoverEvent.reason, 'participant-failover');
+
+  const membersDuringFailover = await jsonRequest(`/api/meetings/${meeting.id}/participants`, {
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(membersDuringFailover.response.status, 200, JSON.stringify(membersDuringFailover.data));
+  assert.equal(
+    membersDuringFailover.data.find((item) => Number(item.userId) === Number(participant.user.id))?.role,
+    'host',
+  );
+
+  const actingHostLock = await jsonRequest(`/api/meetings/${meeting.id}/lock`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ locked: true }),
+  });
+  assert.equal(actingHostLock.response.status, 200, JSON.stringify(actingHostLock.data));
+  const actingHostUnlock = await jsonRequest(`/api/meetings/${meeting.id}/lock`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ locked: false }),
+  });
+  assert.equal(actingHostUnlock.response.status, 200, JSON.stringify(actingHostUnlock.data));
+
+  // Le vrai hôte revient : son rôle est restauré et le participant redevient
+  // automatiquement participant.
+  const restoredEventPromise = waitForSocketEvent(
+    participantSocket,
+    'meeting:host-changed',
+    (payload) => payload?.reason === 'primary-returned',
+  );
+  hostSocket = await socketConnect(host.token);
+  const hostRejoin = await socketAck(hostSocket, 'meeting:join', {
+    meetingId: meeting.id,
+    media: { audio: true, video: true, screen: false },
+  });
+  assert.equal(hostRejoin.ok, true, JSON.stringify(hostRejoin));
+  const restoredEvent = await restoredEventPromise;
+  assert.equal(Number(restoredEvent.hostUserId), Number(host.user.id));
+
+  const membersAfterRestore = await jsonRequest(`/api/meetings/${meeting.id}/participants`, {
+    headers: authHeaders(host.token),
+  });
+  assert.equal(membersAfterRestore.response.status, 200, JSON.stringify(membersAfterRestore.data));
+  assert.equal(
+    membersAfterRestore.data.find((item) => Number(item.userId) === Number(host.user.id))?.role,
+    'host',
+  );
+  assert.equal(
+    membersAfterRestore.data.find((item) => Number(item.userId) === Number(participant.user.id))?.role,
+    'participant',
+  );
 
   const realtimeMessage = await socketAck(participantSocket, 'meeting:chat-message', {
     meetingId: meeting.id,
