@@ -1040,6 +1040,24 @@ try {
   assert.ok(Array.isArray(ended.data.participants));
   assert.ok(ended.data.participants.length >= 2);
 
+  const restarted = await jsonRequest(`/api/meetings/${meeting.id}/restart`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+  });
+  assert.equal(restarted.response.status, 201, JSON.stringify(restarted.data));
+  assert.equal(restarted.data.meeting?.status, 'live');
+  assert.equal(restarted.data.meeting?.is_active, true);
+  assert.notEqual(Number(restarted.data.meeting?.id), Number(meeting.id));
+  assert.equal(restarted.data.meeting?.settings?.meetingAccessId, meeting.settings?.meetingAccessId);
+
+  const restartedLookup = await jsonRequest('/api/meetings/join-lookup', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ value: meeting.settings?.meetingAccessId, password: 'RoomPass2026!' }),
+  });
+  assert.equal(restartedLookup.response.status, 200, JSON.stringify(restartedLookup.data));
+  assert.equal(Number(restartedLookup.data.id), Number(restarted.data.meeting.id));
+
   const finalHealth = await jsonRequest('/api/health');
   assert.equal(finalHealth.response.status, 200);
   assert.equal(finalHealth.data.database?.connected, true);
