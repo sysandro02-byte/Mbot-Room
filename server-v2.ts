@@ -109,7 +109,18 @@ const rateLimit = (limit: number, windowMs: number): express.RequestHandler => (
   const now = Date.now();
   cleanupRateBuckets(now);
   const routeKey = String(request.originalUrl || request.path).split('?')[0];
-  const key = `${request.ip}:${routeKey}`;
+  // Sur les routes d'authentification, une IP partagée (école, entreprise,
+  // opérateur mobile/NAT) ne doit pas bloquer tous les comptes ensemble.
+  // On conserve l'IP et on ajoute l'identité du compte ou du challenge OTP.
+  const authIdentity = routeKey.startsWith('/api/auth/')
+    ? String(
+        request.body?.challengeId
+        || request.body?.email
+        || request.body?.meetingCode
+        || '',
+      ).trim().toLowerCase().slice(0, 180)
+    : '';
+  const key = `${request.ip}:${routeKey}:${authIdentity || '-'}`;
   const current = rateBuckets.get(key);
   if (!current || current.resetAt <= now) {
     rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
