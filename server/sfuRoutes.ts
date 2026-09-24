@@ -133,6 +133,22 @@ export const registerSfuRoutes = (app: express.Express) => {
       const mode = configuredMode();
       const config = liveKitConfig();
       const livekitReady = Boolean(config.serverUrl && config.apiKey && config.apiSecret);
+      const acceptedCountResult = await query(
+        "SELECT COUNT(*)::int AS count FROM room_meeting_members WHERE meeting_id=$1 AND status='accepted'",
+        [meetingId],
+      );
+      const acceptedCount = Number(acceptedCountResult.rows[0]?.count || 0);
+      const requiresSfu = acceptedCount > 12;
+      if (requiresSfu && (mode === 'mesh' || !livekitReady)) {
+        sendApiError(
+          response,
+          503,
+          'MEDIA_SFU_REQUIRED',
+          'Cette réunion compte trop de participants pour le mode direct. Le serveur média doit être disponible pour préserver la qualité audio et vidéo.',
+          { acceptedCount, threshold: 12 },
+        );
+        return;
+      }
 
       if (mode === 'mesh' || (mode === 'auto' && !livekitReady)) {
         response.setHeader('Cache-Control', 'no-store');
