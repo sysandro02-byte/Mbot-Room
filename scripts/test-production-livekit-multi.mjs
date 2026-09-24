@@ -236,6 +236,19 @@ try{
   }
 
   await Promise.all(livePairs.flatMap((pair)=>[
+    pair.hostRoom.page.waitForFunction(
+      () => document.querySelector('[data-testid="media-transport-status"]')?.getAttribute('data-transport') === 'livekit',
+      undefined,
+      {timeout:50000},
+    ),
+    pair.guestRoom.page.waitForFunction(
+      () => document.querySelector('[data-testid="media-transport-status"]')?.getAttribute('data-transport') === 'livekit',
+      undefined,
+      {timeout:50000},
+    ),
+  ]));
+
+  await Promise.all(livePairs.flatMap((pair)=>[
     waitForRemoteMedia(pair.hostRoom.page,pair.guestName),
     waitForRemoteMedia(pair.guestRoom.page,host.user.name),
   ]));
