@@ -82,6 +82,47 @@ export default function RealMeetingList(){
   const canManageAsPrimary=(meeting:Meeting)=>isActualHost(meeting)||isAdmin();
   const isCoHost=(meeting:Meeting)=>Boolean(user&&Number(meeting.co_host_id||0)===Number(user.id));
   const canModerate=(meeting:Meeting)=>canManageAsPrimary(meeting)||isCoHost(meeting);
+  const meetingPhase=(meeting:Meeting):'upcoming'|'live'|'ended'=> {
+    const startAt=new Date(meeting.start_time).getTime();
+    const cancelled=meeting.status==='cancelled';
+    const ended=meeting.status==='ended'||cancelled||(startAt+(meeting.duration||60)*60_000<Date.now()&&!meeting.is_active&&meeting.status!=='scheduled');
+    if(ended)return 'ended';
+    if(meeting.is_active||meeting.status==='live')return 'live';
+    return 'upcoming';
+  };
+  const upcomingMeetings=sorted.filter((meeting)=>meetingPhase(meeting)==='upcoming');
+  const liveMeetings=sorted.filter((meeting)=>meetingPhase(meeting)==='live');
+  const endedMeetings=[...sorted].filter((meeting)=>meetingPhase(meeting)==='ended').sort((a,b)=>new Date(b.start_time).getTime()-new Date(a.start_time).getTime());
+  const mineMeetings=sorted.filter((meeting)=>isActualHost(meeting)||isCoHost(meeting)||isAdmin());
+  const invitationMeetings=sorted.filter((meeting)=>!isActualHost(meeting)&&!isCoHost(meeting)&&!isAdmin());
+  const selectedCollection=viewFilter==='upcoming'?upcomingMeetings:viewFilter==='live'?liveMeetings:viewFilter==='ended'?endedMeetings:viewFilter==='mine'?mineMeetings:invitationMeetings;
+  const normalizedQuery=searchQuery.trim().toLowerCase();
+  const visibleMeetings=selectedCollection.filter((meeting)=>!normalizedQuery||[meeting.title,meeting.description,meeting.host_name,String(meeting.settings?.meetingAccessId||getMeetingAccessCode(meeting))].join(' ').toLowerCase().includes(normalizedQuery));
+  const nextMeeting=upcomingMeetings[0]||liveMeetings[0]||null;
+  const monthNow=new Date();
+  const monthlyMinutes=meetings.filter((meeting)=>{const date=new Date(meeting.start_time);return date.getFullYear()===monthNow.getFullYear()&&date.getMonth()===monthNow.getMonth();}).reduce((total,meeting)=>total+Number(meeting.duration||0),0);
+  const monthlyHours=monthlyMinutes<60?monthlyMinutes+' min':Math.round(monthlyMinutes/6)/10+' h';
+  const storageRatio=recordingStats?.quotaBytes?Math.min(100,Math.round((Number(recordingStats.sizeBytes||0)/Number(recordingStats.quotaBytes))*100)):0;
+  const formatBytes=(value:number)=>{
+    if(!Number.isFinite(value)||value<=0)return '0 Mo';
+    const units=['o','Ko','Mo','Go'];
+    let amount=value,index=0;
+    while(amount>=1024&&index<units.length-1){amount/=1024;index+=1;}
+    return (index===3&&amount<10?amount.toFixed(1):Math.round(amount))+' '+units[index];
+  };
+  const timeUntil=(meeting:Meeting)=>{
+    const diff=new Date(meeting.start_time).getTime()-Date.now();
+    if(diff<=0)return meeting.is_active?'En cours':'Maintenant';
+    const minutes=Math.ceil(diff/60_000);
+    if(minutes<60)return 'Dans '+minutes+' min';
+    const hours=Math.ceil(minutes/60);
+    if(hours<24)return 'Dans '+hours+' h';
+    return 'Dans '+Math.ceil(hours/24)+' j';
+  };
+  const participantLabels=(meeting:Meeting)=>{
+    const emails=Array.isArray(meeting.settings?.participants)?meeting.settings!.participants!:[];
+    return emails.slice(0,5).map((email)=>String(email).split('@')[0].split(/[._-]/).filter(Boolean).slice(0,2).map((part)=>part[0]?.toUpperCase()).join('')||'P');
+  };
 
   const createMeeting=async(event:FormEvent)=>{
     event.preventDefault();setError('');
