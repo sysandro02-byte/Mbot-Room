@@ -368,6 +368,12 @@ try {
     await page.waitForTimeout(250);
 
     assert.ok(!page.url().includes('/login'), `${route} unexpectedly redirected to login`);
+    const globalHeader = page.locator('.global-app-header');
+    await globalHeader.waitFor({ state: 'visible', timeout: 10_000 });
+    const headerPosition = await globalHeader.evaluate((element) => getComputedStyle(element).position);
+    const headerTop = await globalHeader.evaluate((element) => getComputedStyle(element).top);
+    assert.equal(headerPosition, 'sticky', `${route} global header must remain sticky while scrolling`);
+    assert.equal(headerTop, '0px', `${route} global header must stay attached to the top`);
     const body = (await page.locator('body').innerText()).replace(/\s+/g, ' ').trim();
     assert.ok(body.includes(expectedText), `${route} should render "${expectedText}". Body: ${body.slice(0, 500)}`);
 
