@@ -261,6 +261,30 @@ export default function AdminControlCenter(){
       <div className="admin-control-note"><ShieldCheck size={17}/><span>Ces réglages sont appliqués côté interface, API, temps réel et médias : masquer un bouton ne suffit pas à contourner la restriction.</span></div>
     </section>
 
+    <section className="admin-legal-card" id="admin-legal-terms">
+      <header><div><span className="admin-control-icon"><FileText size={20}/></span><div><h2>Conditions d’utilisation</h2><p>Texte obligatoire affiché à l’inscription et aux invités. Chaque publication crée une nouvelle version.</p></div></div><strong>{terms.version?'Version '+terms.version:'Non publiée'}</strong></header>
+      <form className="admin-legal-form" onSubmit={saveTerms}>
+        <label>Titre<input value={termsDraft.title} onChange={event=>setTermsDraft(value=>({...value,title:event.target.value}))} maxLength={180} required/></label>
+        <label>Texte<textarea value={termsDraft.body} onChange={event=>setTermsDraft(value=>({...value,body:event.target.value}))} rows={12} maxLength={30000} required/></label>
+        <div><small>{termsDraft.body.length}/30000 caractères</small><button disabled={termsBusy||termsDraft.body.trim().length<80}><Save size={16}/>{termsBusy?'Publication…':'Publier la nouvelle version'}</button></div>
+      </form>
+    </section>
+
+    <section className="admin-reports-card" id="admin-reports">
+      <header><div><span className="admin-control-icon"><Flag size={20}/></span><div><h2>Signalements</h2><p>Bugs et réunions signalés par les utilisateurs. Le support et les administrateurs reçoivent aussi un e-mail ou une notification.</p></div></div><strong>{reports.filter(report=>report.status==='open').length} ouvert(s)</strong></header>
+      <div className="admin-reports-list">
+        {reports.length?reports.map(report=><article key={report.id}>
+          <div className="admin-report-main">
+            <span className={report.type==='bug'?'bug':'meeting'}>{report.type==='bug'?'Bug':'Réunion'}</span>
+            <div><strong>{report.title}</strong><small>{report.reporterName||report.reporterEmail||'Utilisateur'} · {new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(report.createdAt))}{report.meetingId?' · Réunion #'+report.meetingId:''}</small><p>{report.description}</p></div>
+          </div>
+          <select value={report.status} onChange={event=>void updateReport(report,event.target.value as AdminReport['status'])} disabled={busy}>
+            <option value="open">Ouvert</option><option value="reviewing">En analyse</option><option value="resolved">Résolu</option><option value="dismissed">Classé</option>
+          </select>
+        </article>):<p className="admin-control-empty">Aucun signalement.</p>}
+      </div>
+    </section>
+
     <section className="admin-admin-invites-card" id="admin-admin-invites">
       <header><div><span className="admin-control-icon"><MailPlus size={20}/></span><div><h2>Administrateurs</h2><p>Créez un lien sécurisé pour autoriser un nouveau compte administrateur.</p></div></div><strong>{users.filter(user=>user.role==='admin'&&!user.isSuspended).length} admin(s) actif(s)</strong></header>
       <form className="admin-admin-invite-form" onSubmit={createAdminInvite}>
