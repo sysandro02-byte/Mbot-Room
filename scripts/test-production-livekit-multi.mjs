@@ -73,7 +73,18 @@ const openRoom=async(browser,session,meeting,label)=>{
   });
 
   await page.goto(appUrl+'/reunions/'+meeting.id,{waitUntil:'domcontentloaded',timeout:45000});
-  await page.locator('.room-v2-shell').waitFor({state:'visible',timeout:45000});
+  try{
+    await page.locator('.room-v2-shell').waitFor({state:'visible',timeout:45000});
+  }catch(error){
+    const diagnostics=await page.evaluate(()=>({
+      href:location.href,
+      title:document.title,
+      body:document.body?.innerText?.slice(0,2500)||'',
+      user:localStorage.getItem('user'),
+      hasToken:Boolean(localStorage.getItem('token')),
+    })).catch(()=>({href:page.url(),title:'',body:'',user:null,hasToken:false}));
+    throw new Error(label+' meeting shell unavailable: '+JSON.stringify(diagnostics),{cause:error});
+  }
   return {context,page,browserErrors,livekitSockets,label};
 };
 
