@@ -285,6 +285,7 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
       );
       if (requestedSuspended || requestedStatus === 'banned') {
         await query('DELETE FROM room_sessions WHERE user_id=$1',[userId]);
+        await query('DELETE FROM room_login_otps WHERE user_id=$1',[userId]).catch(()=>undefined);
         io.in(`user:${userId}`).disconnectSockets(true);
       }
       io.emit('admin:user-updated',{userId,isSuspended:requestedSuspended,accountStatus:requestedStatus,featureRestrictions:requestedRestrictions});
