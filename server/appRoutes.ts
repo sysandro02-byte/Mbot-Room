@@ -411,7 +411,8 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
     try{
       const startsAt=parseDate(request.body?.startsAt);const endsAt=parseDate(request.body?.endsAt);const title=String(request.body?.title||'').trim().slice(0,200);
       if(!title||!startsAt||!endsAt||endsAt<=startsAt)return sendApiError(response,400,'VALIDATION_ERROR','Titre et horaires valides requis.');
-      const id=createId();const result=await query(`INSERT INTO room_calendar_events (id,user_id,meeting_id,title,description,starts_at,ends_at) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,[id,request.user!.id,request.body?.meetingId?Number(request.body.meetingId):null,title,String(request.body?.description||'').trim().slice(0,1000),startsAt.toISOString(),endsAt.toISOString()]);
+      const metadata=request.body?.metadata&&typeof request.body.metadata==='object'&&!Array.isArray(request.body.metadata)?request.body.metadata:{};
+      const id=createId();const result=await query(`INSERT INTO room_calendar_events (id,user_id,meeting_id,title,description,starts_at,ends_at,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb) RETURNING *`,[id,request.user!.id,request.body?.meetingId?Number(request.body.meetingId):null,title,String(request.body?.description||'').trim().slice(0,1000),startsAt.toISOString(),endsAt.toISOString(),JSON.stringify(metadata)]);
       const synced=await syncCalendarEventToGoogle(request.user!.id,result.rows[0]);
       io.to(`user:${request.user!.id}`).emit('calendar:event-updated',synced);
       response.status(201).json(synced);
