@@ -21,6 +21,7 @@ export default function SessionSecurity(){
   const navigate=useNavigate();
   const [secondsLeft,setSecondsLeft]=useState<number|null>(null);
   const [authenticated,setAuthenticated]=useState(authService.isAuthenticated());
+  const inActiveMeeting=/^\/reunions\/[^/]+(?:\/luna)?\/?$/.test(location.pathname);
   const lastPingRef=useRef(0);
   const loggingOutRef=useRef(false);
 
@@ -81,6 +82,11 @@ export default function SessionSecurity(){
     document.addEventListener('visibilitychange',visibility);
 
     const timer=window.setInterval(async()=>{
+      if(inActiveMeeting){
+        localStorage.setItem(LAST_ACTIVITY_KEY,String(Date.now()));
+        setSecondsLeft(null);
+        return;
+      }
       if(!navigator.onLine){
         setSecondsLeft(null);
         return;
@@ -103,9 +109,9 @@ export default function SessionSecurity(){
       document.removeEventListener('visibilitychange',visibility);
       window.clearInterval(timer);
     };
-  },[authenticated,navigate]);
+  },[authenticated,inActiveMeeting,navigate]);
 
-  if(secondsLeft===null)return null;
+  if(secondsLeft===null||inActiveMeeting)return null;
   return <aside className="session-idle-warning" role="alertdialog" aria-live="assertive" aria-label="Session bientôt expirée">
     <span><Clock3 size={19}/></span>
     <div><strong>Session bientôt verrouillée</strong><small>Déconnexion automatique dans {secondsLeft}s sans activité.</small></div>
