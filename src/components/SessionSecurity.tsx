@@ -3,10 +3,26 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Clock3, ShieldCheck } from 'lucide-react';
 import { authService } from '../services/authService';
 import { sanitizeInternalPath, routeContainsSensitiveData } from '../lib/navigationSecurity';
+import { PREFERENCES_EVENT, readCachedPreferences } from '../lib/userPreferences';
+import type { Preferences } from '../services/appDataService';
 import './SessionSecurity.css';
 
-const IDLE_MS = 5 * 60 * 1000;
+const DEFAULT_IDLE_MINUTES = 5;
 const WARNING_MS = 30 * 1000;
+const ALLOWED_IDLE_MINUTES = [0,5,15,30,60,240] as const;
+
+const resolveIdleMinutes = (preferences: Preferences) => {
+  const minutes = Number(preferences.automaticLogoutMinutes);
+  return ALLOWED_IDLE_MINUTES.includes(minutes as (typeof ALLOWED_IDLE_MINUTES)[number])
+    ? minutes
+    : DEFAULT_IDLE_MINUTES;
+};
+
+const formatIdleDuration = (minutes: number) => {
+  if (minutes === 60) return '1 heure';
+  if (minutes === 240) return '4 heures';
+  return `${minutes} minutes`;
+};
 const LAST_ACTIVITY_KEY = 'mboteroom-last-activity-at';
 const LAST_ROUTE_KEY = 'mboteroom-last-safe-route';
 const RESUME_DONE_KEY = 'mboteroom-pwa-resume-done';
@@ -21,6 +37,7 @@ export default function SessionSecurity(){
   const navigate=useNavigate();
   const [secondsLeft,setSecondsLeft]=useState<number|null>(null);
   const [authenticated,setAuthenticated]=useState(authService.isAuthenticated());
+  const [idleMinutes,setIdleMinutes]=useState(()=>resolveIdleMinutes(readCachedPreferences()));
   const inActiveMeeting=/^\/reunions\/[^/]+(?:\/luna)?\/?$/.test(location.pathname);
   const lastPingRef=useRef(0);
   const loggingOutRef=useRef(false);
@@ -34,6 +51,22 @@ export default function SessionSecurity(){
     window.addEventListener('mbote-room-auth-changed',syncAuth);
     window.addEventListener('storage',syncAuth);
     return()=>{window.removeEventListener('mbote-room-auth-changed',syncAuth);window.removeEventListener('storage',syncAuth);};
+  },[]);
+
+  useEffect(()=>{
+    const syncPreferences=(event?:Event)=>{
+      const detail=(event as CustomEvent<Preferences> | undefined)?.detail;
+      setIdleMinutes(resolveIdleMinutes(detail || readCachedPreferences()));
+    };
+    const syncStorage=(event:StorageEvent)=>{
+      if(!event.key||event.key==='mboteroom-preferences-cache')syncPreferences();
+    };
+    window.addEventListener(PREFERENCES_EVENT,syncPreferences as EventListener);
+    window.addEventListener('storage',syncStorage);
+    return()=>{
+      window.removeEventListener(PREFERENCES_EVENT,syncPreferences as EventListener);
+      window.removeEventListener('storage',syncStorage);
+    };
   },[]);
 
   useEffect(()=>{
@@ -69,7 +102,7 @@ export default function SessionSecurity(){
         void authService.touchActivity().catch(async()=>{
           if(authService.isAuthenticated()||loggingOutRef.current)return;
           loggingOutRef.current=true;
-          sessionStorage.setItem('mboteroom-auth-notice','Votre session a expiré après 5 minutes d’inactivité.');
+          sessionStorage.setItem('mboteroom-auth-notice','Votre session a expiré pour cause d’inactivité.');
           await authService.logout(false);
           navigate('/login',{replace:true});
         });
@@ -92,11 +125,16 @@ export default function SessionSecurity(){
         return;
       }
       if(!authService.isAuthenticated())return;
+      if(idleMinutes===0){
+        setSecondsLeft(null);
+        return;
+      }
       const elapsed=Date.now()-nowActivity();
-      const remain=IDLE_MS-elapsed;
+      const idleMs=idleMinutes*60*1000;
+      const remain=idleMs-elapsed;
       if(remain<=0&&!loggingOutRef.current){
         loggingOutRef.current=true;
-        sessionStorage.setItem('mboteroom-auth-notice','Vous avez été déconnecté après 5 minutes d’inactivité.');
+        sessionStorage.setItem('mboteroom-auth-notice',`Vous avez été déconnecté après ${formatIdleDuration(idleMinutes)} d’inactivité.`);
         await authService.logout(true);
         navigate('/login',{replace:true});
         return;
@@ -109,7 +147,7 @@ export default function SessionSecurity(){
       document.removeEventListener('visibilitychange',visibility);
       window.clearInterval(timer);
     };
-  },[authenticated,inActiveMeeting,navigate]);
+  },[authenticated,idleMinutes,inActiveMeeting,navigate]);
 
   if(secondsLeft===null||inActiveMeeting)return null;
   return <aside className="session-idle-warning" role="alertdialog" aria-live="assertive" aria-label="Session bientôt expirée">
