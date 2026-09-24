@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { sanitizeInternalPath } from '../lib/navigationSecurity';
+import { apiFetch, apiUrl } from '../lib/api';
 import { getStoredLanguage, persistAppLanguage, type AppLanguage } from '../lib/appLanguage';
 import './Login.css';
 
@@ -35,6 +36,17 @@ type Language = AppLanguage;
 
 type LoginProps = {
   initialView?: AuthView;
+};
+
+type LoginBranding = {
+  wordmarkUrl: string;
+  illustrationUrl: string;
+  updatedAt?: string;
+};
+
+const defaultLoginBranding: LoginBranding = {
+  wordmarkUrl: '/icons/mboteroom-wordmark.png',
+  illustrationUrl: '/images/meeting-black-team.svg',
 };
 
 type FieldErrors = Partial<Record<'name' | 'email' | 'password' | 'confirmPassword' | 'phoneNumber' | 'organization' | 'jobTitle' | 'country' | 'city' | 'birthDate' | 'birthPlace' | 'address' | 'meetingCode' | 'meetingPassword', string>>;
@@ -258,6 +270,7 @@ const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.
 
 export default function Login({ initialView = 'login' }: LoginProps) {
   const [language, setLanguage] = useState<Language>(() => getStoredLanguage());
+  const [loginBranding, setLoginBranding] = useState<LoginBranding>(defaultLoginBranding);
   const [name, setName] = useState('');
   const [email, setEmail] = useState(() => localStorage.getItem('mboteroom-remember-me') === 'true' ? (localStorage.getItem('mboteroom-remember-email') || '') : '');
   const [password, setPassword] = useState('');
@@ -302,6 +315,32 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     return (hash.get('reset') || searchParams.get('token') || '').trim();
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadLoginBranding = async () => {
+      try {
+        const response = await apiFetch(apiUrl('/api/public/login-branding'), { cache: 'no-store' });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload || typeof payload !== 'object') return;
+        const next: LoginBranding = {
+          wordmarkUrl: typeof payload.wordmarkUrl === 'string' && payload.wordmarkUrl ? payload.wordmarkUrl : defaultLoginBranding.wordmarkUrl,
+          illustrationUrl: typeof payload.illustrationUrl === 'string' && payload.illustrationUrl ? payload.illustrationUrl : defaultLoginBranding.illustrationUrl,
+          updatedAt: typeof payload.updatedAt === 'string' ? payload.updatedAt : undefined,
+        };
+        if (!cancelled) setLoginBranding(next);
+      } catch {
+        // Keep bundled defaults when the backend is unavailable.
+      }
+    };
+    void loadLoginBranding();
+    const onFocus = () => void loadLoginBranding();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+    };
+  }, []);
 
   useEffect(() => {
     persistAppLanguage(language);
@@ -673,7 +712,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   return (
     <main className="login-page" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <section className="login-shell" aria-label="Connexion MBotéRoom">
-        <AuthBrandPanel copy={copy} language={language} onLanguageChange={setLanguage} />
+        <AuthBrandPanel copy={copy} language={language} branding={loginBranding} onLanguageChange={setLanguage} />
 
         <section className="auth-side">
           {initialView === 'login' && (
@@ -1073,10 +1112,12 @@ function ExternalAuthErrorModal({ message, onClose }: { message: string; onClose
 function AuthBrandPanel({
   copy,
   language,
+  branding,
   onLanguageChange,
 }: {
   copy: (typeof translations)[Language];
   language: Language;
+  branding: LoginBranding;
   onLanguageChange: (language: Language) => void;
 }) {
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
@@ -1126,7 +1167,12 @@ function AuthBrandPanel({
         )}
       </div>
       <button className="mbote-logo admin-entry" type="button" aria-label="Ouvrir la connexion administrateur" title="Administration" onClick={() => navigateToAdmin('/admin/login')}>
-        <img className="mboteroom-wordmark" src="/icons/mboteroom-wordmark.png" alt="MBotéRoom" />
+        <img
+          className="mboteroom-wordmark"
+          src={branding.wordmarkUrl}
+          alt="MBotéRoom"
+          onError={(event) => { if (event.currentTarget.src !== defaultLoginBranding.wordmarkUrl) event.currentTarget.src = defaultLoginBranding.wordmarkUrl; }}
+        />
       </button>
 
       <div className="brand-panel-copy">
@@ -1152,7 +1198,7 @@ function AuthBrandPanel({
         })}
       </div>
 
-      <MeetingIllustration />
+      <MeetingIllustration src={branding.illustrationUrl} />
       <div className="auth-showcase-badge auth-showcase-badge-team" aria-hidden="true">
         <UsersRound size={18} />
         <span>Réunions plus<br/>productives</span>
@@ -1166,14 +1212,15 @@ function AuthBrandPanel({
   );
 }
 
-function MeetingIllustration() {
+function MeetingIllustration({ src }: { src: string }) {
   return (
     <figure className="meeting-illustration">
       <img
-        src="/images/meeting-black-team.svg"
+        src={src || defaultLoginBranding.illustrationUrl}
         alt="Participants en pleine réunion vidéo MBotéRoom"
         loading="eager"
         decoding="async"
+        onError={(event) => { if (event.currentTarget.src !== defaultLoginBranding.illustrationUrl) event.currentTarget.src = defaultLoginBranding.illustrationUrl; }}
       />
     </figure>
   );
