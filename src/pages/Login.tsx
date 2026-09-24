@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Building2,
   CalendarDays,
+  Download,
   Eye,
   EyeOff,
   Globe2,
@@ -20,6 +21,8 @@ import {
   Phone,
   Sparkles,
   ShieldCheck,
+  Share2,
+  Smartphone,
   User,
   UsersRound,
   Video,
@@ -98,6 +101,13 @@ const translations = {
     joinText: "Vous n'avez pas de compte ? Rejoignez une réunion en tant qu'invité.",
     noAccount: 'Pas encore de compte ?',
     createAccount: 'Créer un compte',
+    apkTitle: 'MBotéRoom pour Android',
+    apkText: 'Téléchargez toujours la dernière version APK compilée.',
+    apkDownload: 'Télécharger l’APK',
+    apkShare: 'Envoyer à un ami',
+    apkShareText: 'Télécharge MBotéRoom pour Android avec ce lien :',
+    apkCopied: 'Lien de téléchargement copié.',
+    apkShareFailed: 'Impossible de partager le lien pour le moment.',
   },
   en: {
     languageLabel: 'English',
@@ -134,6 +144,13 @@ const translations = {
     joinText: "No account? Join a meeting as a guest.",
     noAccount: "Don't have an account?",
     createAccount: 'Create account',
+    apkTitle: 'MBotéRoom for Android',
+    apkText: 'Always download the latest compiled APK.',
+    apkDownload: 'Download APK',
+    apkShare: 'Send to a friend',
+    apkShareText: 'Download MBotéRoom for Android using this link:',
+    apkCopied: 'Download link copied.',
+    apkShareFailed: 'Unable to share the link right now.',
   },
   ln: {
     languageLabel: 'Lingala',
@@ -170,6 +187,13 @@ const translations = {
     joinText: "Ozangi compte ? Kota na réunion lokola invité.",
     noAccount: 'Ozali nanu na compte te ?',
     createAccount: 'Kosala compte',
+    apkTitle: 'MBotéRoom mpo na Android',
+    apkText: 'Télécharger ntango nyonso APK ya sika oyo esili kosalama.',
+    apkDownload: 'Télécharger APK',
+    apkShare: 'Tindela moninga',
+    apkShareText: 'Télécharger MBotéRoom mpo na Android na lien oyo:',
+    apkCopied: 'Lien ya téléchargement ekopiami.',
+    apkShareFailed: 'Kokabola lien ekoki te sikoyo.',
   },
   ar: {
     languageLabel: 'العربية',
@@ -206,6 +230,13 @@ const translations = {
     joinText: 'ليس لديك حساب؟ انضم إلى الاجتماع كضيف.',
     noAccount: 'ليس لديك حساب بعد؟',
     createAccount: 'إنشاء حساب',
+    apkTitle: 'MBotéRoom لنظام Android',
+    apkText: 'نزّل دائمًا أحدث ملف APK تم تجميعه.',
+    apkDownload: 'تنزيل APK',
+    apkShare: 'إرساله إلى صديق',
+    apkShareText: 'نزّل MBotéRoom لنظام Android من هذا الرابط:',
+    apkCopied: 'تم نسخ رابط التنزيل.',
+    apkShareFailed: 'تعذّر مشاركة الرابط الآن.',
   },
 } satisfies Record<Language, {
   languageLabel: string;
@@ -232,6 +263,13 @@ const translations = {
   joinText: string;
   noAccount: string;
   createAccount: string;
+  apkTitle: string;
+  apkText: string;
+  apkDownload: string;
+  apkShare: string;
+  apkShareText: string;
+  apkCopied: string;
+  apkShareFailed: string;
 }>;
 
 const languageOptions: Array<{ value: Language; label: string }> = [
@@ -269,6 +307,7 @@ const features = [
 ] as const;
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+const ANDROID_APK_URL = 'https://github.com/sysandro02-byte/Mbot-Room/releases/download/android-latest/MBoteRoom-Android.apk';
 
 export default function Login({ initialView = 'login' }: LoginProps) {
   const [language, setLanguage] = useState<Language>(() => getStoredLanguage());
@@ -298,6 +337,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isMboteLoading, setIsMboteLoading] = useState(false);
+  const [apkShareMessage, setApkShareMessage] = useState('');
   const [formError, setFormError] = useState('');
   const [externalAuthModalMessage, setExternalAuthModalMessage] = useState('');
   const [otpChallengeId, setOtpChallengeId] = useState('');
@@ -704,6 +744,37 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     }
   };
 
+  const shareAndroidApk = async () => {
+    setApkShareMessage('');
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'MBotéRoom Android',
+          text: copy.apkShareText,
+          url: ANDROID_APK_URL,
+        });
+        return;
+      }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(ANDROID_APK_URL);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = ANDROID_APK_URL;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        textarea.remove();
+      }
+      setApkShareMessage(copy.apkCopied);
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return;
+      setApkShareMessage(copy.apkShareFailed);
+    }
+  };
+
   const renderRegistrationFields = () => (
     <>
       <FormField id="register-name" label="Nom complet" icon={<User size={21} aria-hidden="true" />} error={fieldErrors.name}>
@@ -904,6 +975,27 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                   </span>
                   <ChevronRight className="join-meeting-arrow" size={26} aria-hidden="true" />
                 </button>
+
+                <section className="android-download-card" aria-label={copy.apkTitle}>
+                  <div className="android-download-heading">
+                    <span className="android-download-icon"><Smartphone size={25} aria-hidden="true" /></span>
+                    <span>
+                      <strong>{copy.apkTitle}</strong>
+                      <small>{copy.apkText}</small>
+                    </span>
+                  </div>
+                  <div className="android-download-actions">
+                    <a href={ANDROID_APK_URL} className="android-download-primary" aria-label={copy.apkDownload}>
+                      <Download size={18} aria-hidden="true" />
+                      <span>{copy.apkDownload}</span>
+                    </a>
+                    <button type="button" className="android-download-share" onClick={() => void shareAndroidApk()} aria-label={copy.apkShare}>
+                      <Share2 size={18} aria-hidden="true" />
+                      <span>{copy.apkShare}</span>
+                    </button>
+                  </div>
+                  {apkShareMessage ? <small className="android-download-message" role="status">{apkShareMessage}</small> : null}
+                </section>
 
                 <p className="create-account-copy">
                   {copy.noAccount}
