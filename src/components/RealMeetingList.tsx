@@ -270,34 +270,125 @@ export default function RealMeetingList(){
   const remove=async(meeting:Meeting)=>{setBusyId(meeting.id);try{await meetingService.deleteMeeting(meeting.id);setMeetings((current)=>current.filter((item)=>item.id!==meeting.id));setDeleteTarget(null);setOpenMenuId(null);setNotice('Réunion supprimée de votre liste.');}catch(cause){setError(cause instanceof Error?cause.message:'Suppression impossible.');}finally{setBusyId(null);}};
   const copy=async(meeting:Meeting)=>{setOpenMenuId(null);try{await navigator.clipboard.writeText(getMeetingJoinUrl(meeting));setNotice('Lien de réunion copié.');}catch{setError('Impossible de copier le lien.');}};
 
-  return <section className="real-meeting-page" onMouseDown={(event)=>{if(openMenuId&&!(event.target as HTMLElement).closest('.real-meeting-menu-wrap'))setOpenMenuId(null);}}>
-    <header className="real-meeting-head"><div><h1>Réunions</h1><p>Planifiez, organisez et rejoignez vos réunions depuis cet espace.</p></div><div><button className="secondary" onClick={()=>void load()}><RefreshCw size={17}/> Actualiser</button><button onClick={()=>{setEditingMeeting(null);setForm(defaultForm());setShowCreate(true);}}><Plus size={17}/> Nouvelle réunion</button></div></header>
+  return <section className="real-meeting-page meeting-pro-page" onMouseDown={(event)=>{if(openMenuId&&!(event.target as HTMLElement).closest('.real-meeting-menu-wrap'))setOpenMenuId(null);}}>
+    <header className="meeting-pro-hero">
+      <div className="meeting-pro-title">
+        <span><Video/></span>
+        <div><h1>Réunions</h1><p>Planifiez, organisez et rejoignez vos réunions depuis cet espace.</p></div>
+      </div>
+      <button className="meeting-pro-new" onClick={()=>{setEditingMeeting(null);setForm(defaultForm(preferences));setShowCreate(true);}}><Plus/> Nouvelle réunion</button>
+    </header>
+
+    <section className="meeting-pro-shortcuts" aria-label="Actions rapides">
+      <button className="blue" onClick={()=>{setEditingMeeting(null);setForm(defaultForm(preferences));setShowCreate(true);}}><span><CalendarPlus/></span><div><strong>Planifier<br/>une réunion</strong><small>Programmez et invitez des participants</small></div><ChevronRight/></button>
+      <button className="green" onClick={()=>navigate('/app/groups?new=1')}><span><UsersRound/></span><div><strong>Créer un groupe</strong><small>Collaborez facilement avec votre équipe</small></div><ChevronRight/></button>
+      <button className="purple" onClick={()=>navigate('/join')}><span><Link2/></span><div><strong>Rejoindre une réunion</strong><small>Avec un ID, un code ou un lien</small></div><ChevronRight/></button>
+      <button className="orange" onClick={()=>navigate('/app/calendar')}><span><CalendarDays/></span><div><strong>Voir le calendrier</strong><small>Toutes vos réunions à venir</small></div><ChevronRight/></button>
+    </section>
+
+    <section className="meeting-pro-stats">
+      <article><span className="blue"><CalendarDays/></span><div><strong>{upcomingMeetings.length}</strong><small>Réunions à venir</small></div></article>
+      <article><span className="green"><CirclePlay/></span><div><strong>{liveMeetings.length}</strong><small>Réunions en cours</small></div></article>
+      <article><span className="teal"><CheckCircle2/></span><div><strong>{endedMeetings.length}</strong><small>Réunions terminées</small></div></article>
+      <article><span className="orange"><Clock3/></span><div><strong>{monthlyHours}</strong><small>Durée totale ce mois</small></div></article>
+    </section>
+
     {notice?<div className="real-meeting-notice">{notice}</div>:null}{error?<div className="real-meeting-error">{error}</div>:null}
-    {loading?<div className="real-meeting-empty">Chargement des réunions…</div>:null}
-    {!loading&&!sorted.length?<div className="real-meeting-empty"><Video size={42}/><h2>Aucune réunion</h2><p>Créez votre première réunion pour commencer.</p><button onClick={()=>{setEditingMeeting(null);setForm(defaultForm());setShowCreate(true);}}><CalendarPlus size={17}/> Planifier</button></div>:null}
-    <div className="real-meeting-grid">{sorted.map((meeting)=>{
-      const actualHost=isActualHost(meeting);const primaryManager=canManageAsPrimary(meeting);const coHost=isCoHost(meeting);const moderator=canModerate(meeting);const startAt=new Date(meeting.start_time);const cancelled=meeting.status==='cancelled';const ended=meeting.status==='ended'||cancelled||(startAt.getTime()+meeting.duration*60000<Date.now()&&!meeting.is_active&&meeting.status!=='scheduled');const roleLabel=actualHost?'Vous êtes hôte':coHost?'Vous êtes co-hôte':isAdmin()?'Administration':meeting.host_name;const statusLabel=meeting.is_active?'EN DIRECT':cancelled?'ANNULÉE':ended?'TERMINÉE':'PROGRAMMÉE';
-      return <article key={meeting.id} className="real-meeting-card">
-        <div className="real-meeting-card-top">
-          <span className={meeting.is_active?'live':''}>{statusLabel}</span>
-          <div className="real-meeting-card-meta"><small>{roleLabel}</small><div className="real-meeting-menu-wrap">
-            <button className="real-meeting-menu-trigger" type="button" aria-label={`Options pour ${meeting.title}`} aria-expanded={openMenuId===meeting.id} onClick={()=>setOpenMenuId((current)=>current===meeting.id?null:meeting.id)}><MoreVertical size={19}/></button>
-            {openMenuId===meeting.id?<div className="real-meeting-menu" role="menu">
-              <button type="button" role="menuitem" onClick={()=>{setOpenMenuId(null);void join(meeting);}}><ExternalLink size={16}/><span>{ended?'Voir le résumé':'Ouvrir la réunion'}</span></button>
-              <button type="button" role="menuitem" onClick={()=>void copy(meeting)}><Link2 size={16}/><span>Copier le lien</span></button>
-              <button type="button" role="menuitem" onClick={()=>void copyId(meeting)}><Copy size={16}/><span>Copier l’ID</span></button>
-              <button type="button" role="menuitem" onClick={()=>void shareMeeting(meeting)}><Share2 size={16}/><span>Partager</span></button>
-              {primaryManager&&!meeting.is_active&&!ended?<button type="button" role="menuitem" onClick={()=>openEdit(meeting)}><Pencil size={16}/><span>Modifier</span></button>:null}
-              {primaryManager?<button type="button" role="menuitem" onClick={()=>void duplicate(meeting)}><CopyPlus size={16}/><span>Dupliquer</span></button>:null}
-              {moderator&&!meeting.is_active&&!ended?<button type="button" role="menuitem" onClick={()=>{setOpenMenuId(null);void start(meeting);}}><Play size={16}/><span>Démarrer</span></button>:null}
-              {primaryManager&&!meeting.is_active?<><div className="real-meeting-menu-separator"/><button type="button" role="menuitem" className="is-danger" onClick={()=>{setOpenMenuId(null);setDeleteTarget(meeting);}}><Trash2 size={16}/><span>Supprimer</span></button></>:null}
-            </div>:null}
-          </div></div>
+
+    <div className="meeting-pro-layout">
+      <section className="meeting-pro-main">
+        <div className="meeting-pro-toolbar">
+          <div className="meeting-pro-tabs">
+            <button className={viewFilter==='upcoming'?'active':''} onClick={()=>setViewFilter('upcoming')}><CalendarDays/> À venir <b>{upcomingMeetings.length}</b></button>
+            <button className={viewFilter==='live'?'active':''} onClick={()=>setViewFilter('live')}><CirclePlay/> En cours <b>{liveMeetings.length}</b></button>
+            <button className={viewFilter==='ended'?'active':''} onClick={()=>setViewFilter('ended')}><CheckCircle2/> Terminées</button>
+            <button className={viewFilter==='mine'?'active':''} onClick={()=>setViewFilter('mine')}><UsersRound/> Mes réunions</button>
+            <button className={viewFilter==='invitations'?'active':''} onClick={()=>setViewFilter('invitations')}><UserPlus/> Invitations {invitationMeetings.length?<b className="coral">{invitationMeetings.length}</b>:null}</button>
+          </div>
+          <label className="meeting-pro-search"><Search/><input value={searchQuery} onChange={(event)=>setSearchQuery(event.target.value)} placeholder="Rechercher une réunion…"/></label>
         </div>
-        <h2>{meeting.title}</h2>{meeting.description?<p>{meeting.description}</p>:null}
-        <dl><div><dt><Clock3 size={15}/> Horaire</dt><dd>{formatDate(meeting.start_time)} · {meeting.duration} min</dd></div><div><dt><UsersRound size={15}/> Participants</dt><dd>{Math.max(1,meeting.participant_count||1)} · capacité {meeting.settings?.participantCapacity||'non limitée'}</dd></div><div><dt><Lock size={15}/> ID</dt><dd>{meeting.settings?.meetingAccessId||getMeetingAccessCode(meeting)}</dd></div><div><dt><Link2 size={15}/> Accès</dt><dd>{meeting.settings?.waitingRoom===false?'Entrée directe':'Salle d’attente'} · {meeting.settings?.chat===false?'chat coupé':'chat actif'}</dd></div></dl>
-        <div className="real-meeting-actions"><button className="secondary" onClick={()=>void copy(meeting)}><Copy size={16}/> Copier</button>{ended?<button onClick={()=>void join(meeting)} disabled={busyId===meeting.id}><Video size={16}/> Résumé</button>:moderator&&!meeting.is_active?<button onClick={()=>void start(meeting)} disabled={busyId===meeting.id}><Play size={16}/> Démarrer</button>:<button onClick={()=>void join(meeting)} disabled={busyId===meeting.id}><Video size={16}/> Rejoindre</button>}</div>
-      </article>})}</div>
+
+        {loading?<div className="real-meeting-empty">Chargement des réunions…</div>:null}
+        {!loading&&!visibleMeetings.length?<div className="real-meeting-empty"><Video size={42}/><h2>Aucune réunion</h2><p>{searchQuery?'Aucun résultat ne correspond à votre recherche.':'Aucune réunion dans cette catégorie.'}</p><button onClick={()=>{setEditingMeeting(null);setForm(defaultForm(preferences));setShowCreate(true);}}><CalendarPlus size={17}/> Planifier une réunion</button></div>:null}
+
+        <div className="meeting-pro-list">
+          {visibleMeetings.map((meeting)=>{
+            const phase=meetingPhase(meeting);
+            const actualHost=isActualHost(meeting);
+            const primaryManager=canManageAsPrimary(meeting);
+            const coHost=isCoHost(meeting);
+            const moderator=canModerate(meeting);
+            const ended=phase==='ended';
+            const startAt=new Date(meeting.start_time);
+            const labels=participantLabels(meeting);
+            const participantCount=Math.max(1,Number(meeting.participant_count||meeting.settings?.participants?.length||1));
+            const statusLabel=phase==='live'?'En direct':phase==='ended'?(meeting.status==='cancelled'?'Annulée':'Terminée'):timeUntil(meeting);
+            return <article key={meeting.id} className={'meeting-pro-row '+phase}>
+              <time className="meeting-pro-date"><strong>{pad(startAt.getDate())}</strong><span>{new Intl.DateTimeFormat('fr-FR',{month:'short'}).format(startAt).replace('.','')}</span><small>{startAt.getFullYear()}</small></time>
+              <div className="meeting-pro-info">
+                <div className="meeting-pro-info-top"><h2>{meeting.title}</h2><b className={phase}>{statusLabel}</b></div>
+                <small><Clock3/> {formatTime(startAt)} – {formatTime(new Date(startAt.getTime()+(meeting.duration||60)*60_000))} ({meeting.duration||60} min)</small>
+                <small><Lock/> {meeting.settings?.waitingRoom===false?'Entrée directe':'Salle d’attente activée'}</small>
+                <small><Link2/> ID : {meeting.settings?.meetingAccessId||getMeetingAccessCode(meeting)}</small>
+              </div>
+              <div className="meeting-pro-participants">
+                <div>{labels.map((label,index)=><span key={label+index}>{label}</span>)}{participantCount>labels.length?<span>+{participantCount-labels.length}</span>:null}</div>
+                <small>{participantCount} participant{participantCount>1?'s':''}</small>
+              </div>
+              <div className="meeting-pro-row-actions">
+                {ended
+                  ?<button className="primary" onClick={()=>void join(meeting)} disabled={busyId===meeting.id}><Video/> Résumé</button>
+                  :moderator&&!meeting.is_active
+                    ?<button className="primary" onClick={()=>void start(meeting)} disabled={busyId===meeting.id}><Play/> Démarrer</button>
+                    :<button className="primary" onClick={()=>void join(meeting)} disabled={busyId===meeting.id}><Play/> Rejoindre</button>}
+                <button className="secondary" onClick={()=>void copyId(meeting)}><Copy/> Copier l’ID</button>
+                <button className="secondary" onClick={()=>void shareMeeting(meeting)}><UserPlus/> Inviter</button>
+                <div className="real-meeting-menu-wrap">
+                  <button className="real-meeting-menu-trigger" type="button" aria-label={'Options pour '+meeting.title} aria-expanded={openMenuId===meeting.id} onClick={()=>setOpenMenuId((current)=>current===meeting.id?null:meeting.id)}><MoreVertical/></button>
+                  {openMenuId===meeting.id?<div className="real-meeting-menu" role="menu">
+                    <button type="button" role="menuitem" onClick={()=>{setOpenMenuId(null);void join(meeting);}}><ExternalLink/><span>{ended?'Voir le résumé':'Ouvrir la réunion'}</span></button>
+                    <button type="button" role="menuitem" onClick={()=>void copy(meeting)}><Link2/><span>Copier le lien</span></button>
+                    <button type="button" role="menuitem" onClick={()=>void copyId(meeting)}><Copy/><span>Copier l’ID</span></button>
+                    <button type="button" role="menuitem" onClick={()=>void shareMeeting(meeting)}><Share2/><span>Partager</span></button>
+                    {primaryManager&&!meeting.is_active&&!ended?<button type="button" role="menuitem" onClick={()=>openEdit(meeting)}><Pencil/><span>Modifier</span></button>:null}
+                    {primaryManager?<button type="button" role="menuitem" onClick={()=>void duplicate(meeting)}><CopyPlus/><span>Dupliquer</span></button>:null}
+                    {moderator&&!meeting.is_active&&!ended?<button type="button" role="menuitem" onClick={()=>{setOpenMenuId(null);void start(meeting);}}><Play/><span>Démarrer</span></button>:null}
+                    {primaryManager&&!meeting.is_active?<><div className="real-meeting-menu-separator"/><button type="button" role="menuitem" className="is-danger" onClick={()=>{setOpenMenuId(null);setDeleteTarget(meeting);}}><Trash2/><span>Supprimer</span></button></>:null}
+                  </div>:null}
+                </div>
+              </div>
+            </article>;
+          })}
+        </div>
+      </section>
+
+      <aside className="meeting-pro-side">
+        <section className="meeting-pro-next">
+          <header><CalendarDays/><strong>Prochaine réunion</strong></header>
+          {nextMeeting?<div>
+            <h2>{nextMeeting.title}</h2>
+            <p>{formatDate(nextMeeting.start_time)}</p>
+            <div className="meeting-pro-side-participants">{participantLabels(nextMeeting).map((label,index)=><span key={label+index}>{label}</span>)}<small>{Math.max(1,Number(nextMeeting.participant_count||nextMeeting.settings?.participants?.length||1))} participant(s)</small></div>
+            <button onClick={()=>void (canModerate(nextMeeting)&&!nextMeeting.is_active?start(nextMeeting):join(nextMeeting))}><Play/> {nextMeeting.is_active?'Rejoindre maintenant':canModerate(nextMeeting)?'Démarrer maintenant':'Rejoindre maintenant'}</button>
+            <button className="link" onClick={()=>setSearchQuery(nextMeeting.title)}>Voir les détails <ChevronRight/></button>
+          </div>:<div className="meeting-pro-side-empty">Aucune réunion à venir.</div>}
+        </section>
+
+        <section className="meeting-pro-links">
+          <header><Link2/><strong>Liens rapides</strong></header>
+          <button onClick={()=>{setEditingMeeting(null);setForm(defaultForm(preferences));setShowCreate(true);}}><span className="green"><CalendarPlus/></span><div><strong>Nouvelle réunion</strong><small>Planifier une réunion</small></div><ChevronRight/></button>
+          <button onClick={()=>navigate('/app/groups?new=1')}><span className="blue"><UsersRound/></span><div><strong>Créer un groupe</strong><small>Collaborer avec votre équipe</small></div><ChevronRight/></button>
+          <button onClick={()=>navigate('/join')}><span className="purple"><Link2/></span><div><strong>Rejoindre une réunion</strong><small>Avec un ID ou un lien</small></div><ChevronRight/></button>
+          <button onClick={()=>navigate('/app/calendar')}><span className="orange"><CalendarDays/></span><div><strong>Calendrier</strong><small>Voir toutes vos réunions</small></div><ChevronRight/></button>
+        </section>
+
+        <section className="meeting-pro-storage">
+          <header><Database/><strong>Stockage & données</strong></header>
+          <div><i><b style={{width:storageRatio+'%'}}/></i><span>{formatBytes(Number(recordingStats?.sizeBytes||0))} utilisés sur {formatBytes(Number(recordingStats?.quotaBytes||0))}</span><strong>{storageRatio}%</strong></div>
+          <button onClick={()=>navigate('/app/settings#storage-data')}>Gérer le stockage <ChevronRight/></button>
+        </section>
+      </aside>
+    </div>
 
     {showCreate?<div className="real-meeting-modal" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget){closeMeetingForm();}}}><form className="real-meeting-form" onSubmit={submitMeeting}><header><div><h2>{editingMeeting?'Modifier la réunion':'Planifier une réunion'}</h2><p>{editingMeeting?'Mettez à jour les informations et réglages de cette réunion.':'Le lien de réunion est créé automatiquement.'}</p></div><button type="button" onClick={()=>{closeMeetingForm();}}><X/></button></header><label>Titre<input required maxLength={160} value={form.title} onChange={(event)=>setForm((current)=>({...current,title:event.target.value}))}/></label><label>Description<textarea maxLength={1500} value={form.description} onChange={(event)=>setForm((current)=>({...current,description:event.target.value}))}/></label><div className="real-meeting-form-row"><label>Début<input required type="datetime-local" value={form.startTime} onChange={(event)=>setForm((current)=>({...current,startTime:event.target.value}))}/></label><label>Durée<select value={form.duration} onChange={(event)=>setForm((current)=>({...current,duration:Number(event.target.value)}))}><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>1 heure</option><option value={90}>1 h 30</option><option value={120}>2 heures</option></select></label></div><label>Invités (emails)<textarea placeholder="amina@example.com; paul@example.com" value={form.participants} onChange={(event)=>setForm((current)=>({...current,participants:event.target.value}))}/></label><label>Mot de passe facultatif<input type="password" value={form.password} onChange={(event)=>setForm((current)=>({...current,password:event.target.value}))}/></label><div className="real-meeting-options"><Check label="Salle d’attente" value={form.waitingRoom} set={(value)=>setForm((current)=>({...current,waitingRoom:value}))}/><Check label="Autoriser avant l’hôte" value={form.joinBeforeHost} set={(value)=>setForm((current)=>({...current,joinBeforeHost:value}))}/><Check label="Micro participants" value={form.participantAudio} set={(value)=>setForm((current)=>({...current,participantAudio:value}))}/><Check label="Caméra participants" value={form.participantVideo} set={(value)=>setForm((current)=>({...current,participantVideo:value}))}/><Check label="Partage d’écran" value={form.screenShare} set={(value)=>setForm((current)=>({...current,screenShare:value}))}/><Check label="Chat" value={form.chat} set={(value)=>setForm((current)=>({...current,chat:value}))}/><Check label="Réactions" value={form.reactions} set={(value)=>setForm((current)=>({...current,reactions:value}))}/><Check label="Résumé Luna" value={form.lunaSummary} set={(value)=>setForm((current)=>({...current,lunaSummary:value}))}/><Check label="Réunion publique" value={form.isPublic} set={(value)=>setForm((current)=>({...current,isPublic:value}))}/></div><footer><button type="button" className="secondary" onClick={()=>{closeMeetingForm();}}>Annuler</button><button type="submit" disabled={Boolean(editingMeeting&&busyId===editingMeeting.id)}><CalendarPlus size={17}/> {editingMeeting?'Enregistrer les modifications':'Créer la réunion'}</button></footer></form></div>:null}
 
