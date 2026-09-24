@@ -13,6 +13,7 @@ import { getAppLocale } from '../lib/appLanguage';
 import { socket } from '../lib/socket';
 import { showAppMessage } from '../lib/appMessage';
 import './NotificationsPage.css';
+import AppLoader from '../components/AppLoader';
 
 type FilterKey='all'|'unread'|'meetings'|'messages'|'calls'|'system';
 type SortKey='recent'|'oldest';
@@ -184,7 +185,7 @@ export default function NotificationsPage(){
             <select value={sort} onChange={(event)=>setSort(event.target.value as SortKey)}><option value="recent">Plus récentes</option><option value="oldest">Plus anciennes</option></select>
           </div>
 
-          {loading?<div className="notifications-pro-empty">Chargement des notifications…</div>:filtered.length?<div className="notifications-pro-list">
+          {loading?<AppLoader label="Chargement des notifications…" />:filtered.length?<div className="notifications-pro-list">
             {filtered.map((notification)=>{
               const category=categoryOf(notification);
               const target=typeof notification.data?.url==='string'&&notification.data.url.startsWith('/');
