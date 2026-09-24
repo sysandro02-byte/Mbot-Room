@@ -505,6 +505,13 @@ try {
   await hostRoom.page.locator('[data-testid="gallery-layout"]').waitFor({ state: 'visible', timeout: 10_000 });
   await waitForRemoteMedia(hostRoom.page, 'Participant Vidéo');
 
+  const chrono = hostRoom.page.locator('[data-testid="meeting-chrono"]');
+  await chrono.waitFor({ state: 'visible', timeout: 10_000 });
+  const chronoBefore = (await chrono.innerText()).trim();
+  await sleep(1_250);
+  const chronoAfter = (await chrono.innerText()).trim();
+  assert.notEqual(chronoAfter, chronoBefore, 'Meeting chrono must advance while the meeting is live');
+
   const deviceButton = hostRoom.page.locator('[data-testid="device-settings-button"]');
   await deviceButton.waitFor({ state: 'visible', timeout: 10_000 });
   await deviceButton.click();
@@ -513,6 +520,23 @@ try {
   assert.ok(await devicePanel.locator('select').count() >= 3, 'Device panel should expose microphone, camera and speaker selectors');
   assert.ok(await devicePanel.locator('select').nth(0).locator('option').count() >= 1, 'At least one microphone should be available in the fake media environment');
   assert.ok(await devicePanel.locator('select').nth(1).locator('option').count() >= 1, 'At least one camera should be available in the fake media environment');
+
+  const micSelect = devicePanel.locator('select').nth(0);
+  const cameraSelect = devicePanel.locator('select').nth(1);
+  await micSelect.evaluate((element) => element.dispatchEvent(new Event('change', { bubbles: true })));
+  await hostRoom.page.waitForFunction(
+    () => document.body.textContent?.includes('Microphone changé.'),
+    undefined,
+    { timeout: 10_000 },
+  );
+  await cameraSelect.evaluate((element) => element.dispatchEvent(new Event('change', { bubbles: true })));
+  await hostRoom.page.waitForFunction(
+    () => document.body.textContent?.includes('Caméra changée.'),
+    undefined,
+    { timeout: 10_000 },
+  );
+  await waitForRemoteMedia(participantRoom.page, 'Hôte Vidéo');
+
   await deviceButton.click();
   await devicePanel.waitFor({ state: 'hidden', timeout: 10_000 });
 
