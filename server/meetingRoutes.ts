@@ -67,7 +67,7 @@ const meetingRole = (meeting: Meeting, user: NonNullable<AuthedRequest['user']>)
 
 const meetingCapacity = (meeting: Meeting) => {
   const configured = meeting.settings.participantCapacity;
-  if (configured === null || configured === undefined || configured === '') return 100;
+  if (configured === null || configured === undefined) return 100;
   const numeric = Number(configured);
   if (!Number.isFinite(numeric)) return 100;
   return Math.max(2, Math.min(1000, Math.floor(numeric)));
@@ -173,7 +173,7 @@ const applyMeetingCreationPreferences = async (
   const incoming = (body?.settings || {}) as MeetingSettings & Record<string, unknown>;
 
   if (Object.prototype.hasOwnProperty.call(incoming, 'participantCapacity')) {
-    const rawCapacity = incoming.participantCapacity;
+    const rawCapacity = (body?.settings || {}).participantCapacity as unknown;
     if (rawCapacity === null || rawCapacity === undefined || rawCapacity === '') {
       settings.participantCapacity = null;
     } else {
