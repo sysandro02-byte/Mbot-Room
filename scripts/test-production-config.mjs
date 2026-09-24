@@ -181,9 +181,12 @@ if (!manifest.icons?.some((icon) => icon.sizes === '192x192') || !manifest.icons
   throw new Error('PWA manifest must expose 192x192 and 512x512 icons');
 }
 for (const icon of manifest.icons) {
-  if (!/^\/icons\/[a-z0-9-]+\.png$/.test(icon.src) || !fs.existsSync(new URL(`../public${icon.src}`, import.meta.url))) {
+  if (!/^\/icons\/[a-z0-9-]+\.(?:png|svg)$/.test(icon.src) || !fs.existsSync(new URL(`../public${icon.src}`, import.meta.url))) {
     throw new Error(`PWA icon referenced by the manifest is missing: ${icon.src}`);
   }
+}
+if (!manifest.icons?.some((icon) => icon.src === '/icons/mboteroom-install.svg' && icon.sizes === 'any')) {
+  throw new Error('PWA install icon must use the canonical in-app MBoteRoom logo');
 }
 if (manifest.id !== '/app' || !String(manifest.start_url || '').startsWith('/app') || manifest.scope !== '/' || manifest.display !== 'standalone') {
   throw new Error('PWA manifest must use a stable app identity, an in-scope start URL and standalone display');
@@ -194,6 +197,16 @@ if (manifest.prefer_related_applications !== false || !manifest.icons?.some((ico
 const serviceWorker = fs.readFileSync(serviceWorkerPath, 'utf8');
 if (!serviceWorker.includes("url.pathname.startsWith('/api/')") || !serviceWorker.includes("url.pathname.startsWith('/socket.io/')")) {
   throw new Error('PWA service worker must never cache API or Socket.IO traffic');
+}
+if (!serviceWorker.includes('precacheBuildAssets') || !serviceWorker.includes("cache.match('/app'")) {
+  throw new Error('PWA service worker must precache the built application and keep an offline app-shell fallback');
+}
+if (!apiClient.includes('!navigator.onLine') || !apiClient.includes('readCachedApiResponse')) {
+  throw new Error('Offline API reads must immediately use synchronized local data');
+}
+const sessionSecurity = fs.readFileSync(new URL('../src/components/SessionSecurity.tsx', import.meta.url), 'utf8');
+if (!sessionSecurity.includes('if(!navigator.onLine)') || !sessionSecurity.includes('navigator.onLine?authService.isAuthenticated()')) {
+  throw new Error('Session security must preserve the local workspace during network loss');
 }
 const indexHtml = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 if (!indexHtml.includes('rel="manifest"') || !indexHtml.includes('theme-color')) {
