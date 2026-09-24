@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { authService } from '../services/authService';
 import { apiFetch, apiUrl } from '../lib/api';
+import TermsConsent from '../components/TermsConsent';
 import './GuestJoinPage.css';
 
 type JoinForm = {
@@ -84,6 +85,8 @@ export default function GuestJoinPage() {
   const [errors, setErrors] = useState<JoinErrors>({});
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsVersion, setTermsVersion] = useState('');
   const [guestSlides, setGuestSlides] = useState<GuestAccessSlide[]>([]);
   const [activeGuestSlide, setActiveGuestSlide] = useState(0);
   useEffect(() => {
@@ -140,6 +143,10 @@ export default function GuestJoinPage() {
   const submitJoin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isSubmitting || !validateForm()) return;
+    if (!termsAccepted || !termsVersion) {
+      setErrors({ global: "Vous devez lire et accepter les conditions d’utilisation avant de rejoindre en invité." });
+      return;
+    }
 
     setIsSubmitting(true);
     setErrors({});
@@ -149,6 +156,8 @@ export default function GuestJoinPage() {
         name: form.name.trim(),
         meetingCode: normalizedMeetingIdentifier,
         password: form.password,
+        termsAccepted,
+        termsVersion,
       });
       setForm((currentForm) => ({ ...currentForm, password: '' }));
       const target = result.meeting?.meeting_link
@@ -267,6 +276,12 @@ export default function GuestJoinPage() {
                 />
               </JoinField>
 
+              <TermsConsent
+                accepted={termsAccepted}
+                version={termsVersion}
+                onAccepted={(accepted,version)=>{setTermsAccepted(accepted);setTermsVersion(version);setErrors((current)=>({...current,global:undefined}));}}
+              />
+
               {errors.global && (
                 <div className="guest-global-error" role="alert">
                   <Info size={20} aria-hidden="true" />
@@ -274,7 +289,7 @@ export default function GuestJoinPage() {
                 </div>
               )}
 
-              <button className="guest-join-submit" type="submit" disabled={isSubmitting}>
+              <button className="guest-join-submit" type="submit" disabled={isSubmitting || !termsAccepted || !termsVersion}>
                 <ArrowRightToLine size={22} aria-hidden="true" />
                 {isSubmitting ? 'Connexion à la réunion...' : 'Rejoindre la réunion'}
               </button>
