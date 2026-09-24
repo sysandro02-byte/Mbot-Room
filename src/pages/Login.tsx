@@ -873,7 +873,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
               footer={<AuthFooterAction label="Déjà un compte ?" action="Se connecter" onClick={() => navigate('/connexion')} />}
             >
               {renderRegistrationFields()}
-              <TermsConsent accepted={termsAccepted} version={termsVersion} onAccepted={(accepted,version)=>{setTermsAccepted(accepted);setTermsVersion(version);setFormError('');}} />
+              <TermsConsent accepted={termsAccepted} version={termsVersion} autoOpen onAccepted={(accepted,version)=>{setTermsAccepted(accepted);setTermsVersion(version);setFormError('');}} />
             </CompactAuthCard>
           )}
 
