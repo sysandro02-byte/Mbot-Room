@@ -301,6 +301,19 @@ export const registerRealtime = (io: Server) => {
         if (moderator) socket.join(`meeting:${meetingId}:moderators`);
         roomParticipants.set(socket.id, participant);
         meetings.set(meetingId, roomParticipants);
+        if (moderator) {
+          const pendingLobby = await query(
+            `SELECT user_id,status,name,avatar
+               FROM room_lobby
+              WHERE meeting_id=$1 AND status='requested'
+              ORDER BY user_id`,
+            [meetingId],
+          );
+          socket.emit('meeting:lobby-snapshot', {
+            meetingId,
+            participants: pendingLobby.rows,
+          });
+        }
         const count = new Set([...roomParticipants.values()].map((item) => item.userId)).size;
         await query('UPDATE room_meetings SET participant_count=GREATEST(participant_count,$2),updated_at=now() WHERE id=$1', [meetingId, count])
           .catch((error) => warnPersistenceFailure('participant-count', error));
