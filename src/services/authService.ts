@@ -9,6 +9,7 @@ export type RoomUser = {
   avatar: string;
   phoneNumber?: string;
   organization?: string;
+  organizationCategory?: string;
   jobTitle?: string;
   country?: string;
   city?: string;
@@ -37,7 +38,7 @@ const USER_KEY = 'user';
 const TOKEN_KEY = 'token';
 const EXPIRY_KEY = 'sessionExpiresAt';
 
-type RawRoomUser = Partial<Record<keyof RoomUser | 'is_guest' | 'created_at' | 'phone_number' | 'job_title' | 'birth_date' | 'birth_place' | 'personal_meeting_id' | 'role' | 'permissions', unknown>>;
+type RawRoomUser = Partial<Record<keyof RoomUser | 'is_guest' | 'created_at' | 'phone_number' | 'organization_category' | 'job_title' | 'birth_date' | 'birth_place' | 'personal_meeting_id' | 'role' | 'permissions', unknown>>;
 
 const getStorage = (persist: boolean) => (persist ? localStorage : sessionStorage);
 
@@ -61,6 +62,7 @@ const normalizeUser = (user: RawRoomUser): RoomUser => ({
   avatar: String(user.avatar || ''),
   phoneNumber: String(user.phoneNumber || user.phone_number || ''),
   organization: String(user.organization || ''),
+  organizationCategory: String(user.organizationCategory || user.organization_category || ''),
   jobTitle: String(user.jobTitle || user.job_title || ''),
   country: String(user.country || ''),
   city: String(user.city || ''),
@@ -154,7 +156,7 @@ export const authService = {
     };
   },
 
-  async register(payload: { name: string; email: string; password: string; username?: string; phoneNumber?: string; organization?: string; jobTitle?: string; country?: string; city?: string; birthDate?: string; birthPlace?: string; address?: string; termsAccepted: boolean; termsVersion: string }) {
+  async register(payload: { name: string; email: string; password: string; username?: string; phoneNumber?: string; organization?: string; organizationCategory?: string; jobTitle?: string; country?: string; city?: string; birthDate?: string; birthPlace?: string; address?: string; termsAccepted: boolean; termsVersion: string }) {
     const response = await fetchAuth(apiUrl('/api/auth/register'), {
       method: 'POST',
       headers: authRequestHeaders(),
