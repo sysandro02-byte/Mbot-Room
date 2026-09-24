@@ -7,6 +7,7 @@ import {
   AuthedRequest,
   authenticateToken,
   canModerateMeeting,
+  canUseAccountFeature,
   hasMeetingAccess,
   mapMeeting,
   query,
@@ -116,16 +117,17 @@ export const registerSfuRoutes = (app: express.Express) => {
       }
       const moderator = canModerateMeeting(meeting, user);
       const guestScreenAllowed = !user.isGuest || await isPlatformFeatureEnabled('guestScreenShareEnabled');
+      const accountScreenAllowed = canUseAccountFeature(user, 'screenShare');
       const canPublishSources = moderator
         ? [
             'camera',
             'microphone',
-            ...(guestScreenAllowed ? ['screen_share', 'screen_share_audio'] : []),
+            ...(guestScreenAllowed && accountScreenAllowed ? ['screen_share', 'screen_share_audio'] : []),
           ]
         : [
             ...(meeting.settings.participantVideo !== false ? ['camera'] : []),
             ...(meeting.settings.participantAudio !== false ? ['microphone'] : []),
-            ...(guestScreenAllowed && meeting.settings.screenShare !== false ? ['screen_share', 'screen_share_audio'] : []),
+            ...(accountScreenAllowed && guestScreenAllowed && meeting.settings.screenShare !== false ? ['screen_share', 'screen_share_audio'] : []),
           ];
 
       const mode = configuredMode();
