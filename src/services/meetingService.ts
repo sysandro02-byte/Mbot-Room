@@ -169,6 +169,11 @@ export interface EndedMeetingPayload {
     sourceCounts: { chat: number; captions: number };
     lunaConfigured: boolean;
   };
+  feedback: {
+    submitted: boolean;
+    rating: number | null;
+    comment: string;
+  };
   nextActions: Array<{ id: string; label: string; completed: boolean }>;
   recording: {
     available: boolean;
@@ -303,6 +308,17 @@ export const meetingService = {
       throw new Error(data.error || 'Impossible de charger la fin de réunion.');
     }
     return data as EndedMeetingPayload;
+  },
+
+  async submitFeedback(meetingId: string | number, rating: number, comment: string): Promise<{ submitted: boolean; rating: number; comment: string }> {
+    const response = await apiFetch(apiUrl(`/api/meetings/${encodeURIComponent(String(meetingId))}/feedback`), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ rating, comment }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Impossible d’envoyer votre avis.');
+    return data;
   },
 
   async requestJoin(meetingId: number, userId?: number, password?: string): Promise<{ success: boolean; status?: 'accepted' | 'requested' }> {
