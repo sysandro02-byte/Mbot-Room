@@ -207,7 +207,7 @@ const register = async (name, email, admin = false) => {
   const result = await jsonRequest(admin ? '/api/auth/admin/register' : '/api/auth/register', {
     method: 'POST',
     headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
-    body: JSON.stringify({ name, email, password: 'Password2026!', termsAccepted: true, termsVersion: '2026-09-24' }),
+    body: JSON.stringify({ name, email, password: 'Password2026!', country: 'Congo-Brazzaville', city: 'Brazzaville', termsAccepted: true, termsVersion: '2026-09-24' }),
   });
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
   let session = result;
@@ -873,7 +873,7 @@ try {
 
   const lockedGuestJoin = await jsonRequest('/api/auth/guest-join', {
     method: 'POST',
-    body: JSON.stringify({ name: 'Invité verrouillé', meetingCode: meeting.meeting_link, password: 'RoomPass2026!', termsAccepted: true, termsVersion: '2026-09-24' }),
+    body: JSON.stringify({ name: 'Invité verrouillé', meetingCode: meeting.meeting_link, password: 'RoomPass2026!', country: 'Congo-Brazzaville', city: 'Brazzaville', termsAccepted: true, termsVersion: '2026-09-24' }),
   });
   assert.equal(lockedGuestJoin.response.status, 423, JSON.stringify(lockedGuestJoin.data));
   assert.equal(lockedGuestJoin.data.code, 'MEETING_LOCKED');
@@ -1102,7 +1102,7 @@ try {
 
   const endedGuestJoin = await jsonRequest('/api/auth/guest-join', {
     method: 'POST',
-    body: JSON.stringify({ name: 'Invité trop tard', meetingCode: meeting.meeting_link, password: 'RoomPass2026!', termsAccepted: true, termsVersion: '2026-09-24' }),
+    body: JSON.stringify({ name: 'Invité trop tard', meetingCode: meeting.meeting_link, password: 'RoomPass2026!', country: 'Congo-Brazzaville', city: 'Brazzaville', termsAccepted: true, termsVersion: '2026-09-24' }),
   });
   assert.equal(endedGuestJoin.response.status, 410, JSON.stringify(endedGuestJoin.data));
   assert.equal(endedGuestJoin.data.code, 'MEETING_ENDED');
