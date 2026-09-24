@@ -6,6 +6,7 @@ import {
   authenticateToken,
   createId,
   query,
+  requireAccountFeature,
   requireDatabase,
   sendApiError,
 } from './core.js';
@@ -326,7 +327,7 @@ export const registerWorkspaceRoutes=(app:express.Express,io:Server)=>{
     }catch(error){next(error);}
   });
 
-  app.post('/api/files/upload',...protectedApi,async(request:AuthedRequest,response,next)=>{
+  app.post('/api/files/upload',...protectedApi,requireAccountFeature('files'),async(request:AuthedRequest,response,next)=>{
     try{
       const mime=String(request.headers['content-type']||'').split(';')[0].toLowerCase();
       if(!ALLOWED_FILE_TYPES.has(mime))return sendApiError(response,415,'FILE_TYPE_NOT_ALLOWED','Seuls les fichiers PDF et images sont autorisés.');
@@ -409,7 +410,7 @@ export const registerWorkspaceRoutes=(app:express.Express,io:Server)=>{
     }catch(error){next(error);}
   });
 
-  app.post('/api/work-groups',...protectedApi,async(request:AuthedRequest,response,next)=>{
+  app.post('/api/work-groups',...protectedApi,requireAccountFeature('groups'),async(request:AuthedRequest,response,next)=>{
     try{
       const name=normalizeText(request.body?.name).slice(0,120);
       const description=normalizeText(request.body?.description).slice(0,600);
