@@ -52,8 +52,27 @@ const encodeTusMetadata = (value:string) => {
   return btoa(binary);
 };
 
+const fetchWithTimeout = async (
+  input:RequestInfo|URL,
+  init:RequestInit={},
+  timeoutMs=30_000,
+) => {
+  const controller=new AbortController();
+  const timer=window.setTimeout(()=>controller.abort(),timeoutMs);
+  try{
+    return await fetch(input,{...init,signal:init.signal||controller.signal});
+  }catch(error){
+    if(error instanceof DOMException&&error.name==='AbortError'){
+      throw new Error('Le transfert réseau a expiré. Vérifiez votre connexion puis réessayez.');
+    }
+    throw error;
+  }finally{
+    window.clearTimeout(timer);
+  }
+};
+
 const readTusOffset = async (uploadUrl:string) => {
-  const response = await fetch(uploadUrl, { method:'HEAD', headers:{ 'Tus-Resumable':'1.0.0' } });
+  const response = await fetchWithTimeout(uploadUrl, { method:'HEAD', headers:{ 'Tus-Resumable':'1.0.0' } }, 30_000);
   if (!response.ok) throw new Error('Impossible de reprendre l’envoi de l’enregistrement.');
   return Math.max(0, Number(response.headers.get('Upload-Offset') || 0));
 };
@@ -72,7 +91,7 @@ const uploadBlobToSupabaseTus = async (
     `metadata ${encodeTusMetadata(JSON.stringify({ source:'mboteroom', meetingId }))}`,
   ].join(',');
 
-  const created = await fetch(ticket.tusEndpoint, {
+  const created = await fetchWithTimeout(ticket.tusEndpoint, {
     method:'POST',
     headers:{
       'Tus-Resumable':'1.0.0',
@@ -81,7 +100,7 @@ const uploadBlobToSupabaseTus = async (
       'x-signature':ticket.token,
       'x-upsert':'false',
     },
-  });
+  }, 30_000);
   if (!created.ok) {
     const message = await created.text().catch(()=>'');
     throw new Error(message || 'Supabase n’a pas pu préparer l’envoi de l’enregistrement.');
@@ -101,7 +120,7 @@ const uploadBlobToSupabaseTus = async (
 
     for (let attempt = 0; attempt < 4 && !completed; attempt += 1) {
       try {
-        const response = await fetch(uploadUrl, {
+        const response = await fetchWithTimeout(uploadUrl, {
           method:'PATCH',
           headers:{
             'Tus-Resumable':'1.0.0',
@@ -109,7 +128,7 @@ const uploadBlobToSupabaseTus = async (
             'Content-Type':'application/offset+octet-stream',
           },
           body:chunk,
-        });
+        }, 120_000);
         if (!response.ok) throw new Error(await response.text().catch(()=>''));
         offset = Math.max(end, Number(response.headers.get('Upload-Offset') || end));
         completed = true;
