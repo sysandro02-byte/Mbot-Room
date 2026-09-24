@@ -74,7 +74,7 @@ try {
       name: 'Test pg-mem',
       email: 'pglite.test@mbote.test',
       password: 'Password2026!',
-      termsAccepted: true,
+      country: 'Congo-Brazzaville', city: 'Brazzaville', termsAccepted: true,
       termsVersion: '2026-09-24',
     }),
   });
