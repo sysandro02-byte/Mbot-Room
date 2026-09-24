@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Ban, CheckCircle2, LockKeyhole, LogOut, RefreshCw, Save, Search, Settings2, ShieldCheck, UserCog, UsersRound } from 'lucide-react';
+import { Ban, CheckCircle2, Copy, LockKeyhole, LogOut, MailPlus, RefreshCw, Save, Search, Settings2, ShieldCheck, Trash2, UserCog, UsersRound } from 'lucide-react';
 import {
+  AdminInvite,
   AdminManagedUser,
   AdminPlatformSettings,
   adminDashboardService,
@@ -38,6 +39,9 @@ export default function AdminControlCenter(){
   const current=authService.getCurrentUser();
   const [settings,setSettings]=useState<AdminPlatformSettings>(emptySettings);
   const [users,setUsers]=useState<AdminManagedUser[]>([]);
+  const [adminInvites,setAdminInvites]=useState<AdminInvite[]>([]);
+  const [adminInviteEmail,setAdminInviteEmail]=useState('');
+  const [lastInvitePath,setLastInvitePath]=useState('');
   const [search,setSearch]=useState('');
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState('');
@@ -49,11 +53,12 @@ export default function AdminControlCenter(){
   const load=async()=>{
     setBusy(true);setError('');
     try{
-      const [nextSettings,nextUsers]=await Promise.all([
+      const [nextSettings,nextUsers,nextInvites]=await Promise.all([
         adminDashboardService.getPlatformSettings(),
         adminDashboardService.getUsers(),
+        adminDashboardService.getAdminInvites().catch(()=>[]),
       ]);
-      setSettings(nextSettings);setUsers(nextUsers);
+      setSettings(nextSettings);setUsers(nextUsers);setAdminInvites(nextInvites);
     }catch(cause){setError(cause instanceof Error?cause.message:'Impossible de charger les outils du backoffice.');}
     finally{setBusy(false);}
   };
@@ -113,6 +118,41 @@ export default function AdminControlCenter(){
     finally{setBusy(false);}
   };
 
+  const createAdminInvite=async(event:FormEvent)=>{
+    event.preventDefault();
+    if(!adminInviteEmail.trim())return;
+    setBusy(true);setError('');setMessage('');setLastInvitePath('');
+    try{
+      const invite=await adminDashboardService.createAdminInvite(adminInviteEmail.trim());
+      setAdminInvites(list=>[invite,...list.filter(item=>item.id!==invite.id)]);
+      setAdminInviteEmail('');
+      setLastInvitePath(invite.invitePath||'');
+      setMessage('Invitation administrateur créée. Copiez le lien et envoyez-le à la personne concernée.');
+    }catch(cause){setError(cause instanceof Error?cause.message:'Création de l’invitation impossible.');}
+    finally{setBusy(false);}
+  };
+
+  const copyAdminInvite=async(invitePath:string)=>{
+    if(!invitePath)return;
+    const absolute=new URL(invitePath,window.location.origin).toString();
+    try{
+      await navigator.clipboard.writeText(absolute);
+      setMessage('Lien d’invitation administrateur copié.');
+    }catch{
+      setMessage(absolute);
+    }
+  };
+
+  const revokeAdminInvite=async(invite:AdminInvite)=>{
+    setBusy(true);setError('');setMessage('');
+    try{
+      await adminDashboardService.revokeAdminInvite(invite.id);
+      setAdminInvites(list=>list.map(item=>item.id===invite.id?{...item,consumedAt:new Date().toISOString()}:item));
+      setMessage('Invitation administrateur révoquée.');
+    }catch(cause){setError(cause instanceof Error?cause.message:'Révocation impossible.');}
+    finally{setBusy(false);}
+  };
+
   return <>
     <section className="admin-control-card" id="admin-controls">
       <header><div><span className="admin-control-icon"><Settings2 size={20}/></span><div><h2>Réglages généraux</h2><p>Activez ou bloquez les fonctions principales pour tous les utilisateurs.</p></div></div><button type="button" onClick={()=>void load()} disabled={busy}><RefreshCw size={16}/> Actualiser</button></header>
@@ -138,6 +178,27 @@ export default function AdminControlCenter(){
         </article>)}
       </div>
       <div className="admin-control-note"><ShieldCheck size={17}/><span>Ces réglages sont appliqués côté interface, API, temps réel et médias : masquer un bouton ne suffit pas à contourner la restriction.</span></div>
+    </section>
+
+    <section className="admin-admin-invites-card" id="admin-admin-invites">
+      <header><div><span className="admin-control-icon"><MailPlus size={20}/></span><div><h2>Administrateurs</h2><p>Créez un lien sécurisé pour autoriser un nouveau compte administrateur.</p></div></div><strong>{users.filter(user=>user.role==='admin'&&!user.isSuspended).length} admin(s) actif(s)</strong></header>
+      <form className="admin-admin-invite-form" onSubmit={createAdminInvite}>
+        <label><span>Adresse e-mail du nouvel administrateur</span><input type="email" value={adminInviteEmail} onChange={event=>setAdminInviteEmail(event.target.value)} placeholder="admin@exemple.com" required/></label>
+        <button type="submit" disabled={busy||!adminInviteEmail.trim()}><MailPlus size={16}/> Créer l’invitation</button>
+      </form>
+      {lastInvitePath&&<div className="admin-admin-invite-created"><div><strong>Invitation prête</strong><small>{new URL(lastInvitePath,window.location.origin).toString()}</small></div><button type="button" onClick={()=>void copyAdminInvite(lastInvitePath)}><Copy size={15}/> Copier le lien</button></div>}
+      <div className="admin-admin-invite-list">
+        {adminInvites.length?adminInvites.slice(0,8).map(invite=>{
+          const expired=new Date(invite.expiresAt).getTime()<=Date.now();
+          const inactive=Boolean(invite.consumedAt)||expired;
+          return <article key={invite.id} className={inactive?'is-inactive':''}>
+            <div><strong>{invite.email}</strong><small>{invite.consumedAt?'Utilisée ou révoquée':expired?'Expirée':'Expire le '+new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(invite.expiresAt))}</small></div>
+            {!inactive&&invite.invitePath?<button type="button" onClick={()=>void copyAdminInvite(invite.invitePath||'')}><Copy size={14}/> Copier</button>:null}
+            {!inactive?<button type="button" className="is-danger" onClick={()=>void revokeAdminInvite(invite)} disabled={busy}><Trash2 size={14}/> Révoquer</button>:null}
+          </article>;
+        }):<p className="admin-control-empty">Aucune invitation administrateur récente.</p>}
+      </div>
+      <div className="admin-control-note"><ShieldCheck size={17}/><span>Un nouvel administrateur ne peut plus s’auto-promouvoir simplement parce qu’un autre compte admin existe. Il doit utiliser ce lien d’invitation et confirmer son adresse avec le code OTP.</span></div>
     </section>
 
     <section className="admin-users-card" id="admin-users">
