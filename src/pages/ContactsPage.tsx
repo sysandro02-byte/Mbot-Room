@@ -22,6 +22,7 @@ import { meetingService, type Meeting } from '../services/meetingService';
 import { workspaceService, type WorkGroup } from '../services/workspaceService';
 import { showAppMessage } from '../lib/appMessage';
 import './ContactsPage.css';
+import AppLoader from '../components/AppLoader';
 
 type FilterKey='all'|'recent'|'team'|'saved'|'favorites';
 
@@ -272,7 +273,7 @@ export default function ContactsPage(){
           <span>{filtered.length} résultat{filtered.length>1?'s':''}</span>
         </div>
 
-        {loading?<div className="contacts-pro-empty">Chargement des contacts…</div>:(
+        {loading?<AppLoader label="Chargement des contacts…" />:(
           filtered.length?<div className="contacts-pro-grid">
             {filtered.map((contact)=><article key={contact.id} className={selectedId===contact.id?'selected':''} onClick={()=>setSelectedId(contact.id)}>
               <div className="contacts-pro-card-top">
