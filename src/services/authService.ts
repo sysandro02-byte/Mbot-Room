@@ -404,6 +404,9 @@ export const authService = {
     if (expiry) {
       const timestamp = new Date(expiry).getTime();
       if (!Number.isNaN(timestamp) && timestamp <= Date.now()) {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+          return true;
+        }
         clearStoredSession();
         return false;
       }
