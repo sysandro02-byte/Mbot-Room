@@ -9,6 +9,15 @@ export type LoginBranding = {
   updatedAt: string;
 };
 
+export type AdminInvite = {
+  id: string;
+  email: string;
+  invitePath?: string;
+  expiresAt: string;
+  consumedAt?: string | null;
+  createdAt: string;
+};
+
 export type HomeSlide = {
   slot: 1 | 2 | 3 | 4;
   title: string;
@@ -121,6 +130,31 @@ export const adminDashboardService = {
       body: JSON.stringify(payload),
     });
     return readJson<AdminPlatformSettings>(response);
+  },
+
+  async getAdminInvites(): Promise<AdminInvite[]> {
+    const response = await apiFetch(apiUrl('/api/admin/admin-invites'), { headers: getAuthHeaders(), cache: 'no-store' });
+    return readJson<AdminInvite[]>(response);
+  },
+
+  async createAdminInvite(email: string): Promise<AdminInvite> {
+    const response = await apiFetch(apiUrl('/api/admin/admin-invites'), {
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    return readJson<AdminInvite>(response);
+  },
+
+  async revokeAdminInvite(inviteId: string): Promise<void> {
+    const response = await apiFetch(apiUrl(`/api/admin/admin-invites/${encodeURIComponent(inviteId)}`), {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(typeof data?.error === 'string' ? data.error : 'Révocation impossible.');
+    }
   },
 
   async getUsers(query = ''): Promise<AdminManagedUser[]> {
