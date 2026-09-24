@@ -1,9 +1,11 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Ban, CheckCircle2, Copy, LockKeyhole, LogOut, MailPlus, RefreshCw, Save, Search, Settings2, ShieldCheck, Trash2, UserCog, UsersRound } from 'lucide-react';
+import { Ban, CheckCircle2, Copy, FileText, Flag, LockKeyhole, LogOut, MailPlus, MapPin, RefreshCw, Save, Search, Settings2, ShieldAlert, ShieldCheck, Trash2, UserCog, UsersRound } from 'lucide-react';
 import {
   AdminInvite,
+  AdminLegalDocument,
   AdminManagedUser,
   AdminPlatformSettings,
+  AdminReport,
   adminDashboardService,
 } from '../../services/adminDashboardService';
 import { authService } from '../../services/authService';
@@ -35,40 +37,84 @@ const emptySettings:AdminPlatformSettings={
   guestLunaEnabled:false,guestTranscriptionEnabled:false,guestChatEnabled:false,
 };
 
+const restrictionOptions=[
+  {id:'meetings',label:'Création de réunions'},
+  {id:'messages',label:'Messagerie'},
+  {id:'groups',label:'Création de groupes'},
+  {id:'files',label:'Envoi de fichiers'},
+  {id:'recording',label:'Enregistrement'},
+  {id:'luna',label:'Luna IA'},
+  {id:'screenShare',label:'Partage d’écran'},
+] as const;
+
+const emptyTerms:AdminLegalDocument={key:'terms',title:'Conditions d’utilisation MBotéRoom',body:'',version:'',updatedAt:''};
+
 export default function AdminControlCenter(){
   const current=authService.getCurrentUser();
   const [settings,setSettings]=useState<AdminPlatformSettings>(emptySettings);
   const [users,setUsers]=useState<AdminManagedUser[]>([]);
   const [adminInvites,setAdminInvites]=useState<AdminInvite[]>([]);
+  const [terms,setTerms]=useState<AdminLegalDocument>(emptyTerms);
+  const [reports,setReports]=useState<AdminReport[]>([]);
+  const [termsDraft,setTermsDraft]=useState({title:'',body:''});
+  const [countryFilter,setCountryFilter]=useState('');
+  const [cityFilter,setCityFilter]=useState('');
+  const [organizationFilter,setOrganizationFilter]=useState('');
+  const [statusFilter,setStatusFilter]=useState('');
+  const [minAge,setMinAge]=useState('');
+  const [maxAge,setMaxAge]=useState('');
   const [adminInviteEmail,setAdminInviteEmail]=useState('');
   const [lastInvitePath,setLastInvitePath]=useState('');
   const [search,setSearch]=useState('');
   const [busy,setBusy]=useState(false);
+  const [termsBusy,setTermsBusy]=useState(false);
   const [message,setMessage]=useState('');
   const [error,setError]=useState('');
   const [editing,setEditing]=useState<AdminManagedUser|null>(null);
   const [revokeTarget,setRevokeTarget]=useState<AdminManagedUser|null>(null);
-  const [draft,setDraft]=useState({name:'',phoneNumber:'',organization:'',jobTitle:''});
+  const [draft,setDraft]=useState({
+    name:'',phoneNumber:'',organization:'',jobTitle:'',country:'',city:'',
+    accountStatus:'active' as AdminManagedUser['accountStatus'],
+    featureRestrictions:[] as string[],
+  });
 
   const load=async()=>{
     setBusy(true);setError('');
     try{
-      const [nextSettings,nextUsers,nextInvites]=await Promise.all([
+      const [nextSettings,nextUsers,nextInvites,nextTerms,nextReports]=await Promise.all([
         adminDashboardService.getPlatformSettings(),
         adminDashboardService.getUsers(),
         adminDashboardService.getAdminInvites().catch(()=>[]),
+        adminDashboardService.getTerms().catch(()=>emptyTerms),
+        adminDashboardService.getReports().catch(()=>[]),
       ]);
       setSettings(nextSettings);setUsers(nextUsers);setAdminInvites(nextInvites);
+      setTerms(nextTerms);setTermsDraft({title:nextTerms.title,body:nextTerms.body});setReports(nextReports);
     }catch(cause){setError(cause instanceof Error?cause.message:'Impossible de charger les outils du backoffice.');}
     finally{setBusy(false);}
   };
   useEffect(()=>{void load();},[]);
 
+  const countries=useMemo(()=>[...new Set(users.map(user=>user.country).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),[users]);
+  const cities=useMemo(()=>[...new Set(users.filter(user=>!countryFilter||user.country===countryFilter).map(user=>user.city).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),[countryFilter,users]);
+  const organizations=useMemo(()=>[...new Set(users.map(user=>user.organization).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),[users]);
+
   const filtered=useMemo(()=>{
     const q=search.trim().toLowerCase();
-    if(!q)return users;
-    return users.filter(user=>[user.name,user.email,user.username,user.organization,user.jobTitle].some(value=>String(value||'').toLowerCase().includes(q)));
-  },[search,users]);
+    const ageMin=minAge?Number(minAge):null;
+    const ageMax=maxAge?Number(maxAge):null;
+    return users.filter(user=>{
+      if(q&&![user.name,user.email,user.username,user.organization,user.jobTitle,user.country,user.city].some(value=>String(value||'').toLowerCase().includes(q)))return false;
+      if(countryFilter&&user.country!==countryFilter)return false;
+      if(cityFilter&&user.city!==cityFilter)return false;
+      if(organizationFilter&&user.organization!==organizationFilter)return false;
+      if(statusFilter==='suspended'&&!user.isSuspended)return false;
+      if(statusFilter&&statusFilter!=='suspended'&&user.accountStatus!==statusFilter)return false;
+      if(ageMin!==null&&(user.age===null||user.age<ageMin))return false;
+      if(ageMax!==null&&(user.age===null||user.age>ageMax))return false;
+      return true;
+    });
+  },[search,users,countryFilter,cityFilter,organizationFilter,statusFilter,minAge,maxAge]);
 
   const toggle=async(key:keyof AdminPlatformSettings)=>{
     const previous=settings;
@@ -82,7 +128,10 @@ export default function AdminControlCenter(){
 
   const startEdit=(user:AdminManagedUser)=>{
     setEditing(user);
-    setDraft({name:user.name,phoneNumber:user.phoneNumber,organization:user.organization,jobTitle:user.jobTitle});
+    setDraft({
+      name:user.name,phoneNumber:user.phoneNumber,organization:user.organization,jobTitle:user.jobTitle,
+      country:user.country,city:user.city,accountStatus:user.accountStatus,featureRestrictions:[...(user.featureRestrictions||[])],
+    });
   };
 
   const saveUser=async(event:FormEvent)=>{
@@ -105,6 +154,38 @@ export default function AdminControlCenter(){
       setUsers(list=>list.map(item=>item.id===updated.id?updated:item));
       setMessage(updated.isSuspended?'Compte suspendu.':'Compte réactivé.');
     }catch(cause){setError(cause instanceof Error?cause.message:'Action impossible.');}
+    finally{setBusy(false);}
+  };
+
+  const setAccountStatus=async(user:AdminManagedUser,status:AdminManagedUser['accountStatus'])=>{
+    if(String(user.id)===String(current?.id)&&status!=='active'){setError('Vous ne pouvez pas restreindre votre propre compte administrateur.');return;}
+    setBusy(true);setError('');setMessage('');
+    try{
+      const updated=await adminDashboardService.updateUser(user.id,{accountStatus:status});
+      setUsers(list=>list.map(item=>item.id===updated.id?updated:item));
+      setMessage(status==='banned'?'Compte banni et sessions fermées.':status==='quarantined'?'Compte placé en quarantaine.':'Compte remis en état actif.');
+    }catch(cause){setError(cause instanceof Error?cause.message:'Action impossible.');}
+    finally{setBusy(false);}
+  };
+
+  const saveTerms=async(event:FormEvent)=>{
+    event.preventDefault();
+    setTermsBusy(true);setError('');setMessage('');
+    try{
+      const next=await adminDashboardService.updateTerms({title:termsDraft.title.trim(),body:termsDraft.body.trim()});
+      setTerms(next);setTermsDraft({title:next.title,body:next.body});
+      setMessage('Conditions d’utilisation publiées. Une nouvelle version est maintenant active.');
+    }catch(cause){setError(cause instanceof Error?cause.message:'Publication des conditions impossible.');}
+    finally{setTermsBusy(false);}
+  };
+
+  const updateReport=async(report:AdminReport,status:AdminReport['status'])=>{
+    setBusy(true);setError('');setMessage('');
+    try{
+      const next=await adminDashboardService.updateReport(report.id,status);
+      setReports(rows=>rows.map(item=>item.id===next.id?{...item,...next}:item));
+      setMessage('État du signalement mis à jour.');
+    }catch(cause){setError(cause instanceof Error?cause.message:'Mise à jour du signalement impossible.');}
     finally{setBusy(false);}
   };
 
