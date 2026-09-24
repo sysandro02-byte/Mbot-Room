@@ -1,7 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
-  Bell,
   BriefcaseBusiness,
   CalendarDays,
   CirclePlay,
@@ -18,9 +17,6 @@ import {
   X,
 } from 'lucide-react';
 import { authService } from '../services/authService';
-import { notificationService } from '../services/notificationService';
-import { socket } from '../lib/socket';
-import { PREFERENCES_EVENT, readCachedPreferences } from '../lib/userPreferences';
 import './AppShell.css';
 
 type AppShellProps = {
@@ -39,7 +35,6 @@ const primaryNavItems = [
 ];
 
 const secondaryNavItems = [
-  { label: 'Notifications', icon: Bell, to: '/app/notifications' },
   { label: 'Enregistrements', icon: CirclePlay, to: '/app/recordings' },
   { label: 'Fichiers', icon: FolderOpen, to: '/app/files' },
   { label: 'Paramètres', icon: Settings, to: '/app/settings' },
@@ -60,59 +55,10 @@ export default function AppShell({ children }: AppShellProps) {
     try { return localStorage.getItem('mboteroom-sidebar-collapsed') === '1'; }
     catch { return false; }
   });
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const user = authService.getCurrentUser();
   const guestMode = user?.isGuest === true;
   const userName = user?.name || user?.email || 'Utilisateur';
   const initials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'MB';
-
-  useEffect(() => {
-    const refreshUnread = () => {
-      if (guestMode || readCachedPreferences().notifications === false) {
-        setUnreadNotifications(0);
-        return;
-      }
-      void notificationService.list()
-        .then((rows) => setUnreadNotifications(rows.filter((item) => !item.readAt).length))
-        .catch(() => undefined);
-    };
-    const feedback = () => {
-      const preferences = readCachedPreferences();
-      if (preferences.notifications === false) return;
-      if (preferences.vibration === true && 'vibrate' in navigator) navigator.vibrate([90, 45, 90]);
-      if (preferences.notificationSounds !== false) {
-        try {
-          const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-          if (AudioContextCtor) {
-            const context = new AudioContextCtor();
-            const oscillator = context.createOscillator();
-            const gain = context.createGain();
-            oscillator.frequency.value = 720;
-            gain.gain.setValueAtTime(.0001, context.currentTime);
-            gain.gain.exponentialRampToValueAtTime(.08, context.currentTime + .015);
-            gain.gain.exponentialRampToValueAtTime(.0001, context.currentTime + .18);
-            oscillator.connect(gain).connect(context.destination);
-            oscillator.start();
-            oscillator.stop(context.currentTime + .2);
-            oscillator.addEventListener('ended', () => void context.close());
-          }
-        } catch {
-          // Browser audio feedback can be blocked until the user interacts with the page.
-        }
-      }
-    };
-    const onNotification = () => { refreshUnread(); feedback(); };
-    refreshUnread();
-    if (!socket.connected) socket.connect();
-    socket.on('notification:new', onNotification);
-    window.addEventListener('focus', refreshUnread);
-    window.addEventListener(PREFERENCES_EVENT, refreshUnread);
-    return () => {
-      socket.off('notification:new', onNotification);
-      window.removeEventListener('focus', refreshUnread);
-      window.removeEventListener(PREFERENCES_EVENT, refreshUnread);
-    };
-  }, [guestMode]);
 
   useEffect(() => {
     const handleGlobalMenu = () => {
@@ -148,7 +94,6 @@ export default function AppShell({ children }: AppShellProps) {
           <Link className={active ? 'is-active' : ''} to={item.to} key={item.to} onClick={() => setMenuOpen(false)}>
             <Icon size={20} aria-hidden="true" />
             <span>{item.label}</span>
-            {item.to === '/app/notifications' && unreadNotifications > 0 ? <b className="app-shell-nav-badge">{Math.min(99, unreadNotifications)}</b> : null}
           </Link>
         );
       })}
