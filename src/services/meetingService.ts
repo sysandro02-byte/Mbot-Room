@@ -319,6 +319,16 @@ export const meetingService = {
     return data;
   },
 
+  async restartMeeting(meetingId: number): Promise<{ success: boolean; sourceMeetingId: number; meeting: Meeting }> {
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/restart`), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Impossible de relancer cette réunion.');
+    return data;
+  },
+
   async startMeetingAndNotify(meetingId: number): Promise<{ success: boolean; notifiedCount: number; meeting?: Meeting }> {
     const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/start-notify`), {
       method: 'POST',
