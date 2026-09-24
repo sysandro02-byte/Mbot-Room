@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import type express from 'express';
+import type { Server } from 'socket.io';
 import {
   AuthedRequest,
   authenticateToken,
@@ -327,7 +328,7 @@ const validateTermsAcceptance = async (body: any) => {
 };
 
 
-export const registerAuthRoutes = (app: express.Express) => {
+export const registerAuthRoutes = (app: express.Express, io: Server) => {
   app.post('/api/auth/register', requireDatabase, async (request, response, next) => {
     try {
       if (!(await isPlatformFeatureEnabled('registrationEnabled'))) {
@@ -611,6 +612,14 @@ export const registerAuthRoutes = (app: express.Express) => {
           [meeting.id, user.id],
         );
       }
+
+      io.to(`meeting:${meeting.id}:moderators`).emit('meeting:lobby-updated', {
+        meetingId: meeting.id,
+        userId: user.id,
+        status,
+        name: user.name,
+        avatar: user.avatar,
+      });
 
       const session = await createSession(user.id, false);
       attachSessionCookie(response, session);
