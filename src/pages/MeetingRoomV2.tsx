@@ -492,15 +492,24 @@ export default function MeetingRoomV2() {
     setLoading(true);
     setError('');
     try {
-      let found: Meeting | null = null;
-      if (/^\d+$/.test(meetingId)) {
+      // Use the meeting already carried by navigation immediately. This removes the
+      // unnecessary full meetings-list round trip before the room can render.
+      let found: Meeting | null = state?.meeting?.id ? state.meeting as Meeting : null;
+      if (!found && /^\d+$/.test(meetingId)) {
         const list = await meetingService.getMeetings();
         found = list.find((item) => String(item.id) === meetingId) || null;
-      } else if (meetingId) {
+      } else if (!found && meetingId) {
         found = await meetingService.getMeetingByLink(meetingId);
       }
-      if (!found && state?.meeting?.id) found = state.meeting as Meeting;
       if (!found) throw new Error('Réunion introuvable ou inaccessible.');
+
+      // Paint the room as soon as we know the meeting. Lobby verification can then
+      // continue without keeping authenticated participants on a blocking loader.
+      setMeeting(found);
+      if (!currentUser?.isGuest) {
+        setLoading(false);
+        return;
+      }
 
       const lobby = await meetingService.getLobby(found.id).catch(() => []);
       const ownLobby = lobby.find((item) => String(item.user_id) === String(currentUser?.id || ''));
