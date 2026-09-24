@@ -1290,18 +1290,51 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     } catch (error) { next(error); }
   });
 
+  app.post('/api/meetings/:meetingId/feedback', ...protectedApi, async (request:AuthedRequest,response,next)=>{
+    try{
+      const meeting=await findMeetingByValue(request.params.meetingId);
+      if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');
+      if(!(await hasMeetingAccess(meeting.id,request.user!)))return sendApiError(response,403,'MEETING_ACCESS_DENIED','Accès refusé.');
+      const rating=Number(request.body?.rating);
+      const comment=normalizeText(request.body?.comment).slice(0,1000);
+      if(!Number.isInteger(rating)||rating<1||rating>5)return sendApiError(response,400,'FEEDBACK_RATING_INVALID','Sélectionnez une note entre 1 et 5 étoiles.');
+      if(comment.length<3)return sendApiError(response,400,'FEEDBACK_COMMENT_REQUIRED','Ajoutez un commentaire sur votre expérience.');
+      const feedbackId=createId();
+      const result=await query(
+        `INSERT INTO room_meeting_feedback (id,meeting_id,user_id,rating,comment)
+         VALUES ($1,$2,$3,$4,$5)
+         ON CONFLICT (meeting_id,user_id)
+         DO UPDATE SET rating=excluded.rating,comment=excluded.comment,updated_at=now()
+         RETURNING rating,comment,created_at,updated_at`,
+        [feedbackId,meeting.id,request.user!.id,rating,comment],
+      );
+      const row=result.rows[0];
+      io.to('admins').emit('meeting:feedback-submitted',{meetingId:meeting.id,userId:request.user!.id,rating});
+      response.json({
+        submitted:true,
+        rating:Number(row.rating),
+        comment:String(row.comment||''),
+        createdAt:new Date(row.created_at).toISOString(),
+        updatedAt:new Date(row.updated_at).toISOString(),
+      });
+    }catch(error){next(error);}
+  });
+
   app.get('/api/meetings/:meetingId/ended', ...protectedApi, async (request:AuthedRequest,response,next)=>{
     try{
       const meeting=await findMeetingByValue(request.params.meetingId);
       if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');
       if(!(await hasMeetingAccess(meeting.id,request.user!)))return sendApiError(response,403,'MEETING_ACCESS_DENIED','Accès refusé.');
-      const [members,summaryResult,recordings,sourceCounts]=await Promise.all([
+      const [members,summaryResult,recordings,sourceCounts,feedbackResult]=await Promise.all([
         query(`SELECT m.user_id,m.role,u.name,u.avatar,u.is_guest FROM room_meeting_members m JOIN room_users u ON u.id=m.user_id WHERE m.meeting_id=$1 ORDER BY m.role,u.name`,[meeting.id]),
         query('SELECT * FROM room_meeting_summaries WHERE meeting_id=$1 LIMIT 1',[meeting.id]),
         query('SELECT storage_url FROM room_recordings WHERE meeting_id=$1 ORDER BY created_at DESC LIMIT 1',[meeting.id]),
         getSummarySourceStats(meeting.id),
+        query('SELECT rating,comment,created_at,updated_at FROM room_meeting_feedback WHERE meeting_id=$1 AND user_id=$2 LIMIT 1',[meeting.id,request.user!.id]),
       ]);
       const summaryRow=summaryResult.rows[0];
+      const feedbackRow=feedbackResult.rows[0];
+      const feedbackSubmitted=Boolean(feedbackRow);
       const lunaConfigured=Boolean(String(process.env.GROQ_API_KEY||'').trim());
       const processingStatus=summaryRow
         ? 'ready'
@@ -1324,13 +1357,18 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
         userRole:meetingRole(meeting,request.user!),
         participants:members.rows.map((row)=>({id:String(row.user_id),name:row.name,role:row.role==='host'?'Hôte':row.role==='cohost'?'Co-hôte':row.is_guest?'Invité':'Participant',avatar:row.avatar})),
         summary:{
-          bullets:summaryRow?.bullets||[],
-          decisions:summaryRow?.decisions||[],
-          actions:summaryRow?.actions||[],
-          nextMeeting:summaryRow?.next_meeting||'',
-          processingStatus,
+          bullets:feedbackSubmitted?(summaryRow?.bullets||[]):[],
+          decisions:feedbackSubmitted?(summaryRow?.decisions||[]):[],
+          actions:feedbackSubmitted?(summaryRow?.actions||[]):[],
+          nextMeeting:feedbackSubmitted?(summaryRow?.next_meeting||''):'',
+          processingStatus:feedbackSubmitted?processingStatus:'pending',
           sourceCounts,
           lunaConfigured,
+        },
+        feedback:{
+          submitted:feedbackSubmitted,
+          rating:feedbackRow?Number(feedbackRow.rating):null,
+          comment:feedbackRow?String(feedbackRow.comment||''):'',
         },
         nextActions:[],
         recording:{available:Boolean(recordings.rows[0]),retentionDays:0,url:recordings.rows[0]?.storage_url||null},
