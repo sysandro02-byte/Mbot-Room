@@ -98,6 +98,7 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
         lunaEnabled: typeof request.body?.lunaEnabled === 'boolean' ? request.body.lunaEnabled : undefined,
         recordingEnabled: typeof request.body?.recordingEnabled === 'boolean' ? request.body.recordingEnabled : undefined,
         publicMeetingsEnabled: typeof request.body?.publicMeetingsEnabled === 'boolean' ? request.body.publicMeetingsEnabled : undefined,
+        premiumPaymentEnabled: typeof request.body?.premiumPaymentEnabled === 'boolean' ? request.body.premiumPaymentEnabled : undefined,
       });
       io.emit('admin:settings-updated', settings);
       response.json(settings);
