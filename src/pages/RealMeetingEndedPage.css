@@ -328,3 +328,183 @@
 .real-ended-restart:disabled{opacity:.55;cursor:not-allowed}
 .real-ended-restart-wrap>small{color:#7a879d;font-size:11px}
 .real-ended-restart-error{flex-basis:100%;margin:0;color:#b42318;font-size:12px}
+
+
+.real-ended-feedback-stage{
+  min-height:100dvh;
+  background:linear-gradient(180deg,#f5fbfb 0%,#eef5f7 100%);
+}
+.real-ended-feedback-backdrop{
+  position:fixed;
+  inset:0;
+  z-index:320;
+  display:grid;
+  place-items:center;
+  overflow:auto;
+  padding:18px;
+  background:rgba(7,35,48,.58);
+  backdrop-filter:blur(8px);
+}
+.real-ended-feedback-modal{
+  width:min(560px,100%);
+  max-height:calc(100dvh - 36px);
+  overflow:auto;
+  box-sizing:border-box;
+  padding:26px;
+  border:1px solid #dce8e9;
+  border-radius:22px;
+  background:#fff;
+  box-shadow:0 28px 80px rgba(8,42,55,.28);
+  color:#173d57;
+  text-align:center;
+}
+.real-ended-feedback-icon{
+  width:58px;
+  height:58px;
+  display:grid;
+  place-items:center;
+  margin:0 auto 12px;
+  border-radius:18px;
+  color:#078d8e;
+  background:#e9f8f6;
+}
+.real-ended-feedback-eyebrow{
+  display:block;
+  color:#078d8e;
+  font-size:11px;
+  font-weight:900;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.real-ended-feedback-modal h1{
+  margin:7px 0 8px;
+  color:#15344a;
+  font-size:clamp(24px,5vw,32px);
+  line-height:1.15;
+}
+.real-ended-feedback-modal>p{
+  margin:0 auto 20px;
+  max-width:470px;
+  color:#687d8c;
+  font-size:13px;
+  line-height:1.55;
+}
+.real-ended-feedback-rating{
+  margin:0 0 18px;
+  padding:15px;
+  border:1px solid #dfe9eb;
+  border-radius:16px;
+  background:#f9fcfc;
+}
+.real-ended-feedback-rating legend{
+  padding:0 8px;
+  color:#466276;
+  font-size:11px;
+  font-weight:850;
+}
+.real-ended-feedback-stars{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+}
+.real-ended-feedback-stars button{
+  width:46px;
+  height:46px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border:0;
+  border-radius:12px;
+  background:transparent;
+  color:#b8c6ce;
+  cursor:pointer;
+  transition:transform .15s ease,color .15s ease,background .15s ease;
+}
+.real-ended-feedback-stars button:hover,
+.real-ended-feedback-stars button:focus-visible{
+  transform:translateY(-2px);
+  background:#fff6df;
+  color:#e4a614;
+  outline:none;
+}
+.real-ended-feedback-stars button.is-active{color:#e4a614}
+.real-ended-feedback-rating>strong{
+  display:block;
+  margin-top:6px;
+  color:#425f71;
+  font-size:11px;
+}
+.real-ended-feedback-comment{
+  display:grid;
+  gap:7px;
+  text-align:left;
+  color:#36566b;
+  font-size:12px;
+  font-weight:850;
+}
+.real-ended-feedback-comment textarea{
+  width:100%;
+  box-sizing:border-box;
+  resize:vertical;
+  min-height:112px;
+  padding:12px 13px;
+  border:1px solid #d7e4e8;
+  border-radius:13px;
+  outline:0;
+  color:#173d57;
+  background:#fff;
+  font:inherit;
+  font-size:13px;
+  line-height:1.5;
+}
+.real-ended-feedback-comment textarea:focus{
+  border-color:#078d8e;
+  box-shadow:0 0 0 3px rgba(7,141,142,.12);
+}
+.real-ended-feedback-comment small{
+  justify-self:end;
+  color:#82939f;
+  font-size:10px;
+  font-weight:700;
+}
+.real-ended-feedback-error{
+  margin-top:10px;
+  padding:9px 11px;
+  border-radius:10px;
+  background:#fff0f1;
+  color:#b42335;
+  font-size:11px;
+  text-align:left;
+}
+.real-ended-feedback-submit{
+  width:100%;
+  min-height:46px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  margin-top:14px;
+  border:0;
+  border-radius:13px;
+  background:#078d8e;
+  color:#fff;
+  font-weight:850;
+  cursor:pointer;
+}
+.real-ended-feedback-submit:disabled{opacity:.5;cursor:not-allowed}
+.real-ended-feedback-note{
+  display:block;
+  margin-top:9px;
+  color:#84949f;
+  font-size:10px;
+}
+@media(max-width:520px){
+  .real-ended-feedback-backdrop{padding:10px}
+  .real-ended-feedback-modal{padding:20px 15px;border-radius:18px}
+  .real-ended-feedback-stars{gap:3px}
+  .real-ended-feedback-stars button{width:42px;height:42px}
+}
+@media(prefers-reduced-motion:reduce){
+  .real-ended-feedback-stars button{transition:none}
+}
