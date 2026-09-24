@@ -225,6 +225,16 @@ export const registerRealtime = (io: Server) => {
       }
     });
 
+    socket.on('meeting:hands-request', (payload: any, callback?: Ack) => {
+      const meetingId = Number(socket.data.meetingId || 0);
+      if (!meetingId || Number(payload?.meetingId || meetingId) !== meetingId) {
+        return callback?.(fail('REALTIME_NOT_JOINED', 'Vous devez rejoindre la réunion.'));
+      }
+      const hands = [...(raisedHands.get(meetingId)?.values() || [])];
+      socket.emit('meeting:hands-snapshot', { meetingId, hands });
+      callback?.({ ok:true, hands });
+    });
+
     socket.on('meeting:hand-raised', async (payload: any, callback?: Ack) => {
       const meetingId = Number(socket.data.meetingId || 0);
       if (!meetingId) return callback?.(fail('REALTIME_NOT_JOINED', 'Vous devez rejoindre la réunion.'));
