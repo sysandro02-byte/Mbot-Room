@@ -75,7 +75,11 @@ export function useMeetingCaptions({
   const mode: 'server' | 'browser' | 'unavailable' = serverMode ? 'server' : browserMode ? 'browser' : 'unavailable';
 
   useEffect(() => {
-    if (!meetingId) return undefined;
+    if (!meetingId || !enabled) {
+      setCaptions([]);
+      setStatus(null);
+      return undefined;
+    }
     let cancelled = false;
     void transcriptionService.getStatus()
       .then((next) => {
@@ -112,7 +116,7 @@ export function useMeetingCaptions({
       window.removeEventListener('mbote-room-meeting-realtime-joined', onRealtimeJoined);
       socket.off('meeting:caption', onCaption);
     };
-  }, [breakoutRoomId, meetingId]);
+  }, [breakoutRoomId, enabled, meetingId]);
 
   useEffect(() => {
     setServerUnavailable(false);
