@@ -230,6 +230,12 @@ const androidWorkflow = fs.readFileSync(new URL('../.github/workflows/android-ap
 if (!androidWorkflow.includes('branches: [main]') || androidWorkflow.includes('paths:')) {
   throw new Error('Android APK must rebuild on every main publication');
 }
+if (!androidWorkflow.includes('contents: write') || !androidWorkflow.includes('gh release upload android-latest') || !androidWorkflow.includes('MBoteRoom-Android.apk')) {
+  throw new Error('Android APK workflow must publish a stable public latest-download release');
+}
+if (!loginSource.includes('ANDROID_APK_URL') || !loginSource.includes('android-latest/MBoteRoom-Android.apk') || !loginSource.includes('navigator.share')) {
+  throw new Error('Login page must expose the latest Android APK download and native share action');
+}
 
 const meetingRoomSource = fs.readFileSync(new URL('../src/pages/MeetingRoomV2.tsx', import.meta.url), 'utf8');
 if (!meetingRoomSource.includes('meeting.started_at || meeting.start_time') || !meetingRoomSource.includes('setClockTick(Date.now())')) {
