@@ -1,8 +1,8 @@
-.terms-consent{display:grid;gap:5px;margin-top:8px}
-.terms-consent-button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:43px;padding:9px 12px;border:1px solid #cfdce3;border-radius:11px;background:#fff;color:#23415b;font:inherit;font-size:12px;font-weight:800;cursor:pointer}
+.terms-consent{display:grid;gap:5px;margin-top:8px;margin-bottom:14px}
+.terms-consent-button{display:flex;width:94%;min-height:36px;align-items:center;justify-content:center;justify-self:center;gap:7px;padding:6px 10px;border:1px solid #cfdce3;border-radius:10px;background:#fff;color:#23415b;font:inherit;font-size:11px;font-weight:800;cursor:pointer}
 .terms-consent-button.is-accepted{border-color:#85cfc6;background:#eefaf8;color:#08786f}
 .terms-consent>small{color:#73869a;font-size:10px;line-height:1.4}
-.terms-consent.is-compact .terms-consent-button{min-height:38px;font-size:11px}
+.terms-consent.is-compact .terms-consent-button{width:92%;min-height:34px;font-size:10.5px}
 .terms-modal-backdrop{position:fixed;inset:0;z-index:260;display:grid;place-items:center;padding:18px;background:rgba(4,25,39,.62);backdrop-filter:blur(6px)}
 .terms-modal{width:min(720px,100%);max-height:min(86dvh,820px);display:grid;grid-template-rows:auto minmax(160px,1fr) auto;overflow:hidden;border:1px solid #dbe7eb;border-radius:22px;background:#fff;box-shadow:0 28px 90px rgba(6,35,54,.28);color:#18354e}
 .terms-modal>header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px 20px;border-bottom:1px solid #e7eef1;background:#fbfdfd}
