@@ -1891,6 +1891,16 @@ export default function MeetingRoomV2() {
         </div>
       ) : null}
 
+      {handRaised ? <div className="room-v2-hand-toast" role="status">
+        <span><Hand/></span>
+        <div><strong>Vous avez levé la main</strong><small>L’animateur a été notifié</small></div>
+        <button type="button" aria-label="Baisser la main" onClick={() => {
+          setHandRaised(false);
+          setRaisedHands((current) => { const next=new Set(current); next.delete(Number(currentUser?.id||0)); return next; });
+          socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised:false});
+        }}><X/></button>
+      </div> : null}
+
       <footer className="room-v2-controls">
         <Control active={micEnabled} disabled={!canUseMic} title={!canUseMic ? 'Microphone désactivé par l’hôte' : undefined} label={micEnabled ? 'Micro' : 'Micro coupé'} onClick={() => void toggleMic()}>{micEnabled ? <Mic/> : <MicOff/>}</Control>
         <Control active={cameraEnabled} disabled={!canUseCamera} title={!canUseCamera ? 'Caméra désactivée par l’hôte' : undefined} label={cameraEnabled ? 'Caméra' : 'Caméra coupée'} onClick={() => void toggleCamera()}>{cameraEnabled ? <Camera/> : <CameraOff/>}</Control>
@@ -1907,66 +1917,70 @@ export default function MeetingRoomV2() {
             if (!next) liveCaptions.clearCaptions();
           }}
         ><Captions/></Control>
-        <Control active={handRaised} disabled={!guestRaiseHandAllowed} title={!guestRaiseHandAllowed ? 'Lever la main non autorisé pour les invités' : undefined} label={handRaised ? 'Baisser la main' : 'Main'} onClick={() => { const raised = !handRaised; setHandRaised(raised); setRaisedHands((current) => { const next = new Set(current); if (raised) next.add(Number(currentUser?.id || 0)); else next.delete(Number(currentUser?.id || 0)); return next; }); socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised}); }}><Hand/></Control>
-        <div className="room-v2-reaction-wrap">
-          <Control active={reactionPanelOpen} disabled={!canUseReactions} title={!canUseReactions ? 'Réactions désactivées par l’hôte' : undefined} label="Réactions" testId="reaction-button" onClick={() => setReactionPanelOpen((current) => !current)}>😊</Control>
-          {reactionPanelOpen ? (
-            <div className="room-v2-reaction-panel" data-testid="reaction-panel">
-              {['👍','👏','❤️','🎉','😂'].map((reaction) => (
-                <button key={reaction} type="button" onClick={() => { setReactionPanelOpen(false); socket.emit('meeting:reaction',{meetingId:meeting.id,reaction}); }}>{reaction}</button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-        <Control active={panel === 'participants'} label="Participants" onClick={() => setPanel(panel === 'participants' ? null : 'participants')}><UsersRound/></Control>
-        <Control active={panel === 'chat'} label="Discussion" onClick={() => setPanel(panel === 'chat' ? null : 'chat')}><MessageCircle/></Control>
-        <Control active={panel === 'polls'} label="Sondages" onClick={() => setPanel(panel === 'polls' ? null : 'polls')}><Vote/></Control>
-        {isModerator ? <Control active={panel === 'breakouts'} label="Sous-salles" testId="breakout-button" onClick={() => { setPanel(panel === 'breakouts' ? null : 'breakouts'); void refreshBreakouts(); }}><UsersRound/></Control> : null}
-        <Control active={panel === 'luna'} disabled={!canUseLuna} title={!canUseLuna ? (guestMode && !guestLunaAllowed ? 'Luna IA non autorisée pour les invités' : 'Luna désactivée par l’hôte') : undefined} label="Luna" onClick={() => setPanel(panel === 'luna' ? null : 'luna')}><Bot/></Control>
-        {isModerator ? <Control active={Boolean(meeting.settings?.locked)} label={meeting.settings?.locked ? 'Déverrouiller' : 'Verrouiller'} testId="meeting-lock-button" onClick={() => void toggleMeetingLock()}><ShieldCheck/></Control> : null}
-        <div className="room-v2-device-wrap">
-          <Control
-            active={devicePanelOpen}
-            label="Périphériques"
-            testId="device-settings-button"
-            onClick={() => { setDevicePanelOpen((current) => !current); if (!devicePanelOpen) void refreshMediaDevices(); }}
-          ><Settings2/></Control>
-          {devicePanelOpen ? (
-            <div className="room-v2-device-panel" data-testid="device-settings-panel">
-              <div className="room-v2-device-title"><strong>Audio et vidéo</strong><button type="button" onClick={() => setDevicePanelOpen(false)} aria-label="Fermer"><X size={16}/></button></div>
-              <label>
-                <Mic size={16}/> Microphone
-                <select value={selectedAudioInputId} onChange={(event) => void switchInputDevice('audioinput', event.target.value)}>
-                  {mediaDevices.filter((device) => device.kind === 'audioinput').map((device, index) => <option key={device.deviceId || `audio-${index}`} value={device.deviceId}>{device.label || `Microphone ${index + 1}`}</option>)}
-                </select>
-              </label>
-              <label>
-                <Camera size={16}/> Caméra
-                <select value={selectedVideoInputId} onChange={(event) => void switchInputDevice('videoinput', event.target.value)}>
-                  {mediaDevices.filter((device) => device.kind === 'videoinput').map((device, index) => <option key={device.deviceId || `video-${index}`} value={device.deviceId}>{device.label || `Caméra ${index + 1}`}</option>)}
-                </select>
-              </label>
-              <label>
-                <Volume2 size={16}/> Haut-parleur
-                <select
-                  value={selectedAudioOutputId}
-                  onChange={(event) => setSelectedAudioOutputId(event.target.value)}
-                  disabled={typeof HTMLMediaElement === 'undefined' || !('setSinkId' in HTMLMediaElement.prototype)}
-                >
-                  <option value="">Sortie système</option>
-                  {mediaDevices.filter((device) => device.kind === 'audiooutput').map((device, index) => <option key={device.deviceId || `output-${index}`} value={device.deviceId}>{device.label || `Haut-parleur ${index + 1}`}</option>)}
-                </select>
-              </label>
-              <small>Le choix du haut-parleur dépend du navigateur. Chrome/Edge le prennent généralement en charge.</small>
-            </div>
-          ) : null}
-        </div>
+        <Control active={handRaised} disabled={!guestRaiseHandAllowed} title={!guestRaiseHandAllowed ? 'Lever la main non autorisé pour les invités' : undefined} label={handRaised ? 'Main levée' : 'Main'} onClick={() => {
+          const raised = !handRaised;
+          setHandRaised(raised);
+          setRaisedHands((current) => { const next = new Set(current); if (raised) next.add(Number(currentUser?.id || 0)); else next.delete(Number(currentUser?.id || 0)); return next; });
+          socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised});
+        }}><Hand/></Control>
         <Control active={recording} disabled={!canRecord} title={!canRecord ? (guestMode && !guestRecordingAllowed ? 'Enregistrement non autorisé pour les invités' : 'Enregistrement non autorisé pour votre rôle') : undefined} label={recording ? 'Stop rec.' : 'Enregistrer'} onClick={() => void toggleRecording()}>{recording ? <Square/> : <Circle/>}</Control>
+
+        <div className="room-v2-more-wrap">
+          <Control active={moreMenuOpen} label="Plus" onClick={() => setMoreMenuOpen((current) => !current)}><MoreVertical/></Control>
+          {moreMenuOpen ? <div className="room-v2-more-menu" role="menu">
+            <button type="button" onClick={() => {setPanel(panel==='participants'?null:'participants');setMoreMenuOpen(false);}}><UsersRound/><span>Participants</span><b>{activeMembers.length}</b></button>
+            <button type="button" disabled={!canUseChat} onClick={() => {setPanel(panel==='chat'?null:'chat');setMoreMenuOpen(false);}}><MessageCircle/><span>Discussion</span>{messages.length?<b>{messages.length}</b>:null}</button>
+            <button type="button" onClick={() => {setPanel(panel==='polls'?null:'polls');setMoreMenuOpen(false);}}><Vote/><span>Sondages</span></button>
+            <button type="button" disabled={!canUseReactions} onClick={() => {setReactionPanelOpen((current)=>!current);setMoreMenuOpen(false);}}><span className="room-v2-more-emoji">😊</span><span>Réactions</span></button>
+            <button type="button" disabled={!canUseLuna} onClick={() => {setPanel(panel==='luna'?null:'luna');setMoreMenuOpen(false);}}><Bot/><span>Luna IA</span></button>
+            {isModerator ? <button type="button" onClick={() => {setPanel(panel==='breakouts'?null:'breakouts');void refreshBreakouts();setMoreMenuOpen(false);}}><UsersRound/><span>Sous-salles</span></button> : null}
+            {isModerator ? <button type="button" onClick={() => {void toggleMeetingLock();setMoreMenuOpen(false);}}><ShieldCheck/><span>{meeting.settings?.locked?'Déverrouiller':'Verrouiller'}</span></button> : null}
+            <button type="button" onClick={() => {setDevicePanelOpen(true);void refreshMediaDevices();setMoreMenuOpen(false);}}><Settings2/><span>Périphériques</span></button>
+            <button type="button" onClick={() => {void inviteParticipants();setMoreMenuOpen(false);}}><UsersRound/><span>Inviter</span></button>
+            <div/>
+            <button type="button" className="danger" onClick={() => void leaveMeeting(false)}><LogOut/><span>Quitter la réunion</span></button>
+            {canEndForAll ? <button type="button" className="danger" onClick={() => void leaveMeeting(true)}><PhoneOff/><span>Terminer pour tous</span></button> : null}
+          </div> : null}
+        </div>
+
         <div className="room-v2-leave-actions">
-          <button type="button" className="room-v2-leave" onClick={() => void leaveMeeting(false)}><LogOut size={18}/> Quitter</button>
-          {canEndForAll ? <button type="button" className="room-v2-end" onClick={() => void leaveMeeting(true)}><PhoneOff size={18}/> Terminer pour tous</button> : null}
+          <button type="button" className="room-v2-leave" onClick={() => void leaveMeeting(false)}><PhoneOff size={18}/> Quitter la réunion</button>
         </div>
       </footer>
+
+      {reactionPanelOpen ? (
+        <div className="room-v2-reaction-panel" data-testid="reaction-panel">
+          {['👍','👏','❤️','🎉','😂'].map((reaction) => (
+            <button key={reaction} type="button" onClick={() => { setReactionPanelOpen(false); socket.emit('meeting:reaction',{meetingId:meeting.id,reaction}); }}>{reaction}</button>
+          ))}
+        </div>
+      ) : null}
+
+      {devicePanelOpen ? (
+        <div className="room-v2-device-panel" data-testid="device-settings-panel">
+          <div className="room-v2-device-title"><strong>Audio et vidéo</strong><button type="button" onClick={() => setDevicePanelOpen(false)} aria-label="Fermer"><X size={16}/></button></div>
+          <label>
+            <Mic size={16}/> Microphone
+            <select value={selectedAudioInputId} onChange={(event) => void switchInputDevice('audioinput', event.target.value)}>
+              {mediaDevices.filter((device) => device.kind === 'audioinput').map((device, index) => <option key={device.deviceId || `audio-${index}`} value={device.deviceId}>{device.label || `Microphone ${index + 1}`}</option>)}
+            </select>
+          </label>
+          <label>
+            <Camera size={16}/> Caméra
+            <select value={selectedVideoInputId} onChange={(event) => void switchInputDevice('videoinput', event.target.value)}>
+              {mediaDevices.filter((device) => device.kind === 'videoinput').map((device, index) => <option key={device.deviceId || `video-${index}`} value={device.deviceId}>{device.label || `Caméra ${index + 1}`}</option>)}
+            </select>
+          </label>
+          <label>
+            <Volume2 size={16}/> Haut-parleur
+            <select value={selectedAudioOutputId} onChange={(event) => setSelectedAudioOutputId(event.target.value)} disabled={typeof HTMLMediaElement === 'undefined' || !('setSinkId' in HTMLMediaElement.prototype)}>
+              <option value="">Sortie système</option>
+              {mediaDevices.filter((device) => device.kind === 'audiooutput').map((device, index) => <option key={device.deviceId || `output-${index}`} value={device.deviceId}>{device.label || `Haut-parleur ${index + 1}`}</option>)}
+            </select>
+          </label>
+          <small>Le choix du haut-parleur dépend du navigateur utilisé.</small>
+        </div>
+      ) : null}
     </main>
   );
 }
