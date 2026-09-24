@@ -7,7 +7,13 @@ export type PlatformSettingKey =
   | 'lunaEnabled'
   | 'recordingEnabled'
   | 'publicMeetingsEnabled'
-  | 'premiumPaymentEnabled';
+  | 'premiumPaymentEnabled'
+  | 'guestRaiseHandEnabled'
+  | 'guestRecordingEnabled'
+  | 'guestScreenShareEnabled'
+  | 'guestLunaEnabled'
+  | 'guestTranscriptionEnabled'
+  | 'guestChatEnabled';
 
 export type PlatformSettings = Record<PlatformSettingKey, boolean>;
 
@@ -19,6 +25,12 @@ export const platformSettingDefaults: PlatformSettings = {
   recordingEnabled: true,
   publicMeetingsEnabled: true,
   premiumPaymentEnabled: false,
+  guestRaiseHandEnabled: false,
+  guestRecordingEnabled: false,
+  guestScreenShareEnabled: false,
+  guestLunaEnabled: false,
+  guestTranscriptionEnabled: false,
+  guestChatEnabled: false,
 };
 
 export const getPlatformSettings = async (): Promise<PlatformSettings> => {
