@@ -39,9 +39,10 @@ table{max-width:100%}
 .room-v2-controls{max-width:100%}
 .room-v2-header>*{min-width:0}
 .room-v2-live-state{flex-wrap:wrap}
-.room-v2-controls{overflow-x:auto;overflow-y:visible;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-.room-v2-controls::-webkit-scrollbar{display:none}
-.room-v2-controls>*{flex:0 0 auto}
+.room-v2-controls{overflow:hidden}
+.room-v2-control-strip{min-width:0;overflow-x:auto;overflow-y:visible;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.room-v2-control-strip::-webkit-scrollbar{display:none}
+.room-v2-control-strip>*{flex:0 0 auto}
 
 @media(max-width:1200px){
   .dashboard-quick-actions{grid-template-columns:repeat(3,minmax(0,1fr))!important}
