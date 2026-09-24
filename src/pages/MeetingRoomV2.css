@@ -494,3 +494,8 @@
   .room-v2-gallery>.room-v2-tile{min-height:145px}
   .room-v2-lobby-alert{top:140px}
 }
+/* Online presence indicator for the live participant list */
+.room-v2-person-avatar.is-online{position:relative;overflow:visible}
+.room-v2-person-avatar.is-online img{border-radius:50%}
+.room-v2-person-avatar.is-online::after{content:"";position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border:2px solid #f8fafc;border-radius:50%;background:#22c55e;box-shadow:0 0 0 1px rgba(34,197,94,.12)}
+.room-v2-desktop-rail .room-v2-person-avatar.is-online::after{border-color:#07192b}
