@@ -84,12 +84,23 @@ export function useMeetingCaptions({
       .catch(() => {
         if (!cancelled) setStatus({ configured: false, model: '', chunkSeconds: 10 });
       });
-    void transcriptionService.getCaptions(meetingId)
-      .then((items) => {
-        if (cancelled) return;
-        setCaptions(items.filter((caption) => captionMatchesRoom(caption, breakoutRoomId)).slice(-4));
-      })
-      .catch(() => undefined);
+    const refreshCaptions = () => {
+      void transcriptionService.getCaptions(meetingId)
+        .then((items) => {
+          if (cancelled) return;
+          setCaptions(items.filter((caption) => captionMatchesRoom(caption, breakoutRoomId)).slice(-4));
+        })
+        .catch(() => undefined);
+    };
+    refreshCaptions();
+
+    const onRealtimeJoined = (event: Event) => {
+      const detail = (event as CustomEvent<{ meetingId?: number; breakoutRoomId?: string | null }>).detail;
+      if (Number(detail?.meetingId || 0) !== meetingId) return;
+      if ((detail?.breakoutRoomId || null) !== breakoutRoomId) return;
+      refreshCaptions();
+    };
+    window.addEventListener('mbote-room-meeting-realtime-joined', onRealtimeJoined);
 
     const onCaption = (caption: MeetingCaption) => {
       if (Number(caption.meetingId) !== meetingId || !caption.text || !captionMatchesRoom(caption, breakoutRoomId)) return;
@@ -98,6 +109,7 @@ export function useMeetingCaptions({
     socket.on('meeting:caption', onCaption);
     return () => {
       cancelled = true;
+      window.removeEventListener('mbote-room-meeting-realtime-joined', onRealtimeJoined);
       socket.off('meeting:caption', onCaption);
     };
   }, [breakoutRoomId, meetingId]);
