@@ -66,7 +66,7 @@ app.use((request, response, next) => {
   response.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   response.setHeader('Content-Security-Policy', [
     "default-src 'self'",
-    "script-src 'self'",
+    "script-src 'self' https://cdn.jsdelivr.net",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https:",
