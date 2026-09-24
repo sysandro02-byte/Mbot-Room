@@ -251,6 +251,23 @@ try {
   assert.equal(createGroup.data.isOwner, true);
   assert.ok(createGroup.data.members.length >= 3);
 
+  const groupConversation = await jsonRequest(`/api/conversations/work-group/${createGroup.data.id}`, {
+    method: 'POST',
+    headers: authHeaders(verified.data.token),
+  });
+  assert.equal(groupConversation.response.status, 201, JSON.stringify(groupConversation.data));
+  assert.ok(groupConversation.data.id);
+  const emailCountBeforeGroupMessage = sentEmails.length;
+  const groupMessage = await jsonRequest(`/api/conversations/${groupConversation.data.id}/messages`, {
+    method: 'POST',
+    headers: authHeaders(verified.data.token),
+    body: JSON.stringify({ text: 'Message réservé aux membres qui ont un compte MBotéRoom.' }),
+  });
+  assert.equal(groupMessage.response.status, 201, JSON.stringify(groupMessage.data));
+  const groupMessageEmails = sentEmails.slice(emailCountBeforeGroupMessage);
+  assert.ok(groupMessageEmails.some((mail) => Array.isArray(mail.to) && mail.to.includes('membre.un@mbote.test')), 'External group member one should receive an email notification');
+  assert.ok(groupMessageEmails.some((mail) => Array.isArray(mail.to) && mail.to.includes('membre.deux@mbote.test')), 'External group member two should receive an email notification');
+
   const pdfUpload = await fetch(`${baseUrl}/api/files/upload`, {
     method: 'POST',
     headers: {
