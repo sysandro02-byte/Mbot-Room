@@ -414,8 +414,16 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
         'textSize','notificationSounds','vibration','lockScreenPreview','autoArchiveDays','mediaDownload','chatBackground',
         'noiseReduction','hdVideo','lunaAutoSummary','lunaRealtimeTranslation','lunaActionSuggestions','dataSaver',
         'waitingRoomDefault','meetingLockDefault','participantAudioAllowed','participantVideoAllowed','screenShareAllowed',
+        'automaticLogoutMinutes',
       ];
       const preferences:Record<string,unknown>={}; for(const key of allowed){if(Object.prototype.hasOwnProperty.call(request.body||{},key))preferences[key]=request.body[key];}
+      if(Object.prototype.hasOwnProperty.call(preferences,'automaticLogoutMinutes')){
+        const minutes=Number(preferences.automaticLogoutMinutes);
+        if(![0,5,15,30,60,240].includes(minutes)){
+          return sendApiError(response,400,'AUTOMATIC_LOGOUT_INVALID','Choisissez une durée de déconnexion automatique valide.');
+        }
+        preferences.automaticLogoutMinutes=minutes;
+      }
       const result=await query(`INSERT INTO room_user_preferences (user_id,preferences) VALUES ($1,$2::jsonb) ON CONFLICT (user_id) DO UPDATE SET preferences=room_user_preferences.preferences||excluded.preferences,updated_at=now() RETURNING preferences`,[request.user!.id,JSON.stringify(preferences)]);
       response.json(result.rows[0]?.preferences||{});
     }catch(error){next(error);}
