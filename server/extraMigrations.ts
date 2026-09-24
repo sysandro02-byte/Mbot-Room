@@ -299,5 +299,18 @@ export const runExtraMigrations = async () => {
     );
     CREATE INDEX IF NOT EXISTS room_reports_status_created_idx ON room_reports(status, created_at DESC);
     CREATE INDEX IF NOT EXISTS room_reports_meeting_idx ON room_reports(meeting_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS room_meeting_feedback (
+      id uuid PRIMARY KEY,
+      meeting_id integer NOT NULL REFERENCES room_meetings(id) ON DELETE CASCADE,
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      rating smallint NOT NULL CHECK (rating BETWEEN 1 AND 5),
+      comment text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE (meeting_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS room_meeting_feedback_meeting_idx
+      ON room_meeting_feedback(meeting_id, created_at DESC);
   `);
 };
