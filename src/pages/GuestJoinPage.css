@@ -1087,15 +1087,18 @@
 }
 @media(max-width:760px){
   .guest-trust-strip{
-    justify-content:flex-start;
+    justify-content:center;
   }
   .guest-trust-button{
     width:100%;
-    justify-content:flex-start;
+    justify-content:center;
     gap:9px;
     padding:9px 12px;
+    text-align:center;
   }
   .guest-trust-button span{
+    justify-content:center;
     font-size:10px;
+    text-align:center;
   }
 }
