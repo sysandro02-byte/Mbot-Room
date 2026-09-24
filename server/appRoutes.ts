@@ -11,11 +11,13 @@ import {
   hasDatabase,
   publicMeeting,
   query,
+  requireAccountFeature,
   requireDatabase,
   sendApiError,
   toPublicUser,
 } from './core.js';
 import { createNotificationAndPush, getPushStatus } from './pushService.js';
+import { sendTransactionalEmail } from './emailDelivery.js';
 import { getPlatformSettings, isPlatformFeatureEnabled } from './platformSettings.js';
 import { deleteCalendarEventFromGoogle, syncCalendarEventToGoogle } from './workspaceRoutes.js';
 import { parseSupabaseRecordingMarker, requestSupabaseRecordingSigner, type RecordingDownloadTicket } from './supabaseRecordingStorage.js';
@@ -721,10 +723,11 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
     }catch(error){next(error);}
   });
 
-  app.post('/api/conversations/:conversationId/messages', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+  app.post('/api/conversations/:conversationId/messages', requireDatabase, authenticateToken, requireAccountFeature('messages'), async (request:AuthedRequest,response,next)=>{
     try{
       const access=await getConversationAccess(request.params.conversationId,request.user!.id);
       if(!access)return sendApiError(response,403,'CONVERSATION_ACCESS_DENIED','Vous n’avez pas accès à cette conversation.');
+      if(access.kind==='work_group'&&request.user!.isGuest)return sendApiError(response,403,'GROUP_ACCOUNT_REQUIRED','Seuls les membres disposant d’un compte MBotéRoom peuvent écrire dans un groupe.');
       const text=String(request.body?.text||'').trim().slice(0,4000);
       const fileId=String(request.body?.fileId||'').trim()||null;
       if(!text&&!fileId)return sendApiError(response,400,'MESSAGE_EMPTY','Écrivez un message ou joignez un fichier.');
@@ -764,6 +767,24 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
           });
           io.to(userRoom).emit('notification:new',notification);
         }
+      }
+      if(access.kind==='work_group'&&access.work_group_id){
+        const externalMembers=await query(
+          `SELECT email FROM room_work_group_members
+            WHERE group_id=$1 AND user_id IS NULL AND lower(email)<>lower($2)`,
+          [access.work_group_id,request.user!.email],
+        );
+        const appUrl=String(process.env.MBOTE_ROOM_APP_URL||'').replace(/\/+$/,'');
+        await Promise.all(externalMembers.rows.map((member)=>sendTransactionalEmail({
+          to:String(member.email||''),
+          subject:`MBotéRoom · Nouveau message dans ${String(access.title||'votre groupe')}`,
+          text:[
+            `${request.user!.name} a publié un nouveau message dans le groupe « ${String(access.title||'MBotéRoom')} ».`,
+            text||'Une pièce jointe a été partagée.',
+            appUrl?'Créez ou connectez votre compte MBotéRoom pour participer : '+appUrl+'/connexion':'',
+            'Les membres sans compte reçoivent uniquement ces notifications par e-mail et ne peuvent pas écrire dans le groupe.',
+          ].filter(Boolean).join('\n\n'),
+        }).catch(()=>false)));
       }
       response.status(201).json(payload);
     }catch(error){next(error);}
