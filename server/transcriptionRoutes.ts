@@ -46,9 +46,13 @@ const resolveBreakout = async (meetingId: number, userId: number, role: string, 
   if (!room.rows[0]) throw new Error('BREAKOUT_NOT_FOUND');
 
   if (role !== 'admin') {
-    const meeting = await query('SELECT host_id,co_host_id FROM room_meetings WHERE id=$1 LIMIT 1', [meetingId]);
+    const meeting = await query('SELECT host_id,co_host_id,settings FROM room_meetings WHERE id=$1 LIMIT 1', [meetingId]);
+    const meetingSettings = typeof meeting.rows[0]?.settings === 'string'
+      ? JSON.parse(meeting.rows[0].settings || '{}')
+      : (meeting.rows[0]?.settings || {});
     const moderator = Number(meeting.rows[0]?.host_id || 0) === userId
-      || Number(meeting.rows[0]?.co_host_id || 0) === userId;
+      || Number(meeting.rows[0]?.co_host_id || 0) === userId
+      || Number(meetingSettings.actingHostId || 0) === userId;
     if (!moderator) {
       const assignment = await query(
         'SELECT 1 FROM room_breakout_members WHERE breakout_room_id=$1 AND user_id=$2 LIMIT 1',
@@ -125,12 +129,16 @@ export const registerTranscriptionRoutes = (app: express.Express, io: Server) =>
         return sendApiError(response, 403, 'GUEST_TRANSCRIPTION_DISABLED', 'La transcription n’est pas autorisée pour les invités.');
       }
       const meeting = await query(
-        'SELECT host_id,co_host_id FROM room_meetings WHERE id=$1 LIMIT 1',
+        'SELECT host_id,co_host_id,settings FROM room_meetings WHERE id=$1 LIMIT 1',
         [meetingId],
       );
+      const meetingSettings = typeof meeting.rows[0]?.settings === 'string'
+        ? JSON.parse(meeting.rows[0].settings || '{}')
+        : (meeting.rows[0]?.settings || {});
       const moderator = request.user!.role === 'admin'
         || Number(meeting.rows[0]?.host_id || 0) === request.user!.id
-        || Number(meeting.rows[0]?.co_host_id || 0) === request.user!.id;
+        || Number(meeting.rows[0]?.co_host_id || 0) === request.user!.id
+        || Number(meetingSettings.actingHostId || 0) === request.user!.id;
       const rows = moderator
         ? await query(
             `SELECT id,meeting_id,user_id,speaker,text,breakout_room_id,provider,language,created_at
