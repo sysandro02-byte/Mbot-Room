@@ -95,9 +95,9 @@ export default function AdminControlCenter(){
   };
   useEffect(()=>{void load();},[]);
 
-  const countries=useMemo(()=>[...new Set(users.map(user=>user.country).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),[users]);
-  const cities=useMemo(()=>[...new Set(users.filter(user=>!countryFilter||user.country===countryFilter).map(user=>user.city).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),[countryFilter,users]);
-  const organizations=useMemo(()=>[...new Set(users.map(user=>user.organization).filter(Boolean))].sort((a,b)=>a.localeCompare(b)),[users]);
+  const countries=useMemo<string[]>(()=>Array.from(new Set(users.map(user=>String(user.country||'')).filter(value=>value.length>0))).sort((a,b)=>a.localeCompare(b)),[users]);
+  const cities=useMemo<string[]>(()=>Array.from(new Set(users.filter(user=>!countryFilter||user.country===countryFilter).map(user=>String(user.city||'')).filter(value=>value.length>0))).sort((a,b)=>a.localeCompare(b)),[countryFilter,users]);
+  const organizations=useMemo<string[]>(()=>Array.from(new Set(users.map(user=>String(user.organization||'')).filter(value=>value.length>0))).sort((a,b)=>a.localeCompare(b)),[users]);
 
   const filtered=useMemo(()=>{
     const q=search.trim().toLowerCase();
