@@ -130,6 +130,22 @@ export default function AppShell({ children, title }: AppShellProps) {
   }, []);
 
   useEffect(() => {
+    const handleGlobalMenu = () => {
+      if (window.matchMedia('(max-width: 1024px)').matches) {
+        setMenuOpen((value) => !value);
+        return;
+      }
+      setSidebarCollapsed((value) => {
+        const next = !value;
+        try { localStorage.setItem('mboteroom-sidebar-collapsed', next ? '1' : '0'); } catch { /* storage unavailable */ }
+        return next;
+      });
+    };
+    window.addEventListener('mboteroom-toggle-sidebar', handleGlobalMenu);
+    return () => window.removeEventListener('mboteroom-toggle-sidebar', handleGlobalMenu);
+  }, []);
+
+  useEffect(() => {
     const handleOnline = () => setOnline(true);
     const handleOffline = () => setOnline(false);
     const handlePointer = (event: MouseEvent) => {
