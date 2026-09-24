@@ -499,3 +499,98 @@
 .room-v2-person-avatar.is-online img{border-radius:50%}
 .room-v2-person-avatar.is-online::after{content:"";position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border:2px solid #f8fafc;border-radius:50%;background:#22c55e;box-shadow:0 0 0 1px rgba(34,197,94,.12)}
 .room-v2-desktop-rail .room-v2-person-avatar.is-online::after{border-color:#07192b}
+
+/* Meeting controls layout refinement — avoid overlap and compact view buttons */
+.room-v2-mode-tabs{
+  height:54px;
+  gap:7px;
+  padding:0 14px;
+}
+.room-v2-mode-tabs button{
+  min-width:138px;
+  height:38px;
+  gap:8px;
+  padding:0 14px;
+  border-radius:19px;
+  font-size:10.5px;
+}
+.room-v2-mode-tabs svg{width:17px;height:17px}
+.room-v2-grid-icon{width:16px;height:16px}
+.room-v2-speaker-icon{width:15px;height:16px}
+
+.room-v2-controls{
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:12px;
+  min-height:82px;
+  padding:7px 16px;
+  overflow:visible;
+}
+.room-v2-control-strip{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  overflow-x:auto;
+  overflow-y:visible;
+  padding:0 4px;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+}
+.room-v2-control-strip::-webkit-scrollbar{display:none}
+.room-v2-control-strip>*{flex:0 0 auto}
+.room-v2-leave-actions{
+  position:static;
+  right:auto;
+  flex:0 0 auto;
+  margin:0;
+  padding-left:12px;
+  border-left:1px solid rgba(255,255,255,.09);
+}
+.room-v2-leave{
+  height:42px;
+  padding:0 15px;
+  border-radius:12px;
+  font-size:12px;
+  white-space:nowrap;
+}
+
+@media(max-width:1180px){
+  .room-v2-mode-tabs button{min-width:126px}
+  .room-v2-controls{gap:7px;padding-inline:10px}
+  .room-v2-control-strip{justify-content:flex-start}
+  .room-v2-leave-actions{padding-left:8px}
+  .room-v2-leave{height:40px;padding:0 12px;font-size:11px}
+}
+@media(max-width:760px){
+  .room-v2-mode-tabs{
+    height:52px;
+    justify-content:flex-start;
+    gap:6px;
+    padding:0 8px;
+  }
+  .room-v2-mode-tabs button{
+    min-width:108px;
+    height:36px;
+    padding:0 10px;
+    gap:6px;
+    font-size:9.5px;
+  }
+  .room-v2-controls{
+    display:block;
+    min-height:90px;
+    padding:7px 8px;
+    overflow:hidden;
+  }
+  .room-v2-control-strip{
+    width:100%;
+    justify-content:flex-start;
+  }
+  .room-v2-leave-actions{display:none}
+}
+@media(max-width:420px){
+  .room-v2-mode-tabs button{min-width:102px;height:34px;font-size:9px}
+}
