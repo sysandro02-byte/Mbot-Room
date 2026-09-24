@@ -17,6 +17,7 @@ import { registerRtcRoutes } from './server/rtcRoutes.js';
 import { registerSfuRoutes } from './server/sfuRoutes.js';
 import { registerRecordingRoutes } from './server/recordingRoutes.js';
 import { registerTranscriptionRoutes } from './server/transcriptionRoutes.js';
+import { registerLegalAndReportRoutes } from './server/legalReportRoutes.js';
 import { getRuntimeReadiness } from './server/readiness.js';
 import { isAllowedOrigin } from './server/originPolicy.js';
 import { getEmailDeliveryStatus, sendTransactionalEmail } from './server/emailDelivery.js';
@@ -157,6 +158,7 @@ registerRtcRoutes(app);
 registerSfuRoutes(app);
 registerRecordingRoutes(app, io);
 registerTranscriptionRoutes(app, io);
+registerLegalAndReportRoutes(app, io);
 registerRealtime(io);
 
 app.use('/api', (_request, response) => {
