@@ -24,6 +24,9 @@ export type PublicUser = {
   profileVisible?: boolean;
   mboteUserId?: string;
   personalMeetingId?: string;
+  accountStatus?: 'active' | 'quarantined' | 'banned';
+  featureRestrictions?: string[];
+  termsVersion?: string;
   isGuest: boolean;
   role: UserRole;
   permissions: string[];
@@ -186,6 +189,9 @@ export const toPublicUser = (row: any): PublicUser => {
     profileVisible: row.profile_visible !== false,
     mboteUserId: String(row.mbote_user_id || ''),
     personalMeetingId: String(row.personal_meeting_id || ''),
+    accountStatus: row.account_status === 'quarantined' || row.account_status === 'banned' ? row.account_status : 'active',
+    featureRestrictions: Array.isArray(row.feature_restrictions) ? row.feature_restrictions.filter((item: unknown): item is string => typeof item === 'string') : [],
+    termsVersion: String(row.terms_version || ''),
     isGuest: Boolean(row.is_guest),
     role,
     permissions: role === 'admin' ? adminPermissions : [],
@@ -282,6 +288,7 @@ export const getUserByRawToken = async (rawToken: string): Promise<PublicUser | 
       WHERE s.token_hash = $1
         AND s.expires_at::timestamptz > now()
         AND COALESCE(u.is_suspended,false)=false
+        AND COALESCE(u.account_status,'active') <> 'banned'
         AND COALESCE(s.last_activity, s.created_at::timestamptz) > $2::timestamptz
       LIMIT 1`,
     [hashToken(rawToken), idleCutoff],
