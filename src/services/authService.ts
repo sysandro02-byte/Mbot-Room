@@ -18,6 +18,9 @@ export type RoomUser = {
   bio?: string;
   profileVisible?: boolean;
   personalMeetingId?: string;
+  accountStatus?: 'active' | 'quarantined' | 'banned';
+  featureRestrictions?: string[];
+  termsVersion?: string;
   role?: 'admin' | 'user' | 'guest';
   permissions?: string[];
   isGuest?: boolean;
@@ -67,6 +70,9 @@ const normalizeUser = (user: RawRoomUser): RoomUser => ({
   bio: String(user.bio || ''),
   profileVisible: user.profileVisible === undefined ? true : Boolean(user.profileVisible),
   personalMeetingId: String(user.personalMeetingId || user.personal_meeting_id || ''),
+  accountStatus: user.accountStatus === 'quarantined' || user.accountStatus === 'banned' ? user.accountStatus : 'active',
+  featureRestrictions: Array.isArray(user.featureRestrictions) ? user.featureRestrictions.filter((item): item is string => typeof item === 'string') : [],
+  termsVersion: String(user.termsVersion || ''),
   role: user.role === 'admin' || user.role === 'guest' ? user.role : user.isGuest || user.is_guest ? 'guest' : 'user',
   permissions: Array.isArray(user.permissions) ? user.permissions.filter((item): item is string => typeof item === 'string') : [],
   isGuest: Boolean(user.isGuest || user.is_guest),
@@ -148,7 +154,7 @@ export const authService = {
     };
   },
 
-  async register(payload: { name: string; email: string; password: string; username?: string; phoneNumber?: string; organization?: string; jobTitle?: string; country?: string; city?: string; birthDate?: string; birthPlace?: string; address?: string }) {
+  async register(payload: { name: string; email: string; password: string; username?: string; phoneNumber?: string; organization?: string; jobTitle?: string; country?: string; city?: string; birthDate?: string; birthPlace?: string; address?: string; termsAccepted: boolean; termsVersion: string }) {
     const response = await fetchAuth(apiUrl('/api/auth/register'), {
       method: 'POST',
       headers: authRequestHeaders(),
@@ -213,7 +219,7 @@ export const authService = {
     return result as { success: boolean; expiresInSeconds: number };
   },
 
-  async guestJoin(payload: { name: string; meetingCode: string; password: string }) {
+  async guestJoin(payload: { name: string; meetingCode: string; password: string; termsAccepted: boolean; termsVersion: string }) {
     const response = await fetchAuth(apiUrl('/api/auth/guest-join'), {
       method: 'POST',
       headers: authRequestHeaders(),
