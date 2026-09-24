@@ -330,7 +330,10 @@ export const registerWorkspaceRoutes=(app:express.Express,io:Server)=>{
     try{
       const mime=String(request.headers['content-type']||'').split(';')[0].toLowerCase();
       if(!ALLOWED_FILE_TYPES.has(mime))return sendApiError(response,415,'FILE_TYPE_NOT_ALLOWED','Seuls les fichiers PDF et images sont autorisés.');
-      const rawName=decodeURIComponent(String(request.headers['x-file-name']||'fichier')).replace(/[\\/\0]/g,' ').trim().slice(0,180);
+      const encodedName=String(request.headers['x-file-name']||'fichier');
+      let decodedName=encodedName;
+      try{decodedName=decodeURIComponent(encodedName);}catch{decodedName=encodedName;}
+      const rawName=decodedName.replace(/[\\/\0]/g,' ').trim().slice(0,180);
       const name=rawName||'fichier';
       const content=await readRawBody(request);
       if(!content.length)return sendApiError(response,400,'FILE_EMPTY','Le fichier est vide.');
