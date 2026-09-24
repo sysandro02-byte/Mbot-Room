@@ -7,6 +7,7 @@ export type MediaTransportStatus = {
   livekitReady: boolean;
   turnConfigured: boolean;
   serverRecordingReady: boolean;
+  recordingStorageReady: boolean;
 };
 
 export type MediaSession =
