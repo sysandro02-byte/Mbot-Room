@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { appDataService, type Contact, type Recording, type Whiteboard } from '../services/appDataService';
 import { getMeetingAccessCode, type Meeting, meetingService } from '../services/meetingService';
 import './UtilityPages.css';
+import AppLoader from '../components/AppLoader';
 
 export default function GlobalSearchPage() {
   const navigate = useNavigate();
@@ -94,7 +95,7 @@ export default function GlobalSearchPage() {
     </form>
 
     {error ? <div className="utility-error">{error}</div> : null}
-    {loading ? <div className="utility-empty">Chargement des données…</div> : null}
+    {loading ? <AppLoader label="Chargement des données…" compact /> : null}
     {!loading && !query ? <div className="utility-empty">Saisissez un terme pour lancer la recherche.</div> : null}
 
     {!loading && query ? <div className="utility-grid">
