@@ -1,7 +1,7 @@
 const API_CACHE_PREFIX = 'mboteroom-api-v2';
 const LEGACY_QUEUE_KEY = 'mboteroom-offline-queue-v2';
 const QUEUE_KEY_PREFIX = 'mboteroom-offline-queue-v3';
-const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_QUEUE = 100;
 
 export type OfflineQueueEntry = {
