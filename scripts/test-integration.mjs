@@ -646,6 +646,9 @@ try {
   const adminReports = await jsonRequest('/api/admin/reports', { headers: authHeaders(host.token) });
   assert.equal(adminReports.response.status, 200, JSON.stringify(adminReports.data));
   assert.ok(adminReports.data.some((item)=>item.id===report.data.id));
+  const adminNotifications = await jsonRequest('/api/notifications', { headers: authHeaders(host.token) });
+  assert.equal(adminNotifications.response.status, 200, JSON.stringify(adminNotifications.data));
+  assert.ok(adminNotifications.data.some((item)=>item.type==='USER_REPORT'&&String(item.tag||'')==='report-'+report.data.id), 'Admin should receive an in-app notification for a new report');
 
   const wrongPassword = await jsonRequest('/api/meetings/join-lookup', {
     method: 'POST',
@@ -1127,6 +1130,16 @@ try {
   });
   assert.equal(restartedLookup.response.status, 200, JSON.stringify(restartedLookup.data));
   assert.equal(Number(restartedLookup.data.id), Number(restarted.data.meeting.id));
+
+  const banOutsider = await jsonRequest('/api/admin/users/'+outsider.user.id, {
+    method: 'PUT',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ accountStatus: 'banned' }),
+  });
+  assert.equal(banOutsider.response.status, 200, JSON.stringify(banOutsider.data));
+  assert.equal(banOutsider.data.accountStatus, 'banned');
+  const bannedSession = await jsonRequest('/api/auth/me', { headers: authHeaders(outsider.token) });
+  assert.equal(bannedSession.response.status, 401, 'Banning a user must revoke their existing sessions');
 
   const finalHealth = await jsonRequest('/api/health');
   assert.equal(finalHealth.response.status, 200);
