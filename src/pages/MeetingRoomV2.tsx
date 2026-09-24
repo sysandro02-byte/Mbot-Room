@@ -146,10 +146,11 @@ function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, l
 
     const attach = (forceFresh = false) => {
       if (disposed || !stream) return;
-      const nextStream = forceFresh
+      const shouldClone = forceFresh && !screen;
+      const nextStream = shouldClone
         ? new MediaStream(stream.getTracks().filter((track) => track.readyState === 'live'))
         : stream;
-      if (forceFresh || node.srcObject !== nextStream) node.srcObject = nextStream;
+      if (node.srcObject !== nextStream) node.srcObject = nextStream;
       void node.play().catch(() => undefined);
     };
 
@@ -181,7 +182,7 @@ function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, l
       if (recoveryTimer !== null) window.clearTimeout(recoveryTimer);
       tracks.forEach((track) => track.removeEventListener('unmute', retry));
     };
-  }, [local, stream, videoEnabled]);
+  }, [local, screen, stream, videoEnabled]);
 
   return (
     <article className={`room-v2-tile ${screen ? 'is-screen' : ''} ${activeSpeaker ? 'is-speaking' : ''} ${pinned ? 'is-pinned' : ''}`} data-speaking={activeSpeaker ? 'true' : 'false'}>
