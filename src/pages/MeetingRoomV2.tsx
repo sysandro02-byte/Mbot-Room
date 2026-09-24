@@ -481,6 +481,19 @@ export default function MeetingRoomV2() {
   }, [canUseTranscription, captionsEnabled]);
 
   useEffect(() => {
+    if (!guestRaiseHandAllowed && handRaised && meeting?.id) {
+      setHandRaised(false);
+      setRaisedHands((current) => {
+        const next = new Set(current);
+        next.delete(Number(currentUser?.id || 0));
+        return next;
+      });
+      socket.emit('meeting:hand-raised', { meetingId: meeting.id, raised: false });
+    }
+    if (!canUseLuna && panel === 'luna') setPanel(null);
+  }, [canUseLuna, currentUser?.id, guestRaiseHandAllowed, handRaised, meeting?.id, panel]);
+
+  useEffect(() => {
     let cancelled = false;
     setMediaTransportChecked(false);
     void mediaTransportService.getStatus()
@@ -1036,6 +1049,13 @@ export default function MeetingRoomV2() {
     }
     stopLocalRecording();
   }, [meeting?.id, recording, recordingMode, serverRecordingId, stopLocalRecording]);
+
+  useEffect(() => {
+    if (recording && !canRecord) {
+      void stopActiveRecording();
+      setNotice('L’autorisation d’enregistrement pour les invités a été retirée.');
+    }
+  }, [canRecord, recording, stopActiveRecording]);
 
   const startLocalRecording = useCallback(async () => {
     if (!localStream || typeof MediaRecorder === 'undefined') {
