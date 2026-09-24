@@ -314,6 +314,18 @@ const linkPendingWorkGroupMemberships = async (userId: number, email: string) =>
 };
 
 
+const currentTermsVersion = async () => {
+  const result = await query("SELECT version FROM room_legal_documents WHERE key='terms' LIMIT 1");
+  return String(result.rows[0]?.version || '2026-09-24');
+};
+
+const validateTermsAcceptance = async (body: any) => {
+  const version = await currentTermsVersion();
+  const accepted = body?.termsAccepted === true && String(body?.termsVersion || '') === version;
+  return { accepted, version };
+};
+
+
 export const registerAuthRoutes = (app: express.Express) => {
   app.post('/api/auth/register', requireDatabase, async (request, response, next) => {
     try {
@@ -325,6 +337,8 @@ export const registerAuthRoutes = (app: express.Express) => {
       const password = String(request.body?.password || '');
       const username = normalizeText(request.body?.username || email.split('@')[0]).toLowerCase().slice(0, 80);
       if (!name || !email || !password) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Nom, email et mot de passe sont requis.');
+      const terms = await validateTermsAcceptance(request.body);
+      if (!terms.accepted) return sendApiError(response, 400, 'TERMS_NOT_ACCEPTED', 'Vous devez lire et accepter la version actuelle des conditions d’utilisation.');
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendApiError(response, 400, 'INVALID_EMAIL', 'Email invalide.');
       const passwordError = validatePasswordStrength(password);
       if (passwordError) return sendApiError(response, 400, 'PASSWORD_WEAK', passwordError);
@@ -341,8 +355,8 @@ export const registerAuthRoutes = (app: express.Express) => {
       }
       const inserted = await query(
         `INSERT INTO room_users
-          (name,username,email,avatar,password_hash,password_salt,is_guest,created_at,phone_number,organization,job_title,country,city,birth_date,birth_place,address,role)
-         VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *`,
+          (name,username,email,avatar,password_hash,password_salt,is_guest,created_at,phone_number,organization,job_title,country,city,birth_date,birth_place,address,role,terms_accepted_at,terms_version)
+         VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,now(),$17) RETURNING *`,
         [
           name,
           username,
@@ -360,6 +374,7 @@ export const registerAuthRoutes = (app: express.Express) => {
           normalizeText(request.body?.birthPlace).slice(0, 160),
           normalizeText(request.body?.address).slice(0, 240),
           role,
+          terms.version,
         ],
       );
       await linkPendingWorkGroupMemberships(Number(inserted.rows[0].id), email);
@@ -414,7 +429,7 @@ export const registerAuthRoutes = (app: express.Express) => {
   app.post('/api/auth/login', requireDatabase, async (request, response, next) => {
     try {
       const email = normalizeEmail(request.body?.email);
-      const result = await query('SELECT * FROM room_users WHERE lower(email) = lower($1) AND is_guest=false AND COALESCE(is_suspended,false)=false LIMIT 1', [email]);
+      const result = await query("SELECT * FROM room_users WHERE lower(email) = lower($1) AND is_guest=false AND COALESCE(is_suspended,false)=false AND COALESCE(account_status,'active')<>'banned' LIMIT 1", [email]);
       const user = result.rows[0];
       if (!user) return sendApiError(response, 401, 'INVALID_CREDENTIALS', 'Email ou mot de passe incorrect.');
       const adminOnly = request.body?.adminOnly === true;
@@ -530,6 +545,8 @@ export const registerAuthRoutes = (app: express.Express) => {
       const name = normalizeText(request.body?.name).slice(0, 100);
       const meeting = await findMeeting(request.body?.meetingCode);
       if (!name) return sendApiError(response, 400, 'VALIDATION_ERROR', 'Votre nom est requis.');
+      const terms = await validateTermsAcceptance(request.body);
+      if (!terms.accepted) return sendApiError(response, 400, 'TERMS_NOT_ACCEPTED', 'Vous devez lire et accepter les conditions d’utilisation avant de rejoindre en invité.');
       if (!meeting) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
       if (meeting.status === 'ended' || meeting.status === 'cancelled') {
         return sendApiError(response, 410, 'MEETING_ENDED', 'Cette réunion est terminée ou annulée.');
@@ -555,9 +572,9 @@ export const registerAuthRoutes = (app: express.Express) => {
       const randomPassword = hashPassword(createToken());
       const guestEmail = `guest-${createId()}@guest.mbote.local`;
       const inserted = await query(
-        `INSERT INTO room_users (name,username,email,avatar,password_hash,password_salt,is_guest,created_at,role)
-         VALUES ($1,$2,$3,$4,$5,$6,true,$7,'guest') RETURNING *`,
-        [name, `guest-${createId().slice(0, 8)}`, guestEmail, createAvatar(name), randomPassword.hash, randomPassword.salt, new Date().toISOString()],
+        `INSERT INTO room_users (name,username,email,avatar,password_hash,password_salt,is_guest,created_at,role,terms_accepted_at,terms_version)
+         VALUES ($1,$2,$3,$4,$5,$6,true,$7,'guest',now(),$8) RETURNING *`,
+        [name, `guest-${createId().slice(0, 8)}`, guestEmail, createAvatar(name), randomPassword.hash, randomPassword.salt, new Date().toISOString(), terms.version],
       );
       const user = toPublicUser(inserted.rows[0]);
 
