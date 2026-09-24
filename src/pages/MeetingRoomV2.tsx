@@ -35,6 +35,7 @@ import { useMeetingLiveKit } from '../hooks/useMeetingLiveKit';
 import { useMeetingCaptions } from '../hooks/useMeetingCaptions';
 import { socket } from '../lib/socket';
 import { authService } from '../services/authService';
+import { appDataService, type ClientPlatformSettings } from '../services/appDataService';
 import {
   BreakoutRoom,
   collaborationService,
@@ -309,6 +310,7 @@ export default function MeetingRoomV2() {
   const [menuUserId, setMenuUserId] = useState<number | null>(null);
   const [mediaTransportStatus, setMediaTransportStatus] = useState<MediaTransportStatus | null>(null);
   const [mediaTransportChecked, setMediaTransportChecked] = useState(false);
+  const [platformSettings, setPlatformSettings] = useState<ClientPlatformSettings | null>(null);
   const [liveKitFailed, setLiveKitFailed] = useState(false);
   const [captionsEnabled, setCaptionsEnabled] = useState(userPreferences.lunaRealtimeTranslation === true);
   const [pendingMediaRequest, setPendingMediaRequest] = useState<MeetingMediaRequest | null>(null);
@@ -323,13 +325,21 @@ export default function MeetingRoomV2() {
   ));
   const isAdmin = currentUser?.role === 'admin';
   const isModerator = Boolean(meeting && currentUser && (isHost || isCoHost || isAdmin));
+  const guestMode = currentUser?.isGuest === true;
+  const guestRaiseHandAllowed = !guestMode || platformSettings?.guestRaiseHandEnabled === true;
+  const guestRecordingAllowed = !guestMode || platformSettings?.guestRecordingEnabled === true;
+  const guestScreenShareAllowed = !guestMode || platformSettings?.guestScreenShareEnabled === true;
+  const guestLunaAllowed = !guestMode || platformSettings?.guestLunaEnabled === true;
+  const guestTranscriptionAllowed = !guestMode || platformSettings?.guestTranscriptionEnabled === true;
+  const guestChatAllowed = !guestMode || platformSettings?.guestChatEnabled === true;
   const canUseMic = Boolean(meeting && (isModerator || meeting.settings?.participantAudio !== false));
   const canUseCamera = Boolean(meeting && meeting.settings?.callType !== 'audio' && (isModerator || meeting.settings?.participantVideo !== false));
-  const canShareScreen = Boolean(meeting && (isModerator || meeting.settings?.screenShare !== false));
+  const canShareScreen = Boolean(meeting && guestScreenShareAllowed && (isModerator || meeting.settings?.screenShare !== false));
   const canUseReactions = Boolean(meeting && (isModerator || meeting.settings?.reactions !== false));
-  const canUseChat = Boolean(meeting && meeting.settings?.chat !== false);
-  const canUseLuna = Boolean(meeting && (isModerator || meeting.settings?.lunaSummary !== false));
-  const canRecord = Boolean(meeting && (isModerator || meeting.settings?.recording === true));
+  const canUseChat = Boolean(meeting && guestChatAllowed && meeting.settings?.chat !== false);
+  const canUseLuna = Boolean(meeting && guestLunaAllowed && (isModerator || meeting.settings?.lunaSummary !== false));
+  const canUseTranscription = Boolean(meeting && guestTranscriptionAllowed);
+  const canRecord = Boolean(meeting && guestRecordingAllowed && (isModerator || meeting.settings?.recording === true));
   const canCreatePoll = isModerator;
   const canEndForAll = Boolean(meeting && currentUser && (isHost || isAdmin));
 
@@ -398,7 +408,7 @@ export default function MeetingRoomV2() {
   const networkQuality = usingLiveKit ? liveKitMedia.networkQuality : meshMedia.networkQuality;
   const activeSpeakerSocketId = usingLiveKit ? liveKitMedia.activeSpeakerSocketId : meshMedia.activeSpeakerSocketId;
 
-  const summaryTranscriptionEnabled = Boolean(meeting?.id && meeting.settings?.lunaSummary !== false);
+  const summaryTranscriptionEnabled = Boolean(meeting?.id && meeting.settings?.lunaSummary !== false && canUseTranscription);
   const liveCaptions = useMeetingCaptions({
     meetingId: meeting?.id || 0,
     enabled: Boolean(meeting?.id) && (captionsEnabled || summaryTranscriptionEnabled),
@@ -442,6 +452,36 @@ export default function MeetingRoomV2() {
   }, [currentUser?.id, currentUser?.isGuest, isAuthenticated, location.state, meetingId, navigate, state?.meeting]);
 
   useEffect(() => { void loadMeeting(); }, [loadMeeting]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refreshPlatformSettings = async () => {
+      try {
+        const next = await appDataService.getPlatformSettings();
+        if (!cancelled) setPlatformSettings(next);
+      } catch {
+        if (!cancelled && currentUser?.isGuest) setPlatformSettings(null);
+      }
+    };
+    void refreshPlatformSettings();
+    const interval = window.setInterval(() => void refreshPlatformSettings(), 30_000);
+    const onSettingsUpdated = (next: ClientPlatformSettings) => {
+      if (!cancelled && next && typeof next === 'object') setPlatformSettings(next);
+    };
+    socket.on('admin:settings-updated', onSettingsUpdated);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      socket.off('admin:settings-updated', onSettingsUpdated);
+    };
+  }, [currentUser?.isGuest]);
+
+  useEffect(() => {
+    if (!canUseTranscription && captionsEnabled) {
+      setCaptionsEnabled(false);
+      liveCaptions.clearCaptions();
+    }
+  }, [canUseTranscription, captionsEnabled, liveCaptions]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1102,6 +1142,10 @@ export default function MeetingRoomV2() {
     event.preventDefault();
     const text = messageDraft.trim();
     if (!meeting?.id || !text) return;
+    if (!canUseChat) {
+      setNotice(guestMode ? 'L’envoi de messages est désactivé pour les invités.' : 'Le chat est désactivé pour cette réunion.');
+      return;
+    }
     try {
       const message = await collaborationService.sendMessage(meeting.id, text);
       setMessages((current) => dedupeMessages([...current, message]));
@@ -1132,6 +1176,10 @@ export default function MeetingRoomV2() {
   const askLuna = async (event: FormEvent) => {
     event.preventDefault();
     if (!meeting?.id || !lunaPrompt.trim()) return;
+    if (!canUseLuna) {
+      setLunaAnswer(guestMode ? 'Luna IA est désactivée pour les invités.' : 'Luna IA est désactivée pour cette réunion.');
+      return;
+    }
     setLunaLoading(true);
     try {
       const answer = await meetingService.askLuna(meeting.id, lunaPrompt.trim());
@@ -1536,7 +1584,7 @@ export default function MeetingRoomV2() {
                   )) : <p className="room-v2-empty">Aucun message pour le moment.</p>}
                 </div>
                 <form className="room-v2-chat-form" onSubmit={sendMessage}>
-                  <textarea value={messageDraft} onChange={(event) => setMessageDraft(event.target.value)} maxLength={2000} placeholder={!canUseChat ? 'Chat désactivé par l’hôte' : 'Écrire un message…'} disabled={!canUseChat}/>
+                  <textarea value={messageDraft} onChange={(event) => setMessageDraft(event.target.value)} maxLength={2000} placeholder={!canUseChat ? (guestMode && !guestChatAllowed ? 'Envoi de messages désactivé pour les invités' : 'Chat désactivé par l’hôte') : 'Écrire un message…'} disabled={!canUseChat}/>
                   <button type="submit" disabled={!messageDraft.trim() || !canUseChat}><Send size={18}/></button>
                 </form>
               </div>
@@ -1675,11 +1723,11 @@ export default function MeetingRoomV2() {
       <footer className="room-v2-controls">
         <Control active={micEnabled} disabled={!canUseMic} title={!canUseMic ? 'Microphone désactivé par l’hôte' : undefined} label={micEnabled ? 'Micro' : 'Micro coupé'} onClick={() => void toggleMic()}>{micEnabled ? <Mic/> : <MicOff/>}</Control>
         <Control active={cameraEnabled} disabled={!canUseCamera} title={!canUseCamera ? 'Caméra désactivée par l’hôte' : undefined} label={cameraEnabled ? 'Caméra' : 'Caméra coupée'} onClick={() => void toggleCamera()}>{cameraEnabled ? <Camera/> : <CameraOff/>}</Control>
-        <Control active={screenSharing} disabled={!canShareScreen} title={!canShareScreen ? 'Partage d’écran désactivé par l’hôte' : undefined} label="Partager" onClick={() => void toggleScreenShare()}><MonitorUp/></Control>
+        <Control active={screenSharing} disabled={!canShareScreen} title={!canShareScreen ? (guestMode && !guestScreenShareAllowed ? 'Partage d’écran non autorisé pour les invités' : 'Partage d’écran désactivé par l’hôte') : undefined} label="Partager" onClick={() => void toggleScreenShare()}><MonitorUp/></Control>
         <Control
           active={captionsEnabled}
-          disabled={userPreferences.lunaRealtimeTranslation !== true}
-          title={userPreferences.lunaRealtimeTranslation !== true ? 'Activez la traduction en temps réel dans Paramètres > Outils IA Luna' : undefined}
+          disabled={!canUseTranscription || userPreferences.lunaRealtimeTranslation !== true}
+          title={!canUseTranscription ? 'Transcription non autorisée pour les invités' : userPreferences.lunaRealtimeTranslation !== true ? 'Activez la traduction en temps réel dans Paramètres > Outils IA Luna' : undefined}
           label={captionsEnabled ? (liveCaptions.mode === 'server' ? 'Sous-titres IA' : 'Sous-titres') : 'Sous-titres'}
           testId="captions-button"
           onClick={() => {
@@ -1688,7 +1736,7 @@ export default function MeetingRoomV2() {
             if (!next) liveCaptions.clearCaptions();
           }}
         ><Captions/></Control>
-        <Control active={handRaised} label={handRaised ? 'Baisser la main' : 'Main'} onClick={() => { const raised = !handRaised; setHandRaised(raised); setRaisedHands((current) => { const next = new Set(current); if (raised) next.add(Number(currentUser?.id || 0)); else next.delete(Number(currentUser?.id || 0)); return next; }); socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised}); }}><Hand/></Control>
+        <Control active={handRaised} disabled={!guestRaiseHandAllowed} title={!guestRaiseHandAllowed ? 'Lever la main non autorisé pour les invités' : undefined} label={handRaised ? 'Baisser la main' : 'Main'} onClick={() => { const raised = !handRaised; setHandRaised(raised); setRaisedHands((current) => { const next = new Set(current); if (raised) next.add(Number(currentUser?.id || 0)); else next.delete(Number(currentUser?.id || 0)); return next; }); socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised}); }}><Hand/></Control>
         <div className="room-v2-reaction-wrap">
           <Control active={reactionPanelOpen} disabled={!canUseReactions} title={!canUseReactions ? 'Réactions désactivées par l’hôte' : undefined} label="Réactions" testId="reaction-button" onClick={() => setReactionPanelOpen((current) => !current)}>😊</Control>
           {reactionPanelOpen ? (
@@ -1703,7 +1751,7 @@ export default function MeetingRoomV2() {
         <Control active={panel === 'chat'} label="Discussion" onClick={() => setPanel(panel === 'chat' ? null : 'chat')}><MessageCircle/></Control>
         <Control active={panel === 'polls'} label="Sondages" onClick={() => setPanel(panel === 'polls' ? null : 'polls')}><Vote/></Control>
         {isModerator ? <Control active={panel === 'breakouts'} label="Sous-salles" testId="breakout-button" onClick={() => { setPanel(panel === 'breakouts' ? null : 'breakouts'); void refreshBreakouts(); }}><UsersRound/></Control> : null}
-        <Control active={panel === 'luna'} disabled={!canUseLuna} title={!canUseLuna ? 'Luna désactivée par l’hôte' : undefined} label="Luna" onClick={() => setPanel(panel === 'luna' ? null : 'luna')}><Bot/></Control>
+        <Control active={panel === 'luna'} disabled={!canUseLuna} title={!canUseLuna ? (guestMode && !guestLunaAllowed ? 'Luna IA non autorisée pour les invités' : 'Luna désactivée par l’hôte') : undefined} label="Luna" onClick={() => setPanel(panel === 'luna' ? null : 'luna')}><Bot/></Control>
         {isModerator ? <Control active={Boolean(meeting.settings?.locked)} label={meeting.settings?.locked ? 'Déverrouiller' : 'Verrouiller'} testId="meeting-lock-button" onClick={() => void toggleMeetingLock()}><ShieldCheck/></Control> : null}
         <div className="room-v2-device-wrap">
           <Control
@@ -1742,7 +1790,7 @@ export default function MeetingRoomV2() {
             </div>
           ) : null}
         </div>
-        <Control active={recording} disabled={!canRecord} title={!canRecord ? 'Enregistrement non autorisé pour votre rôle' : undefined} label={recording ? 'Stop rec.' : 'Enregistrer'} onClick={() => void toggleRecording()}>{recording ? <Square/> : <Circle/>}</Control>
+        <Control active={recording} disabled={!canRecord} title={!canRecord ? (guestMode && !guestRecordingAllowed ? 'Enregistrement non autorisé pour les invités' : 'Enregistrement non autorisé pour votre rôle') : undefined} label={recording ? 'Stop rec.' : 'Enregistrer'} onClick={() => void toggleRecording()}>{recording ? <Square/> : <Circle/>}</Control>
         <div className="room-v2-leave-actions">
           <button type="button" className="room-v2-leave" onClick={() => void leaveMeeting(false)}><LogOut size={18}/> Quitter</button>
           {canEndForAll ? <button type="button" className="room-v2-end" onClick={() => void leaveMeeting(true)}><PhoneOff size={18}/> Terminer pour tous</button> : null}
