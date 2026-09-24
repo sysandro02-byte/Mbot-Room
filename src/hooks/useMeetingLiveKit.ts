@@ -60,6 +60,7 @@ export function useMeetingLiveKit({
   const sdkRef = useRef<LiveKitSdk | null>(null);
   const publishedTracksRef = useRef<Map<MediaStreamTrack, LiveKitTrackPublicationLike>>(new Map());
   const publishGenerationRef = useRef(0);
+  const remoteStreamsRef = useRef<Map<string, MediaStream>>(new Map());
   const [status, setStatus] = useState<LiveKitStatus>('idle');
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteMeetingParticipant[]>([]);
   const [activeSpeakerSocketId, setActiveSpeakerSocketId] = useState<string | null>(null);
@@ -79,9 +80,19 @@ export function useMeetingLiveKit({
       return;
     }
 
+    const activeIdentities = new Set<string>();
     const participants = [...room.remoteParticipants.values()].map((participant) => {
+      activeIdentities.add(participant.identity);
       const metadata = parseMetadata(participant.metadata);
-      const stream = new MediaStream();
+      let stream = remoteStreamsRef.current.get(participant.identity);
+      if (!stream) {
+        stream = new MediaStream();
+        remoteStreamsRef.current.set(participant.identity, stream);
+      }
+
+      const audioTracks: MediaStreamTrack[] = [];
+      const cameraTracks: MediaStreamTrack[] = [];
+      const screenTracks: MediaStreamTrack[] = [];
       let audio = false;
       let video = false;
       let screen = false;
@@ -90,18 +101,33 @@ export function useMeetingLiveKit({
         const track = publication.track;
         const mediaTrack = track?.mediaStreamTrack;
         if (!track || !mediaTrack || mediaTrack.readyState !== 'live' || publication.isSubscribed === false) return;
-        if (!stream.getTracks().some((current) => current.id === mediaTrack.id)) stream.addTrack(mediaTrack);
 
         const kind = String(track.kind || publication.kind || '');
         const source = String(publication.source || track.source || '');
         const muted = Boolean(publication.isMuted || track.isMuted);
         if (kind === sdk.Track.Kind.Audio || kind === 'audio') {
+          audioTracks.push(mediaTrack);
           if (!muted) audio = true;
         }
         if (kind === sdk.Track.Kind.Video || kind === 'video') {
-          if (source === sdk.Track.Source.ScreenShare) screen = !muted;
-          else video = !muted;
+          if (source === sdk.Track.Source.ScreenShare) {
+            screenTracks.push(mediaTrack);
+            if (!muted) screen = true;
+          } else {
+            cameraTracks.push(mediaTrack);
+            if (!muted) video = true;
+          }
         }
+      });
+
+      const preferredVideoTracks = screen ? screenTracks : cameraTracks;
+      const desiredTracks = [...audioTracks, ...preferredVideoTracks];
+      const desiredIds = new Set(desiredTracks.map((track) => track.id));
+      stream.getTracks().forEach((track) => {
+        if (!desiredIds.has(track.id)) stream!.removeTrack(track);
+      });
+      desiredTracks.forEach((track) => {
+        if (!stream!.getTracks().some((current) => current.id === track.id)) stream!.addTrack(track);
       });
 
       const userId = String(metadata.mboteRoomUserId || userIdFromIdentity(participant.identity));
@@ -111,9 +137,13 @@ export function useMeetingLiveKit({
         name: participant.name || metadata.displayName || 'Participant',
         avatar: metadata.avatar || '',
         stream: stream.getTracks().length ? stream : null,
-        media: { audio, video, screen },
+        media: { audio, video: screen ? false : video, screen },
       } satisfies RemoteMeetingParticipant;
     });
+
+    for (const identity of [...remoteStreamsRef.current.keys()]) {
+      if (!activeIdentities.has(identity)) remoteStreamsRef.current.delete(identity);
+    }
 
     setRemoteParticipants(participants);
     setNetworkQuality((current) => ({
@@ -128,6 +158,7 @@ export function useMeetingLiveKit({
     if (!enabled || !meetingId) {
       setStatus('idle');
       setRemoteParticipants([]);
+      remoteStreamsRef.current.clear();
       setActiveSpeakerSocketId(null);
       setNetworkQuality({ level: 'offline', rttMs: null, packetLossPct: null, connectedPeers: 0, totalPeers: 0 });
       return undefined;
@@ -189,6 +220,8 @@ export function useMeetingLiveKit({
         [
           'TrackSubscribed',
           'TrackUnsubscribed',
+          'TrackPublished',
+          'TrackUnpublished',
           'TrackMuted',
           'TrackUnmuted',
           'ParticipantConnected',
@@ -235,6 +268,7 @@ export function useMeetingLiveKit({
       cancelled = true;
       publishGenerationRef.current += 1;
       publishedTracksRef.current.clear();
+      remoteStreamsRef.current.clear();
       listeners.forEach(({ event, listener }) => room?.off(event, listener));
       const activeRoom = roomRef.current;
       if (activeRoom === room) roomRef.current = null;
