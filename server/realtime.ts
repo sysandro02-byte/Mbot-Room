@@ -2,6 +2,7 @@ import type { Server, Socket } from 'socket.io';
 import {
   PublicUser,
   canModerateMeeting,
+  canUseAccountFeature,
   getRawSessionToken,
   getUserByRawToken,
   hasMeetingAccess,
@@ -267,7 +268,7 @@ export const registerRealtime = (io: Server) => {
         const allowedMedia: MediaState = {
           audio: (moderator || meeting.settings.participantAudio !== false) ? requestedMedia.audio : false,
           video: (moderator || meeting.settings.participantVideo !== false) ? requestedMedia.video : false,
-          screen: guestScreenAllowed && (moderator || meeting.settings.screenShare !== false) ? requestedMedia.screen : false,
+          screen: accountScreenAllowed && guestScreenAllowed && (moderator || meeting.settings.screenShare !== false) ? requestedMedia.screen : false,
         };
         const participant: LiveParticipant = {
           socketId: socket.id,
@@ -322,6 +323,7 @@ export const registerRealtime = (io: Server) => {
       const moderator = canModerateMeeting(meeting, user);
       const requestedMedia = cleanMedia(payload?.media);
       const guestScreenAllowed = !user.isGuest || await isPlatformFeatureEnabled('guestScreenShareEnabled');
+      const accountScreenAllowed = canUseAccountFeature(user, 'screenShare');
       participant.media = {
         audio: (moderator || meeting.settings.participantAudio !== false) ? requestedMedia.audio : false,
         video: (moderator || meeting.settings.participantVideo !== false) ? requestedMedia.video : false,
@@ -346,6 +348,9 @@ export const registerRealtime = (io: Server) => {
       try {
         if (!meetingId || Number(payload?.meetingId || meetingId) !== meetingId) return callback?.(fail('REALTIME_NOT_JOINED', 'Vous devez rejoindre la réunion.'));
         const meeting = await getMeetingById(meetingId);
+        if (!canUseAccountFeature(user, 'messages')) {
+          return callback?.(fail(user.accountStatus === 'quarantined' ? 'ACCOUNT_QUARANTINED' : 'FEATURE_RESTRICTED', 'La messagerie a été désactivée pour ce compte.'));
+        }
         if (user.isGuest && !(await isPlatformFeatureEnabled('guestChatEnabled'))) {
           return callback?.(fail('GUEST_CHAT_DISABLED', 'Les invités ne sont pas autorisés à envoyer des messages.'));
         }
