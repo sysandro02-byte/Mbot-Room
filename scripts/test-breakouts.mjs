@@ -69,6 +69,7 @@ const authHeaders = (token) => ({ Authorization: `Bearer ${token}` });
 const register = async (name, email) => {
   const result = await jsonRequest('/api/auth/register', {
     method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
     body: JSON.stringify({ name, email, password: 'Password2026!' }),
   });
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
@@ -142,6 +143,7 @@ try {
   assert.equal(createBreakouts.response.status, 201, JSON.stringify(createBreakouts.data));
   assert.equal(createBreakouts.data.length, 2);
   const breakoutA = createBreakouts.data[0];
+  const breakoutB = createBreakouts.data[1];
 
   const assignment = await jsonRequest(`/api/meetings/${meeting.id}/breakouts/${breakoutA.id}/assign`, {
     method: 'POST',
@@ -156,6 +158,50 @@ try {
   });
   assert.equal(opened.response.status, 200, JSON.stringify(opened.data));
   assert.equal(opened.data.assignments, 1);
+
+  const mainCaption = await jsonRequest(`/api/meetings/${meeting.id}/captions/text`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ text: 'Message salle principale' }),
+  });
+  assert.equal(mainCaption.response.status, 201, JSON.stringify(mainCaption.data));
+
+  const breakoutACaption = await jsonRequest(`/api/meetings/${meeting.id}/captions/text`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ text: 'Secret Atelier A', breakoutRoomId: breakoutA.id }),
+  });
+  assert.equal(breakoutACaption.response.status, 201, JSON.stringify(breakoutACaption.data));
+
+  const breakoutBCaption = await jsonRequest(`/api/meetings/${meeting.id}/captions/text`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ text: 'Secret Atelier B', breakoutRoomId: breakoutB.id }),
+  });
+  assert.equal(breakoutBCaption.response.status, 201, JSON.stringify(breakoutBCaption.data));
+
+  const forbiddenCrossBreakoutCaption = await jsonRequest(`/api/meetings/${meeting.id}/captions/text`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ text: 'Tentative Atelier B', breakoutRoomId: breakoutB.id }),
+  });
+  assert.equal(forbiddenCrossBreakoutCaption.response.status, 403, JSON.stringify(forbiddenCrossBreakoutCaption.data));
+  assert.equal(forbiddenCrossBreakoutCaption.data.code, 'BREAKOUT_ACCESS_DENIED');
+
+  const participantCaptions = await jsonRequest(`/api/meetings/${meeting.id}/captions`, {
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(participantCaptions.response.status, 200, JSON.stringify(participantCaptions.data));
+  assert.ok(participantCaptions.data.some((caption) => caption.text === 'Message salle principale'));
+  assert.ok(participantCaptions.data.some((caption) => caption.text === 'Secret Atelier A'));
+  assert.equal(participantCaptions.data.some((caption) => caption.text === 'Secret Atelier B'), false, 'Participant must not read captions from another breakout room');
+
+  const hostCaptions = await jsonRequest(`/api/meetings/${meeting.id}/captions`, {
+    headers: authHeaders(host.token),
+  });
+  assert.equal(hostCaptions.response.status, 200, JSON.stringify(hostCaptions.data));
+  assert.ok(hostCaptions.data.some((caption) => caption.text === 'Secret Atelier A'));
+  assert.ok(hostCaptions.data.some((caption) => caption.text === 'Secret Atelier B'));
 
   const list = await jsonRequest(`/api/meetings/${meeting.id}/breakouts`, {
     headers: authHeaders(host.token),
