@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowRightToLine,
@@ -20,7 +20,6 @@ import {
   Zap,
 } from 'lucide-react';
 import { authService } from '../services/authService';
-import { apiFetch, apiUrl } from '../lib/api';
 import TermsConsent from '../components/TermsConsent';
 import './GuestJoinPage.css';
 
@@ -31,8 +30,6 @@ type JoinForm = {
 };
 
 type JoinErrors = Partial<Record<keyof JoinForm | 'global', string>>;
-
-type GuestAccessSlide = { id: string; title: string; body: string; imageUrl: string; isActive: boolean; };
 
 const footerAdvantages = [
   {
@@ -87,27 +84,6 @@ export default function GuestJoinPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsVersion, setTermsVersion] = useState('');
-  const [guestSlides, setGuestSlides] = useState<GuestAccessSlide[]>([]);
-  const [activeGuestSlide, setActiveGuestSlide] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    const loadGuestSlides = async () => {
-      try {
-        const response = await apiFetch(apiUrl('/api/public/guest-access-slides'));
-        const payload = await response.json().catch(() => []);
-        if (!response.ok || !Array.isArray(payload)) return;
-        if (!cancelled) setGuestSlides(payload.filter((slide: GuestAccessSlide) => slide.isActive));
-      } catch { /* Keep the default card when the API is unavailable. */ }
-    };
-    void loadGuestSlides();
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    if (guestSlides.length < 2) return undefined;
-    const timer = window.setInterval(() => setActiveGuestSlide((current) => (current + 1) % guestSlides.length), 6000);
-    return () => window.clearInterval(timer);
-  }, [guestSlides.length]);
   const normalizedMeetingIdentifier = useMemo(
     () => normalizeMeetingIdentifier(form.meetingIdentifier),
     [form.meetingIdentifier],
@@ -315,7 +291,6 @@ export default function GuestJoinPage() {
         </div>
 
         <aside className="guest-join-right" aria-label="Informations invité">
-          <GuestAccessCard slides={guestSlides} activeIndex={activeGuestSlide} onSelect={setActiveGuestSlide} />
           <InformationCard
             icon={<Headphones size={39} aria-hidden="true" />}
             iconVariant="soft"
@@ -402,22 +377,6 @@ function JoinField({
   );
 }
 
-function GuestAccessCard({ slides, activeIndex, onSelect }: { slides: GuestAccessSlide[]; activeIndex: number; onSelect: (index: number) => void }) {
-  const fallback: GuestAccessSlide = { id: 'fallback', title: 'Acc\u00e8s invit\u00e9', body: "Vous participez en tant qu'invit\u00e9. Certaines fonctionnalit\u00e9s peuvent \u00eatre limit\u00e9es.", imageUrl: '/meeting-black-team.svg', isActive: true };
-  const visibleSlides = slides.length ? slides : [fallback];
-  const slide = visibleSlides[activeIndex % visibleSlides.length];
-  return (
-    <section className="guest-side-card guest-access-card" aria-labelledby="guest-access-title">
-      <div className="guest-access-copy"><h2 id="guest-access-title">{slide.title}</h2><p>{slide.body}</p></div>
-      <img className="guest-access-image" src={slide.imageUrl} alt="" />
-      {visibleSlides.length > 1 && <div className="guest-access-controls" aria-label="Slides accès invité">
-        <button type="button" aria-label="Slide précédente" onClick={() => onSelect((activeIndex - 1 + visibleSlides.length) % visibleSlides.length)}>‹</button>
-        {visibleSlides.map((item, index) => <button key={item.id} type="button" className={index === activeIndex % visibleSlides.length ? 'is-active' : ''} aria-label={`Afficher ${item.title}`} onClick={() => onSelect(index)} />)}
-        <button type="button" aria-label="Slide suivante" onClick={() => onSelect((activeIndex + 1) % visibleSlides.length)}>›</button>
-      </div>}
-    </section>
-  );
-}
 function InformationCard({
   icon,
   iconVariant,
