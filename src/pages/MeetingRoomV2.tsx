@@ -477,11 +477,8 @@ export default function MeetingRoomV2() {
   }, [currentUser?.isGuest]);
 
   useEffect(() => {
-    if (!canUseTranscription && captionsEnabled) {
-      setCaptionsEnabled(false);
-      liveCaptions.clearCaptions();
-    }
-  }, [canUseTranscription, captionsEnabled, liveCaptions]);
+    if (!canUseTranscription && captionsEnabled) setCaptionsEnabled(false);
+  }, [canUseTranscription, captionsEnabled]);
 
   useEffect(() => {
     let cancelled = false;
