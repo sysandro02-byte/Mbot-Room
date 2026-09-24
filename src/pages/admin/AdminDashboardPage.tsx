@@ -42,6 +42,7 @@ import { DashboardTip, getMeetingAccessCode, Meeting } from '../../services/meet
 import { collaborationService } from '../../services/collaborationService';
 import AdminControlCenter from './AdminControlCenter';
 import './AdminDashboardPage.css';
+import AppLoader from '../../components/AppLoader';
 
 type ActivityTone = 'green' | 'blue' | 'orange' | 'red' | 'violet';
 
@@ -537,7 +538,7 @@ export default function AdminDashboardPage() {
             </label>
           </header>
 
-          {isLoading && <p className="admin-loading">Chargement des statistiques...</p>}
+          {isLoading && <AppLoader label="Chargement des statistiques…" compact />}
           {error && dashboard && <p className="admin-inline-error" role="alert">{error}</p>}
 
           <section className="admin-stat-grid" aria-label="Indicateurs principaux">
