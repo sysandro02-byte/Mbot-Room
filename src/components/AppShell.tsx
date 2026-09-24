@@ -78,12 +78,13 @@ export default function AppShell({ children, title }: AppShellProps) {
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const sidebarProfileRef = useRef<HTMLDivElement | null>(null);
   const user = authService.getCurrentUser();
+  const guestMode = user?.isGuest === true;
   const userName = user?.name || user?.email || 'Utilisateur';
   const initials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'MB';
 
   useEffect(() => {
     const refreshUnread = () => {
-      if (readCachedPreferences().notifications === false) {
+      if (guestMode || readCachedPreferences().notifications === false) {
         setUnreadNotifications(0);
         return;
       }
@@ -127,7 +128,7 @@ export default function AppShell({ children, title }: AppShellProps) {
       window.removeEventListener('focus', refreshUnread);
       window.removeEventListener(PREFERENCES_EVENT, refreshUnread);
     };
-  }, []);
+  }, [guestMode]);
 
   useEffect(() => {
     const handleGlobalMenu = () => {
@@ -206,8 +207,8 @@ export default function AppShell({ children, title }: AppShellProps) {
   );
 
   return (
-    <main className={`app-shell ${sidebarCollapsed ? 'is-sidebar-collapsed' : ''}`}>
-      <aside className={`app-shell-sidebar ${menuOpen ? 'is-open' : ''}`}>
+    <main className={`app-shell ${sidebarCollapsed ? 'is-sidebar-collapsed' : ''} ${guestMode ? 'is-guest-shell' : ''}`}>
+      {!guestMode ? <aside className={`app-shell-sidebar ${menuOpen ? 'is-open' : ''}`}>
         <button className="app-shell-close" type="button" aria-label="Fermer le menu" onClick={() => setMenuOpen(false)}>
           <X size={22} aria-hidden="true" />
         </button>
@@ -246,9 +247,9 @@ export default function AppShell({ children, title }: AppShellProps) {
             </div> : null}
           </div>
         </div>
-      </aside>
+      </aside> : null}
 
-      {menuOpen ? <button className="app-shell-overlay" type="button" aria-label="Fermer le menu" onClick={() => setMenuOpen(false)} /> : null}
+      {!guestMode && menuOpen ? <button className="app-shell-overlay" type="button" aria-label="Fermer le menu" onClick={() => setMenuOpen(false)} /> : null}
 
       <section className="app-shell-workspace">
         <header className="app-shell-header">
@@ -284,10 +285,10 @@ export default function AppShell({ children, title }: AppShellProps) {
 
           <div className="app-shell-header-actions">
             {title && location.pathname !== '/app' ? <span className="app-shell-header-title">{title}</span> : null}
-            <button className="app-shell-header-icon" type="button" aria-label="Notifications" onClick={() => navigate('/app/notifications')}>
+            {!guestMode ? <button className="app-shell-header-icon" type="button" aria-label="Notifications" onClick={() => navigate('/app/notifications')}>
               <Bell size={20}/>
               {unreadNotifications > 0 ? <b>{Math.min(99, unreadNotifications)}</b> : null}
-            </button>
+            </button> : null}
             <button className="app-shell-header-icon app-shell-help-button" type="button" aria-label="Aide" onClick={() => navigate('/aide')}>
               <CircleHelp size={20}/>
             </button>
@@ -318,8 +319,8 @@ export default function AppShell({ children, title }: AppShellProps) {
                     <div><strong>{userName}</strong><small>{user?.email}</small></div>
                   </div>
                   {!online ? <div className="app-shell-offline-status"><WifiOff size={15}/><span>Vos données déjà chargées restent disponibles. La synchronisation reprendra automatiquement.</span></div> : null}
-                  <button type="button" role="menuitem" onClick={() => goFromProfile('/app/profile')}><UserRound size={17}/><span><strong>Mon profil</strong><small>Identité, avatar et organisation</small></span></button>
-                  <button type="button" role="menuitem" onClick={() => goFromProfile('/app/notifications')}><Bell size={17}/><span><strong>Notifications</strong><small>Alertes et activité</small></span></button>
+                  {!guestMode ? <button type="button" role="menuitem" onClick={() => goFromProfile('/app/profile')}><UserRound size={17}/><span><strong>Mon profil</strong><small>Identité, avatar et organisation</small></span></button> : null}
+                  {!guestMode ? <button type="button" role="menuitem" onClick={() => goFromProfile('/app/notifications')}><Bell size={17}/><span><strong>Notifications</strong><small>Alertes et activité</small></span></button> : null}
                   <button type="button" role="menuitem" onClick={() => goFromProfile('/app/settings')}><Settings size={17}/><span><strong>Paramètres</strong><small>Appareil, application et préférences</small></span></button>
                   <button type="button" role="menuitem" onClick={() => goFromProfile('/securite')}><ShieldCheck size={17}/><span><strong>Sécurité</strong><small>Code de sécurité et protection du compte</small></span></button>
                   <div className="app-shell-profile-dropdown-brand">MBotéRoom · créée par <b>LoukaTech</b></div>
@@ -332,7 +333,7 @@ export default function AppShell({ children, title }: AppShellProps) {
 
         <div className="app-shell-content">{children}</div>
 
-        <nav className="app-shell-bottom-nav" aria-label="Navigation mobile">
+        {!guestMode ? <nav className="app-shell-bottom-nav" aria-label="Navigation mobile">
           {mobileNavItems.map((item) => {
             const Icon = item.icon;
             const active = location.pathname === item.to || (item.to !== '/app' && location.pathname.startsWith(item.to));
@@ -343,7 +344,7 @@ export default function AppShell({ children, title }: AppShellProps) {
               </Link>
             );
           })}
-        </nav>
+        </nav> : null}
       </section>
     </main>
   );
