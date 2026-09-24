@@ -18,6 +18,7 @@ import {
   Pin,
   PinOff,
   Radio,
+  Search,
   Send,
   Settings2,
   ShieldCheck,
@@ -190,12 +191,13 @@ function VideoTile({ name, stream, avatar, muted, videoEnabled, screen, badge, l
           {avatar ? <img src={avatar} alt="" /> : <span>{initials(name)}</span>}
         </div>
       )}
+      {badge ? <span className="room-v2-role-badge">{badge}</span> : null}
+      {handRaised ? <div className="room-v2-hand-overlay" aria-label="Main levée"><span><Hand/></span><div><strong>Main levée</strong><small>Demande de parole</small></div></div> : null}
       <div className="room-v2-tile-meta">
         <span>{name}{local ? ' (vous)' : ''}</span>
-        {badge ? <small>{badge}</small> : null}
         {activeSpeaker ? <small className="speaker-badge">Parle</small> : null}
-        {handRaised ? <small className="hand-badge" aria-label="Main levée"><Hand size={13}/> Main</small> : null}
         {muted ? <MicOff size={15} aria-label="Micro coupé" /> : <Mic size={15} aria-label="Micro actif" />}
+        {!muted ? <i className="room-v2-audio-bars" aria-hidden="true"><b/><b/><b/></i> : null}
       </div>
       {reaction ? <div className="room-v2-reaction-bubble" aria-label={`Réaction ${reaction}`}>{reaction}</div> : null}
       {!local && onPin ? (
