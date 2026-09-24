@@ -99,6 +99,12 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
         recordingEnabled: typeof request.body?.recordingEnabled === 'boolean' ? request.body.recordingEnabled : undefined,
         publicMeetingsEnabled: typeof request.body?.publicMeetingsEnabled === 'boolean' ? request.body.publicMeetingsEnabled : undefined,
         premiumPaymentEnabled: typeof request.body?.premiumPaymentEnabled === 'boolean' ? request.body.premiumPaymentEnabled : undefined,
+        guestRaiseHandEnabled: typeof request.body?.guestRaiseHandEnabled === 'boolean' ? request.body.guestRaiseHandEnabled : undefined,
+        guestRecordingEnabled: typeof request.body?.guestRecordingEnabled === 'boolean' ? request.body.guestRecordingEnabled : undefined,
+        guestScreenShareEnabled: typeof request.body?.guestScreenShareEnabled === 'boolean' ? request.body.guestScreenShareEnabled : undefined,
+        guestLunaEnabled: typeof request.body?.guestLunaEnabled === 'boolean' ? request.body.guestLunaEnabled : undefined,
+        guestTranscriptionEnabled: typeof request.body?.guestTranscriptionEnabled === 'boolean' ? request.body.guestTranscriptionEnabled : undefined,
+        guestChatEnabled: typeof request.body?.guestChatEnabled === 'boolean' ? request.body.guestChatEnabled : undefined,
       });
       io.emit('admin:settings-updated', settings);
       response.json(settings);
