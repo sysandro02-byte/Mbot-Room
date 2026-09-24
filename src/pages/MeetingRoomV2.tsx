@@ -468,6 +468,13 @@ export default function MeetingRoomV2() {
   useEffect(() => { void loadMeeting(); }, [loadMeeting]);
 
   useEffect(() => {
+    if (!meeting?.is_active) return undefined;
+    setClockTick(Date.now());
+    const timer = window.setInterval(() => setClockTick(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [meeting?.is_active, meeting?.id]);
+
+  useEffect(() => {
     let cancelled = false;
     const refreshPlatformSettings = async () => {
       try {
@@ -680,14 +687,29 @@ export default function MeetingRoomV2() {
     const onPoll = (poll: MeetingPoll) => setPolls((current) => [poll, ...current.filter((item) => item.id !== poll.id)]);
     const onPresence = () => void refreshParticipants();
     const onLobby = () => { void refreshParticipants(); void refreshLobby(); };
-    const onHandRaised = (payload: { meetingId: number; userId: number; raised: boolean }) => {
+    const onHandRaised = (payload: { meetingId: number; userId: number; raised: boolean; raisedAt?: string | null }) => {
       if (Number(payload.meetingId) !== id) return;
+      const userId = Number(payload.userId);
       setRaisedHands((current) => {
         const next = new Set(current);
-        if (payload.raised) next.add(Number(payload.userId));
-        else next.delete(Number(payload.userId));
+        if (payload.raised) next.add(userId);
+        else next.delete(userId);
         return next;
       });
+      setRaisedHandTimes((current) => {
+        const next = { ...current };
+        if (payload.raised) next[userId] = String(payload.raisedAt || new Date().toISOString());
+        else delete next[userId];
+        return next;
+      });
+    };
+    const onHandsSnapshot = (payload: { meetingId:number; hands?: Array<{userId:number;raisedAt?:string}> }) => {
+      if (Number(payload.meetingId) !== id) return;
+      const hands = Array.isArray(payload.hands) ? payload.hands : [];
+      setRaisedHands(new Set(hands.map((item) => Number(item.userId))));
+      const times: Record<number,string> = {};
+      hands.forEach((item) => { if (item.raisedAt) times[Number(item.userId)] = String(item.raisedAt); });
+      setRaisedHandTimes(times);
     };
     const onReaction = (payload: { meetingId: number; userId: number; reaction: string }) => {
       if (Number(payload.meetingId) !== id || !payload.reaction) return;
@@ -772,6 +794,7 @@ export default function MeetingRoomV2() {
     socket.on('meeting:presence', onPresence);
     socket.on('meeting:lobby-updated', onLobby);
     socket.on('meeting:hand-raised', onHandRaised);
+    socket.on('meeting:hands-snapshot', onHandsSnapshot);
     socket.on('meeting:reaction', onReaction);
     socket.on('meeting:breakout-assigned', onBreakoutAssigned);
     socket.on('meeting:breakouts-updated', onBreakoutsUpdated);
@@ -794,6 +817,7 @@ export default function MeetingRoomV2() {
       socket.off('meeting:presence', onPresence);
       socket.off('meeting:lobby-updated', onLobby);
       socket.off('meeting:hand-raised', onHandRaised);
+      socket.off('meeting:hands-snapshot', onHandsSnapshot);
       socket.off('meeting:reaction', onReaction);
       socket.off('meeting:breakout-assigned', onBreakoutAssigned);
       socket.off('meeting:breakouts-updated', onBreakoutsUpdated);
@@ -1360,6 +1384,27 @@ export default function MeetingRoomV2() {
     }
   };
 
+  const inviteParticipants = async () => {
+    if (!meeting) return;
+    const url = getMeetingJoinUrl(meeting);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: meeting.title, text: `Rejoignez « ${meeting.title} » sur MBotéRoom`, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setNotice('Lien d’invitation copié.');
+      }
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return;
+      try {
+        await navigator.clipboard.writeText(url);
+        setNotice('Lien d’invitation copié.');
+      } catch {
+        setNotice(url);
+      }
+    }
+  };
+
   const leaveMeeting = async (endForAll = false) => {
     if (!meeting?.id) return;
     try {
@@ -1389,7 +1434,16 @@ export default function MeetingRoomV2() {
   const galleryCount = 1 + remoteParticipants.length;
   const featuredSocketId = pinnedSocketId || activeSpeakerSocketId || remoteParticipants[0]?.socketId || null;
   const featuredParticipant = featuredSocketId ? remoteParticipants.find((participant) => participant.socketId === featuredSocketId) || null : null;
-  const speakerViewEnabled = viewMode === 'speaker' && Boolean(featuredParticipant);
+  const remoteScreenParticipant = remoteParticipants.find((participant) => participant.media.screen) || null;
+  const screenShareActive = Boolean(screenSharing || remoteScreenParticipant);
+  const screenPresenterName = screenSharing ? localName : remoteScreenParticipant?.name || '';
+  const speakerViewEnabled = (viewMode === 'speaker' || viewMode === 'participants') && Boolean(featuredParticipant);
+  const elapsedSeconds = meeting.is_active ? Math.max(0, Math.floor((clockTick - new Date(meeting.start_time).getTime()) / 1000)) : 0;
+  const raisedMembers = activeMembers.filter((member) => raisedHands.has(member.userId));
+  const normalizedParticipantSearch = participantSearch.trim().toLowerCase();
+  const visibleMembers = normalizedParticipantSearch
+    ? activeMembers.filter((member) => [member.name, member.role, member.isGuest ? 'invité' : 'participant'].some((value) => String(value || '').toLowerCase().includes(normalizedParticipantSearch)))
+    : activeMembers;
 
   return (
     <main className="room-v2-shell">
