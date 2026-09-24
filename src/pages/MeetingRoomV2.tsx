@@ -334,7 +334,10 @@ export default function MeetingRoomV2() {
   const localUserId = String(currentUser?.id || '');
   const localName = state?.guestName?.trim() || currentUser?.name || currentUser?.username || currentUser?.email || 'Participant';
   const localMember = participants.find((participant) => participant.userId === Number(currentUser?.id || 0));
-  const isHost = Boolean(meeting && currentUser && Number(meeting.host_id) === Number(currentUser.id));
+  const isHost = Boolean(meeting && currentUser && (
+    Number(meeting.host_id) === Number(currentUser.id)
+    || Number(meeting.temporary_host_id || 0) === Number(currentUser.id)
+  ));
   const isCoHost = Boolean(meeting && currentUser && (
     Number(meeting.co_host_id || 0) === Number(currentUser.id)
     || localMember?.role === 'cohost'
@@ -688,7 +691,13 @@ export default function MeetingRoomV2() {
     const onChatDeleted = ({ messageId }: { messageId: string }) => setMessages((current) => current.filter((message) => message.id !== messageId));
     const onPoll = (poll: MeetingPoll) => setPolls((current) => [poll, ...current.filter((item) => item.id !== poll.id)]);
     const onPresence = () => void refreshParticipants();
-    const onLobby = () => { void refreshParticipants(); void refreshLobby(); };
+    const onLobby = (payload?: { meetingId?: number; userId?: number; status?: string }) => {
+      void refreshParticipants();
+      void refreshLobby();
+      if (isModerator && Number(payload?.meetingId || 0) === id && payload?.status === 'requested') {
+        setNotice('Un participant attend votre autorisation dans la salle d’attente.');
+      }
+    };
     const onHandRaised = (payload: { meetingId: number; userId: number; raised: boolean; raisedAt?: string | null }) => {
       if (Number(payload.meetingId) !== id) return;
       const userId = Number(payload.userId);
@@ -751,6 +760,21 @@ export default function MeetingRoomV2() {
       if (Number(payload?.id) !== id) return;
       setMeeting((current) => current ? { ...current, ...payload, settings: { ...(current.settings || {}), ...(payload.settings || {}) } } : payload);
     };
+    const onHostChanged = (payload: { meetingId?: number; hostId?: number; originalHostId?: number; previousHostId?: number; temporary?: boolean }) => {
+      if (Number(payload?.meetingId || 0) !== id) return;
+      setMeeting((current) => current ? {
+        ...current,
+        temporary_host_id: payload.temporary ? Number(payload.hostId || 0) || undefined : undefined,
+      } : current);
+      void refreshParticipants();
+      if (Number(payload.hostId || 0) === Number(currentUser?.id || 0)) {
+        setNotice(payload.temporary
+          ? 'Vous êtes temporairement hôte pendant l’absence de l’hôte principal.'
+          : 'Votre rôle d’hôte principal a été restauré.');
+      } else if (Number(payload.previousHostId || 0) === Number(currentUser?.id || 0) && !payload.temporary) {
+        setNotice('L’hôte principal est revenu : votre rôle d’hôte temporaire a été retiré.');
+      }
+    };
     const onMediaRequest = (payload: any) => {
       const request = normalizeMediaRequest(payload);
       if (!request || request.meetingId !== id || request.targetUserId !== Number(currentUser?.id || 0) || request.status !== 'pending') return;
@@ -805,6 +829,7 @@ export default function MeetingRoomV2() {
     socket.on('meeting:breakouts-closed', onBreakoutsUpdated);
     socket.on('meeting:locked', onLocked);
     socket.on('meeting:updated', onMeetingUpdated);
+    socket.on('meeting:host-changed', onHostChanged);
     socket.on('meeting:media-request', onMediaRequest);
     socket.on('meeting:media-request-responded', onMediaRequestResponded);
     socket.on('meeting:moderation', onModeration);
@@ -828,6 +853,7 @@ export default function MeetingRoomV2() {
       socket.off('meeting:breakouts-closed', onBreakoutsUpdated);
       socket.off('meeting:locked', onLocked);
       socket.off('meeting:updated', onMeetingUpdated);
+      socket.off('meeting:host-changed', onHostChanged);
       socket.off('meeting:media-request', onMediaRequest);
       socket.off('meeting:media-request-responded', onMediaRequestResponded);
       socket.off('meeting:moderation', onModeration);
@@ -839,7 +865,7 @@ export default function MeetingRoomV2() {
       socket.off('meeting:banned', onBanned);
       socket.off('meeting:moved-to-lobby', onMoved);
     };
-  }, [currentUser?.id, location.state, meeting?.id, navigate, refreshBreakouts, refreshLobby, refreshParticipants]);
+  }, [currentUser?.id, isModerator, location.state, meeting?.id, navigate, refreshBreakouts, refreshLobby, refreshParticipants]);
 
   const requestMissingMediaTrack = useCallback(async (kind: 'audio' | 'video') => {
     if (!navigator.mediaDevices?.getUserMedia) return false;
