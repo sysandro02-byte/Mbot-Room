@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'mboteroom-shell-v4-brand';
+const CACHE_VERSION = 'mboteroom-shell-v5-runtime-recovery';
 const SHELL = [
   '/',
   '/app',
@@ -59,7 +59,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.pathname.startsWith('/assets/') || url.pathname === '/manifest.webmanifest' || url.pathname.startsWith('/icons/')) {
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy)).catch(() => undefined);
+          }
+          return response;
+        })
+        .catch(async () => (await caches.match(request)) || Response.error())
+    );
+    return;
+  }
+
+  if (url.pathname === '/manifest.webmanifest' || url.pathname.startsWith('/icons/')) {
     event.respondWith(
       caches.match(request).then((cached) => {
         const network = fetch(request)
