@@ -6,12 +6,20 @@ import { appDataService, type ClientPlatformSettings, type Contact, type Recordi
 import { getMeetingPhase, HomeSlide, Meeting, meetingService } from '../../services/meetingService';
 import { notificationService, RoomNotification } from '../../services/notificationService';
 import { socket } from '../../lib/socket';
+import { apiUrl } from '../../lib/api';
+import { readCachedApiResponse } from '../../lib/offline';
 import HomeHero from './components/HomeHero';
 import { HomeQuickActions, HomeStats, type HomeStatsData } from './components/HomeQuickActions';
 import { NextMeetingCard, RecentMeetings } from './components/HomeMeetings';
 import { HomeFeatureBanner, HomeFooter, HomeQuickAccess, LunaAssistantCard } from './components/HomeExtras';
 import { PremiumModal, StorageDataModal } from './components/HomeDashboardModals';
 import './RealDashboardPage.css';
+
+const readCachedJson = async <T,>(path: string): Promise<T | null> => {
+  const response = await readCachedApiResponse(apiUrl(path));
+  if (!response) return null;
+  return response.json().catch(() => null) as Promise<T | null>;
+};
 
 export default function RealDashboardPage() {
   const navigate = useNavigate();
@@ -32,35 +40,61 @@ export default function RealDashboardPage() {
   const load = async () => {
     setLoading(true);
     setError('');
-    try {
-      const [meetingRows, contactRows, recordingRows, notificationRows, tipRows, slideRows, platformRows] = await Promise.all([
-        meetingService.getMeetings(),
-        appDataService.getContacts().catch(() => []),
-        appDataService.getRecordings().catch(() => []),
-        notificationService.list().catch(() => []),
-        meetingService.getDashboardTips().catch(() => []),
-        meetingService.getHomeSlides().catch(() => []),
-        appDataService.getPlatformSettings().catch(() => null),
-      ]);
-      setMeetings(Array.isArray(meetingRows) ? meetingRows : []);
-      setContacts(Array.isArray(contactRows) ? contactRows : []);
-      setRecordings(Array.isArray(recordingRows) ? recordingRows : []);
-      setNotifications(Array.isArray(notificationRows) ? notificationRows : []);
-      setTips(Array.isArray(tipRows) ? tipRows : []);
-      setHomeSlides(Array.isArray(slideRows) ? slideRows : []);
-      setPlatformSettings(platformRows);
+
+    // Affiche immédiatement les dernières données disponibles pendant que le réseau se met à jour.
+    const [cachedMeetings, cachedContacts, cachedRecordings, cachedNotifications, cachedTips, cachedSlides, cachedPlatform] = await Promise.all([
+      readCachedJson<Meeting[]>('/api/meetings'),
+      readCachedJson<Contact[]>('/api/contacts'),
+      readCachedJson<Recording[]>('/api/recordings'),
+      readCachedJson<RoomNotification[]>('/api/notifications'),
+      readCachedJson<Array<{id:string;title:string;body:string;actionLabel:string;actionPath:string}>>('/api/dashboard/tips'),
+      readCachedJson<HomeSlide[]>('/api/dashboard/slides'),
+      readCachedJson<ClientPlatformSettings>('/api/platform/settings'),
+    ]);
+
+    if (Array.isArray(cachedMeetings)) setMeetings(cachedMeetings);
+    if (Array.isArray(cachedContacts)) setContacts(cachedContacts);
+    if (Array.isArray(cachedRecordings)) setRecordings(cachedRecordings);
+    if (Array.isArray(cachedNotifications)) setNotifications(cachedNotifications);
+    if (Array.isArray(cachedTips)) setTips(cachedTips);
+    if (Array.isArray(cachedSlides)) {
+      setHomeSlides(cachedSlides);
       setActiveSlide(0);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Impossible de charger le tableau de bord.');
-    } finally {
-      setLoading(false);
     }
+    if (cachedPlatform) setPlatformSettings(cachedPlatform);
+
+    const jobs = [
+      meetingService.getMeetings(10_000)
+        .then((rows) => setMeetings(Array.isArray(rows) ? rows : [])),
+      appDataService.getContacts(10_000)
+        .then((rows) => setContacts(Array.isArray(rows) ? rows : [])),
+      appDataService.getRecordings(10_000)
+        .then((rows) => setRecordings(Array.isArray(rows) ? rows : [])),
+      notificationService.list(10_000)
+        .then((rows) => setNotifications(Array.isArray(rows) ? rows : [])),
+      meetingService.getDashboardTips(10_000)
+        .then((rows) => setTips(Array.isArray(rows) ? rows : [])),
+      meetingService.getHomeSlides(10_000)
+        .then((rows) => {
+          setHomeSlides(Array.isArray(rows) ? rows : []);
+          setActiveSlide(0);
+        }),
+      appDataService.getPlatformSettings(10_000)
+        .then((rows) => setPlatformSettings(rows)),
+    ];
+
+    const results = await Promise.allSettled(jobs);
+    if (results[0]?.status === 'rejected' && !cachedMeetings?.length) {
+      const cause = results[0].reason;
+      setError(cause instanceof Error ? cause.message : 'Impossible de charger les réunions.');
+    }
+    setLoading(false);
   };
 
   useEffect(() => { void load(); }, []);
 
   useEffect(() => {
-    const refreshMeetings = () => void meetingService.getMeetings()
+    const refreshMeetings = () => void meetingService.getMeetings(8_000)
       .then((rows) => setMeetings(Array.isArray(rows) ? rows : []))
       .catch(() => undefined);
     const onVisible = () => { if (document.visibilityState === 'visible') refreshMeetings(); };
@@ -182,16 +216,8 @@ export default function RealDashboardPage() {
     navigate('/app/meetings');
   };
 
-  if (loading) {
-    return <main className="real-dashboard home-dashboard-loading" aria-busy="true">
-      <div className="home-skeleton hero"/>
-      <div className="home-skeleton actions"/>
-      <div className="home-skeleton stats"/>
-      <div className="home-skeleton grid"/>
-    </main>;
-  }
-
-  return <main className="real-dashboard">
+  return <main className="real-dashboard" aria-busy={loading}>
+    {loading ? <div className="home-data-progress" aria-hidden="true"><span/></div> : null}
     <HomeHero
       firstName={firstName}
       slides={heroSlides}
