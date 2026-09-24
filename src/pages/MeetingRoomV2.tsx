@@ -1998,69 +1998,10 @@ export default function MeetingRoomV2() {
         {panel && panel !== 'participants' ? (
           <aside className="room-v2-panel">
             <div className="room-v2-panel-title">
-              <h2>{panel === 'participants' ? 'Participants' : panel === 'chat' ? 'Discussion' : panel === 'polls' ? 'Sondages' : panel === 'breakouts' ? 'Sous-salles' : 'Luna IA'}</h2>
+              <h2>{panel === 'chat' ? 'Discussion' : panel === 'polls' ? 'Sondages' : panel === 'breakouts' ? 'Sous-salles' : 'Luna IA'}</h2>
               <button type="button" onClick={() => setPanel(null)} aria-label="Fermer"><X size={20}/></button>
             </div>
 
-            {panel === 'participants' ? (
-              <div className="room-v2-participants">
-                {isModerator ? (
-                  <div className="room-v2-host-tools">
-                    <button type="button" onClick={() => void muteAllParticipants()} data-testid="mute-all-button">Couper tous les micros</button>
-                    {lobbyParticipants.length ? <button type="button" onClick={() => void admitAllLobby()} data-testid="admit-all-button">Admettre tous ({lobbyParticipants.length})</button> : null}
-                  </div>
-                ) : null}
-                {isModerator && lobbyParticipants.length ? (
-                  <section className="room-v2-lobby-section">
-                    <strong>Salle d’attente</strong>
-                    {lobbyParticipants.map((item) => (
-                      <article key={item.user_id} className="room-v2-lobby-row">
-                        <div className="room-v2-person-avatar">{item.avatar ? <img src={item.avatar} alt=""/> : initials(item.name)}</div>
-                        <div><strong>{item.name}</strong><small>En attente</small></div>
-                        <div className="room-v2-lobby-actions">
-                          <button type="button" onClick={() => void respondToLobby(item.user_id, 'accepted')}>Admettre</button>
-                          <button type="button" className="danger" onClick={() => void respondToLobby(item.user_id, 'rejected')}>Refuser</button>
-                        </div>
-                      </article>
-                    ))}
-                  </section>
-                ) : null}
-                {activeMembers.map((member) => {
-                  const remote = remoteParticipants.find((participant) => Number(participant.userId) === member.userId);
-                  const isSelf = member.userId === Number(currentUser?.id || 0);
-                  return (
-                    <article key={member.userId}>
-                      <div className="room-v2-person-avatar is-online">{member.avatar ? <img src={member.avatar} alt=""/> : initials(member.name)}</div>
-                      <div><strong>{member.name}{isSelf ? ' (vous)' : ''}{raisedHands.has(member.userId) || (isSelf && handRaised) ? <span className="room-v2-raised-inline"> · ✋</span> : null}</strong><small>{member.role === 'host' ? 'Hôte' : member.role === 'cohost' ? 'Co-hôte' : member.isGuest ? 'Invité' : 'Participant'} · En ligne</small></div>
-                      {isModerator && !isSelf && member.role !== 'host' && (isHost || member.role !== 'cohost') ? (
-                        <div className="room-v2-person-menu-wrap">
-                          <button type="button" onClick={() => setMenuUserId(menuUserId === member.userId ? null : member.userId)}><MoreVertical size={18}/></button>
-                          {menuUserId === member.userId ? (
-                            <div className="room-v2-person-menu">
-                              {remote ? (
-                                <>
-                                  {remote.media.audio
-                                    ? <button onClick={() => void moderateParticipant(member.userId, 'mute')}>Couper le micro</button>
-                                    : <button onClick={() => void moderateParticipant(member.userId, 'request-mic')}>Demander d’activer le micro</button>}
-                                  {remote.media.video
-                                    ? <button onClick={() => void moderateParticipant(member.userId, 'camera')}>Couper la caméra</button>
-                                    : <button onClick={() => void moderateParticipant(member.userId, 'request-camera')}>Demander d’activer la caméra</button>}
-                                </>
-                              ) : <span className="room-v2-person-offline">Participant hors ligne</span>}
-                              {isHost && member.role !== 'cohost' ? <button onClick={() => void moderateParticipant(member.userId, 'cohost')}>Nommer co-hôte</button> : null}
-                              {isHost && member.role === 'cohost' ? <button onClick={() => void moderateParticipant(member.userId, 'participant')}>Retirer le rôle co-hôte</button> : null}
-                              <button onClick={() => void moderateParticipant(member.userId, 'lobby')}>Mettre en salle d’attente</button>
-                              <button onClick={() => void moderateParticipant(member.userId, 'remove')}>Retirer</button>
-                              <button className="danger" onClick={() => void moderateParticipant(member.userId, 'ban')}>Exclure et bannir</button>
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </article>
-                  );
-                })}
-              </div>
-            ) : null}
 
             {panel === 'chat' ? (
               <div className="room-v2-chat">
