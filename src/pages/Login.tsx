@@ -29,6 +29,7 @@ import { authService } from '../services/authService';
 import { sanitizeInternalPath } from '../lib/navigationSecurity';
 import { apiFetch, apiUrl } from '../lib/api';
 import { getStoredLanguage, persistAppLanguage, type AppLanguage } from '../lib/appLanguage';
+import { companyCategories, getRegistrationCountry, registrationCountries } from '../lib/registrationCatalog';
 import TermsConsent from '../components/TermsConsent';
 import './Login.css';
 
@@ -278,6 +279,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [organization, setOrganization] = useState('');
+  const [organizationCategory, setOrganizationCategory] = useState('');
   const [jobTitle, setJobTitle] = useState('');
   const [country, setCountry] = useState('');
   const [city, setCity] = useState('');
@@ -314,6 +316,11 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const copy = translations[language];
+  const selectedRegistrationCountry = useMemo(() => getRegistrationCountry(country), [country]);
+  const phoneDialCode = selectedRegistrationCountry?.dialCode || '';
+  const phoneDisplayValue = phoneDialCode
+    ? `${phoneDialCode}${phoneNumber ? ` ${phoneNumber}` : ''}`
+    : phoneNumber;
   const [resetToken] = useState(() => {
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     return (hash.get('reset') || searchParams.get('token') || '').trim();
@@ -413,6 +420,14 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     if (Object.keys(fieldErrors).length) setFieldErrors({});
   };
 
+  const updateRegistrationPhone = (value: string) => {
+    const localValue = phoneDialCode && value.startsWith(phoneDialCode)
+      ? value.slice(phoneDialCode.length).trimStart()
+      : value.replace(/^\+\d{1,4}\s*/, '');
+    setPhoneNumber(localValue.replace(/[^0-9\s()-]/g, '').slice(0, 30));
+    clearErrors();
+  };
+
   const submitLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isLoading) return;
@@ -494,7 +509,9 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       const passwordError = passwordStrengthError(password);
       if (passwordError) nextErrors.password = passwordError;
     }
-    if (phoneNumber.trim() && phoneNumber.trim().length < 6) nextErrors.phoneNumber = 'Le numéro de téléphone est trop court.';
+    if (!country) nextErrors.country = 'Sélectionnez votre pays.';
+    if (!city) nextErrors.city = 'Sélectionnez votre ville.';
+    if (phoneNumber.trim() && phoneNumber.replace(/\D/g, '').length < 6) nextErrors.phoneNumber = 'Le numéro de téléphone est trop court.';
     if (!termsAccepted || !termsVersion) {
       setFormError("Vous devez lire et accepter les conditions d’utilisation avant de créer votre compte.");
       return;
@@ -510,8 +527,9 @@ export default function Login({ initialView = 'login' }: LoginProps) {
         name: name.trim(),
         email: email.trim(),
         password,
-        phoneNumber: phoneNumber.trim(),
+        phoneNumber: phoneNumber.trim() && phoneDialCode ? `${phoneDialCode} ${phoneNumber.trim()}` : '',
         organization: organization.trim(),
+        organizationCategory,
         jobTitle: jobTitle.trim(),
         country: country.trim(),
         city: city.trim(),
@@ -694,14 +712,44 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       <FormField id="register-email" label="Adresse e-mail" icon={<Mail size={21} aria-hidden="true" />} error={fieldErrors.email}>
         <input id="register-email" type="email" value={email} placeholder="exemple@mail.com" autoComplete="email" onChange={(event) => { setEmail(event.target.value); clearErrors(); }} />
       </FormField>
-      <FormField id="register-phone" label="Téléphone" icon={<Phone size={21} aria-hidden="true" />} error={fieldErrors.phoneNumber}>
-        <input id="register-phone" type="tel" value={phoneNumber} placeholder="+242 06 000 00 00" autoComplete="tel" onChange={(event) => { setPhoneNumber(event.target.value); clearErrors(); }} />
-      </FormField>
       <FormField id="register-country" label="Pays" icon={<Globe2 size={21} aria-hidden="true" />} error={fieldErrors.country}>
-        <input id="register-country" value={country} placeholder="Ex : Congo-Brazzaville" autoComplete="country-name" onChange={(event) => { setCountry(event.target.value); clearErrors(); }} />
+        <select
+          id="register-country"
+          value={country}
+          autoComplete="country-name"
+          onChange={(event) => {
+            setCountry(event.target.value);
+            setCity('');
+            clearErrors();
+          }}
+        >
+          <option value="">Sélectionner un pays</option>
+          {registrationCountries.map((item) => <option key={item.code} value={item.name}>{item.name} ({item.dialCode})</option>)}
+        </select>
       </FormField>
       <FormField id="register-city" label="Ville" icon={<MapPin size={21} aria-hidden="true" />} error={fieldErrors.city}>
-        <input id="register-city" value={city} placeholder="Ex : Brazzaville" autoComplete="address-level2" onChange={(event) => { setCity(event.target.value); clearErrors(); }} />
+        <select
+          id="register-city"
+          value={city}
+          autoComplete="address-level2"
+          disabled={!selectedRegistrationCountry}
+          onChange={(event) => { setCity(event.target.value); clearErrors(); }}
+        >
+          <option value="">{selectedRegistrationCountry ? 'Sélectionner une ville' : 'Choisissez d’abord un pays'}</option>
+          {selectedRegistrationCountry?.cities.map((item) => <option key={item} value={item}>{item}</option>)}
+          {selectedRegistrationCountry ? <option value="Autre ville">Autre ville</option> : null}
+        </select>
+      </FormField>
+      <FormField id="register-phone" label="Téléphone" icon={<Phone size={21} aria-hidden="true" />} error={fieldErrors.phoneNumber}>
+        <input
+          id="register-phone"
+          type="tel"
+          value={phoneDisplayValue}
+          placeholder={phoneDialCode ? `${phoneDialCode} 06 000 00 00` : 'Sélectionnez d’abord un pays'}
+          autoComplete="tel"
+          disabled={!phoneDialCode}
+          onChange={(event) => updateRegistrationPhone(event.target.value)}
+        />
       </FormField>
       <FormField id="register-birth-date" label="Date de naissance" icon={<CalendarDays size={21} aria-hidden="true" />} error={fieldErrors.birthDate}>
         <input id="register-birth-date" type="date" value={birthDate} max={new Date().toISOString().slice(0, 10)} autoComplete="bday" onChange={(event) => { setBirthDate(event.target.value); clearErrors(); }} />
@@ -714,6 +762,12 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       </FormField>
       <FormField id="register-organization" label="Organisation" icon={<Building2 size={21} aria-hidden="true" />} error={fieldErrors.organization}>
         <input id="register-organization" value={organization} placeholder="Entreprise, école ou équipe" autoComplete="organization" onChange={(event) => { setOrganization(event.target.value); clearErrors(); }} />
+      </FormField>
+      <FormField id="register-organization-category" label="Catégorie d’entreprise (optionnel)" icon={<Building2 size={21} aria-hidden="true" />}>
+        <select id="register-organization-category" value={organizationCategory} onChange={(event) => { setOrganizationCategory(event.target.value); clearErrors(); }}>
+          <option value="">Aucune catégorie sélectionnée</option>
+          {companyCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+        </select>
       </FormField>
       <FormField id="register-job-title" label="Fonction" icon={<Sparkles size={21} aria-hidden="true" />} error={fieldErrors.jobTitle}>
         <input id="register-job-title" value={jobTitle} placeholder="Ex : Chef de projet" autoComplete="organization-title" onChange={(event) => { setJobTitle(event.target.value); clearErrors(); }} />
