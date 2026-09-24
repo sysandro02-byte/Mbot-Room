@@ -13,6 +13,7 @@ import { AppLanguageBridge } from './lib/appLanguage';
 const RealMeetingList = lazy(() => import('./components/RealMeetingList'));
 const AppShell = lazy(() => import('./components/AppShell'));
 const RealJoinPage = lazy(() => import('./pages/RealJoinPage'));
+const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const GuestJoinPage = lazy(() => import('./pages/GuestJoinPage'));
 const MeetingRoomV2 = lazy(() => import('./pages/MeetingRoomV2'));
 const GuestWaitingRoomPage = lazy(() => import('./pages/GuestWaitingRoomPage'));
@@ -150,7 +151,7 @@ export default function App() {
     <Route path="/conditions" element={<SimpleInfoPage title="Conditions d’utilisation" description="Consultez ici les conditions d’utilisation de MBotéRoom." />} />
     <Route path="/app/meetings" element={<ProtectedRoute><AppShell title="Réunions"><RealMeetingList /></AppShell></ProtectedRoute>} />
     <Route path="/app/search" element={<ProtectedRoute><AppShell title="Recherche"><GlobalSearchPage /></AppShell></ProtectedRoute>} />
-    <Route path="/app/calendar" element={<ProtectedRoute><RealFeaturePage kind="calendar" /></ProtectedRoute>} />
+    <Route path="/app/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
     <Route path="/app/recordings" element={<ProtectedRoute><AppShell title="Enregistrements"><RecordingsPage /></AppShell></ProtectedRoute>} />
     <Route path="/app/messages" element={<ProtectedRoute><AppShell title="Messages"><MessagesPage /></AppShell></ProtectedRoute>} />
     <Route path="/app/contacts" element={<ProtectedRoute><AppShell title="Contacts"><ContactsPage /></AppShell></ProtectedRoute>} />
