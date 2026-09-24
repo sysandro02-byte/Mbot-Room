@@ -129,3 +129,80 @@ table{max-width:100%}
   .app-shell-bottom-nav a.is-primary>span{width:46px!important;height:46px!important}
   .real-profile-avatar{width:66px!important;height:66px!important;flex-basis:66px!important}
 }
+
+
+/* Mobile/Android touch ergonomics */
+@media(max-width:800px){
+  button,
+  [role="button"]{
+    min-height:48px;
+    touch-action:manipulation;
+  }
+
+  .global-header-menu,
+  .global-header-icon,
+  .global-header-action{
+    width:46px!important;
+    height:46px!important;
+    min-width:46px!important;
+    min-height:46px!important;
+  }
+
+  .global-header-avatar{
+    min-height:46px!important;
+    padding:2px!important;
+  }
+
+  .global-header-avatar>span{
+    width:40px!important;
+    height:40px!important;
+  }
+
+  .app-shell-bottom-nav{
+    min-height:78px!important;
+    padding-top:8px!important;
+  }
+
+  .app-shell-bottom-nav a{
+    min-height:58px!important;
+    gap:4px!important;
+  }
+
+  .app-shell-bottom-nav a>span{
+    width:38px!important;
+    height:34px!important;
+  }
+
+  .app-shell-bottom-nav a small{
+    font-size:10.5px!important;
+    line-height:1.15!important;
+  }
+
+  .app-shell-bottom-nav a.is-primary{
+    transform:translateY(-11px)!important;
+  }
+
+  .app-shell-bottom-nav a.is-primary>span{
+    width:58px!important;
+    height:58px!important;
+  }
+
+  .pwa-install-actions button,
+  .app-message-confirm,
+  .global-report-modal footer button,
+  .global-report-types button{
+    min-height:52px!important;
+    font-size:14px!important;
+  }
+}
+
+@media(max-width:380px){
+  .app-shell-bottom-nav a small{font-size:9.5px!important}
+  .app-shell-bottom-nav a.is-primary>span{width:54px!important;height:54px!important}
+}
+
+/* Native Android APK already is the installed application. */
+html[data-native-app="android"] .pwa-install-backdrop,
+html[data-native-app="android"] .app-shell-pwa-card{
+  display:none!important;
+}
