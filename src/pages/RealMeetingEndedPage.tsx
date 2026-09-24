@@ -47,6 +47,8 @@ export default function RealMeetingEndedPage(){
   const [error,setError]=useState('');
   const [summaryError,setSummaryError]=useState('');
   const [summaryBusy,setSummaryBusy]=useState(false);
+  const [restartBusy,setRestartBusy]=useState(false);
+  const [restartError,setRestartError]=useState('');
 
   const load=async()=>{
     if(!meetingId){setLoading(false);return;}
@@ -91,6 +93,20 @@ export default function RealMeetingEndedPage(){
     ()=>messages.map((message)=>`[${new Date(message.time).toLocaleString('fr-FR')}] ${message.sender}: ${message.text}`).join('\n'),
     [messages],
   );
+
+  const restartMeeting=async()=>{
+    if(!payload||restartBusy)return;
+    setRestartBusy(true);
+    setRestartError('');
+    try{
+      const result=await meetingService.restartMeeting(payload.meeting.id);
+      navigate('/reunions/'+encodeURIComponent(result.meeting.meeting_link),{replace:true,state:{meeting:result.meeting}});
+    }catch(cause){
+      setRestartError(cause instanceof Error?cause.message:'Impossible de relancer cette réunion.');
+    }finally{
+      setRestartBusy(false);
+    }
+  };
 
   const generateSummary=async()=>{
     if(!payload||totalSources===0||!payload.summary.lunaConfigured)return;
@@ -143,6 +159,14 @@ export default function RealMeetingEndedPage(){
           </div>
           <span className="real-ended-status-badge"><CheckCircle2 size={14}/> Terminée</span>
         </div>
+        {payload.userRole==='host'||payload.userRole==='cohost'?<div className="real-ended-restart-wrap">
+          <button className="real-ended-restart" type="button" disabled={restartBusy} onClick={()=>void restartMeeting()}>
+            <RefreshCw className={restartBusy?'is-spinning':''} size={17}/>
+            {restartBusy?'Relance en cours…':'Relancer cette réunion'}
+          </button>
+          <small>Une nouvelle session sera créée avec le même sujet, les mêmes participants et le même ID de réunion.</small>
+          {restartError?<p className="real-ended-restart-error">{restartError}</p>:null}
+        </div>:null}
       </header>
 
       <section className="real-ended-stats" aria-label="Statistiques de la réunion">
