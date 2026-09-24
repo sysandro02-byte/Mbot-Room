@@ -64,6 +64,12 @@ export type ClientPlatformSettings = {
   recordingEnabled:boolean;
   publicMeetingsEnabled:boolean;
   premiumPaymentEnabled:boolean;
+  guestRaiseHandEnabled:boolean;
+  guestRecordingEnabled:boolean;
+  guestScreenShareEnabled:boolean;
+  guestLunaEnabled:boolean;
+  guestTranscriptionEnabled:boolean;
+  guestChatEnabled:boolean;
   premiumCheckoutReady:boolean;
   premiumCheckoutUrl:string;
 };
