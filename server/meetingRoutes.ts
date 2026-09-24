@@ -443,7 +443,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     try {
       const meeting = await getMeetingById(Number(request.params.meetingId));
       if (!meeting) return response.status(204).end();
-      if (meeting.host_id !== request.user!.id && request.user!.role !== 'admin') return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte principal peut annuler cette réunion.');
+      if (meeting.host_id !== request.user!.id) return sendApiError(response, 403, 'MEETING_CREATOR_REQUIRED', 'Seul le créateur de cette réunion peut la supprimer.');
       if (meeting.status === 'live' || meeting.is_active) return sendApiError(response, 409, 'MEETING_ALREADY_LIVE', 'Une réunion en direct doit être terminée avec « Terminer pour tous ».');
       await query(`UPDATE room_meetings SET status='cancelled',is_active=false,ended_at=COALESCE(ended_at,now()),updated_at=now() WHERE id=$1`, [meeting.id]);
       io.to(`meeting:${meeting.id}`).emit('meeting:cancelled', { meetingId: meeting.id });
