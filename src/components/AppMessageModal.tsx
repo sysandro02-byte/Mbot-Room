@@ -45,6 +45,8 @@ const titleForTone = (tone: AppMessageTone) => ({
   error: 'Une action est nécessaire',
 }[tone]);
 
+const isTransientNetworkMessage = (value: string) => /(connexion lente|met trop de temps à répondre|momentanément indisponible|vérifiez votre connexion)/i.test(String(value || ''));
+
 const sanitizeTechnicalMessage = (value: string) => {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
   if (!text) return '';
@@ -64,10 +66,12 @@ export default function AppMessageModal() {
       const text = sanitizeTechnicalMessage(detail.message || '');
       if (!text || text === lastMessageRef.current) return;
       lastMessageRef.current = text;
+      const transientNetwork=isTransientNetworkMessage(text);
+      const tone:AppMessageTone=transientNetwork?'warning':(detail.tone||'info');
       setMessage({
         message: text,
-        tone: detail.tone || 'info',
-        title: detail.title || titleForTone(detail.tone || 'info'),
+        tone,
+        title: detail.title || (transientNetwork?'Connexion lente':titleForTone(tone)),
       });
     };
 
@@ -85,6 +89,7 @@ export default function AppMessageModal() {
         const text = node.textContent?.replace(/\s+/g, ' ').trim() || '';
         if (!text || text.toLowerCase().includes('chargement')) return;
         node.setAttribute('data-app-message-captured', 'true');
+        if(isTransientNetworkMessage(text)) return;
         const tone = toneFromElement(node);
         openMessage({ message: text, tone, title: titleForTone(tone) });
       });
@@ -122,11 +127,11 @@ export default function AppMessageModal() {
   }, [message]);
 
   useEffect(() => {
-    if (!message || (message.tone !== 'info' && message.tone !== 'success')) return undefined;
+    if (!message || (message.tone !== 'info' && message.tone !== 'success' && message.tone !== 'warning')) return undefined;
     const timer = window.setTimeout(() => {
       lastMessageRef.current = '';
       setMessage(null);
-    }, 3200);
+    }, message.tone === 'warning' ? 5200 : 3200);
     return () => window.clearTimeout(timer);
   }, [message]);
 
