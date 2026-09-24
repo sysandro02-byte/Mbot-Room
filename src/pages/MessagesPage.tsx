@@ -33,6 +33,7 @@ import { workspaceService, type WorkGroup } from '../services/workspaceService';
 import { socket } from '../lib/socket';
 import { showAppMessage } from '../lib/appMessage';
 import './MessagesPage.css';
+import AppLoader from '../components/AppLoader';
 
 type ConversationFilter='all'|'groups'|'contacts'|'unread';
 
@@ -361,7 +362,7 @@ export default function MessagesPage(){
           <button className={filter==='unread'?'active':''} onClick={()=>setFilter('unread')}>Non lus {unreadTotal?<b>{unreadTotal}</b>:null}</button>
         </div>
         <div className="messages-pro-conversations">
-          {loading?<p className="messages-pro-empty-small">Chargement…</p>:filteredConversations.map((conversation)=>{
+          {loading?<AppLoader label="Chargement des conversations…" compact />:filteredConversations.map((conversation)=>{
             const other=conversation.participants.find((participant)=>participant.id!==currentUserId);
             const online=conversation.kind==='direct'&&Boolean(other?.online);
             return <button key={conversation.id} className={selectedId===conversation.id?'active':''} onClick={()=>{setSelectedId(conversation.id);setParams({conversation:conversation.id},{replace:true});}}>
@@ -388,7 +389,7 @@ export default function MessagesPage(){
           </header>
 
           <div className="messages-pro-thread">
-            {messagesLoading?<p className="messages-pro-empty-small">Chargement des messages…</p>:messages.map((message,index)=>{
+            {messagesLoading?<AppLoader label="Chargement des messages…" compact />:messages.map((message,index)=>{
               const own=message.userId===currentUserId;
               const previous=messages[index-1];
               const showDate=!previous||new Date(previous.createdAt).toDateString()!==new Date(message.createdAt).toDateString();
