@@ -66,6 +66,10 @@ export default function AppShell({ children, title }: AppShellProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('mboteroom-sidebar-collapsed') === '1'; }
+    catch { return false; }
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
   const [sidebarProfileOpen, setSidebarProfileOpen] = useState(false);
@@ -157,6 +161,18 @@ export default function AppShell({ children, title }: AppShellProps) {
     navigate(path);
   };
 
+  const toggleSidebar = () => {
+    if (window.matchMedia('(max-width: 1024px)').matches) {
+      setMenuOpen((value) => !value);
+      return;
+    }
+    setSidebarCollapsed((value) => {
+      const next = !value;
+      try { localStorage.setItem('mboteroom-sidebar-collapsed', next ? '1' : '0'); } catch { /* storage unavailable */ }
+      return next;
+    });
+  };
+
   const renderNav = (items: typeof primaryNavItems, ariaLabel: string) => (
     <nav className="app-shell-nav" aria-label={ariaLabel}>
       {items.map((item) => {
@@ -174,7 +190,7 @@ export default function AppShell({ children, title }: AppShellProps) {
   );
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${sidebarCollapsed ? 'is-sidebar-collapsed' : ''}`}>
       <aside className={`app-shell-sidebar ${menuOpen ? 'is-open' : ''}`}>
         <button className="app-shell-close" type="button" aria-label="Fermer le menu" onClick={() => setMenuOpen(false)}>
           <X size={22} aria-hidden="true" />
@@ -220,7 +236,13 @@ export default function AppShell({ children, title }: AppShellProps) {
 
       <section className="app-shell-workspace">
         <header className="app-shell-header">
-          <button className="app-shell-menu-button" type="button" aria-label="Ouvrir le menu" onClick={() => setMenuOpen(true)}>
+          <button
+            className="app-shell-menu-button"
+            type="button"
+            aria-label={window.matchMedia('(max-width: 1024px)').matches ? (menuOpen ? 'Fermer le menu' : 'Ouvrir le menu') : (sidebarCollapsed ? 'Afficher la barre latérale' : 'Masquer la barre latérale')}
+            aria-expanded={window.matchMedia('(max-width: 1024px)').matches ? menuOpen : !sidebarCollapsed}
+            onClick={toggleSidebar}
+          >
             <Menu size={23} aria-hidden="true" />
           </button>
 
