@@ -439,6 +439,9 @@ export function useMeetingMeshWebRTC({
           return;
         }
         joinedRef.current = true;
+        window.dispatchEvent(new CustomEvent('mbote-room-meeting-realtime-joined', {
+          detail: { meetingId, breakoutRoomId },
+        }));
         const rawParticipants = Array.isArray(response.participants) ? response.participants : [];
         const participantsByUser = new Map<string, ServerMeetingParticipant>();
         for (const participant of rawParticipants) {
