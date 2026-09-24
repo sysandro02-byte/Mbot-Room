@@ -63,6 +63,7 @@ export type Meeting = {
   description: string;
   host_id: number;
   co_host_id?: number;
+  temporary_host_id?: number;
   host_name: string;
   host_avatar: string;
   start_time: string;
@@ -201,6 +202,7 @@ export const mapMeeting = (row: any): Meeting => ({
   description: String(row.description || ''),
   host_id: Number(row.host_id),
   co_host_id: row.co_host_id ? Number(row.co_host_id) : undefined,
+  temporary_host_id: row.temporary_host_id ? Number(row.temporary_host_id) : undefined,
   host_name: String(row.host_name || ''),
   host_avatar: String(row.host_avatar || ''),
   start_time: new Date(row.start_time).toISOString(),
@@ -336,7 +338,10 @@ export const createSession = async (userId: number, rememberMe = false) => {
 };
 
 export const canModerateMeeting = (meeting: Meeting, user: PublicUser) =>
-  meeting.host_id === user.id || meeting.co_host_id === user.id || user.role === 'admin';
+  meeting.host_id === user.id
+  || meeting.co_host_id === user.id
+  || meeting.temporary_host_id === user.id
+  || user.role === 'admin';
 
 export const hasMeetingAccess = async (meetingId: number, user: PublicUser) => {
   if (user.role === 'admin') return true;
@@ -419,6 +424,7 @@ export const runMigrations = async () => {
     ALTER TABLE room_meetings ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'scheduled';
     ALTER TABLE room_meetings ADD COLUMN IF NOT EXISTS started_at timestamptz;
     ALTER TABLE room_meetings ADD COLUMN IF NOT EXISTS ended_at timestamptz;
+    ALTER TABLE room_meetings ADD COLUMN IF NOT EXISTS temporary_host_id integer REFERENCES room_users(id) ON DELETE SET NULL;
     ALTER TABLE room_meetings ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
     ALTER TABLE room_meetings ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
