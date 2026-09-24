@@ -72,7 +72,8 @@ export const runExtraMigrations = async () => {
       ('meetingCreationEnabled',true),
       ('lunaEnabled',true),
       ('recordingEnabled',true),
-      ('publicMeetingsEnabled',true)
+      ('publicMeetingsEnabled',true),
+      ('premiumPaymentEnabled',false)
     ON CONFLICT (key) DO NOTHING;
 
     CREATE TABLE IF NOT EXISTS room_user_preferences (
@@ -107,6 +108,7 @@ export const runExtraMigrations = async () => {
 
     ALTER TABLE room_calendar_events ADD COLUMN IF NOT EXISTS google_event_id text;
     ALTER TABLE room_calendar_events ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'mboteroom';
+    ALTER TABLE room_calendar_events ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
     CREATE UNIQUE INDEX IF NOT EXISTS room_calendar_google_event_unique
       ON room_calendar_events(user_id, google_event_id)
       WHERE google_event_id IS NOT NULL;
