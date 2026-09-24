@@ -21,6 +21,7 @@ export type AdminPlatformSettings = {
   lunaEnabled: boolean;
   recordingEnabled: boolean;
   publicMeetingsEnabled: boolean;
+  premiumPaymentEnabled: boolean;
 };
 
 export type AdminManagedUser = {
