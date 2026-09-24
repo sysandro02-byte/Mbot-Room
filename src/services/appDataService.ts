@@ -104,6 +104,7 @@ export type Preferences = {
   participantAudioAllowed?: boolean;
   participantVideoAllowed?: boolean;
   screenShareAllowed?: boolean;
+  automaticLogoutMinutes?: 0 | 5 | 15 | 30 | 60 | 240;
 };
 
 export const appDataService = {
