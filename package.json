@@ -7,7 +7,7 @@
     "dev": "node scripts/dev.mjs",
     "vite:internal": "vite",
     "start": "node dist/server.js",
-    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && node --max-old-space-size=384 node_modules/vite/bin/vite.js build --configLoader bundle && esbuild server-v2.ts --bundle --platform=node --format=esm --packages=external --sourcemap --outfile=dist/server.js",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && node --max-old-space-size=384 node_modules/vite/bin/vite.js build --configLoader bundle && esbuild server-v2.ts --bundle --platform=node --format=esm --packages=external --minify --outfile=dist/server.js",
     "lint": "node node_modules/typescript/bin/tsc --noEmit",
     "test": "npm run lint && node scripts/test-production-config.mjs",
     "test:integration": "node scripts/test-integration.mjs",
