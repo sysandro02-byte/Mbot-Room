@@ -321,3 +321,10 @@
 @media(prefers-reduced-motion:reduce){
   .is-spinning,.real-ended-state-spinner{animation:none}
 }
+
+
+.real-ended-restart-wrap{margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.real-ended-restart{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border:0;border-radius:11px;background:#007e83;color:#fff;font-weight:800;cursor:pointer}
+.real-ended-restart:disabled{opacity:.55;cursor:not-allowed}
+.real-ended-restart-wrap>small{color:#7a879d;font-size:11px}
+.real-ended-restart-error{flex-basis:100%;margin:0;color:#b42318;font-size:12px}
