@@ -307,6 +307,7 @@ export default function MeetingRoomV2() {
   const [reactionPanelOpen, setReactionPanelOpen] = useState(false);
   const [participants, setParticipants] = useState<MeetingParticipant[]>([]);
   const [lobbyParticipants, setLobbyParticipants] = useState<LobbyParticipant[]>([]);
+  const [lobbyAlert, setLobbyAlert] = useState<{ userId:number; name:string; avatar?:string } | null>(null);
   const [breakoutRooms, setBreakoutRooms] = useState<BreakoutRoom[]>([]);
   const [breakoutRoomId, setBreakoutRoomId] = useState<string | null>(null);
   const [breakoutRoomName, setBreakoutRoomName] = useState('');
@@ -691,11 +692,20 @@ export default function MeetingRoomV2() {
     const onChatDeleted = ({ messageId }: { messageId: string }) => setMessages((current) => current.filter((message) => message.id !== messageId));
     const onPoll = (poll: MeetingPoll) => setPolls((current) => [poll, ...current.filter((item) => item.id !== poll.id)]);
     const onPresence = () => void refreshParticipants();
-    const onLobby = (payload?: { meetingId?: number; userId?: number; status?: string }) => {
+    const onLobby = (payload?: { meetingId?: number; userId?: number; status?: string; name?:string; avatar?:string }) => {
       void refreshParticipants();
       void refreshLobby();
-      if (isModerator && Number(payload?.meetingId || 0) === id && payload?.status === 'requested') {
+      if (Number(payload?.meetingId || 0) !== id) return;
+      const lobbyUserId = Number(payload?.userId || 0);
+      if (isModerator && payload?.status === 'requested' && lobbyUserId) {
+        setLobbyAlert({
+          userId: lobbyUserId,
+          name: String(payload?.name || 'Un participant'),
+          avatar: String(payload?.avatar || ''),
+        });
         setNotice('Un participant attend votre autorisation dans la salle d’attente.');
+      } else if (payload?.status && payload.status !== 'requested' && lobbyUserId) {
+        setLobbyAlert((current) => current?.userId === lobbyUserId ? null : current);
       }
     };
     const onHandRaised = (payload: { meetingId: number; userId: number; raised: boolean; raisedAt?: string | null }) => {
@@ -1304,6 +1314,7 @@ export default function MeetingRoomV2() {
     try {
       await meetingService.respondToLobby(meeting.id, userId, status);
       await Promise.all([refreshLobby(), refreshParticipants()]);
+      setLobbyAlert((current) => current?.userId === userId ? null : current);
       setNotice(status === 'accepted' ? 'Participant admis.' : 'Demande refusée.');
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : 'Action salle d’attente impossible.');
@@ -1468,6 +1479,10 @@ export default function MeetingRoomV2() {
   );
 
   const activeMembers = participants.filter((participant) => participant.status === 'accepted');
+  const roleBadgeFor = (userId: number | string) => {
+    const role = activeMembers.find((member) => member.userId === Number(userId))?.role;
+    return role === 'host' ? 'Hôte' : role === 'cohost' ? 'Co-hôte' : undefined;
+  };
   const galleryCount = 1 + remoteParticipants.length;
   const featuredSocketId = pinnedSocketId || activeSpeakerSocketId || remoteParticipants[0]?.socketId || null;
   const featuredParticipant = featuredSocketId ? remoteParticipants.find((participant) => participant.socketId === featuredSocketId) || null : null;
@@ -1525,6 +1540,23 @@ export default function MeetingRoomV2() {
 
       {notice ? <div className="room-v2-notice" role="status"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Fermer"><X size={16}/></button></div> : null}
 
+      {isModerator && lobbyAlert ? (
+        <aside className="room-v2-lobby-alert" role="alert" aria-live="assertive">
+          <div className="room-v2-lobby-alert-avatar">
+            {lobbyAlert.avatar ? <img src={lobbyAlert.avatar} alt=""/> : initials(lobbyAlert.name)}
+          </div>
+          <div className="room-v2-lobby-alert-copy">
+            <strong>Participant en salle d’attente</strong>
+            <span>{lobbyAlert.name} souhaite rejoindre la réunion.</span>
+          </div>
+          <div className="room-v2-lobby-alert-actions">
+            <button type="button" className="secondary" onClick={() => setPanel('participants')}>Voir</button>
+            <button type="button" onClick={() => void respondToLobby(lobbyAlert.userId, 'accepted')}>Admettre</button>
+            <button type="button" className="dismiss" aria-label="Fermer la notification" onClick={() => setLobbyAlert(null)}><X size={16}/></button>
+          </div>
+        </aside>
+      ) : null}
+
       {meeting.is_active && !isModerator && canUseLuna && !catchUpDismissed && (Date.now() - new Date(meeting.start_time).getTime() > 5 * 60_000) ? (
         <section className="room-v2-catchup-offer" aria-label="Rattrapage intelligent Luna">
           <span><Sparkles size={18}/></span>
@@ -1578,7 +1610,7 @@ export default function MeetingRoomV2() {
                     avatar={participant.avatar}
                     muted={!participant.media.audio}
                     videoEnabled={participant.media.video}
-                    badge={activeMembers.find((member) => member.userId === Number(participant.userId))?.role === 'cohost' ? 'Co-hôte' : undefined}
+                    badge={roleBadgeFor(participant.userId)}
                     audioOutputId={selectedAudioOutputId}
                     activeSpeaker={activeSpeakerSocketId === participant.socketId}
                     pinned={pinnedSocketId === participant.socketId}
@@ -1601,7 +1633,7 @@ export default function MeetingRoomV2() {
                   muted={!featuredParticipant.media.audio}
                   videoEnabled={featuredParticipant.media.video || featuredParticipant.media.screen}
                   screen={featuredParticipant.media.screen}
-                  badge={activeMembers.find((member) => member.userId === Number(featuredParticipant.userId))?.role === 'cohost' ? 'Co-hôte' : undefined}
+                  badge={roleBadgeFor(featuredParticipant.userId)}
                   audioOutputId={selectedAudioOutputId}
                   activeSpeaker={activeSpeakerSocketId === featuredParticipant.socketId}
                   pinned={pinnedSocketId === featuredParticipant.socketId}
@@ -1632,7 +1664,7 @@ export default function MeetingRoomV2() {
                     muted={!participant.media.audio}
                     videoEnabled={participant.media.video || participant.media.screen}
                     screen={participant.media.screen}
-                    badge={activeMembers.find((member) => member.userId === Number(participant.userId))?.role === 'cohost' ? 'Co-hôte' : undefined}
+                    badge={roleBadgeFor(participant.userId)}
                     audioOutputId={selectedAudioOutputId}
                     activeSpeaker={activeSpeakerSocketId === participant.socketId}
                     pinned={pinnedSocketId === participant.socketId}
@@ -1667,7 +1699,7 @@ export default function MeetingRoomV2() {
                   muted={!participant.media.audio}
                   videoEnabled={participant.media.video || participant.media.screen}
                   screen={participant.media.screen}
-                  badge={activeMembers.find((member) => member.userId === Number(participant.userId))?.role === 'cohost' ? 'Co-hôte' : undefined}
+                  badge={roleBadgeFor(participant.userId)}
                   audioOutputId={selectedAudioOutputId}
                   activeSpeaker={activeSpeakerSocketId === participant.socketId}
                   pinned={pinnedSocketId === participant.socketId}
