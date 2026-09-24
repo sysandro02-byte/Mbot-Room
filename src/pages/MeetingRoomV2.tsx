@@ -1467,13 +1467,13 @@ export default function MeetingRoomV2() {
           {isModerator && !meeting.is_active ? <button className="room-v2-start" type="button" onClick={startMeeting}>Démarrer</button> : null}
           <button className="room-v2-header-icon" type="button" aria-label="Participants" onClick={() => setPanel(panel === 'participants' ? null : 'participants')}><UsersRound/></button>
           <button className="room-v2-header-icon" type="button" aria-label="Discussion" onClick={() => setPanel(panel === 'chat' ? null : 'chat')}><MessageCircle/></button>
-          <button className="room-v2-header-icon" type="button" aria-label="Périphériques" onClick={() => { setDevicePanelOpen((current) => !current); if (!devicePanelOpen) void refreshMediaDevices(); }}><Settings2/></button>
+          <button className="room-v2-header-icon" type="button" data-testid="device-settings-button" aria-label="Périphériques" onClick={() => { setDevicePanelOpen((current) => !current); if (!devicePanelOpen) void refreshMediaDevices(); }}><Settings2/></button>
           <div className="room-v2-technical-status" aria-label="État technique de la réunion">
             <span
               className={`room-v2-media-transport ${liveKitMedia.connected ? 'sfu-active' : liveKitDesired ? 'sfu-connecting' : 'mesh-active'}`}
               data-testid="media-transport-status"
               data-transport={liveKitMedia.connected ? 'livekit' : 'mesh'}
-            >{liveKitMedia.connected ? 'Connexion optimisée' : liveKitDesired ? 'Optimisation…' : 'Connexion active'}</span>
+            >{liveKitMedia.connected ? 'Connexion optimisée' : liveKitDesired ? 'Optimisation…' : 'Connexion active'}{liveKitFailed ? <small> · secours</small> : null}</span>
             <span className={`room-v2-network ${networkQuality.level}`} data-testid="network-quality" data-level={networkQuality.level}>
               {networkQuality.level === 'offline' ? <WifiOff size={14}/> : <Wifi size={14}/>}
               {networkQuality.rttMs !== null ? <small>{networkQuality.rttMs} ms</small> : null}
@@ -1919,13 +1919,16 @@ export default function MeetingRoomV2() {
             if (!next) liveCaptions.clearCaptions();
           }}
         ><Captions/></Control>
-        <Control active={handRaised} disabled={!guestRaiseHandAllowed} title={!guestRaiseHandAllowed ? 'Lever la main non autorisé pour les invités' : undefined} label={handRaised ? 'Main levée' : 'Main'} onClick={() => {
+        <Control active={handRaised} disabled={!guestRaiseHandAllowed} title={!guestRaiseHandAllowed ? 'Lever la main non autorisé pour les invités' : undefined} label={handRaised ? 'Baisser la main' : 'Main'} onClick={() => {
           const raised = !handRaised;
           setHandRaised(raised);
           setRaisedHands((current) => { const next = new Set(current); if (raised) next.add(Number(currentUser?.id || 0)); else next.delete(Number(currentUser?.id || 0)); return next; });
           socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised});
         }}><Hand/></Control>
-        <Control active={recording} disabled={!canRecord} title={!canRecord ? (guestMode && !guestRecordingAllowed ? 'Enregistrement non autorisé pour les invités' : 'Enregistrement non autorisé pour votre rôle') : undefined} label={recording ? 'Stop rec.' : 'Enregistrer'} onClick={() => void toggleRecording()}>{recording ? <Square/> : <Circle/>}</Control>
+        <div className="room-v2-reaction-wrap">
+          <Control active={reactionPanelOpen} disabled={!canUseReactions} title={!canUseReactions ? 'Réactions désactivées par l’hôte' : undefined} label="Réactions" testId="reaction-button" onClick={() => setReactionPanelOpen((current) => !current)}>😊</Control>
+        </div>
+                <Control active={recording} disabled={!canRecord} title={!canRecord ? (guestMode && !guestRecordingAllowed ? 'Enregistrement non autorisé pour les invités' : 'Enregistrement non autorisé pour votre rôle') : undefined} label={recording ? 'Stop rec.' : 'Enregistrer'} onClick={() => void toggleRecording()}>{recording ? <Square/> : <Circle/>}</Control>
 
         <div className="room-v2-more-wrap">
           <Control active={moreMenuOpen} label="Plus" onClick={() => setMoreMenuOpen((current) => !current)}><MoreVertical/></Control>
