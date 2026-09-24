@@ -1295,6 +1295,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const meeting=await findMeetingByValue(request.params.meetingId);
       if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');
       if(!(await hasMeetingAccess(meeting.id,request.user!)))return sendApiError(response,403,'MEETING_ACCESS_DENIED','Accès refusé.');
+      const member=await query(`SELECT 1 FROM room_meeting_members WHERE meeting_id=$1 AND user_id=$2 AND status='accepted' LIMIT 1`,[meeting.id,request.user!.id]);
+      if(!member.rows[0])return sendApiError(response,403,'FEEDBACK_PARTICIPANT_REQUIRED','Seuls les utilisateurs ayant participé à la réunion peuvent donner leur avis.');
       const rating=Number(request.body?.rating);
       const comment=normalizeText(request.body?.comment).slice(0,1000);
       if(!Number.isInteger(rating)||rating<1||rating>5)return sendApiError(response,400,'FEEDBACK_RATING_INVALID','Sélectionnez une note entre 1 et 5 étoiles.');
@@ -1332,6 +1334,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
         getSummarySourceStats(meeting.id),
         query('SELECT rating,comment,created_at,updated_at FROM room_meeting_feedback WHERE meeting_id=$1 AND user_id=$2 LIMIT 1',[meeting.id,request.user!.id]),
       ]);
+      const participated=members.rows.some((row)=>Number(row.user_id)===request.user!.id);
       const summaryRow=summaryResult.rows[0];
       const feedbackRow=feedbackResult.rows[0];
       const feedbackSubmitted=Boolean(feedbackRow);
@@ -1372,7 +1375,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
         },
         nextActions:[],
         recording:{available:Boolean(recordings.rows[0]),retentionDays:0,url:recordings.rows[0]?.storage_url||null},
-        permissions:{canDownloadSummary:true,canShareSummary:true,canViewRecording:Boolean(recordings.rows[0]),canExportChat:true,canRate:true},
+        permissions:{canDownloadSummary:true,canShareSummary:true,canViewRecording:Boolean(recordings.rows[0]),canExportChat:true,canRate:participated},
         guestRestrictions:Boolean(request.user!.isGuest),
       });
     }catch(error){next(error);}
