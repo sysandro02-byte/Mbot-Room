@@ -43,7 +43,7 @@ const localStoredUser = (): RoomUser => {
 export type CalendarEvent = {
   id:string; user_id:number; meeting_id?:number|null; title:string; description:string;
   starts_at:string; ends_at:string; created_at:string; updated_at:string;
-  google_event_id?:string|null; source?:string;
+  google_event_id?:string|null; source?:string; metadata?:Record<string,unknown>;
 };
 export type Contact = { id:number; name:string; username:string; email:string; avatar:string; is_guest:boolean };
 export type Recording = {
@@ -107,12 +107,12 @@ export const appDataService = {
   async getCalendar() {
     return readJson<CalendarEvent[]>(await apiFetch(apiUrl('/api/calendar/events'), { headers:getAuthHeaders() }));
   },
-  async createCalendarEvent(payload:{title:string;description?:string;startsAt:string;endsAt:string;meetingId?:number}) {
+  async createCalendarEvent(payload:{title:string;description?:string;startsAt:string;endsAt:string;meetingId?:number;metadata?:Record<string,unknown>}) {
     const url=apiUrl('/api/calendar/events');
     return safeOfflineMutation<CalendarEvent>(url,'POST',payload,()=>({
       id:`offline-${crypto.randomUUID()}`,user_id:Number(localStoredUser().id||0),meeting_id:payload.meetingId||null,
       title:payload.title,description:payload.description||'',starts_at:payload.startsAt,ends_at:payload.endsAt,
-      created_at:new Date().toISOString(),updated_at:new Date().toISOString(),
+      metadata:payload.metadata||{},created_at:new Date().toISOString(),updated_at:new Date().toISOString(),
     }));
   },
   async deleteCalendarEvent(id:string) {
