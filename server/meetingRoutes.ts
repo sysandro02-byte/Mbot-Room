@@ -58,9 +58,10 @@ const visibleToUser = async (meeting: Meeting, user: NonNullable<AuthedRequest['
 };
 
 const meetingRole = (meeting: Meeting, user: NonNullable<AuthedRequest['user']>) => {
-  if (meeting.host_id === user.id) return 'host';
+  if (meeting.host_id === user.id || Number(meeting.settings?.actingHostId || 0) === user.id) return 'host';
   if (meeting.co_host_id === user.id) return 'cohost';
-  if (user.isGuest) return 'guest';
+  // Le statut invité est porté par room_users.is_guest. La colonne role de
+  // room_meeting_members n’accepte volontairement que host/cohost/participant.
   return 'participant';
 };
 
@@ -140,7 +141,10 @@ const defaultSettings = (): MeetingSettings => ({
 });
 
 const buildSettings = (body: any, existing?: Meeting) => {
-  const incoming = (body?.settings || {}) as MeetingSettings & { password?: string };
+  const incoming = { ...((body?.settings || {}) as MeetingSettings & { password?: string }) };
+  // actingHostId est une donnée de contrôle serveur : un client ne doit jamais
+  // pouvoir s’auto-promouvoir en hôte en l’envoyant dans settings.
+  delete (incoming as any).actingHostId;
   const settings: MeetingSettings = { ...defaultSettings(), ...(existing?.settings || {}), ...incoming };
   const invitationEmails = normalizeInvitationEmails(body?.participants || incoming.participants);
   if (invitationEmails.length) settings.participants = invitationEmails;
@@ -494,7 +498,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
           [meeting.id, request.user!.id, meetingRole(meeting, request.user!)],
         );
       }
-      io.to(`meeting:${meeting.id}:moderators`).emit('meeting:lobby-updated', { meetingId: meeting.id, userId: request.user!.id, status });
+      io.to(`meeting:${meeting.id}:moderators`).emit('meeting:lobby-updated', { meetingId: meeting.id, userId: request.user!.id, status, name: request.user!.name, avatar: request.user!.avatar });
       if (status === 'requested') {
         const moderatorIds=[meeting.host_id,meeting.co_host_id].map(Number).filter((id)=>id&&id!==request.user!.id);
         await Promise.all(moderatorIds.map(async(userId)=>{
