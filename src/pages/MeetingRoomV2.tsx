@@ -972,14 +972,52 @@ export default function MeetingRoomV2() {
     setCameraEnabled(next);
   };
 
+  const applyAudioOutputDevice = useCallback(async (deviceId: string) => {
+    setSelectedAudioOutputId(deviceId);
+    const elements = [...document.querySelectorAll<HTMLMediaElement>('.room-v2-shell video')];
+    const sinkable = elements.filter((element) => typeof (element as HTMLMediaElement & { setSinkId?: (id: string) => Promise<void> }).setSinkId === 'function');
+    if (!sinkable.length) {
+      if (deviceId) setNotice('Le choix du haut-parleur n’est pas pris en charge par ce navigateur.');
+      return;
+    }
+    try {
+      await Promise.all(sinkable.map((element) => (
+        (element as HTMLMediaElement & { setSinkId: (id: string) => Promise<void> }).setSinkId(deviceId)
+      )));
+      setNotice(deviceId ? 'Haut-parleur changé.' : 'Sortie audio système utilisée.');
+    } catch {
+      setNotice('Impossible de changer de haut-parleur sur cet appareil.');
+    }
+  }, []);
+
   const switchInputDevice = useCallback(async (kind: 'audioinput' | 'videoinput', deviceId: string) => {
     if (!deviceId || !navigator.mediaDevices?.getUserMedia) return;
+    const previousId = kind === 'audioinput' ? selectedAudioInputId : selectedVideoInputId;
+    if (kind === 'audioinput') setSelectedAudioInputId(deviceId);
+    else setSelectedVideoInputId(deviceId);
+
     try {
-      const fresh = await navigator.mediaDevices.getUserMedia(kind === 'audioinput'
+      const exactConstraints: MediaStreamConstraints = kind === 'audioinput'
         ? { audio: { deviceId: { exact: deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: { ideal: 1 } }, video: false }
-        : { audio: false, video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } } });
+        : { audio: false, video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } } };
+      const fallbackConstraints: MediaStreamConstraints = kind === 'audioinput'
+        ? { audio: { deviceId: { ideal: deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false }
+        : { audio: false, video: { deviceId: { ideal: deviceId } } };
+
+      let fresh: MediaStream;
+      try {
+        fresh = await navigator.mediaDevices.getUserMedia(exactConstraints);
+      } catch (cause) {
+        const recoverable = cause instanceof DOMException && ['OverconstrainedError', 'NotFoundError', 'AbortError'].includes(cause.name);
+        if (!recoverable) throw cause;
+        fresh = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+      }
+
       const nextTrack = kind === 'audioinput' ? fresh.getAudioTracks()[0] : fresh.getVideoTracks()[0];
-      if (!nextTrack) throw new Error('Périphérique sans piste média.');
+      if (!nextTrack) {
+        fresh.getTracks().forEach((track) => track.stop());
+        throw new Error('Périphérique sans piste média.');
+      }
 
       const current = cameraStreamRef.current || new MediaStream();
       const replacingKind = kind === 'audioinput' ? 'audio' : 'video';
@@ -1000,14 +1038,20 @@ export default function MeetingRoomV2() {
         setLocalStream(combined);
       }
 
-      if (kind === 'audioinput') setSelectedAudioInputId(deviceId);
-      else setSelectedVideoInputId(deviceId);
+      const actualDeviceId = nextTrack.getSettings().deviceId || deviceId;
+      if (kind === 'audioinput') setSelectedAudioInputId(actualDeviceId);
+      else setSelectedVideoInputId(actualDeviceId);
       await refreshMediaDevices();
       setNotice(kind === 'audioinput' ? 'Microphone changé.' : 'Caméra changée.');
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : 'Impossible de changer de périphérique.');
+      if (kind === 'audioinput') setSelectedAudioInputId(previousId);
+      else setSelectedVideoInputId(previousId);
+      const denied = cause instanceof DOMException && cause.name === 'NotAllowedError';
+      setNotice(denied
+        ? 'Autorisez l’accès au périphérique dans votre navigateur puis réessayez.'
+        : cause instanceof Error ? cause.message : 'Impossible de changer de périphérique.');
     }
-  }, [cameraEnabled, canUseCamera, canUseMic, micEnabled, refreshMediaDevices, screenSharing]);
+  }, [cameraEnabled, canUseCamera, canUseMic, micEnabled, refreshMediaDevices, screenSharing, selectedAudioInputId, selectedVideoInputId]);
 
   const stopScreenShare = useCallback(() => {
     screenStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -2059,7 +2103,7 @@ export default function MeetingRoomV2() {
           </label>
           <label>
             <Volume2 size={16}/> Haut-parleur
-            <select value={selectedAudioOutputId} onChange={(event) => setSelectedAudioOutputId(event.target.value)} disabled={typeof HTMLMediaElement === 'undefined' || !('setSinkId' in HTMLMediaElement.prototype)}>
+            <select value={selectedAudioOutputId} onChange={(event) => void applyAudioOutputDevice(event.target.value)} disabled={typeof HTMLMediaElement === 'undefined' || !('setSinkId' in HTMLMediaElement.prototype)}>
               <option value="">Sortie système</option>
               {mediaDevices.filter((device) => device.kind === 'audiooutput').map((device, index) => <option key={device.deviceId || `output-${index}`} value={device.deviceId}>{device.label || `Haut-parleur ${index + 1}`}</option>)}
             </select>
