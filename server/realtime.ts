@@ -214,10 +214,10 @@ export const registerRealtime = (io: Server) => {
     socket.on('meeting:hand-raised', async (payload: any, callback?: Ack) => {
       const meetingId = Number(socket.data.meetingId || 0);
       if (!meetingId) return callback?.(fail('REALTIME_NOT_JOINED', 'Vous devez rejoindre la réunion.'));
-      if (user.isGuest && !(await isPlatformFeatureEnabled('guestRaiseHandEnabled'))) {
+      const raised = Boolean(payload?.raised);
+      if (raised && user.isGuest && !(await isPlatformFeatureEnabled('guestRaiseHandEnabled'))) {
         return callback?.(fail('GUEST_RAISE_HAND_DISABLED', 'Les invités ne sont pas autorisés à lever la main.'));
       }
-      const raised = Boolean(payload?.raised);
       io.to(`meeting:${meetingId}`).emit('meeting:hand-raised', { meetingId, userId: user.id, name: user.name, raised });
       callback?.({ ok: true });
     });
