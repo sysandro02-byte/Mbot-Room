@@ -1572,7 +1572,7 @@ export default function MeetingRoomV2() {
                   onPin={() => setPinnedSocketId((current) => current === featuredParticipant.socketId ? null : featuredParticipant.socketId)}
                 />
               </div>
-              <div className="room-v2-speaker-strip">
+              <div className={`room-v2-speaker-strip ${viewMode === 'participants' ? 'participant-mode' : ''}`}>
                 <VideoTile
                   name={localName}
                   stream={localStream}
@@ -1581,6 +1581,7 @@ export default function MeetingRoomV2() {
                   videoEnabled={screenSharing || mediaState.video}
                   screen={screenSharing}
                   badge={isHost ? 'Hôte' : isCoHost ? 'Co-hôte' : isAdmin ? 'Admin' : currentUser?.isGuest ? 'Invité' : 'Participant'}
+                  handRaised={handRaised}
                   reaction={reactions[Number(currentUser?.id || 0)]}
                   local
                 />
@@ -1602,6 +1603,7 @@ export default function MeetingRoomV2() {
                     onPin={() => setPinnedSocketId((current) => current === participant.socketId ? null : participant.socketId)}
                   />
                 ))}
+                {viewMode === 'participants' ? <button type="button" className="room-v2-invite-tile" onClick={() => void inviteParticipants()}><UsersRound/><span>Inviter des participants</span></button> : null}
               </div>
             </div>
           ) : (
@@ -1614,6 +1616,8 @@ export default function MeetingRoomV2() {
                 videoEnabled={screenSharing || mediaState.video}
                 screen={screenSharing}
                 badge={isHost ? 'Hôte' : isCoHost ? 'Co-hôte' : isAdmin ? 'Admin' : currentUser?.isGuest ? 'Invité' : 'Participant'}
+                handRaised={handRaised}
+                reaction={reactions[Number(currentUser?.id || 0)]}
                 local
               />
               {remoteParticipants.map((participant) => (
@@ -1637,6 +1641,39 @@ export default function MeetingRoomV2() {
             </div>
           )}
         </div>
+
+        {!panel ? <aside className="room-v2-desktop-rail" aria-label="Participants de la réunion">
+          {raisedMembers.length ? <section className="room-v2-hand-queue">
+            <header><span><Hand size={18}/></span><strong>File des mains levées ({raisedMembers.length})</strong></header>
+            {raisedMembers.map((member) => {
+              const remote = remoteParticipants.find((participant) => Number(participant.userId) === member.userId);
+              const raisedAt = raisedHandTimes[member.userId];
+              return <article key={member.userId}>
+                <div className="room-v2-person-avatar">{member.avatar?<img src={member.avatar} alt=""/>:initials(member.name)}</div>
+                <div><strong>{member.name}</strong><small>a levé la main et souhaite prendre la parole.{raisedAt ? ' · '+formatTime(raisedAt) : ''}</small></div>
+                {remote ? <button type="button" aria-label={`Mettre ${member.name} en avant`} onClick={() => { setPinnedSocketId(remote.socketId); setViewMode('speaker'); }}><Hand/></button> : null}
+              </article>;
+            })}
+          </section> : null}
+          <section className="room-v2-rail-participants">
+            <header><span><UsersRound size={18}/></span><strong>Participants ({activeMembers.length})</strong></header>
+            <label><Search size={15}/><input value={participantSearch} onChange={(event)=>setParticipantSearch(event.target.value)} placeholder="Rechercher un participant…"/></label>
+            <div>
+              {visibleMembers.map((member) => {
+                const remote = remoteParticipants.find((participant) => Number(participant.userId) === member.userId);
+                const isSelf = member.userId === Number(currentUser?.id || 0);
+                return <article key={member.userId}>
+                  <div className="room-v2-person-avatar">{member.avatar?<img src={member.avatar} alt=""/>:initials(member.name)}</div>
+                  <div><strong>{member.name}{isSelf?' (vous)':''}</strong><small>{member.role==='host'?'Hôte':member.role==='cohost'?'Co-hôte':member.isGuest?'Invité':'Participant'}</small></div>
+                  {raisedHands.has(member.userId)?<Hand className="room-v2-rail-hand"/>:null}
+                  {remote?.media.audio || (isSelf&&mediaState.audio)?<Mic className="room-v2-rail-mic"/>:<MicOff className="room-v2-rail-muted"/>}
+                  {remote ? <button type="button" className="room-v2-rail-more" aria-label={`Mettre ${member.name} en avant`} onClick={()=>{setPinnedSocketId(remote.socketId);setViewMode('speaker');}}><MoreVertical/></button>:null}
+                </article>;
+              })}
+            </div>
+            <button type="button" className="room-v2-rail-invite" onClick={()=>void inviteParticipants()}><UsersRound/> Inviter des participants</button>
+          </section>
+        </aside> : null}
 
         {panel ? (
           <aside className="room-v2-panel">
