@@ -355,7 +355,7 @@ export default function RealMeetingList(){
                     {primaryManager&&!meeting.is_active&&!ended?<button type="button" role="menuitem" onClick={()=>openEdit(meeting)}><Pencil/><span>Modifier</span></button>:null}
                     {primaryManager?<button type="button" role="menuitem" onClick={()=>void duplicate(meeting)}><CopyPlus/><span>Dupliquer</span></button>:null}
                     {moderator&&!meeting.is_active&&!ended?<button type="button" role="menuitem" onClick={()=>{setOpenMenuId(null);void start(meeting);}}><Play/><span>Démarrer</span></button>:null}
-                    {primaryManager&&!meeting.is_active?<><div className="real-meeting-menu-separator"/><button type="button" role="menuitem" className="is-danger" onClick={()=>{setOpenMenuId(null);setDeleteTarget(meeting);}}><Trash2/><span>Supprimer</span></button></>:null}
+                    {actualHost&&!meeting.is_active?<><div className="real-meeting-menu-separator"/><button type="button" role="menuitem" className="is-danger" onClick={()=>{setOpenMenuId(null);setDeleteTarget(meeting);}}><Trash2/><span>Supprimer</span></button></>:null}
                   </div>:null}
                 </div>
               </div>
