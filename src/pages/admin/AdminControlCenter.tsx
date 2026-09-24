@@ -15,11 +15,12 @@ const labels: Array<{key:keyof AdminPlatformSettings;title:string;description:st
   {key:'publicMeetingsEnabled',title:'Réunions publiques',description:'Afficher ou masquer les réunions accessibles publiquement.'},
   {key:'lunaEnabled',title:'Luna',description:'Autoriser l’assistance Luna dans les réunions.'},
   {key:'recordingEnabled',title:'Enregistrement',description:'Autoriser les utilisateurs à enregistrer une réunion.'},
+  {key:'premiumPaymentEnabled',title:'Paiement Premium',description:'Activer uniquement lorsque le système de paiement Premium est réellement raccordé.'},
 ];
 
 const emptySettings:AdminPlatformSettings={
   registrationEnabled:true,guestAccessEnabled:true,meetingCreationEnabled:true,
-  lunaEnabled:true,recordingEnabled:true,publicMeetingsEnabled:true,
+  lunaEnabled:true,recordingEnabled:true,publicMeetingsEnabled:true,premiumPaymentEnabled:false,
 };
 
 export default function AdminControlCenter(){
