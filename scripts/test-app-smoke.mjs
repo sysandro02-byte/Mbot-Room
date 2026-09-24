@@ -265,8 +265,8 @@ try {
   });
   assert.equal(groupMessage.response.status, 201, JSON.stringify(groupMessage.data));
   const groupMessageEmails = sentEmails.slice(emailCountBeforeGroupMessage);
-  assert.ok(groupMessageEmails.some((mail) => Array.isArray(mail.to) && mail.to.includes('membre.un@mbote.test')), 'External group member one should receive an email notification');
-  assert.ok(groupMessageEmails.some((mail) => Array.isArray(mail.to) && mail.to.includes('membre.deux@mbote.test')), 'External group member two should receive an email notification');
+  assert.ok(groupMessageEmails.some((mail) => String(mail.to || '') === 'membre.un@mbote.test'), 'External group member one should receive an email notification');
+  assert.ok(groupMessageEmails.some((mail) => String(mail.to || '') === 'membre.deux@mbote.test'), 'External group member two should receive an email notification');
 
   const pdfUpload = await fetch(`${baseUrl}/api/files/upload`, {
     method: 'POST',
