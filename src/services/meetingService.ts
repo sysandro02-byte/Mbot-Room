@@ -273,6 +273,16 @@ export const meetingService = {
     })) : [];
   },
 
+  async cancelLobbyRequest(meetingId: number): Promise<{ success: boolean; cancelled: boolean }> {
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/lobby/cancel`), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'Impossible d’annuler la demande.');
+    return { success: Boolean(data.success), cancelled: Boolean(data.cancelled) };
+  },
+
   async getLobby(meetingId: number): Promise<LobbyParticipant[]> {
     const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/lobby`), { headers: getAuthHeaders() });
     if (!response.ok) return [];
