@@ -213,4 +213,31 @@ if (!indexHtml.includes('rel="manifest"') || !indexHtml.includes('theme-color'))
   throw new Error('PWA metadata is missing from index.html');
 }
 
+const pwaRuntime = fs.readFileSync(new URL('../src/lib/pwa.ts', import.meta.url), 'utf8');
+if (!pwaRuntime.includes("postMessage({ type: 'SKIP_WAITING' })") || !pwaRuntime.includes('isLiveMeetingRoute') || !pwaRuntime.includes('60 * 1000')) {
+  throw new Error('Published web updates must auto-activate while deferring reload during a live meeting');
+}
+const androidWorkflow = fs.readFileSync(new URL('../.github/workflows/android-apk.yml', import.meta.url), 'utf8');
+if (!androidWorkflow.includes('branches: [main]') || androidWorkflow.includes('paths:')) {
+  throw new Error('Android APK must rebuild on every main publication');
+}
+
+const meetingRoomSource = fs.readFileSync(new URL('../src/pages/MeetingRoomV2.tsx', import.meta.url), 'utf8');
+if (!meetingRoomSource.includes('meeting.started_at || meeting.start_time') || !meetingRoomSource.includes('setClockTick(Date.now())')) {
+  throw new Error('Meeting chrono must use the actual started_at timestamp');
+}
+if (!meetingRoomSource.includes('applyAudioOutputDevice') || !meetingRoomSource.includes("switchInputDevice('audioinput'") || !meetingRoomSource.includes("switchInputDevice('videoinput'")) {
+  throw new Error('Meeting peripheral selectors must apply audio/video device changes');
+}
+if (!meetingRoomSource.includes('authService.touchActivity()') || !sessionSecurity.includes('inActiveMeeting')) {
+  throw new Error('Active meetings must keep the authenticated session alive and bypass idle logout');
+}
+
+if (!core.includes('personal_meeting_id') || !core.includes('personalMeetingId')) {
+  throw new Error('Personal meeting ID persistence is missing');
+}
+if (!meetingRoutes.includes("app.post('/api/meetings/:meetingId/restart'") || !meetingRoutes.includes('request.user!.personalMeetingId')) {
+  throw new Error('Past meeting relaunch and personal meeting ID reuse are required');
+}
+
 console.log('Production configuration smoke checks passed.');
