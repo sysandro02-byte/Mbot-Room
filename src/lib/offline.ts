@@ -2,7 +2,9 @@ const API_CACHE_PREFIX = 'mboteroom-api-v2';
 const LEGACY_QUEUE_KEY = 'mboteroom-offline-queue-v2';
 const QUEUE_KEY_PREFIX = 'mboteroom-offline-queue-v3';
 const CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
-const MAX_QUEUE = 100;
+const MAX_QUEUE = 500;
+const SYNC_RETRY_BASE_MS = 5_000;
+const SYNC_RETRY_MAX_MS = 5 * 60_000;
 
 export type OfflineQueueEntry = {
   id: string;
@@ -12,6 +14,7 @@ export type OfflineQueueEntry = {
   contentType: string;
   createdAt: string;
   attempts: number;
+  nextAttemptAt?: number;
 };
 
 const safeWindow = () => typeof window !== 'undefined';
@@ -133,6 +136,10 @@ export const flushOfflineQueue = async () => {
   try {
     for (let index = 0; index < entries.length; index += 1) {
       const entry = entries[index];
+      if (entry.nextAttemptAt && entry.nextAttemptAt > Date.now()) {
+        remaining.push(entry);
+        continue;
+      }
       try {
         const headers = new Headers();
         headers.set('Content-Type', entry.contentType || 'application/json');
@@ -158,14 +165,18 @@ export const flushOfflineQueue = async () => {
           continue;
         }
         if (response.status === 401 || response.status === 403 || response.status === 408 || response.status === 429 || response.status >= 500) {
-          remaining.push({ ...entry, attempts: entry.attempts + 1 }, ...entries.slice(index + 1));
+          const attempts = entry.attempts + 1;
+          const delay = Math.min(SYNC_RETRY_MAX_MS, SYNC_RETRY_BASE_MS * (2 ** Math.min(attempts, 6)));
+          remaining.push({ ...entry, attempts, nextAttemptAt: Date.now() + delay }, ...entries.slice(index + 1));
           break;
         }
         window.dispatchEvent(new CustomEvent('mbote-room-offline-conflict', {
           detail: { entry, status: response.status },
         }));
       } catch {
-        remaining.push({ ...entry, attempts: entry.attempts + 1 }, ...entries.slice(index + 1));
+        const attempts = entry.attempts + 1;
+        const delay = Math.min(SYNC_RETRY_MAX_MS, SYNC_RETRY_BASE_MS * (2 ** Math.min(attempts, 6)));
+        remaining.push({ ...entry, attempts, nextAttemptAt: Date.now() + delay }, ...entries.slice(index + 1));
         break;
       }
     }
@@ -198,8 +209,12 @@ export const initOfflineMode = () => {
   const sync = () => void flushOfflineQueue();
   window.addEventListener('online', sync);
   window.addEventListener('focus', sync);
+  window.addEventListener('pageshow', sync);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') sync();
+  });
   window.setInterval(() => {
     if (navigator.onLine && getOfflineQueueCount()) void flushOfflineQueue();
-  }, 60_000);
+  }, 15_000);
   if (navigator.onLine && getOfflineQueueCount()) void flushOfflineQueue();
 };
