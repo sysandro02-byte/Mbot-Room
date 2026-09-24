@@ -16,7 +16,7 @@ import {
   toPublicUser,
 } from './core.js';
 import { createNotificationAndPush, getPushStatus } from './pushService.js';
-import { isPlatformFeatureEnabled } from './platformSettings.js';
+import { getPlatformSettings, isPlatformFeatureEnabled } from './platformSettings.js';
 import { deleteCalendarEventFromGoogle, syncCalendarEventToGoogle } from './workspaceRoutes.js';
 import { parseSupabaseRecordingMarker, requestSupabaseRecordingSigner, type RecordingDownloadTicket } from './supabaseRecordingStorage.js';
 
@@ -243,6 +243,26 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
         error:process.env.NODE_ENV==='production'?'Database unavailable':error instanceof Error?error.message:'Database unavailable',
       });
     }
+  });
+
+  app.get('/api/platform/settings', requireDatabase, authenticateToken, async (_request,response,next)=>{
+    try{
+      const settings=await getPlatformSettings();
+      const configuredUrl=String(process.env.MBOTE_PREMIUM_CHECKOUT_URL||'').trim();
+      let premiumCheckoutUrl='';
+      if(configuredUrl.startsWith('/')&&!configuredUrl.startsWith('//'))premiumCheckoutUrl=configuredUrl;
+      else{
+        try{
+          const parsed=new URL(configuredUrl);
+          if(parsed.protocol==='https:')premiumCheckoutUrl=parsed.href;
+        }catch{/* no checkout configured */}
+      }
+      response.json({
+        ...settings,
+        premiumCheckoutReady:Boolean(settings.premiumPaymentEnabled&&premiumCheckoutUrl),
+        premiumCheckoutUrl:settings.premiumPaymentEnabled?premiumCheckoutUrl:'',
+      });
+    }catch(error){next(error);}
   });
 
   app.get('/api/public/meetings', requireDatabase, async (_request,response,next)=>{
