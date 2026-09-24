@@ -301,6 +301,21 @@ export default function SettingsWorkspace({
           <SettingRow icon={<ShieldCheck/>} label="Sécurité" description="Mot de passe, sessions et protection" onClick={() => void loadSessions('security')}/>
           <SettingRow icon={<Laptop/>} label="Appareils connectés" description="Consultez et fermez vos sessions actives" value={sessions.length ? String(sessions.length) : undefined} onClick={() => void loadSessions('sessions')}/>
           <SettingRow icon={<LockKeyhole/>} label="Vérification en deux étapes" description="Code de sécurité par e-mail à chaque connexion" value="Activée" onClick={() => void loadSessions('security')}/>
+          <SettingRow icon={<Clock3/>} label="Déconnexion automatique" description="Se déconnecter après une période sans activité">
+            <select
+              aria-label="Déconnexion automatique"
+              value={preferences.automaticLogoutMinutes ?? 5}
+              disabled={savingKey==='automaticLogoutMinutes'}
+              onChange={(event) => void update('automaticLogoutMinutes', { automaticLogoutMinutes: Number(event.target.value) as Preferences['automaticLogoutMinutes'] })}
+            >
+              <option value="5">Après 5 minutes</option>
+              <option value="15">Après 15 minutes</option>
+              <option value="30">Après 30 minutes</option>
+              <option value="60">Après 1 heure</option>
+              <option value="240">Après 4 heures</option>
+              <option value="0">Jamais</option>
+            </select>
+          </SettingRow>
         </SettingsCard>
 
         <SettingsCard title="Notifications" subtitle="Choisissez comment vous êtes notifié" icon={<Bell/>}>
