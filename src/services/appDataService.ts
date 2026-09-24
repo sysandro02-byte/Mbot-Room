@@ -56,6 +56,17 @@ export type ProfileStats = { meetings:number; participants:number; files:number;
 export type WhiteboardStroke = { id:string; color:string; width:number; points:Array<{x:number;y:number}> };
 export type Whiteboard = { id:string; owner_id:number; meeting_id?:number|null; title:string; document:{strokes:WhiteboardStroke[]}; created_at:string; updated_at:string };
 export type ConnectedSession = { id:string; current:boolean; createdAt:string; expiresAt:string; lastActivity:string; label:string };
+export type ClientPlatformSettings = {
+  registrationEnabled:boolean;
+  guestAccessEnabled:boolean;
+  meetingCreationEnabled:boolean;
+  lunaEnabled:boolean;
+  recordingEnabled:boolean;
+  publicMeetingsEnabled:boolean;
+  premiumPaymentEnabled:boolean;
+  premiumCheckoutReady:boolean;
+  premiumCheckoutUrl:string;
+};
 
 export type Preferences = {
   language?: string;
@@ -90,6 +101,9 @@ export type Preferences = {
 };
 
 export const appDataService = {
+  async getPlatformSettings() {
+    return readJson<ClientPlatformSettings>(await apiFetch(apiUrl('/api/platform/settings'),{headers:getAuthHeaders(),cache:'no-store'}));
+  },
   async getCalendar() {
     return readJson<CalendarEvent[]>(await apiFetch(apiUrl('/api/calendar/events'), { headers:getAuthHeaders() }));
   },
