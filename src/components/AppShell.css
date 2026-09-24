@@ -20,7 +20,18 @@
   padding:16px 12px 14px;overflow:visible;color:#fff;
   background:
     radial-gradient(circle at 110% -5%,rgba(8,166,166,.28),transparent 25%),
-    linear-gradient(180deg,#063b63 0%,#043555 48%,#032f4f 100%)
+    linear-gradient(180deg,#063b63 0%,#043555 48%,#032f4f 100%);
+  transition:opacity .18s ease,padding .18s ease,width .18s ease
+}
+.app-shell.is-sidebar-collapsed{grid-template-columns:0 minmax(0,1fr)}
+.app-shell.is-sidebar-collapsed .app-shell-sidebar{
+  width:0;
+  min-width:0;
+  padding-left:0;
+  padding-right:0;
+  opacity:0;
+  overflow:hidden;
+  pointer-events:none
 }
 .app-shell-close{display:none}
 .app-shell-logo{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:2px 8px 14px;color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.10)}
@@ -104,7 +115,8 @@
 .app-shell-bottom-nav{display:none}
 
 @media(max-width:1024px){
-  .app-shell{display:block}
+  .app-shell,.app-shell.is-sidebar-collapsed{display:block}
+  .app-shell.is-sidebar-collapsed .app-shell-sidebar{width:min(286px,86vw);min-width:0;padding:16px 12px 14px;opacity:1;overflow-y:auto;pointer-events:auto}
   .app-shell-sidebar{position:fixed;inset:0 auto 0 0;width:min(286px,86vw);height:100dvh;min-height:100dvh;overflow-y:auto;align-self:auto;transform:translateX(-104%);transition:transform .2s ease}
   .app-shell-sidebar.is-open{transform:translateX(0)}
   .app-shell-pwa-card{display:none}
