@@ -12,6 +12,7 @@ import { workspaceService, type GoogleCalendarStatus } from '../services/workspa
 import { readCachedPreferences } from '../lib/userPreferences';
 import { showAppMessage } from '../lib/appMessage';
 import './CalendarPage.css';
+import AppLoader from '../components/AppLoader';
 
 type CalendarView='month'|'week'|'day';
 type EventKind='meeting'|'event';
@@ -531,7 +532,7 @@ export default function CalendarPage(){
           </footer>
         </section>
       </div>:null}
-      {loading?<div className="calendar-loading">Chargement du calendrier…</div>:null}
+      {loading?<AppLoader label="Chargement du calendrier…" />:null}
     </main>
   </AppShell>;
 }
