@@ -725,19 +725,50 @@ export default function MeetingRoomV2() {
       void refreshParticipants();
     };
     const onLobby = (payload?: { meetingId?: number; userId?: number; status?: string; name?:string; avatar?:string }) => {
-      void refreshParticipants();
-      void refreshLobby();
       if (Number(payload?.meetingId || 0) !== id) return;
       const lobbyUserId = Number(payload?.userId || 0);
       if (isModerator && payload?.status === 'requested' && lobbyUserId) {
-        setLobbyAlert({
-          userId: lobbyUserId,
+        const nextParticipant: LobbyParticipant = {
+          meeting_id: id,
+          user_id: lobbyUserId,
+          status: 'requested',
           name: String(payload?.name || 'Un participant'),
           avatar: String(payload?.avatar || ''),
+        };
+        setLobbyParticipants((current) => {
+          const existing = current.find((item) => Number(item.user_id) === lobbyUserId);
+          return existing
+            ? current.map((item) => Number(item.user_id) === lobbyUserId ? { ...item, ...nextParticipant } : item)
+            : [...current, nextParticipant];
+        });
+        setLobbyAlert({
+          userId: lobbyUserId,
+          name: nextParticipant.name,
+          avatar: nextParticipant.avatar,
         });
         setNotice('Un participant attend votre autorisation dans la salle d’attente.');
       } else if (payload?.status && payload.status !== 'requested' && lobbyUserId) {
+        setLobbyParticipants((current) => current.filter((item) => Number(item.user_id) !== lobbyUserId));
         setLobbyAlert((current) => current?.userId === lobbyUserId ? null : current);
+      }
+      void refreshParticipants();
+      void refreshLobby();
+    };
+    const onLobbySnapshot = (payload?: { meetingId?: number; participants?: LobbyParticipant[] }) => {
+      if (Number(payload?.meetingId || 0) !== id || !isModerator) return;
+      const rows = Array.isArray(payload?.participants)
+        ? payload.participants.filter((item) => item.status === 'requested')
+        : [];
+      setLobbyParticipants(rows);
+      if (rows.length) {
+        const latest = rows[rows.length - 1];
+        setLobbyAlert({
+          userId: Number(latest.user_id),
+          name: String(latest.name || 'Un participant'),
+          avatar: String(latest.avatar || ''),
+        });
+      } else {
+        setLobbyAlert(null);
       }
     };
     const onHandRaised = (payload: { meetingId: number; userId: number; raised: boolean; raisedAt?: string | null }) => {
@@ -861,6 +892,7 @@ export default function MeetingRoomV2() {
     socket.on('meeting:poll-updated', onPoll);
     socket.on('meeting:presence', onPresence);
     socket.on('meeting:lobby-updated', onLobby);
+    socket.on('meeting:lobby-snapshot', onLobbySnapshot);
     socket.on('meeting:hand-raised', onHandRaised);
     socket.on('meeting:hands-snapshot', onHandsSnapshot);
     socket.emit('meeting:hands-request', { meetingId:id });
@@ -886,6 +918,7 @@ export default function MeetingRoomV2() {
       socket.off('meeting:poll-updated', onPoll);
       socket.off('meeting:presence', onPresence);
       socket.off('meeting:lobby-updated', onLobby);
+      socket.off('meeting:lobby-snapshot', onLobbySnapshot);
       socket.off('meeting:hand-raised', onHandRaised);
       socket.off('meeting:hands-snapshot', onHandsSnapshot);
       socket.off('meeting:reaction', onReaction);
@@ -1389,6 +1422,7 @@ export default function MeetingRoomV2() {
     if (!meeting?.id) return;
     try {
       await meetingService.respondToLobby(meeting.id, userId, status);
+      setLobbyParticipants((current) => current.filter((item) => Number(item.user_id) !== userId));
       await Promise.all([refreshLobby(), refreshParticipants()]);
       setLobbyAlert((current) => current?.userId === userId ? null : current);
       setNotice(status === 'accepted' ? 'Participant admis.' : 'Demande refusée.');
@@ -1401,6 +1435,8 @@ export default function MeetingRoomV2() {
     if (!meeting?.id) return;
     try {
       const result = await meetingService.admitAllLobby(meeting.id);
+      setLobbyParticipants([]);
+      setLobbyAlert(null);
       await Promise.all([refreshLobby(), refreshParticipants()]);
       setNotice(`${result.admitted} participant${result.admitted > 1 ? 's' : ''} admis.`);
     } catch (cause) {
@@ -1624,6 +1660,20 @@ export default function MeetingRoomV2() {
         <button type="button" className={viewMode === 'speaker' && !screenShareActive ? 'active' : ''} onClick={() => setViewMode('speaker')} data-testid="speaker-view-button"><span className="room-v2-speaker-icon" aria-hidden="true"/><span>Intervenant</span></button>
         {screenShareActive ? <button type="button" className="active room-v2-share-tab"><MonitorUp/><span>Partage d’écran</span></button> : null}
       </nav>
+
+      {isModerator && lobbyParticipants.length ? (
+        <button
+          type="button"
+          className="room-v2-lobby-live-button"
+          onClick={() => { setPanel('participants'); setLobbyAlert(null); }}
+          aria-live="polite"
+          aria-label={`${lobbyParticipants.length} participant${lobbyParticipants.length > 1 ? 's' : ''} en salle d’attente`}
+        >
+          <UsersRound size={17}/>
+          <span>Salle d’attente</span>
+          <b>{lobbyParticipants.length}</b>
+        </button>
+      ) : null}
 
       {notice ? <div className="room-v2-notice" role="status"><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Fermer"><X size={16}/></button></div> : null}
 
