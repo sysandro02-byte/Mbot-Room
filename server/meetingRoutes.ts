@@ -831,6 +831,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       if(!(await hasMeetingAccess(meetingId,request.user!))) return sendApiError(response,403,'MEETING_ACCESS_DENIED','Accès refusé.');
       const meeting=await getMeetingById(meetingId);
       if(!meeting) return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');
+      if(request.user!.isGuest && !(await isPlatformFeatureEnabled('guestChatEnabled'))) return sendApiError(response,403,'GUEST_CHAT_DISABLED','Les invités ne sont pas autorisés à envoyer des messages.');
       if(meeting.settings.chat===false) return sendApiError(response,403,'MEETING_CHAT_DISABLED','Le chat est désactivé pour cette réunion.');
       const message=await insertChatMessage(meetingId,request.user!,request.body?.text);
       if(!message) return sendApiError(response,400,'VALIDATION_ERROR','Message vide.');
@@ -935,6 +936,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     try{
       const meeting=await getMeetingById(Number(request.params.meetingId));
       if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');
+      if(!(await isPlatformFeatureEnabled('recordingEnabled'))&&request.user!.role!=='admin')return sendApiError(response,403,'RECORDING_DISABLED','L’enregistrement est temporairement désactivé.');
+      if(request.user!.isGuest&&!(await isPlatformFeatureEnabled('guestRecordingEnabled')))return sendApiError(response,403,'GUEST_RECORDING_DISABLED','Les invités ne sont pas autorisés à enregistrer une réunion.');
       const canRecord=canModerateMeeting(meeting,request.user!)
         || (meeting.settings.recording===true && await hasMeetingAccess(meeting.id,request.user!));
       if(!canRecord)return sendApiError(response,403,'RECORDING_ACCESS_DENIED','Vous n’êtes pas autorisé à enregistrer cette réunion.');
@@ -980,6 +983,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const meetingId=Number(request.params.meetingId);
       const minutes=Math.max(5,Math.min(45,Number(request.body?.minutes||15)));
       if(!(await hasMeetingAccess(meetingId,request.user!)))return sendApiError(response,403,'LUNA_ACCESS_DENIED','Accès refusé.');
+      if(request.user!.isGuest&&!(await isPlatformFeatureEnabled('guestLunaEnabled')))return sendApiError(response,403,'GUEST_LUNA_DISABLED','Luna IA n’est pas autorisée pour les invités.');
       const meeting=await getMeetingById(meetingId);
       if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');
       if(meeting.settings.lunaSummary===false&&!canModerateMeeting(meeting,request.user!))return sendApiError(response,403,'LUNA_DISABLED','Luna est désactivée pour les participants de cette réunion.');
@@ -1049,7 +1053,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
   });
 
   app.post('/api/ai/luna', ...protectedApi, async (request:AuthedRequest,response,next)=>{
-    try{if(!(await isPlatformFeatureEnabled('lunaEnabled'))&&request.user?.role!=='admin')return sendApiError(response,403,'LUNA_DISABLED','Luna est temporairement indisponible.');const meetingId=Number(request.body?.meetingId);const prompt=normalizeText(request.body?.prompt).slice(0,5000);if(!prompt)return sendApiError(response,400,'LUNA_PROMPT_REQUIRED','Message requis pour Luna IA.');if(!(await hasMeetingAccess(meetingId,request.user!)))return sendApiError(response,403,'LUNA_ACCESS_DENIED','Accès refusé.');const meeting=await getMeetingById(meetingId);if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');if(meeting.settings.lunaSummary===false&&!canModerateMeeting(meeting,request.user!))return sendApiError(response,403,'LUNA_DISABLED','Luna est désactivée pour les participants de cette réunion.');const answer=await callGroq(`Tu es Luna IA, assistante de réunion MBotéRoom. Réunion: ${meeting?.title||meetingId}. Réponds en français. Ne prétends pas avoir entendu ou vu du contenu qui ne t’a pas été fourni.`,prompt);if(!answer)return response.status(503).json({error:'Luna IA n’est pas configurée ou le fournisseur est indisponible.',code:'LUNA_NOT_CONFIGURED',configured:false});response.json({answer,configured:true});}catch(error){next(error);}
+    try{if(!(await isPlatformFeatureEnabled('lunaEnabled'))&&request.user?.role!=='admin')return sendApiError(response,403,'LUNA_DISABLED','Luna est temporairement indisponible.');if(request.user!.isGuest&&!(await isPlatformFeatureEnabled('guestLunaEnabled')))return sendApiError(response,403,'GUEST_LUNA_DISABLED','Luna IA n’est pas autorisée pour les invités.');const meetingId=Number(request.body?.meetingId);const prompt=normalizeText(request.body?.prompt).slice(0,5000);if(!prompt)return sendApiError(response,400,'LUNA_PROMPT_REQUIRED','Message requis pour Luna IA.');if(!(await hasMeetingAccess(meetingId,request.user!)))return sendApiError(response,403,'LUNA_ACCESS_DENIED','Accès refusé.');const meeting=await getMeetingById(meetingId);if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');if(meeting.settings.lunaSummary===false&&!canModerateMeeting(meeting,request.user!))return sendApiError(response,403,'LUNA_DISABLED','Luna est désactivée pour les participants de cette réunion.');const answer=await callGroq(`Tu es Luna IA, assistante de réunion MBotéRoom. Réunion: ${meeting?.title||meetingId}. Réponds en français. Ne prétends pas avoir entendu ou vu du contenu qui ne t’a pas été fourni.`,prompt);if(!answer)return response.status(503).json({error:'Luna IA n’est pas configurée ou le fournisseur est indisponible.',code:'LUNA_NOT_CONFIGURED',configured:false});response.json({answer,configured:true});}catch(error){next(error);}
   });
 
   app.post('/api/meetings/:meetingId/summary/generate', ...protectedApi, async (request:AuthedRequest,response,next)=>{
