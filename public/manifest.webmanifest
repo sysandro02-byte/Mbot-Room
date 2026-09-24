@@ -37,9 +37,9 @@
       "url": "/app/meetings",
       "icons": [
         {
-          "src": "/icons/mboteroom-192.png",
-          "sizes": "192x192",
-          "type": "image/png"
+          "src": "/icons/mboteroom-install.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
         }
       ]
     },
@@ -50,9 +50,9 @@
       "url": "/join",
       "icons": [
         {
-          "src": "/icons/mboteroom-192.png",
-          "sizes": "192x192",
-          "type": "image/png"
+          "src": "/icons/mboteroom-install.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
         }
       ]
     },
@@ -63,14 +63,26 @@
       "url": "/app/messages",
       "icons": [
         {
-          "src": "/icons/mboteroom-192.png",
-          "sizes": "192x192",
-          "type": "image/png"
+          "src": "/icons/mboteroom-install.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
         }
       ]
     }
   ],
   "icons": [
+    {
+      "src": "/icons/mboteroom-install.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/mboteroom-install-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
     {
       "src": "/icons/mboteroom-192.png",
       "sizes": "192x192",
