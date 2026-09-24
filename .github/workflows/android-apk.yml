@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: mboteroom-android-${{ github.ref }}
@@ -35,10 +35,29 @@ jobs:
         working-directory: android
         run: gradle --no-daemon :app:assembleDebug
 
-      - name: Upload APK
+      - name: Prepare public APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk MBoteRoom-Android.apk
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: mboteroom-android-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: MBoteRoom-Android.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish stable Android download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view android-latest >/dev/null 2>&1; then
+            gh release upload android-latest MBoteRoom-Android.apk --clobber
+            gh release edit android-latest \
+              --title "MBotéRoom Android — dernière version" \
+              --notes "APK Android généré automatiquement depuis la branche main. Commit: ${GITHUB_SHA}."
+          else
+            gh release create android-latest MBoteRoom-Android.apk \
+              --target "${GITHUB_SHA}" \
+              --title "MBotéRoom Android — dernière version" \
+              --notes "APK Android généré automatiquement depuis la branche main. Commit: ${GITHUB_SHA}."
+          fi
