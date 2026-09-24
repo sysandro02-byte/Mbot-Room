@@ -15,7 +15,7 @@ concurrency:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -31,33 +31,70 @@ jobs:
         with:
           gradle-version: "8.10.2"
 
-      - name: Build debug APK
+      - name: Validate Android release signing
+        env:
+          KEYSTORE_B64: ${{ secrets.MBOTEROOM_ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.MBOTEROOM_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.MBOTEROOM_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.MBOTEROOM_ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_B64" || { echo "::error::Secret MBOTEROOM_ANDROID_KEYSTORE_BASE64 manquant."; exit 1; }
+          test -n "$STORE_PASSWORD" || { echo "::error::Secret MBOTEROOM_ANDROID_KEYSTORE_PASSWORD manquant."; exit 1; }
+          test -n "$KEY_ALIAS" || { echo "::error::Secret MBOTEROOM_ANDROID_KEY_ALIAS manquant."; exit 1; }
+          test -n "$KEY_PASSWORD" || { echo "::error::Secret MBOTEROOM_ANDROID_KEY_PASSWORD manquant."; exit 1; }
+
+      - name: Restore release keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.MBOTEROOM_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > android/app/mboteroom-release.jks
+          test -s android/app/mboteroom-release.jks
+
+      - name: Build signed release APK and AAB
         working-directory: android
-        run: gradle --no-daemon :app:assembleDebug
+        env:
+          MBOTEROOM_KEYSTORE_FILE: mboteroom-release.jks
+          MBOTEROOM_KEYSTORE_PASSWORD: ${{ secrets.MBOTEROOM_ANDROID_KEYSTORE_PASSWORD }}
+          MBOTEROOM_KEY_ALIAS: ${{ secrets.MBOTEROOM_ANDROID_KEY_ALIAS }}
+          MBOTEROOM_KEY_PASSWORD: ${{ secrets.MBOTEROOM_ANDROID_KEY_PASSWORD }}
+        run: gradle --no-daemon :app:assembleRelease :app:bundleRelease
 
-      - name: Prepare public APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk MBoteRoom-Android.apk
+      - name: Verify APK signature
+        run: |
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER" || { echo "::error::apksigner introuvable."; exit 1; }
+          "$APKSIGNER" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
 
-      - name: Upload APK artifact
+      - name: Prepare public Android packages
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk MBoteRoom-Android.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab MBoteRoom-Android.aab
+          rm -f android/app/mboteroom-release.jks
+
+      - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mboteroom-android-debug
+          name: mboteroom-android-release
           path: MBoteRoom-Android.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
+
+      - name: Upload Play Store bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: mboteroom-android-play-bundle
+          path: MBoteRoom-Android.aab
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Publish stable Android download
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          NOTES="APK Android signé en mode release depuis la branche main. Commit: ${GITHUB_SHA}. Le fichier AAB est également généré pour Google Play."
           if gh release view android-latest >/dev/null 2>&1; then
-            gh release upload android-latest MBoteRoom-Android.apk --clobber
-            gh release edit android-latest \
-              --title "MBotéRoom Android — dernière version" \
-              --notes "APK Android généré automatiquement depuis la branche main. Commit: ${GITHUB_SHA}."
+            gh release upload android-latest MBoteRoom-Android.apk MBoteRoom-Android.aab --clobber
+            gh release edit android-latest               --title "MBotéRoom Android — dernière version signée"               --notes "$NOTES"
           else
-            gh release create android-latest MBoteRoom-Android.apk \
-              --target "${GITHUB_SHA}" \
-              --title "MBotéRoom Android — dernière version" \
-              --notes "APK Android généré automatiquement depuis la branche main. Commit: ${GITHUB_SHA}."
+            gh release create android-latest MBoteRoom-Android.apk MBoteRoom-Android.aab               --target "${GITHUB_SHA}"               --title "MBotéRoom Android — dernière version signée"               --notes "$NOTES"
           fi
