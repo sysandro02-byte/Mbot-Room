@@ -173,12 +173,10 @@ export default function RealDashboardPage() {
     {error ? <div className="real-dashboard-error">{error}</div> : null}
 
     <HomeQuickActions
-      onNewMeeting={() => navigate('/app/meetings?new=1')}
-      onJoin={() => navigate('/join')}
-      onPlan={() => navigate('/app/meetings?new=1&mode=schedule')}
+      onPremium={() => navigate('/app/settings#premium')}
+      onCreateGroup={() => navigate('/app/groups?new=1')}
+      onStorageData={() => navigate('/app/settings#storage-data')}
       onShareScreen={() => navigate('/app/meetings?new=1&intent=screen-share')}
-      onCalendar={() => navigate('/app/calendar')}
-      onMessages={() => navigate('/app/messages')}
     />
 
     <HomeStats data={stats}/>
