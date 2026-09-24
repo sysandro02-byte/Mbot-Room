@@ -686,3 +686,120 @@
 @media(prefers-reduced-motion:reduce){
   .room-v2-lobby-live-button{animation:none}
 }
+
+/* Participants drawer opened from the Participants button */
+.room-v2-rail-participants>header .room-v2-rail-close{
+  width:30px;
+  height:30px;
+  margin-left:auto;
+  display:grid;
+  place-items:center;
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  color:#c8d9e6;
+  cursor:pointer;
+}
+.room-v2-rail-participants>header .room-v2-rail-close:hover{background:#12324d;color:#10e0e8}
+.room-v2-rail-menu button:disabled{opacity:.45;cursor:not-allowed}
+.room-v2-rail-menu button:disabled:hover{background:transparent}
+
+@media(max-width:1180px){
+  .room-v2-desktop-rail.is-panel-open{
+    position:fixed;
+    z-index:115;
+    top:144px;
+    right:0;
+    bottom:90px;
+    width:min(350px,92vw);
+    min-width:0;
+    display:flex;
+    padding:10px;
+    background:#04101e;
+    border-left:1px solid rgba(112,171,211,.22);
+    box-shadow:-20px 0 45px rgba(0,0,0,.42);
+    overflow:auto;
+  }
+}
+@media(max-width:760px){
+  .room-v2-desktop-rail.is-panel-open{
+    top:174px;
+    bottom:90px;
+    width:min(340px,96vw);
+    padding:8px;
+  }
+}
+@media(max-width:420px){
+  .room-v2-desktop-rail.is-panel-open{top:170px;width:100vw}
+}
+
+/* In-meeting private message and account report dialogs */
+.room-v2-action-modal-backdrop{
+  position:fixed;
+  z-index:180;
+  inset:0;
+  display:grid;
+  place-items:center;
+  padding:18px;
+  background:rgba(1,8,16,.62);
+  backdrop-filter:blur(6px);
+}
+.room-v2-action-modal{
+  width:min(430px,calc(100vw - 24px));
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  padding:16px;
+  border:1px solid rgba(102,171,216,.25);
+  border-radius:16px;
+  background:#0a2037;
+  color:#eef7fb;
+  box-shadow:0 24px 70px rgba(0,0,0,.52);
+}
+.room-v2-action-modal>header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+.room-v2-action-modal>header strong,
+.room-v2-action-modal>header span{display:block}
+.room-v2-action-modal>header strong{font-size:15px}
+.room-v2-action-modal>header span{margin-top:3px;color:#93aabd;font-size:11px}
+.room-v2-action-modal>header>button{
+  width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:8px;
+  background:#102f4b;color:#dbe9f2;cursor:pointer
+}
+.room-v2-action-modal>label{font-size:11px;font-weight:800;color:#bdd0dd}
+.room-v2-action-modal>textarea{
+  width:100%;
+  min-height:110px;
+  resize:vertical;
+  padding:11px 12px;
+  border:1px solid rgba(118,174,214,.28);
+  border-radius:11px;
+  outline:0;
+  background:#07192b;
+  color:#f4f9fc;
+  font:inherit;
+  font-size:12px;
+  line-height:1.5;
+}
+.room-v2-action-modal>textarea:focus{border-color:#0bd3db;box-shadow:0 0 0 3px rgba(11,211,219,.12)}
+.room-v2-action-modal>small{color:#8fa6b8;font-size:9.5px;line-height:1.45}
+.room-v2-action-modal>footer{display:flex;justify-content:flex-end;gap:8px}
+.room-v2-action-modal>footer button{
+  min-height:38px;
+  padding:0 14px;
+  border:0;
+  border-radius:9px;
+  background:#08a5aa;
+  color:#fff;
+  font-size:10px;
+  font-weight:850;
+  cursor:pointer;
+}
+.room-v2-action-modal>footer button.secondary{background:#14324b;color:#d9e8f0}
+.room-v2-action-modal>footer button.danger{background:#c9333d}
+.room-v2-action-modal>footer button:disabled,
+.room-v2-action-modal>header>button:disabled{opacity:.55;cursor:not-allowed}
