@@ -9,7 +9,11 @@ export const registerPwa = () => {
       .then((registration) => {
         registration.update().catch(() => undefined);
         window.dispatchEvent(new CustomEvent('mbote-room-pwa-ready', { detail: { registration } }));
-        window.setInterval(() => registration.update().catch(() => undefined), 60 * 60 * 1000);
+        window.setInterval(() => registration.update().catch(() => undefined), 15 * 60 * 1000);
+        const refreshOnVisible = () => {
+          if (document.visibilityState === 'visible') registration.update().catch(() => undefined);
+        };
+        document.addEventListener('visibilitychange', refreshOnVisible);
 
         const notifyUpdate = (worker: ServiceWorker | null) => {
           if (!worker) return;
