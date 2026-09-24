@@ -195,7 +195,7 @@ export const appDataService = {
   async getProfileStats() {
     return readJson<ProfileStats>(await apiFetch(apiUrl('/api/profile/stats'),{headers:getAuthHeaders(),cache:'no-store'}));
   },
-  async updateProfile(payload:Partial<Pick<RoomUser,'name'|'username'|'avatar'|'phoneNumber'|'organization'|'jobTitle'|'country'|'city'|'address'|'bio'|'profileVisible'>>) {
+  async updateProfile(payload:Partial<Pick<RoomUser,'name'|'username'|'avatar'|'phoneNumber'|'organization'|'jobTitle'|'country'|'city'|'address'|'bio'|'profileVisible'|'personalMeetingId'>>) {
     return safeOfflineMutation<{user:RoomUser}>(apiUrl('/api/profile'),'PUT',payload,()=>({user:{...localStoredUser(),...payload}}));
   },
   async getWhiteboards() {
