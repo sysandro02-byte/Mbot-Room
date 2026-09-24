@@ -65,7 +65,6 @@ export default function TermsConsent({accepted,version,onAccepted,compact=false,
         {accepted?<CheckCircle2 size={16}/>:<FileText size={16}/>}
         {accepted?'Conditions d’utilisation acceptées':'Lire et accepter les conditions d’utilisation'}
       </button>
-      {accepted&&version?<small>Version acceptée : {version}</small>:null}
     </div>
 
     {open?<div className="terms-modal-backdrop" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)setOpen(false);}}>
