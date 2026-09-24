@@ -288,7 +288,9 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
         await query('DELETE FROM room_login_otps WHERE user_id=$1',[userId]).catch(()=>undefined);
         io.in(`user:${userId}`).disconnectSockets(true);
       }
-      io.emit('admin:user-updated',{userId,isSuspended:requestedSuspended,accountStatus:requestedStatus,featureRestrictions:requestedRestrictions});
+      const userUpdate={userId,isSuspended:requestedSuspended,accountStatus:requestedStatus,featureRestrictions:requestedRestrictions};
+      io.to('admins').emit('admin:user-updated',userUpdate);
+      io.to(`user:${userId}`).emit('account:restrictions-updated',userUpdate);
       const resultRow=updated.rows[0];
       const birthDate=String(resultRow.birth_date||'');
       const birthTime=birthDate?new Date(birthDate+'T00:00:00Z').getTime():NaN;
