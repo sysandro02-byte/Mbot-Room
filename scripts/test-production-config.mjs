@@ -87,8 +87,11 @@ for (const relativePath of resilientClientFiles) {
 }
 
 const meetingRoutes = fs.readFileSync(new URL('../server/meetingRoutes.ts', import.meta.url), 'utf8');
-if (!meetingRoutes.includes('qwen/qwen3.8-27b') || !meetingRoutes.includes('openai/gpt-oss-120b')) {
-  throw new Error('Luna must keep current Groq fallback models when the configured model is blocked');
+if (!meetingRoutes.includes('openai/gpt-oss-120b') || !meetingRoutes.includes('openai/gpt-oss-20b')) {
+  throw new Error('Luna must keep the supported Groq fallback models when the configured model is unavailable');
+}
+if (meetingRoutes.includes('qwen/qwen3.8-27b')) {
+  throw new Error('Luna must not reintroduce the project-blocked Qwen fallback model');
 }
 
 const liveSmoke = fs.readFileSync(new URL('../scripts/test-production-live.mjs', import.meta.url), 'utf8');
