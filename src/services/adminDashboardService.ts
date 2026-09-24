@@ -3,6 +3,12 @@ import { DashboardTip, Meeting } from './meetingService';
 
 export type GuestAccessSlide = { id: string; title: string; body: string; imageUrl: string; isActive: boolean; createdAt: string; updatedAt: string };
 
+export type LoginBranding = {
+  wordmarkUrl: string;
+  illustrationUrl: string;
+  updatedAt: string;
+};
+
 export type HomeSlide = {
   slot: 1 | 2 | 3 | 4;
   title: string;
@@ -185,6 +191,20 @@ export const adminDashboardService = {
       body: JSON.stringify(payload),
     });
     return readJson<DashboardTip>(response);
+  },
+
+  async getLoginBranding(): Promise<LoginBranding> {
+    const response = await apiFetch(apiUrl('/api/admin/login-branding'), { headers: getAuthHeaders(), cache: 'no-store' });
+    return readJson<LoginBranding>(response);
+  },
+
+  async saveLoginBranding(payload: Pick<LoginBranding, 'wordmarkUrl' | 'illustrationUrl'>): Promise<LoginBranding> {
+    const response = await apiFetch(apiUrl('/api/admin/login-branding'), {
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return readJson<LoginBranding>(response);
   },
 
   async getHomeSlides(): Promise<HomeSlide[]> {
