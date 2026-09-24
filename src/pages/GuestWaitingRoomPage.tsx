@@ -96,6 +96,7 @@ export default function GuestWaitingRoomPage() {
   const [mediaError, setMediaError] = useState('');
   const [isTestingSpeaker, setIsTestingSpeaker] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isLeavingWaitingRoom, setIsLeavingWaitingRoom] = useState(false);
 
   const stopMedia = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -441,8 +442,22 @@ export default function GuestWaitingRoomPage() {
   };
 
   const handleQuit = async () => {
+    if (isLeavingWaitingRoom) return;
+    setIsLeavingWaitingRoom(true);
+    try {
+      if (meeting?.id) {
+        await meetingService.cancelLobbyRequest(meeting.id);
+      }
+    } catch (error) {
+      setMediaError(error instanceof Error ? error.message : 'Impossible d’annuler la demande pour le moment.');
+      setIsLeavingWaitingRoom(false);
+      return;
+    }
+
     stopMedia();
-    await authService.logout().catch(() => undefined);
+    if (currentUser?.isGuest) {
+      await authService.logout().catch(() => undefined);
+    }
     navigate('/rejoindre-une-reunion', { replace: true });
   };
 
@@ -478,9 +493,9 @@ export default function GuestWaitingRoomPage() {
         <nav className="waiting-header-actions" aria-label="Actions de la réunion">
           <span className="waiting-guest-status"><UserRound size={19} aria-hidden="true" />Invité</span>
           <Link className="waiting-create-account" to="/inscription">Créer un compte</Link>
-          <button className="waiting-leave-button" type="button" onClick={handleQuit}>
+          <button className="waiting-leave-button" type="button" onClick={handleQuit} disabled={isLeavingWaitingRoom}>
             <LogOut size={20} aria-hidden="true" />
-            Quitter
+            {isLeavingWaitingRoom ? 'Sortie…' : 'Annuler et sortir'}
           </button>
         </nav>
       </header>
@@ -493,10 +508,21 @@ export default function GuestWaitingRoomPage() {
               <Sparkles className="waiting-spark waiting-spark-one" size={12} aria-hidden="true" />
               <Sparkles className="waiting-spark waiting-spark-two" size={12} aria-hidden="true" />
             </span>
-            <div>
+            <div className="waiting-notice-copy">
               <h2>{lobbyStatus === 'rejected' ? "L'hôte a refusé votre demande." : 'Vous êtes dans la salle d’attente.'}</h2>
               <p>{lobbyStatus === 'rejected' ? 'Vous allez être redirigé vers la page de participation.' : "L'hôte vous admettra bientôt. Merci de patienter."}</p>
             </div>
+            {lobbyStatus === 'waiting' ? (
+              <button
+                className="waiting-cancel-request"
+                type="button"
+                onClick={handleQuit}
+                disabled={isLeavingWaitingRoom}
+              >
+                <LogOut size={18} aria-hidden="true" />
+                {isLeavingWaitingRoom ? 'Sortie…' : 'Annuler et sortir'}
+              </button>
+            ) : null}
           </div>
 
           {meetingError && <p className="waiting-error" role="alert">{meetingError}</p>}
@@ -627,9 +653,9 @@ export default function GuestWaitingRoomPage() {
             <ControlButton icon={<Volume2 />} label="Tester l'audio" active onClick={() => openDeviceSettings()} />
             <ControlButton icon={<ImageIcon />} label="Arrière-plan" active={backgroundMode !== 'none'} onClick={() => openDeviceSettings()} />
             <ControlButton icon={<Settings />} label="Paramètres" active={isSettingsOpen} onClick={() => openDeviceSettings(true)} />
-            <button className="waiting-controls-leave" type="button" onClick={handleQuit}>
+            <button className="waiting-controls-leave" type="button" onClick={handleQuit} disabled={isLeavingWaitingRoom}>
               <LogOut size={22} aria-hidden="true" />
-              Quitter
+              {isLeavingWaitingRoom ? 'Sortie…' : 'Annuler et sortir'}
             </button>
           </nav>
         </section>
