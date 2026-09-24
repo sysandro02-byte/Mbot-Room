@@ -1554,12 +1554,13 @@ export default function MeetingRoomV2() {
     </main>
   );
 
+  const currentOnlineParticipantIds = new Set<number>([
+    ...onlineParticipantIds,
+    ...remoteParticipants.map((participant) => Number(participant.userId || 0)).filter((userId) => userId > 0),
+    ...(mediaEnabled && currentUser?.id ? [Number(currentUser.id)] : []),
+  ]);
   const activeMembers = participants.filter((participant) =>
-    participant.status === 'accepted'
-    && (
-      onlineParticipantIds.has(participant.userId)
-      || (participant.userId === Number(currentUser?.id || 0) && mediaEnabled)
-    )
+    participant.status === 'accepted' && currentOnlineParticipantIds.has(participant.userId)
   );
   const roleBadgeFor = (userId: number | string) => {
     const role = activeMembers.find((member) => member.userId === Number(userId))?.role;
