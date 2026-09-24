@@ -324,16 +324,31 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
       const address=String(request.body?.address??request.user!.address??'').trim().slice(0,240);
       const bio=String(request.body?.bio??request.user!.bio??'').trim().slice(0,300);
       const profileVisible=typeof request.body?.profileVisible==='boolean'?request.body.profileVisible:request.user!.profileVisible!==false;
+      const personalMeetingId=String(request.body?.personalMeetingId??request.user!.personalMeetingId??'').replace(/\s+/g,'').trim();
       if(!name||!username)return sendApiError(response,400,'VALIDATION_ERROR','Nom et nom d’utilisateur requis.');
+      if(personalMeetingId&&!/^\d{6,12}$/.test(personalMeetingId))return sendApiError(response,400,'PERSONAL_MEETING_ID_INVALID','L’ID personnel doit contenir entre 6 et 12 chiffres.');
       const duplicate=await query('SELECT 1 FROM room_users WHERE lower(username)=lower($1) AND id<>$2 LIMIT 1',[username,request.user!.id]);
       if(duplicate.rows[0])return sendApiError(response,409,'USERNAME_ALREADY_EXISTS','Ce nom d’utilisateur est déjà utilisé.');
+      if(personalMeetingId){
+        const duplicateMeetingId=await query('SELECT 1 FROM room_users WHERE personal_meeting_id=$1 AND id<>$2 LIMIT 1',[personalMeetingId,request.user!.id]);
+        if(duplicateMeetingId.rows[0])return sendApiError(response,409,'PERSONAL_MEETING_ID_ALREADY_USED','Cet ID personnel est déjà utilisé.');
+      }
+      const previousPersonalMeetingId=String(request.user!.personalMeetingId||'');
       const result=await query(
         `UPDATE room_users
             SET name=$2,username=$3,avatar=$4,phone_number=$5,organization=$6,job_title=$7,
-                country=$8,city=$9,address=$10,bio=$11,profile_visible=$12
+                country=$8,city=$9,address=$10,bio=$11,profile_visible=$12,personal_meeting_id=$13
           WHERE id=$1 RETURNING *`,
-        [request.user!.id,name,username,avatar,phoneNumber,organization,jobTitle,country,city,address,bio,profileVisible],
+        [request.user!.id,name,username,avatar,phoneNumber,organization,jobTitle,country,city,address,bio,profileVisible,personalMeetingId],
       );
+      if(personalMeetingId&&personalMeetingId!==previousPersonalMeetingId){
+        const hostedMeetings=await query('SELECT id,settings FROM room_meetings WHERE host_id=$1',[request.user!.id]);
+        for(const row of hostedMeetings.rows){
+          const settings=typeof row.settings==='string'?JSON.parse(row.settings||'{}'):(row.settings||{});
+          settings.meetingAccessId=personalMeetingId;
+          await query('UPDATE room_meetings SET settings=$2::jsonb,updated_at=now() WHERE id=$1',[Number(row.id),JSON.stringify(settings)]);
+        }
+      }
       const user=toPublicUser(result.rows[0]);
       io.to(`user:${user.id}`).emit('profile:updated',user);
       response.json({user});
