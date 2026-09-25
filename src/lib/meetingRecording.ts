@@ -34,8 +34,9 @@ export async function createCompositeMeetingRecording(sources: RecordingSource[]
   if (!active.length) throw new Error('Aucun flux média disponible pour l’enregistrement.');
 
   const canvas = document.createElement('canvas');
-  canvas.width = 1280;
-  canvas.height = 720;
+  const mobile = navigator.maxTouchPoints > 0 || window.matchMedia?.('(pointer: coarse)').matches;
+  canvas.width = mobile ? 960 : 1280;
+  canvas.height = mobile ? 540 : 720;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Composition vidéo indisponible.');
 
@@ -92,8 +93,12 @@ export async function createCompositeMeetingRecording(sources: RecordingSource[]
   };
   render();
 
-  const canvasStream = canvas.captureStream(24);
+  if (typeof canvas.captureStream !== 'function') {
+    throw new Error('La composition vidéo n’est pas prise en charge par ce navigateur.');
+  }
+  const canvasStream = canvas.captureStream(mobile ? 15 : 24);
   const audioContext = new AudioContext();
+  await audioContext.resume().catch(() => undefined);
   const destination = audioContext.createMediaStreamDestination();
   const audioNodes: MediaStreamAudioSourceNode[] = [];
   for (const source of active) {
