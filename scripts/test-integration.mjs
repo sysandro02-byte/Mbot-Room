@@ -342,6 +342,11 @@ try {
   assert.equal(publicTerms.data.version, '2026-09-24');
   assert.ok(String(publicTerms.data.body||'').length > 80);
 
+  const publicSecurityPage = await jsonRequest('/api/public/pages/security');
+  assert.equal(publicSecurityPage.response.status, 200, JSON.stringify(publicSecurityPage.data));
+  assert.equal(publicSecurityPage.data.key, 'security');
+  assert.ok(String(publicSecurityPage.data.body || '').length > 80);
+
   const registrationWithoutTerms = await jsonRequest('/api/auth/register', {
     method: 'POST',
     headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
@@ -421,6 +426,19 @@ try {
   assert.equal(invitedAdminVerify.response.status, 200, JSON.stringify(invitedAdminVerify.data));
   assert.equal(invitedAdminVerify.data.user?.role, 'admin');
   assert.ok(invitedAdminVerify.data.token);
+
+  const updatedSecurityPage = await jsonRequest('/api/admin/public-pages/security', {
+    method: 'PUT',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: 'Sécurité MBotéRoom CI',
+      body: 'Contenu dynamique de sécurité utilisé par le test d’intégration. Cette page est stockée dans PostgreSQL et modifiable depuis les API administrateur.',
+    }),
+  });
+  assert.equal(updatedSecurityPage.response.status, 200, JSON.stringify(updatedSecurityPage.data));
+  const reloadedSecurityPage = await jsonRequest('/api/public/pages/security');
+  assert.equal(reloadedSecurityPage.response.status, 200, JSON.stringify(reloadedSecurityPage.data));
+  assert.equal(reloadedSecurityPage.data.title, 'Sécurité MBotéRoom CI');
 
   const browserLogin = await jsonRequest('/api/auth/login', {
     method: 'POST',
@@ -667,6 +685,30 @@ try {
   assert.equal(participantThread.response.status, 200, JSON.stringify(participantThread.data));
   assert.ok(participantThread.data.some((item) => item.text === 'Message admin vers user CI' && Number(item.userId) === Number(host.user.id)));
   participantDirectSocket.close();
+
+  const banOutsiderFromMessaging = await jsonRequest('/api/admin/users/'+outsider.user.id, {
+    method: 'PUT',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ accountStatus: 'banned' }),
+  });
+  assert.equal(banOutsiderFromMessaging.response.status, 200, JSON.stringify(banOutsiderFromMessaging.data));
+  const bannedDirectorySearch = await jsonRequest('/api/contacts/search?q=Participant%20Bloqu%C3%A9', {
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(bannedDirectorySearch.response.status, 200, JSON.stringify(bannedDirectorySearch.data));
+  assert.equal(bannedDirectorySearch.data.some((item) => Number(item.id) === Number(outsider.user.id)), false);
+  const bannedDirectAttempt = await jsonRequest('/api/conversations/direct', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ contactUserId: outsider.user.id }),
+  });
+  assert.equal(bannedDirectAttempt.response.status, 404, JSON.stringify(bannedDirectAttempt.data));
+  const restoreOutsiderAfterMessagingSecurity = await jsonRequest('/api/admin/users/'+outsider.user.id, {
+    method: 'PUT',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ accountStatus: 'active' }),
+  });
+  assert.equal(restoreOutsiderAfterMessagingSecurity.response.status, 200, JSON.stringify(restoreOutsiderAfterMessagingSecurity.data));
 
   const audienceOptions = await jsonRequest('/api/admin/broadcasts/audience-options', { headers: authHeaders(host.token) });
   assert.equal(audienceOptions.response.status, 200, JSON.stringify(audienceOptions.data));
