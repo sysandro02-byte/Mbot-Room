@@ -37,9 +37,12 @@ const normalizeAudienceFilters = (value: any): AdminAudienceFilters => {
   const accountStatus = ['active','quarantined','banned','all'].includes(String(value?.accountStatus))
     ? String(value.accountStatus) as AdminAudienceFilters['accountStatus']
     : 'active';
-  const userIds = Array.isArray(value?.userIds)
-    ? [...new Set(value.userIds.map((item: unknown) => Number(item)).filter((id: number) => Number.isSafeInteger(id) && id > 0))].slice(0,5000)
+  const rawUserIds: number[] = Array.isArray(value?.userIds)
+    ? value.userIds
+        .map((item: unknown) => Number(item))
+        .filter((id: number) => Number.isSafeInteger(id) && id > 0)
     : [];
+  const userIds: number[] = [...new Set<number>(rawUserIds)].slice(0,5000);
   return {
     country: normalizeText(value?.country).slice(0,120),
     city: normalizeText(value?.city).slice(0,120),
