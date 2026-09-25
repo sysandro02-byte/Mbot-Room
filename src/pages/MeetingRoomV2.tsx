@@ -59,6 +59,14 @@ type MeetingLocationState = {
   meeting?: Partial<Meeting>;
 };
 
+type ConfirmationRequest = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  tone?: 'danger' | 'warning';
+  action: () => void | Promise<void>;
+};
+
 type DisplayCaptureMediaDevices = MediaDevices & {
   getDisplayMedia?: (options?: DisplayMediaStreamOptions) => Promise<MediaStream>;
 };
@@ -457,6 +465,8 @@ export default function MeetingRoomV2() {
   const [liveKitFailed, setLiveKitFailed] = useState(false);
   const [captionsEnabled, setCaptionsEnabled] = useState(userPreferences.lunaRealtimeTranslation === true);
   const [pendingMediaRequest, setPendingMediaRequest] = useState<MeetingMediaRequest | null>(null);
+  const [confirmation, setConfirmation] = useState<ConfirmationRequest | null>(null);
+  const [confirmationBusy, setConfirmationBusy] = useState(false);
 
   const localUserId = String(currentUser?.id || '');
   const localName = state?.guestName?.trim() || currentUser?.name || currentUser?.username || currentUser?.email || 'Participant';
@@ -488,6 +498,25 @@ export default function MeetingRoomV2() {
   const canRecord = Boolean(meeting && guestRecordingAllowed && (isModerator || meeting.settings?.recording === true));
   const canCreatePoll = isModerator;
   const canEndForAll = Boolean(meeting && currentUser && (isHost || isAdmin));
+
+  const requestConfirmation = useCallback((request: ConfirmationRequest) => {
+    setMoreMenuOpen(false);
+    setMenuUserId(null);
+    setConfirmation(request);
+  }, []);
+
+  const confirmRequestedAction = useCallback(async () => {
+    if (!confirmation || confirmationBusy) return;
+    setConfirmationBusy(true);
+    try {
+      await confirmation.action();
+      setConfirmation(null);
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : 'Cette action n’a pas pu être exécutée.');
+    } finally {
+      setConfirmationBusy(false);
+    }
+  }, [confirmation, confirmationBusy]);
 
   const refreshMediaDevices = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -1891,6 +1920,91 @@ export default function MeetingRoomV2() {
     navigate(`/reunions/${meeting.meeting_link}/terminee`, { replace: true });
   };
 
+  const confirmLeaveMeeting = () => requestConfirmation({
+    title: 'Quitter la réunion ?',
+    message: 'Vous allez quitter la salle. Les autres participants resteront dans la réunion.',
+    confirmLabel: 'Quitter la réunion',
+    tone: 'warning',
+    action: () => leaveMeeting(false),
+  });
+
+  const confirmEndMeeting = () => requestConfirmation({
+    title: 'Terminer la réunion pour tous ?',
+    message: 'Tous les participants seront déconnectés et la réunion sera marquée comme terminée. Cette action est irréversible.',
+    confirmLabel: 'Terminer pour tous',
+    tone: 'danger',
+    action: () => leaveMeeting(true),
+  });
+
+  const confirmParticipantAction = (member: MeetingParticipant, action: 'remove' | 'ban' | 'lobby' | 'participant') => {
+    const config = action === 'ban'
+      ? {
+          title: `Bannir ${member.name} ?`,
+          message: 'Cette personne sera exclue de la réunion et ne pourra plus la rejoindre avec ce compte.',
+          confirmLabel: 'Bannir',
+          tone: 'danger' as const,
+        }
+      : action === 'remove'
+        ? {
+            title: `Retirer ${member.name} ?`,
+            message: 'Cette personne sera immédiatement retirée de la réunion en cours.',
+            confirmLabel: 'Retirer',
+            tone: 'danger' as const,
+          }
+        : action === 'lobby'
+          ? {
+              title: `Renvoyer ${member.name} en salle d’attente ?`,
+              message: 'La personne quittera temporairement la salle principale et devra être admise à nouveau.',
+              confirmLabel: 'Mettre en attente',
+              tone: 'warning' as const,
+            }
+          : {
+              title: `Retirer le rôle co-hôte à ${member.name} ?`,
+              message: 'Cette personne redeviendra participant et perdra les commandes de modération.',
+              confirmLabel: 'Retirer le rôle',
+              tone: 'warning' as const,
+            };
+
+    requestConfirmation({
+      ...config,
+      action: () => moderateParticipant(member.userId, action),
+    });
+  };
+
+  const confirmStopRecording = () => {
+    if (!recording) {
+      void toggleRecording();
+      return;
+    }
+    requestConfirmation({
+      title: 'Arrêter l’enregistrement ?',
+      message: 'L’enregistrement en cours va être arrêté et sauvegardé selon les paramètres de stockage disponibles.',
+      confirmLabel: 'Arrêter',
+      tone: 'warning',
+      action: () => toggleRecording(),
+    });
+  };
+
+  const confirmCloseBreakouts = () => requestConfirmation({
+    title: 'Fermer toutes les sous-salles ?',
+    message: 'Les participants des sous-salles seront ramenés dans la réunion principale.',
+    confirmLabel: 'Fermer les sous-salles',
+    tone: 'warning',
+    action: () => setBreakoutsOpen(false),
+  });
+
+  const confirmClosePoll = (poll: MeetingPoll) => requestConfirmation({
+    title: 'Fermer ce sondage ?',
+    message: 'Les participants ne pourront plus voter après sa fermeture.',
+    confirmLabel: 'Fermer le sondage',
+    tone: 'warning',
+    action: async () => {
+      if (!meeting?.id) return;
+      const value = await collaborationService.closePoll(meeting.id, poll.id);
+      setPolls((current) => [value, ...current.filter((item) => item.id !== value.id)]);
+    },
+  });
+
   if (loading) return <main className="room-v2-loading">Connexion à la réunion…</main>;
   if (error || !meeting) return (
     <main className="room-v2-error">
@@ -2206,7 +2320,7 @@ export default function MeetingRoomV2() {
                               setRaisedHands((current)=>{const next=new Set(current);if(raised)next.add(Number(currentUser?.id||0));else next.delete(Number(currentUser?.id||0));return next;});
                               socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised});
                             }}>{handRaised?'Baisser la main':'Lever la main'}</button>:null}
-                            <button type="button" className="danger" onClick={()=>{setMenuUserId(null);void leaveMeeting(false);}}>Quitter la réunion</button>
+                            <button type="button" className="danger" onClick={confirmLeaveMeeting}>Quitter la réunion</button>
                           </>
                         ):(
                           <>
@@ -2225,10 +2339,10 @@ export default function MeetingRoomV2() {
                                 {remote?.media.audio?<button type="button" onClick={()=>void moderateParticipant(member.userId,'mute')}>Couper le micro</button>:null}
                                 {remote?.media.video?<button type="button" onClick={()=>void moderateParticipant(member.userId,'camera')}>Couper la caméra</button>:null}
                                 {isHost&&member.role!=='cohost'?<button type="button" onClick={()=>void moderateParticipant(member.userId,'cohost')}>Nommer co-hôte</button>:null}
-                                {isHost&&member.role==='cohost'?<button type="button" onClick={()=>void moderateParticipant(member.userId,'participant')}>Retirer le rôle co-hôte</button>:null}
-                                <button type="button" onClick={()=>void moderateParticipant(member.userId,'lobby')}>Mettre en salle d’attente</button>
-                                <button type="button" onClick={()=>void moderateParticipant(member.userId,'remove')}>Retirer</button>
-                                <button type="button" className="danger" onClick={()=>void moderateParticipant(member.userId,'ban')}>Bannir</button>
+                                {isHost&&member.role==='cohost'?<button type="button" onClick={()=>confirmParticipantAction(member,'participant')}>Retirer le rôle co-hôte</button>:null}
+                                <button type="button" onClick={()=>confirmParticipantAction(member,'lobby')}>Mettre en salle d’attente</button>
+                                <button type="button" onClick={()=>confirmParticipantAction(member,'remove')}>Retirer</button>
+                                <button type="button" className="danger" onClick={()=>confirmParticipantAction(member,'ban')}>Bannir</button>
                               </>
                             ):null}
                           </>
@@ -2282,7 +2396,7 @@ export default function MeetingRoomV2() {
                   <>
                     <div className="room-v2-breakout-actions">
                       <button type="button" onClick={() => void setBreakoutsOpen(true)}>Ouvrir les sous-salles</button>
-                      <button type="button" className="secondary" onClick={() => void setBreakoutsOpen(false)}>Fermer les sous-salles</button>
+                      <button type="button" className="secondary" onClick={confirmCloseBreakouts}>Fermer les sous-salles</button>
                     </div>
                     {breakoutRooms.map((room) => (
                       <article className="room-v2-breakout-card" key={room.id}>
@@ -2323,7 +2437,7 @@ export default function MeetingRoomV2() {
                         <span>{option.label}</span><b>{option.votes}</b>
                       </button>
                     ))}
-                    {isModerator && poll.isOpen ? <button className="room-v2-close-poll" onClick={() => meeting?.id && void collaborationService.closePoll(meeting.id, poll.id).then((value) => setPolls((current) => [value, ...current.filter((item) => item.id !== value.id)]))}>Fermer le sondage</button> : null}
+                    {isModerator && poll.isOpen ? <button className="room-v2-close-poll" onClick={() => confirmClosePoll(poll)}>Fermer le sondage</button> : null}
                   </article>
                 ))}
               </div>
@@ -2378,6 +2492,39 @@ export default function MeetingRoomV2() {
             <button type="button" onClick={() => void respondToPendingMediaRequest('rejected')}>Refuser</button>
           </div>
         </section>
+      ) : null}
+
+      {confirmation ? (
+        <div
+          className="room-v2-action-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !confirmationBusy) setConfirmation(null);
+          }}
+        >
+          <section
+            className={`room-v2-action-modal room-v2-confirm-modal ${confirmation.tone === 'danger' ? 'is-danger' : 'is-warning'}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="room-v2-confirm-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <strong id="room-v2-confirm-title">{confirmation.title}</strong>
+                <span>Confirmation requise</span>
+              </div>
+              <button type="button" aria-label="Fermer" disabled={confirmationBusy} onClick={() => setConfirmation(null)}><X size={18}/></button>
+            </header>
+            <p>{confirmation.message}</p>
+            <footer>
+              <button type="button" className="secondary" disabled={confirmationBusy} onClick={() => setConfirmation(null)}>Annuler</button>
+              <button type="button" className={confirmation.tone === 'danger' ? 'danger' : ''} disabled={confirmationBusy} onClick={() => void confirmRequestedAction()}>
+                {confirmationBusy ? 'Action en cours…' : confirmation.confirmLabel}
+              </button>
+            </footer>
+          </section>
+        </div>
       ) : null}
 
       {privateMessageTarget ? (
@@ -2489,7 +2636,7 @@ export default function MeetingRoomV2() {
         <div className="room-v2-reaction-wrap">
           <Control active={reactionPanelOpen} disabled={!canUseReactions} title={!canUseReactions ? 'Réactions désactivées par l’hôte' : undefined} label="Réactions" testId="reaction-button" onClick={() => setReactionPanelOpen((current) => !current)}>😊</Control>
         </div>
-                <Control active={recording} disabled={!canRecord} title={!canRecord ? (guestMode && !guestRecordingAllowed ? 'Enregistrement non autorisé pour les invités' : 'Enregistrement non autorisé pour votre rôle') : undefined} label={recording ? 'Stop rec.' : 'Enregistrer'} onClick={() => void toggleRecording()}>{recording ? <Square/> : <Circle/>}</Control>
+                <Control active={recording} disabled={!canRecord} title={!canRecord ? (guestMode && !guestRecordingAllowed ? 'Enregistrement non autorisé pour les invités' : 'Enregistrement non autorisé pour votre rôle') : undefined} label={recording ? 'Stop rec.' : 'Enregistrer'} onClick={confirmStopRecording}>{recording ? <Square/> : <Circle/>}</Control>
 
         <div className="room-v2-more-wrap">
           <Control active={moreMenuOpen} label="Plus" onClick={() => setMoreMenuOpen((current) => !current)}><MoreVertical/></Control>
@@ -2504,14 +2651,14 @@ export default function MeetingRoomV2() {
             <button type="button" onClick={() => {setDevicePanelOpen(true);void refreshMediaDevices();setMoreMenuOpen(false);}}><Settings2/><span>Périphériques</span></button>
             <button type="button" onClick={() => {void inviteParticipants();setMoreMenuOpen(false);}}><UsersRound/><span>Inviter</span></button>
             <div/>
-            <button type="button" className="danger" onClick={() => void leaveMeeting(false)}><LogOut/><span>Quitter la réunion</span></button>
-            {canEndForAll ? <button type="button" className="danger" data-testid="end-meeting-for-all" disabled={endingMeeting} onClick={() => void leaveMeeting(true)}><PhoneOff/><span>{endingMeeting ? 'Fin en cours…' : 'Terminer pour tous'}</span></button> : null}
+            <button type="button" className="danger" onClick={confirmLeaveMeeting}><LogOut/><span>Quitter la réunion</span></button>
+            {canEndForAll ? <button type="button" className="danger" data-testid="end-meeting-for-all" disabled={endingMeeting} onClick={confirmEndMeeting}><PhoneOff/><span>{endingMeeting ? 'Fin en cours…' : 'Terminer pour tous'}</span></button> : null}
           </div> : null}
         </div>
         </div>
 
         <div className="room-v2-leave-actions">
-          <button type="button" className="room-v2-leave" onClick={() => void leaveMeeting(false)}><PhoneOff size={18}/> Quitter la réunion</button>
+          <button type="button" className="room-v2-leave" onClick={confirmLeaveMeeting}><PhoneOff size={18}/> Quitter la réunion</button>
         </div>
       </footer>
 
