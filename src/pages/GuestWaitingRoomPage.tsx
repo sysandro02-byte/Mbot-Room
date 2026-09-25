@@ -91,11 +91,11 @@ export default function GuestWaitingRoomPage() {
   const [microphoneLevel, setMicrophoneLevel] = useState(0);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('none');
   const [customBackgroundUrl, setCustomBackgroundUrl] = useState('');
-  const [showDeviceSettings, setShowDeviceSettings] = useState(true);
+  const [showDeviceSettings, setShowDeviceSettings] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<PermissionStatus>('checking');
   const [mediaError, setMediaError] = useState('');
   const [isTestingSpeaker, setIsTestingSpeaker] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [confirmExitOpen, setConfirmExitOpen] = useState(false);
   const [isLeavingWaitingRoom, setIsLeavingWaitingRoom] = useState(false);
 
   const stopMedia = useCallback(() => {
@@ -461,11 +461,10 @@ export default function GuestWaitingRoomPage() {
     navigate('/rejoindre-une-reunion', { replace: true });
   };
 
-  const openDeviceSettings = (openStatusModal = false) => {
-    setShowDeviceSettings(true);
-    if (openStatusModal) setIsSettingsOpen(true);
+  const openDeviceSettings = () => {
+    setShowDeviceSettings((current) => !current);
     window.setTimeout(() => {
-      deviceSettingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      deviceSettingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 0);
   };
 
@@ -475,222 +474,133 @@ export default function GuestWaitingRoomPage() {
   };
 
   return (
-    <main className="guest-waiting-page">
-      <header className="waiting-header">
-        <Link className="waiting-brand" to="/rejoindre-une-reunion" aria-label="Accueil MBotéRoom">
-          <span className="waiting-brand-logo"><img src="/icons/mboteroom-symbol.png" alt="" /></span>
-          <strong>MBoté<span>Room</span></strong>
-        </Link>
-
-        <div className="waiting-header-meeting">
-          <h1>{meetingTitle}</h1>
-          <span>
-            <ShieldCheck size={18} aria-hidden="true" />
-            {secured ? 'Réunion sécurisée' : 'Réunion standard'}
-          </span>
+    <main className="guest-waiting-page waiting-simple-page">
+      <section className="waiting-simple-card" aria-labelledby="waiting-room-title">
+        <div className="waiting-simple-heading">
+          <span className="waiting-simple-logo" aria-hidden="true"><img src="/icons/mboteroom-symbol.png" alt="" /></span>
+          <div>
+            <p className="waiting-simple-kicker">Salle d’attente</p>
+            <h1 id="waiting-room-title">{meetingTitle}</h1>
+            <span className="waiting-simple-host">Hôte : {hostName}</span>
+          </div>
+          <span className="waiting-simple-security"><ShieldCheck size={16} aria-hidden="true" />{secured ? 'Sécurisée' : 'Standard'}</span>
         </div>
 
-        <nav className="waiting-header-actions" aria-label="Actions de la réunion">
-          <span className="waiting-guest-status"><UserRound size={19} aria-hidden="true" />Invité</span>
-          <Link className="waiting-create-account" to="/inscription">Créer un compte</Link>
-          <button className="waiting-leave-button" type="button" onClick={handleQuit} disabled={isLeavingWaitingRoom}>
-            <LogOut size={20} aria-hidden="true" />
-            {isLeavingWaitingRoom ? 'Sortie…' : 'Annuler et sortir'}
-          </button>
-        </nav>
-      </header>
-
-      <div className="waiting-page-layout">
-        <section className="waiting-main">
-          <div className="waiting-notice">
-            <span className="waiting-notice-icon">
-              <Hourglass size={27} aria-hidden="true" />
-              <Sparkles className="waiting-spark waiting-spark-one" size={12} aria-hidden="true" />
-              <Sparkles className="waiting-spark waiting-spark-two" size={12} aria-hidden="true" />
-            </span>
-            <div className="waiting-notice-copy">
-              <h2>{lobbyStatus === 'rejected' ? "L'hôte a refusé votre demande." : 'Vous êtes dans la salle d’attente.'}</h2>
-              <p>{lobbyStatus === 'rejected' ? 'Vous allez être redirigé vers la page de participation.' : "L'hôte vous admettra bientôt. Merci de patienter."}</p>
-            </div>
-            {lobbyStatus === 'waiting' ? (
-              <button
-                className="waiting-cancel-request"
-                type="button"
-                onClick={handleQuit}
-                disabled={isLeavingWaitingRoom}
-              >
-                <LogOut size={18} aria-hidden="true" />
-                {isLeavingWaitingRoom ? 'Sortie…' : 'Annuler et sortir'}
-              </button>
-            ) : null}
+        <div className={lobbyStatus === 'rejected' ? 'waiting-simple-status is-rejected' : 'waiting-simple-status'}>
+          <span><Hourglass size={20} aria-hidden="true" /></span>
+          <div>
+            <strong>{lobbyStatus === 'rejected' ? 'Demande refusée' : 'En attente de l’hôte'}</strong>
+            <p>{lobbyStatus === 'rejected'
+              ? 'Vous allez être redirigé.'
+              : 'Votre demande a été envoyée. Vous entrerez automatiquement dès que l’hôte vous admettra.'}</p>
           </div>
+        </div>
 
-          {meetingError && <p className="waiting-error" role="alert">{meetingError}</p>}
+        {meetingError ? <p className="waiting-error" role="alert">{meetingError}</p> : null}
 
-          <div className="waiting-workspace">
-            <section className={videoClassName} style={customPreviewStyle} aria-label="Aperçu vidéo">
-              <span className="video-preview-badge">Aperçu vidéo</span>
-              {cameraEnabled && stream?.getVideoTracks().length ? (
-                <video ref={videoRef} muted playsInline autoPlay />
-              ) : (
-                <div className="video-disabled-state">
-                  <CircleOff size={42} aria-hidden="true" />
-                  <strong>Caméra désactivée</strong>
-                  <span>Votre image ne sera pas partagée avant votre admission.</span>
-                </div>
-              )}
-              {mediaError && <p className="video-error" role="alert">{mediaError}</p>}
-              <span className="video-guest-label"><UserRound size={20} aria-hidden="true" />{guestName} (invité)</span>
-            </section>
+        <section className={videoClassName + ' waiting-simple-preview'} style={customPreviewStyle} aria-label="Aperçu vidéo">
+          {cameraEnabled && stream?.getVideoTracks().length ? (
+            <video ref={videoRef} muted playsInline autoPlay />
+          ) : (
+            <div className="video-disabled-state">
+              <CircleOff size={40} aria-hidden="true" />
+              <strong>Caméra désactivée</strong>
+              <span>Vous pouvez rejoindre la réunion sans caméra.</span>
+            </div>
+          )}
+          <span className="waiting-simple-name">{guestName}</span>
+          {mediaError ? <p className="video-error" role="alert">{mediaError}</p> : null}
+        </section>
 
-            <section ref={deviceSettingsRef} className={`device-settings-card${showDeviceSettings ? '' : ' is-hidden'}`} aria-labelledby="device-settings-title">
-              <header>
-                <h2 id="device-settings-title">Vérifiez vos paramètres</h2>
-                <p>Assurez-vous que tout fonctionne correctement.</p>
-                <button
-                  className="device-settings-close"
-                  type="button"
-                  aria-label="Fermer les paramètres"
-                  onClick={() => setShowDeviceSettings(false)}
-                >
-                  <X size={20} aria-hidden="true" />
-                </button>
-              </header>
+        <div className="waiting-simple-controls" aria-label="Contrôles avant la réunion">
+          <button type="button" className={microphoneEnabled ? 'is-active' : ''} onClick={toggleMicrophone}>
+            {microphoneEnabled ? <Mic size={20}/> : <CircleOff size={20}/>}
+            <span>{microphoneEnabled ? 'Micro activé' : 'Micro coupé'}</span>
+          </button>
+          <button type="button" className={cameraEnabled ? 'is-active' : ''} onClick={toggleCamera}>
+            {cameraEnabled ? <Camera size={20}/> : <CircleOff size={20}/>}
+            <span>{cameraEnabled ? 'Caméra activée' : 'Caméra coupée'}</span>
+          </button>
+          <button type="button" className={showDeviceSettings ? 'is-active' : ''} onClick={openDeviceSettings}>
+            <Settings size={20}/>
+            <span>Paramètres</span>
+          </button>
+        </div>
 
-              <DeviceSetting
-                icon={<Mic />}
-                title="Microphone"
-                status={microphoneEnabled && stream?.getAudioTracks().length ? 'Le son est détecté' : 'Microphone coupé'}
-                actionLabel={microphoneEnabled ? 'Désactiver le microphone' : 'Activer le microphone'}
-                onAction={toggleMicrophone}
-                active={microphoneEnabled}
-              >
-                <div className="audio-level-meter" aria-label={`Niveau sonore ${Math.round(microphoneLevel * 100)}%`}>
-                  {audioBars.map((bar) => (
-                    <span key={bar} className={bar < activeAudioBars ? (bar > 20 ? 'is-hot is-active' : 'is-active') : ''} />
-                  ))}
-                </div>
+        {showDeviceSettings ? (
+          <section ref={deviceSettingsRef} className="waiting-simple-settings" aria-label="Paramètres audio et vidéo">
+            <div className="waiting-simple-setting-row">
+              <label>
+                <span><Mic size={17}/> Microphone</span>
                 <select value={selectedMicrophone} onChange={changeMicrophone} aria-label="Sélectionner le microphone">
                   {devices.microphones.length ? devices.microphones.map((device, index) => (
                     <option key={device.deviceId} value={device.deviceId}>{getDeviceLabel(device, 'Microphone', index)}</option>
                   )) : <option value="">Microphone par défaut</option>}
                 </select>
-              </DeviceSetting>
+              </label>
+              <div className="waiting-simple-meter" aria-label={`Niveau sonore ${Math.round(microphoneLevel * 100)}%`}>
+                {audioBars.slice(0,12).map((bar) => <span key={bar} className={bar < Math.round(microphoneLevel * 12) ? 'is-active' : ''}/>)}
+              </div>
+            </div>
 
-              <DeviceSetting
-                icon={<Camera />}
-                title="Caméra"
-                status={cameraEnabled && stream?.getVideoTracks().length ? 'Caméra activée' : 'Caméra désactivée'}
-                actionLabel={cameraEnabled ? 'Désactiver la caméra' : 'Activer la caméra'}
-                onAction={toggleCamera}
-                active={cameraEnabled}
-              >
-                <select value={selectedCamera} onChange={changeCamera} aria-label="Sélectionner la caméra">
-                  {devices.cameras.length ? devices.cameras.map((device, index) => (
-                    <option key={device.deviceId} value={device.deviceId}>{getDeviceLabel(device, 'Caméra', index)}</option>
-                  )) : <option value="">Caméra par défaut</option>}
-                </select>
-              </DeviceSetting>
+            <label className="waiting-simple-setting-row">
+              <span><Camera size={17}/> Caméra</span>
+              <select value={selectedCamera} onChange={changeCamera} aria-label="Sélectionner la caméra">
+                {devices.cameras.length ? devices.cameras.map((device, index) => (
+                  <option key={device.deviceId} value={device.deviceId}>{getDeviceLabel(device, 'Caméra', index)}</option>
+                )) : <option value="">Caméra par défaut</option>}
+              </select>
+            </label>
 
-              <DeviceSetting
-                icon={<Volume2 />}
-                title="Haut-parleurs"
-                status={devices.speakers.length ? 'Sortie audio détectée' : 'Sortie par défaut'}
-                actionLabel="Tester les haut-parleurs"
-                actionText={isTestingSpeaker ? 'Test...' : 'Tester'}
-                onAction={() => void testSpeaker()}
-                active
-              >
-                <select value={selectedSpeaker} onChange={(event) => setSelectedSpeaker(event.target.value)} aria-label="Sélectionner les haut-parleurs">
-                  {devices.speakers.length ? devices.speakers.map((device, index) => (
-                    <option key={device.deviceId} value={device.deviceId}>{getDeviceLabel(device, 'Haut-parleurs', index)}</option>
-                  )) : <option value="">Sortie par défaut</option>}
-                </select>
-              </DeviceSetting>
+            <div className="waiting-simple-setting-row waiting-simple-audio-test">
+              <div><span><Volume2 size={17}/> Haut-parleurs</span><small>{devices.speakers.length ? 'Sortie détectée' : 'Sortie par défaut'}</small></div>
+              <button type="button" onClick={() => void testSpeaker()} disabled={isTestingSpeaker}>{isTestingSpeaker ? 'Test…' : 'Tester'}</button>
+            </div>
 
-              <section className="background-settings" aria-label="Changer le fond">
-                <h3>Changer le fond</h3>
-                <div className="background-options">
-                  <BackgroundButton mode="none" active={backgroundMode === 'none'} label="Aucun" icon={<CircleOff />} onClick={selectBackgroundMode} />
-                  <BackgroundButton mode="blur" active={backgroundMode === 'blur'} label="Flou" icon={<MonitorUp />} onClick={selectBackgroundMode} />
-                  <BackgroundButton mode="office" active={backgroundMode === 'office'} label="Bureau" icon={<ImageIcon />} onClick={selectBackgroundMode} />
-                  <BackgroundButton mode="gradient" active={backgroundMode === 'gradient'} label="Dégradé bleu" icon={<Sparkles />} onClick={selectBackgroundMode} />
-                  <button className={backgroundMode === 'custom' ? 'background-option background-option-custom is-active' : 'background-option background-option-custom'} type="button" aria-pressed={backgroundMode === 'custom'} onClick={() => customBackgroundUrl ? selectBackgroundMode('custom') : customBackgroundInputRef.current?.click()}>
-                    <FileImage size={22} aria-hidden="true" />
-                    Image
-                  </button>
-                </div>
-                <input ref={customBackgroundInputRef} className="waiting-hidden-file" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleCustomBackground} aria-label="Importer une image d’arrière-plan" />
-              </section>
-            </section>
-          </div>
-
-          {isSettingsOpen && (
-            <div className="waiting-settings-modal-backdrop" role="presentation" onMouseDown={() => setIsSettingsOpen(false)}>
-              <section
-                className="waiting-settings-modal"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="waiting-settings-modal-title"
-                onMouseDown={(event) => event.stopPropagation()}
-              >
-                <button type="button" aria-label="Fermer" onClick={() => setIsSettingsOpen(false)}>
-                  <X size={20} aria-hidden="true" />
+            <div className="waiting-simple-backgrounds">
+              <span>Arrière-plan</span>
+              <div>
+                <BackgroundButton mode="none" active={backgroundMode === 'none'} label="Aucun" icon={<CircleOff />} onClick={selectBackgroundMode} />
+                <BackgroundButton mode="blur" active={backgroundMode === 'blur'} label="Flou" icon={<MonitorUp />} onClick={selectBackgroundMode} />
+                <BackgroundButton mode="gradient" active={backgroundMode === 'gradient'} label="Dégradé" icon={<Sparkles />} onClick={selectBackgroundMode} />
+                <button className={backgroundMode === 'custom' ? 'background-option background-option-custom is-active' : 'background-option background-option-custom'} type="button" onClick={() => customBackgroundUrl ? selectBackgroundMode('custom') : customBackgroundInputRef.current?.click()}>
+                  <FileImage size={18}/> Image
                 </button>
-                <span className="waiting-settings-modal-icon" aria-hidden="true"><BadgeInfo size={27} /></span>
-                <h2 id="waiting-settings-modal-title">Paramètres avancés</h2>
-                <p>{mediaError || `Statut média : ${permissionStatus === 'ready' ? 'caméra et micro prêts' : permissionStatus === 'partial' ? 'accès partiel' : permissionStatus === 'checking' ? 'vérification en cours' : 'accès refusé'}.`}</p>
-                {permissionStatus === 'denied' && (
-                  <strong>Autorisez la caméra et le microphone dans les paramètres de votre navigateur, puis rechargez la page.</strong>
-                )}
-              </section>
+              </div>
+              <input ref={customBackgroundInputRef} className="waiting-hidden-file" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleCustomBackground} />
             </div>
-          )}
-
-          <nav className="waiting-controls" aria-label="Contrôles de la salle d’attente">
-            <ControlButton icon={microphoneEnabled ? <Mic /> : <CircleOff />} label="Micro" active={microphoneEnabled} onClick={() => openDeviceSettings()} />
-            <ControlButton icon={cameraEnabled ? <Camera /> : <CircleOff />} label="Caméra" active={cameraEnabled} onClick={() => openDeviceSettings()} />
-            <ControlButton icon={<Volume2 />} label="Tester l'audio" active onClick={() => openDeviceSettings()} />
-            <ControlButton icon={<ImageIcon />} label="Arrière-plan" active={backgroundMode !== 'none'} onClick={() => openDeviceSettings()} />
-            <ControlButton icon={<Settings />} label="Paramètres" active={isSettingsOpen} onClick={() => openDeviceSettings(true)} />
-            <button className="waiting-controls-leave" type="button" onClick={handleQuit} disabled={isLeavingWaitingRoom}>
-              <LogOut size={22} aria-hidden="true" />
-              {isLeavingWaitingRoom ? 'Sortie…' : 'Annuler et sortir'}
-            </button>
-          </nav>
-        </section>
-
-        <aside className="waiting-sidebar" aria-label="Informations de la réunion">
-          <section className="meeting-information-card">
-            <h2>Informations de la réunion</h2>
-            <InfoRow icon={<CalendarIcon />} label="ID de réunion" value={formatMeetingId(meetingAccessId)} />
-            <InfoRow icon={<UserRound />} label="Hôte" value={hostName} />
-            <InfoRow icon={<ShieldCheck />} label="Sécurité" value={secured ? 'Réunion sécurisée' : 'Réunion standard'} positive={secured} />
-            <InfoRow icon={<UsersRound />} label="Participants dans la réunion" value={String(participantCount)} />
           </section>
+        ) : null}
 
-          <section className="guest-information-card">
-            <BadgeInfo size={30} aria-hidden="true" />
+        <div className="waiting-simple-footer">
+          <div className="waiting-simple-id">
+            <span>ID</span>
+            <strong>{formatMeetingId(meetingAccessId)}</strong>
+          </div>
+          <button type="button" className="waiting-simple-exit" onClick={() => setConfirmExitOpen(true)} disabled={isLeavingWaitingRoom}>
+            <LogOut size={18}/>
+            Annuler et sortir
+          </button>
+        </div>
+      </section>
+
+      {confirmExitOpen ? (
+        <div className="waiting-simple-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !isLeavingWaitingRoom) setConfirmExitOpen(false); }}>
+          <section className="waiting-simple-modal" role="dialog" aria-modal="true" aria-labelledby="waiting-exit-title">
+            <h2 id="waiting-exit-title">Quitter la salle d’attente ?</h2>
+            <p>Votre demande pour rejoindre cette réunion sera annulée.</p>
             <div>
-              <h2>En tant qu'invité</h2>
-              <p>Vous pouvez participer à la réunion, mais certaines fonctionnalités peuvent être limitées : enregistrement, historique des discussions, etc.</p>
+              <button type="button" className="secondary" disabled={isLeavingWaitingRoom} onClick={() => setConfirmExitOpen(false)}>Rester</button>
+              <button type="button" className="danger" disabled={isLeavingWaitingRoom} onClick={() => void handleQuit()}>{isLeavingWaitingRoom ? 'Sortie…' : 'Quitter'}</button>
             </div>
           </section>
-
-          <section className="premium-account-card">
-            <UsersRound size={40} aria-hidden="true" />
-            <h2>Profitez de toutes les fonctionnalités</h2>
-            <p>Créez un compte MBotéRoom pour enregistrer vos réunions, retrouver votre historique et gérer vos invitations.</p>
-            <Link to="/inscription">Créer un compte</Link>
-            <Link className="premium-learn-more" to="/fonctionnalites">En savoir plus</Link>
-          </section>
-        </aside>
-      </div>
+        </div>
+      ) : null}
     </main>
   );
 }
 
-function DeviceSetting({
+function DeviceSettingfunction DeviceSetting({
   icon,
   title,
   status,
