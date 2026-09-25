@@ -59,10 +59,14 @@ jobs:
           MBOTEROOM_KEY_PASSWORD: ${{ secrets.MBOTEROOM_ANDROID_KEY_PASSWORD }}
         run: gradle --no-daemon :app:assembleRelease :app:bundleRelease
 
-      - name: Verify APK signature
+      - name: Verify APK alignment and signature
         run: |
-          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
-          test -n "$APKSIGNER" || { echo "::error::apksigner introuvable."; exit 1; }
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          ZIPALIGN="$BUILD_TOOLS/zipalign"
+          test -x "$APKSIGNER" || { echo "::error::apksigner introuvable."; exit 1; }
+          test -x "$ZIPALIGN" || { echo "::error::zipalign introuvable."; exit 1; }
+          "$ZIPALIGN" -c -v 4 android/app/build/outputs/apk/release/app-release.apk
           "$APKSIGNER" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk
 
       - name: Prepare public Android packages
@@ -71,11 +75,16 @@ jobs:
           cp android/app/build/outputs/bundle/release/app-release.aab MBoteRoom-Android.aab
           rm -f android/app/mboteroom-release.jks
 
+      - name: Create release checksums
+        run: sha256sum MBoteRoom-Android.apk MBoteRoom-Android.aab > MBoteRoom-Android.sha256
+
       - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: mboteroom-android-release
-          path: MBoteRoom-Android.apk
+          path: |
+            MBoteRoom-Android.apk
+            MBoteRoom-Android.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -93,8 +102,8 @@ jobs:
         run: |
           NOTES="APK Android signé en mode release depuis la branche main. Commit: ${GITHUB_SHA}. Le fichier AAB est également généré pour Google Play."
           if gh release view android-latest >/dev/null 2>&1; then
-            gh release upload android-latest MBoteRoom-Android.apk MBoteRoom-Android.aab --clobber
+            gh release upload android-latest MBoteRoom-Android.apk MBoteRoom-Android.aab MBoteRoom-Android.sha256 --clobber
             gh release edit android-latest               --title "MBotéRoom Android — dernière version signée"               --notes "$NOTES"
           else
-            gh release create android-latest MBoteRoom-Android.apk MBoteRoom-Android.aab               --target "${GITHUB_SHA}"               --title "MBotéRoom Android — dernière version signée"               --notes "$NOTES"
+            gh release create android-latest MBoteRoom-Android.apk MBoteRoom-Android.aab MBoteRoom-Android.sha256               --target "${GITHUB_SHA}"               --title "MBotéRoom Android — dernière version signée"               --notes "$NOTES"
           fi
