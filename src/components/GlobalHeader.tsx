@@ -134,7 +134,7 @@ export default function GlobalHeader(){
         {authenticated?<>
           <button type="button" className="global-header-action" onClick={()=>void openReport()} title="Signaler un problème"><Flag size={19}/><span>Signaler</span></button>
           <button type="button" className="global-header-icon" onClick={()=>navigate('/aide')} aria-label="Aide"><CircleHelp size={19}/></button>
-          {!guestMode?<button type="button" className={`global-header-icon global-header-notification ${notificationPulse?'is-pulsing':''}`.trim()} onClick={()=>{setNotificationPulse(false);navigate('/app/notifications');}} aria-label="Notifications" aria-live="polite"><Bell size={19}/>{unread>0?<b>{Math.min(99,unread)}</b>:null}</button>:null}
+          {!guestMode?<button type="button" className={`global-header-icon global-header-notification ${notificationPulse?'is-pulsing':''}`.trim()} onClick={()=>{setNotificationPulse(false);navigate(isAdmin?'/admin#admin-notifications':'/app/notifications');}} aria-label={isAdmin?'Notifications administrateur':'Notifications'} aria-live="polite"><Bell size={19}/>{unread>0?<b>{Math.min(99,unread)}</b>:null}</button>:null}
           <div className="global-header-profile" ref={profileRef}>
             <button type="button" className="global-header-avatar" onClick={()=>setProfileOpen((value)=>!value)} aria-expanded={profileOpen}>
               <span>{user?.avatar?<img src={user.avatar} alt=""/>:<b>{initials}</b>}</span>
