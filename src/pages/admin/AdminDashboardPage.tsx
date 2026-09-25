@@ -357,6 +357,14 @@ export default function AdminDashboardPage() {
     return () => window.clearTimeout(timeoutId);
   }, [toast]);
 
+  useEffect(() => {
+    if (window.location.hash !== '#admin-notifications') return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('admin-notifications')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
   const liveMeetings = useMemo(() => {
     const rows = dashboard?.liveMeetings || [];
     if (!debouncedSearch) return rows;
@@ -516,7 +524,7 @@ export default function AdminDashboardPage() {
               type="button"
               aria-label="Notifications administrateur"
               onClick={() => {
-                window.history.replaceState(null, '', '/admin#admin-notifications');
+                navigate('/admin#admin-notifications');
                 document.getElementById('admin-notifications')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }}
             >
