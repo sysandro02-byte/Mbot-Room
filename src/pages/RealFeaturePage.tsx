@@ -271,7 +271,7 @@ export default function RealFeaturePage({kind}:Props){
           </div>
           <div className="real-profile-shortcuts">
             <button onClick={()=>navigate('/app/settings')}><Settings size={16}/> Paramètres</button>
-            <button onClick={()=>navigate('/app/notifications')}><Bell size={16}/> Notifications</button>
+            <button onClick={()=>navigate(currentUser?.role==='admin'?'/admin#admin-notifications':'/app/notifications')}><Bell size={16}/> Notifications</button>
             <button onClick={()=>navigate('/mot-de-passe-oublie')}><KeyRound size={16}/> Changer le mot de passe</button>
           </div>
         </aside>
