@@ -595,6 +595,8 @@ try {
   assert.equal(participant.user.role, 'user');
   const outsider = await register('Participant Bloqué', 'outsider.integration@mbote.test');
   assert.equal(outsider.user.role, 'user');
+  const bannedMessagingUser = await register('Compte Bannissement Messagerie', 'banned.messaging.integration@mbote.test');
+  assert.equal(bannedMessagingUser.user.role, 'user');
 
   const quarantineOutsider = await jsonRequest('/api/admin/users/'+outsider.user.id, {
     method: 'PUT',
@@ -686,29 +688,23 @@ try {
   assert.ok(participantThread.data.some((item) => item.text === 'Message admin vers user CI' && Number(item.userId) === Number(host.user.id)));
   participantDirectSocket.close();
 
-  const banOutsiderFromMessaging = await jsonRequest('/api/admin/users/'+outsider.user.id, {
+  const banMessagingAccount = await jsonRequest('/api/admin/users/'+bannedMessagingUser.user.id, {
     method: 'PUT',
     headers: authHeaders(host.token),
     body: JSON.stringify({ accountStatus: 'banned' }),
   });
-  assert.equal(banOutsiderFromMessaging.response.status, 200, JSON.stringify(banOutsiderFromMessaging.data));
-  const bannedDirectorySearch = await jsonRequest('/api/contacts/search?q=Participant%20Bloqu%C3%A9', {
+  assert.equal(banMessagingAccount.response.status, 200, JSON.stringify(banMessagingAccount.data));
+  const bannedDirectorySearch = await jsonRequest('/api/contacts/search?q=Compte%20Bannissement%20Messagerie', {
     headers: authHeaders(participant.token),
   });
   assert.equal(bannedDirectorySearch.response.status, 200, JSON.stringify(bannedDirectorySearch.data));
-  assert.equal(bannedDirectorySearch.data.some((item) => Number(item.id) === Number(outsider.user.id)), false);
+  assert.equal(bannedDirectorySearch.data.some((item) => Number(item.id) === Number(bannedMessagingUser.user.id)), false);
   const bannedDirectAttempt = await jsonRequest('/api/conversations/direct', {
     method: 'POST',
     headers: authHeaders(participant.token),
-    body: JSON.stringify({ contactUserId: outsider.user.id }),
+    body: JSON.stringify({ contactUserId: bannedMessagingUser.user.id }),
   });
   assert.equal(bannedDirectAttempt.response.status, 404, JSON.stringify(bannedDirectAttempt.data));
-  const restoreOutsiderAfterMessagingSecurity = await jsonRequest('/api/admin/users/'+outsider.user.id, {
-    method: 'PUT',
-    headers: authHeaders(host.token),
-    body: JSON.stringify({ accountStatus: 'active' }),
-  });
-  assert.equal(restoreOutsiderAfterMessagingSecurity.response.status, 200, JSON.stringify(restoreOutsiderAfterMessagingSecurity.data));
 
   const audienceOptions = await jsonRequest('/api/admin/broadcasts/audience-options', { headers: authHeaders(host.token) });
   assert.equal(audienceOptions.response.status, 200, JSON.stringify(audienceOptions.data));
