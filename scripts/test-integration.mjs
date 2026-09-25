@@ -614,6 +614,60 @@ try {
   });
   assert.equal(restoreOutsider.response.status, 200, JSON.stringify(restoreOutsider.data));
 
+  const userToUserConversation = await jsonRequest('/api/conversations/direct', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ contactUserId: outsider.user.id }),
+  });
+  assert.equal(userToUserConversation.response.status, 201, JSON.stringify(userToUserConversation.data));
+  const outsiderMessageSocket = await socketConnect(outsider.token);
+  const userToUserRealtime = waitForSocketEvent(
+    outsiderMessageSocket,
+    'conversation:message',
+    (payload) => payload?.conversationId === userToUserConversation.data.id && payload?.text === 'Message user vers user CI',
+  );
+  const userToUserSend = await jsonRequest('/api/conversations/'+encodeURIComponent(userToUserConversation.data.id)+'/messages', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ text: 'Message user vers user CI' }),
+  });
+  assert.equal(userToUserSend.response.status, 201, JSON.stringify(userToUserSend.data));
+  const receivedUserToUser = await userToUserRealtime;
+  assert.equal(receivedUserToUser.sender, 'Participant Integration');
+  const outsiderThread = await jsonRequest('/api/conversations/'+encodeURIComponent(userToUserConversation.data.id)+'/messages', {
+    headers: authHeaders(outsider.token),
+  });
+  assert.equal(outsiderThread.response.status, 200, JSON.stringify(outsiderThread.data));
+  assert.ok(outsiderThread.data.some((item) => item.text === 'Message user vers user CI' && Number(item.userId) === Number(participant.user.id)));
+  outsiderMessageSocket.close();
+
+  const adminToUserConversation = await jsonRequest('/api/conversations/direct', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ contactUserId: participant.user.id }),
+  });
+  assert.equal(adminToUserConversation.response.status, 201, JSON.stringify(adminToUserConversation.data));
+  const participantDirectSocket = await socketConnect(participant.token);
+  const adminToUserRealtime = waitForSocketEvent(
+    participantDirectSocket,
+    'conversation:message',
+    (payload) => payload?.conversationId === adminToUserConversation.data.id && payload?.text === 'Message admin vers user CI',
+  );
+  const adminToUserSend = await jsonRequest('/api/conversations/'+encodeURIComponent(adminToUserConversation.data.id)+'/messages', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ text: 'Message admin vers user CI' }),
+  });
+  assert.equal(adminToUserSend.response.status, 201, JSON.stringify(adminToUserSend.data));
+  const receivedAdminToUser = await adminToUserRealtime;
+  assert.equal(receivedAdminToUser.sender, 'Hôte Integration');
+  const participantThread = await jsonRequest('/api/conversations/'+encodeURIComponent(adminToUserConversation.data.id)+'/messages', {
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(participantThread.response.status, 200, JSON.stringify(participantThread.data));
+  assert.ok(participantThread.data.some((item) => item.text === 'Message admin vers user CI' && Number(item.userId) === Number(host.user.id)));
+  participantDirectSocket.close();
+
   const audienceOptions = await jsonRequest('/api/admin/broadcasts/audience-options', { headers: authHeaders(host.token) });
   assert.equal(audienceOptions.response.status, 200, JSON.stringify(audienceOptions.data));
   assert.ok(Number(audienceOptions.data.totals?.users || 0) >= 3);
