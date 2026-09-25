@@ -148,6 +148,7 @@ app.post('/api/meetings/:meetingId/lobby/admit-all', rateLimit(20, 60_000));
 app.post('/api/meetings/:meetingId/luna/catch-up', rateLimit(10, 60_000));
 app.use('/api/meetings', rateLimit(240, 60_000));
 app.use('/api/ai', rateLimit(30, 60_000));
+app.use('/api/ads', rateLimit(120, 60_000));
 app.post('/api/admin/broadcasts', rateLimit(10, 60_000));
 app.use('/api/admin/ai', rateLimit(20, 60_000));
 app.use('/api/admin', rateLimit(300, 60_000));
