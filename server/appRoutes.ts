@@ -563,7 +563,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
            FROM candidates cand
            JOIN room_users u ON u.id=cand.id
            LEFT JOIN room_user_contacts uc ON uc.user_id=$1 AND uc.contact_user_id=u.id
-          WHERE u.id<>$1 AND u.is_guest=false AND COALESCE(u.is_suspended,false)=false
+          WHERE u.id<>$1 AND u.is_guest=false AND COALESCE(u.is_suspended,false)=false AND COALESCE(u.account_status,'active')<>'banned'
           ORDER BY u.name ASC`,
         [request.user!.id,request.user!.email],
       );
@@ -599,7 +599,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
                 EXISTS(SELECT 1 FROM room_user_contacts c WHERE c.user_id=$1 AND c.contact_user_id=u.id) AS saved,
                 COALESCE((SELECT favorite FROM room_user_contacts c WHERE c.user_id=$1 AND c.contact_user_id=u.id LIMIT 1),false) AS favorite
            FROM room_users u
-          WHERE u.id<>$1 AND u.is_guest=false AND COALESCE(u.is_suspended,false)=false
+          WHERE u.id<>$1 AND u.is_guest=false AND COALESCE(u.is_suspended,false)=false AND COALESCE(u.account_status,'active')<>'banned'
             AND (lower(u.name) LIKE $2 OR lower(u.email) LIKE $2 OR lower(u.username) LIKE $2)
           ORDER BY CASE WHEN lower(u.name)=$3 THEN 0 ELSE 1 END,u.name ASC
           LIMIT 30`,
@@ -673,7 +673,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
     try{
       const targetUserId=Number(request.body?.contactUserId||0);
       const target=await query(
-        'SELECT id,name,email,is_guest FROM room_users WHERE id=$1 AND COALESCE(is_suspended,false)=false LIMIT 1',
+        "SELECT id,name,email,is_guest FROM room_users WHERE id=$1 AND COALESCE(is_suspended,false)=false AND COALESCE(account_status,'active')<>'banned' LIMIT 1",
         [targetUserId],
       );
       if(!target.rows[0]||Boolean(target.rows[0].is_guest)||targetUserId===request.user!.id){
