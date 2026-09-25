@@ -1972,17 +1972,7 @@ export default function MeetingRoomV2() {
   };
 
   const confirmStopRecording = () => {
-    if (!recording) {
-      void toggleRecording();
-      return;
-    }
-    requestConfirmation({
-      title: 'Arrêter l’enregistrement ?',
-      message: 'L’enregistrement en cours va être arrêté et sauvegardé selon les paramètres de stockage disponibles.',
-      confirmLabel: 'Arrêter',
-      tone: 'warning',
-      action: () => toggleRecording(),
-    });
+    void toggleRecording();
   };
 
   const confirmCloseBreakouts = () => requestConfirmation({
