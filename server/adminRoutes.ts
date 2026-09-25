@@ -210,6 +210,46 @@ const realSparkline = async (days: number) => {
 export const registerAdminRoutes = (app: express.Express, io: Server) => {
   const adminApi = [requireDatabase, authenticateToken, requireAdmin] as const;
 
+  app.get('/api/public/pages/:pageKey', requireDatabase, async (request,response,next)=>{
+    try{
+      const key=String(request.params.pageKey||'').trim().toLowerCase();
+      if(!['security','features','privacy'].includes(key))return sendApiError(response,404,'PUBLIC_PAGE_NOT_FOUND','Page introuvable.');
+      const result=await query('SELECT key,title,body,updated_at FROM room_public_pages WHERE key=$1 LIMIT 1',[key]);
+      if(!result.rows[0])return sendApiError(response,404,'PUBLIC_PAGE_NOT_FOUND','Page introuvable.');
+      const row=result.rows[0];
+      response.setHeader('Cache-Control','public, max-age=60');
+      response.json({key:String(row.key),title:String(row.title||''),body:String(row.body||''),updatedAt:new Date(row.updated_at).toISOString()});
+    }catch(error){next(error);}
+  });
+
+  app.get('/api/admin/public-pages', ...adminApi, async (_request,response,next)=>{
+    try{
+      const result=await query('SELECT key,title,body,updated_at FROM room_public_pages ORDER BY key');
+      response.json(result.rows.map((row)=>({key:String(row.key),title:String(row.title||''),body:String(row.body||''),updatedAt:new Date(row.updated_at).toISOString()})));
+    }catch(error){next(error);}
+  });
+
+  app.put('/api/admin/public-pages/:pageKey', ...adminApi, async (request,response,next)=>{
+    try{
+      const key=String(request.params.pageKey||'').trim().toLowerCase();
+      if(!['security','features','privacy'].includes(key))return sendApiError(response,404,'PUBLIC_PAGE_NOT_FOUND','Page introuvable.');
+      const title=normalizeText(request.body?.title).slice(0,180);
+      const body=String(request.body?.body||'').trim().slice(0,12000);
+      if(!title||body.length<20)return sendApiError(response,400,'PUBLIC_PAGE_CONTENT_INVALID','Ajoutez un titre et un contenu suffisamment complet.');
+      const result=await query(
+        `INSERT INTO room_public_pages (key,title,body,updated_at)
+         VALUES ($1,$2,$3,now())
+         ON CONFLICT (key) DO UPDATE SET title=excluded.title,body=excluded.body,updated_at=now()
+         RETURNING key,title,body,updated_at`,
+        [key,title,body],
+      );
+      const row=result.rows[0];
+      const payload={key:String(row.key),title:String(row.title||''),body:String(row.body||''),updatedAt:new Date(row.updated_at).toISOString()};
+      io.emit('public-page:updated',payload);
+      response.json(payload);
+    }catch(error){next(error);}
+  });
+
   app.get('/api/admin/settings', ...adminApi, async (_request, response, next) => {
     try {
       response.json(await getPlatformSettings());
