@@ -1,25 +1,17 @@
-import { ChangeEvent, CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ChangeEvent, CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
-  BadgeInfo,
   Camera,
-  Check,
-  ChevronDown,
   CircleOff,
   FileImage,
   Hourglass,
-  Image as ImageIcon,
   LogOut,
   Mic,
   MonitorUp,
   Settings,
   ShieldCheck,
   Sparkles,
-  UserRound,
-  UsersRound,
-  Video,
   Volume2,
-  X,
 } from 'lucide-react';
 import { socket } from '../lib/socket';
 import { authService } from '../services/authService';
@@ -349,12 +341,9 @@ export default function GuestWaitingRoomPage() {
   }, [customBackgroundUrl]);
 
   const meetingTitle = meeting?.title || 'Réunion MBotéRoom';
-  const meetingLink = meeting?.meeting_link || String(locationState?.meetingId || meetingId);
   const meetingAccessId = meeting ? getMeetingAccessCode(meeting) : String(locationState?.meetingId || meetingId);
   const hostName = meeting?.host_name || 'Hôte MBotéRoom';
-  const participantCount = Math.max(1, meeting?.participant_count || 1);
   const secured = meeting?.settings?.encryption !== false;
-  const activeAudioBars = Math.round(microphoneLevel * audioBars.length);
   const videoClassName = ['waiting-video-preview', `background-${backgroundMode}`, cameraEnabled ? '' : 'is-camera-off'].filter(Boolean).join(' ');
   const customPreviewStyle = customBackgroundUrl ? ({ '--waiting-room-background': `url("${customBackgroundUrl}")` } as CSSProperties) : undefined;
 
@@ -600,38 +589,6 @@ export default function GuestWaitingRoomPage() {
   );
 }
 
-function DeviceSettingfunction DeviceSetting({
-  icon,
-  title,
-  status,
-  actionLabel,
-  actionText,
-  active,
-  onAction,
-  children,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  status: string;
-  actionLabel: string;
-  actionText?: string;
-  active: boolean;
-  onAction: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="device-setting">
-      <div className="device-setting-title">
-        <span>{icon}</span>
-        <strong>{title}</strong>
-        <small className={active ? 'is-ok' : 'is-off'}>{status}</small>
-        <button type="button" aria-label={actionLabel} onClick={onAction}>{actionText || icon}</button>
-      </div>
-      {children}
-    </section>
-  );
-}
-
 function BackgroundButton({ mode, label, icon, active, onClick }: { mode: BackgroundMode; label: string; icon: React.ReactNode; active: boolean; onClick: (mode: BackgroundMode) => void }) {
   return (
     <button className={`background-option background-option-${mode}${active ? ' is-active' : ''}`} type="button" onClick={() => onClick(mode)} aria-pressed={active}>
@@ -641,29 +598,3 @@ function BackgroundButton({ mode, label, icon, active, onClick }: { mode: Backgr
   );
 }
 
-function ControlButton({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button className={active ? 'waiting-control is-active' : 'waiting-control'} type="button" onClick={onClick} aria-pressed={active}>
-      <span>{icon}</span>
-      {label}
-    </button>
-  );
-}
-
-function InfoRow({ icon, label, value, positive = false }: { icon: React.ReactNode; label: string; value: string; positive?: boolean }) {
-  return (
-    <div className="meeting-info-row">
-      <span>{icon}</span>
-      <p>{label}</p>
-      <strong className={positive ? 'is-positive' : ''}>{value}</strong>
-    </div>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M7 2v3M17 2v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
