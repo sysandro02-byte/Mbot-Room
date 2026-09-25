@@ -95,7 +95,7 @@ const translations = {
     submit: 'Se connecter',
     submitting: 'Connexion en cours...',
     or: 'ou',
-    google: 'Continuer avec MBoté Connect',
+    google: 'MBoté Connect',
     mboteLoading: 'Redirection vers MBoté Connect...',
     joinTitle: 'Rejoindre une réunion',
     joinText: "Vous n'avez pas de compte ? Rejoignez une réunion en tant qu'invité.",
@@ -138,7 +138,7 @@ const translations = {
     submit: 'Sign in',
     submitting: 'Signing in...',
     or: 'or',
-    google: 'Continue with MBoté Connect',
+    google: 'MBoté Connect',
     mboteLoading: 'Redirecting to MBoté Connect...',
     joinTitle: 'Join a meeting',
     joinText: "No account? Join a meeting as a guest.",
@@ -181,7 +181,7 @@ const translations = {
     submit: 'Kokota',
     submitting: 'Kokota ezali kosalema...',
     or: 'to',
-    google: 'Koba na MBoté Connect',
+    google: 'MBoté Connect',
     mboteLoading: 'Kokende na MBoté Connect...',
     joinTitle: 'Kokota na réunion',
     joinText: "Ozangi compte ? Kota na réunion lokola invité.",
@@ -224,7 +224,7 @@ const translations = {
     submit: 'تسجيل الدخول',
     submitting: 'جارٍ تسجيل الدخول...',
     or: 'أو',
-    google: 'المتابعة باستخدام MBoté Connect',
+    google: 'MBoté Connect',
     mboteLoading: 'جارٍ الانتقال إلى MBoté Connect...',
     joinTitle: 'الانضمام إلى اجتماع',
     joinText: 'ليس لديك حساب؟ انضم إلى الاجتماع كضيف.',
@@ -956,16 +956,31 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                   <span />
                 </div>
 
-                <button
-                  className="google-login-button mbote-auth-button"
-                  type="button"
-                  onClick={() => void startMboteLogin()}
-                  disabled={isLoading || isMboteLoading}
-                  aria-busy={isMboteLoading}
-                >
-                  {isMboteLoading ? <LoaderCircle className="mbote-auth-spinner" size={22} aria-hidden="true" /> : <MboteAuthIcon />}
-                  <span aria-live="polite">{isMboteLoading ? copy.mboteLoading : copy.google}</span>
-                </button>
+                <div className="external-login-row" aria-label="Méthodes de connexion externes">
+                  <button
+                    className="google-login-button mbote-auth-button"
+                    type="button"
+                    onClick={() => void startMboteLogin()}
+                    disabled={isLoading || isMboteLoading}
+                    aria-busy={isMboteLoading}
+                  >
+                    {isMboteLoading ? <LoaderCircle className="mbote-auth-spinner" size={22} aria-hidden="true" /> : <MboteAuthIcon />}
+                    <span aria-live="polite">{isMboteLoading ? copy.mboteLoading : copy.google}</span>
+                    <ChevronRight className="external-login-arrow" size={20} aria-hidden="true" />
+                  </button>
+
+                  <button
+                    className="google-login-button google-oauth-button"
+                    type="button"
+                    onClick={() => setExternalAuthModalMessage('La connexion Google sera disponible dès que le fournisseur Google OAuth sera configuré pour MBotéRoom.')}
+                    disabled={isLoading || isMboteLoading}
+                    aria-label="Google"
+                  >
+                    <span className="google-g" aria-hidden="true">G</span>
+                    <span>Google</span>
+                    <ChevronRight className="external-login-arrow" size={20} aria-hidden="true" />
+                  </button>
+                </div>
 
                 <button className="join-meeting-card" type="button" onClick={goToGuestJoin} onKeyDown={handleGuestKeyDown}>
                   <span className="join-meeting-icon"><UsersRound size={29} aria-hidden="true" /></span>
@@ -1127,7 +1142,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       </section>
 
       <footer className="login-benefits" aria-label="Créateur de MBotéRoom">
-        <div className="login-created-by">MBotéRoom application créé par <strong>LoukaTech</strong></div>
+        <div className="login-created-by">MBotéRoom créé par <strong>LoukaTech</strong></div>
       </footer>
 
       {isRegisterModalOpen && !registrationSuccess && (
