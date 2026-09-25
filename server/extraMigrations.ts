@@ -133,6 +133,22 @@ export const runExtraMigrations = async () => {
     );
     CREATE INDEX IF NOT EXISTS room_notifications_user_created_idx ON room_notifications(user_id, created_at DESC);
 
+    CREATE TABLE IF NOT EXISTS room_admin_broadcasts (
+      id uuid PRIMARY KEY,
+      created_by integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      title text NOT NULL,
+      body text NOT NULL,
+      action_path text NOT NULL DEFAULT '/app/notifications',
+      audience jsonb NOT NULL DEFAULT '{}'::jsonb,
+      recipient_count integer NOT NULL DEFAULT 0,
+      push_sent integer NOT NULL DEFAULT 0,
+      push_failed integer NOT NULL DEFAULT 0,
+      ai_assisted boolean NOT NULL DEFAULT false,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS room_admin_broadcasts_created_idx
+      ON room_admin_broadcasts(created_at DESC);
+
     ALTER TABLE room_calendar_events ADD COLUMN IF NOT EXISTS google_event_id text;
     ALTER TABLE room_calendar_events ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'mboteroom';
     ALTER TABLE room_calendar_events ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
