@@ -1714,3 +1714,246 @@ html[data-native-app="android"] .android-download-card{
   .android-download-actions{grid-template-columns:1fr}
   .android-download-primary,.android-download-share{min-height:48px}
 }
+
+
+/* 2026-09 login mockup implementation */
+.external-login-row{
+  display:grid;
+  grid-template-columns:minmax(0,1.16fr) minmax(0,.84fr);
+  gap:10px;
+  align-items:stretch;
+}
+.external-login-row .google-login-button{
+  width:100%;
+  min-width:0;
+  min-height:48px;
+  padding:0 12px;
+  justify-content:flex-start;
+  gap:9px;
+  border-radius:13px;
+  border:1.5px solid #5f67f4;
+  background:#fff;
+  color:#1c5fc9;
+  box-shadow:0 6px 18px rgba(53,73,201,.07);
+}
+.external-login-row .google-login-button > span:not(.mbote-auth-icon):not(.google-g){
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:13px;
+  font-weight:850;
+}
+.external-login-row .mbote-auth-button{
+  border-color:#5067ff;
+  color:#135cc8;
+  background:linear-gradient(180deg,#fff,#f9fbff);
+}
+.external-login-row .google-oauth-button{
+  border-color:#5f67f4;
+  color:#2159c6;
+}
+.external-login-arrow{
+  flex:0 0 auto;
+  margin-left:auto;
+  color:#554cf3;
+}
+.google-g{
+  width:28px;
+  height:28px;
+  flex:0 0 auto;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  font-size:22px;
+  line-height:1;
+  font-family:Arial,Helvetica,sans-serif;
+  font-weight:900;
+  background:conic-gradient(from -42deg,#4285f4 0 25%,#34a853 25% 47%,#fbbc05 47% 70%,#ea4335 70% 100%);
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+}
+.join-meeting-card{
+  min-height:104px!important;
+  margin-top:18px!important;
+  grid-template-columns:54px minmax(0,1fr) 42px!important;
+  gap:14px!important;
+  padding:17px 20px!important;
+  border:1.5px solid rgba(0,159,151,.34)!important;
+  border-radius:20px!important;
+  background:
+    radial-gradient(circle at 92% 84%,rgba(0,126,131,.08),transparent 28%),
+    linear-gradient(135deg,#ecfbf7 0%,#e7f8f4 52%,#f4fbff 100%)!important;
+  box-shadow:0 12px 30px rgba(0,126,131,.08)!important;
+}
+.join-meeting-icon{
+  width:54px!important;
+  height:54px!important;
+  border-radius:16px!important;
+  background:linear-gradient(145deg,#0aa397,#007e83)!important;
+}
+.join-meeting-copy strong{
+  margin-bottom:4px!important;
+  color:#0f3a53!important;
+  font-size:18px!important;
+  line-height:1.2!important;
+}
+.join-meeting-copy small{
+  color:#526f7d!important;
+  font-size:12px!important;
+  line-height:1.45!important;
+}
+.join-meeting-arrow{
+  width:42px;
+  height:42px;
+  padding:9px;
+  border-radius:50%;
+  background:rgba(0,126,131,.08);
+  color:#008e91!important;
+}
+.android-download-card{
+  gap:9px!important;
+  margin-top:14px!important;
+  padding:13px 14px 14px!important;
+  border:1px solid #d5e0f0!important;
+  border-radius:18px!important;
+  background:linear-gradient(135deg,#f5f9ff 0%,#eef5fd 100%)!important;
+  box-shadow:0 8px 22px rgba(43,75,140,.06)!important;
+}
+.android-download-heading{
+  grid-template-columns:40px minmax(0,1fr)!important;
+  gap:10px!important;
+}
+.android-download-icon{
+  width:40px!important;
+  height:40px!important;
+  border-radius:12px!important;
+  background:#e9f1ff!important;
+  color:#1c67d7!important;
+}
+.android-download-heading strong{
+  color:#173664!important;
+  font-size:14px!important;
+}
+.android-download-heading small{
+  color:#7687a6!important;
+  font-size:10.5px!important;
+  line-height:1.35!important;
+}
+.android-download-actions{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  gap:7px!important;
+}
+.android-download-primary,
+.android-download-share{
+  width:min(78%,430px)!important;
+  min-height:40px!important;
+  padding:0 14px!important;
+  border-radius:11px!important;
+  font-size:11.5px!important;
+}
+.android-download-primary{
+  border:0!important;
+  background:linear-gradient(100deg,#1886df,#4155e8 58%,#5b37e8)!important;
+  box-shadow:0 8px 18px rgba(45,76,220,.18)!important;
+}
+.android-download-share{
+  border:1px solid #c9d4e6!important;
+  color:#163f70!important;
+  background:#fff!important;
+}
+.login-created-by{
+  width:100%!important;
+  margin:0!important;
+  text-align:center!important;
+  color:#59758a!important;
+  font-size:11px!important;
+  line-height:1.5!important;
+}
+.login-created-by strong{
+  color:#365e75!important;
+  font-weight:850!important;
+}
+
+@media(max-width:790px){
+  .login-benefits{
+    min-height:48px!important;
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))!important;
+    border-top:0!important;
+    background:transparent!important;
+  }
+  .external-login-row{
+    grid-template-columns:minmax(0,1.22fr) minmax(0,.78fr);
+    gap:8px;
+  }
+  .external-login-row .google-login-button{
+    min-height:50px;
+    padding:0 10px;
+  }
+  .external-login-row .google-login-button > span:not(.mbote-auth-icon):not(.google-g){
+    font-size:12px;
+  }
+  .join-meeting-card{
+    min-height:112px!important;
+  }
+  .android-download-card{
+    max-width:100%;
+  }
+  .android-download-primary,
+  .android-download-share{
+    width:min(72%,380px)!important;
+  }
+}
+
+@media(max-width:430px){
+  .external-login-row{
+    grid-template-columns:minmax(0,1.18fr) minmax(0,.82fr);
+    gap:7px;
+  }
+  .external-login-row .google-login-button{
+    min-height:47px;
+    padding:0 8px;
+    gap:6px;
+  }
+  .external-login-row .google-login-button > span:not(.mbote-auth-icon):not(.google-g){
+    font-size:10.5px;
+  }
+  .external-login-row .mbote-auth-icon,
+  .google-g{
+    width:25px;
+    height:25px;
+  }
+  .external-login-arrow{
+    width:17px;
+    height:17px;
+  }
+  .join-meeting-card{
+    min-height:106px!important;
+    grid-template-columns:48px minmax(0,1fr) 34px!important;
+    gap:10px!important;
+    padding:15px 13px!important;
+  }
+  .join-meeting-icon{
+    width:48px!important;
+    height:48px!important;
+  }
+  .join-meeting-copy strong{font-size:16px!important}
+  .join-meeting-copy small{font-size:11px!important}
+  .join-meeting-arrow{
+    width:34px;
+    height:34px;
+    padding:7px;
+  }
+  .android-download-card{
+    padding:11px 12px 12px!important;
+  }
+  .android-download-primary,
+  .android-download-share{
+    width:min(76%,330px)!important;
+    min-height:39px!important;
+    font-size:11px!important;
+  }
+}
