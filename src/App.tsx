@@ -22,6 +22,7 @@ import RealDashboardPage from './pages/dashboard/RealDashboardPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import GlobalSearchPage from './pages/GlobalSearchPage';
 import HelpPage from './pages/HelpPage';
+import DynamicInfoPage from './pages/DynamicInfoPage';
 import NotificationsPage from './pages/NotificationsPage';
 import MessagesPage from './pages/MessagesPage';
 import ContactsPage from './pages/ContactsPage';
@@ -124,17 +125,6 @@ function AdminRoute({ children }: { children: ReactNode }) {
   return children;
 }
 
-function SimpleInfoPage({ title, description }: { title: string; description: string }) {
-  const navigate = useNavigate();
-  const closeModal = () => window.history.length > 1 ? navigate(-1) : navigate('/app', { replace: true });
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') closeModal(); };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, []);
-  return <main className="simple-info-page" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeModal(); }}><section className="simple-info-modal" role="dialog" aria-modal="true" aria-labelledby="simple-info-title"><button className="simple-info-close" type="button" aria-label="Fermer" onClick={closeModal}><X size={20} aria-hidden="true" /></button><h1 id="simple-info-title">{title}</h1><p>{description}</p></section></main>;
-}
-
 export default function App() {
   const location = useLocation();
   const hideGlobalHeader = /^\/reunions\/(?!recentes(?:\/|$)|terminee(?:\/|$))[^/]+(?:\/(?:luna|salle-attente))?$/.test(location.pathname);
@@ -157,9 +147,9 @@ export default function App() {
     <Route path="/admin" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
     <Route path="/reunions/recentes" element={<Navigate to="/app?tab=reunions" replace />} />
     <Route path="/aide" element={<HelpPage />} />
-    <Route path="/securite" element={<SimpleInfoPage title="Sécurité MBotéRoom" description="Les réunions utilisent les protections disponibles dans l'application." />} />
-    <Route path="/fonctionnalites" element={<SimpleInfoPage title="Fonctionnalités MBotéRoom" description="Créez un compte pour retrouver l'historique, organiser vos réunions et gérer les invitations." />} />
-    <Route path="/confidentialite" element={<SimpleInfoPage title="Confidentialité" description="Consultez ici les informations de confidentialité applicables à votre espace MBotéRoom." />} />
+    <Route path="/securite" element={<DynamicInfoPage pageKey="security" />} />
+    <Route path="/fonctionnalites" element={<DynamicInfoPage pageKey="features" />} />
+    <Route path="/confidentialite" element={<DynamicInfoPage pageKey="privacy" />} />
     <Route path="/conditions" element={<TermsPage />} />
     <Route path="/app/meetings" element={<ProtectedRoute><AppShell title="Réunions"><RealMeetingList /></AppShell></ProtectedRoute>} />
     <Route path="/app/search" element={<ProtectedRoute><AppShell title="Recherche"><GlobalSearchPage /></AppShell></ProtectedRoute>} />
