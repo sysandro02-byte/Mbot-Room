@@ -340,6 +340,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [apkShareMessage, setApkShareMessage] = useState('');
   const [formError, setFormError] = useState('');
   const [externalAuthModalMessage, setExternalAuthModalMessage] = useState('');
+  const [googleConfigModalOpen, setGoogleConfigModalOpen] = useState(false);
   const [otpChallengeId, setOtpChallengeId] = useState('');
   const [otpEmailHint, setOtpEmailHint] = useState('');
   const [otpRedirectTo, setOtpRedirectTo] = useState('');
@@ -972,7 +973,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                   <button
                     className="google-login-button google-oauth-button"
                     type="button"
-                    onClick={() => setExternalAuthModalMessage('La connexion Google sera disponible dès que le fournisseur Google OAuth sera configuré pour MBotéRoom.')}
+                    onClick={() => setGoogleConfigModalOpen(true)}
                     disabled={isLoading || isMboteLoading}
                     aria-label="Google"
                   >
@@ -1264,6 +1265,9 @@ export default function Login({ initialView = 'login' }: LoginProps) {
           onClose={() => setExternalAuthModalMessage('')}
         />
       )}
+      {googleConfigModalOpen && (
+        <GoogleConfigurationModal onClose={() => setGoogleConfigModalOpen(false)} />
+      )}
     </main>
   );
 }
@@ -1283,6 +1287,31 @@ function ExternalAuthErrorModal({ message, onClose }: { message: string; onClose
         <h2 id="auth-modal-title">Connexion MBoté impossible</h2>
         <p id="auth-modal-message">{message}</p>
         <button type="button" onClick={onClose} autoFocus>Fermer</button>
+      </section>
+    </div>
+  );
+}
+
+function GoogleConfigurationModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="auth-modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="auth-modal google-config-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="google-config-title"
+        aria-describedby="google-config-message"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <span className="google-config-icon" aria-hidden="true">G</span>
+        <span className="google-config-kicker">Connexion Google</span>
+        <h2 id="google-config-title">Configuration en cours</h2>
+        <p id="google-config-message">
+          La connexion avec Google est en cours de configuration sur MBotéRoom.
+          Elle sera disponible prochainement.
+        </p>
+        <div className="google-config-progress" aria-hidden="true"><span /></div>
+        <button type="button" onClick={onClose} autoFocus>Compris</button>
       </section>
     </div>
   );
