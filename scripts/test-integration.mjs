@@ -597,6 +597,42 @@ try {
   assert.equal(outsider.user.role, 'user');
   const bannedMessagingUser = await register('Compte Bannissement Messagerie', 'banned.messaging.integration@mbote.test');
   assert.equal(bannedMessagingUser.user.role, 'user');
+  const attacker = await register('Attaquant Integration', 'attacker.integration@mbote.test');
+  assert.equal(attacker.user.role, 'user');
+
+  const moveAttacker = await jsonRequest('/api/admin/users/'+attacker.user.id, {
+    method: 'PUT',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ city: 'Pointe-Noire' }),
+  });
+  assert.equal(moveAttacker.response.status, 200, JSON.stringify(moveAttacker.data));
+
+  const tamperedToken = participant.token.slice(0,-1) + (participant.token.endsWith('a') ? 'b' : 'a');
+  const tamperedSession = await jsonRequest('/api/auth/me', { headers: authHeaders(tamperedToken) });
+  assert.equal(tamperedSession.response.status, 401, 'A falsified bearer token must be rejected');
+
+  const hostileOrigin = await fetch(baseUrl+'/api/health', { headers: { Origin: 'https://evil.example' } });
+  assert.equal(hostileOrigin.status, 403, 'Untrusted origins must be rejected');
+
+  const serverSource = await fetch(baseUrl+'/server.js', { headers: { Origin: baseUrl } });
+  assert.equal(serverSource.status, 404, 'Server source must not be publicly exposed');
+  const sourceMap = await fetch(baseUrl+'/assets/app.js.map', { headers: { Origin: baseUrl } });
+  assert.equal(sourceMap.status, 404, 'Source maps must not be publicly exposed');
+
+  const sqlLogin = await jsonRequest('/api/auth/login', {
+    method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+    body: JSON.stringify({ email: "' OR 1=1--@evil.test", password: "x' OR '1'='1" }),
+  });
+  assert.ok(sqlLogin.response.status >= 400 && sqlLogin.response.status < 500, JSON.stringify(sqlLogin.data));
+  assert.equal(Boolean(sqlLogin.data.challengeId), false, 'SQL injection input must never create an auth challenge');
+
+  const sqlAdminSearch = await jsonRequest('/api/admin/users?q='+encodeURIComponent("' OR 1=1--"), {
+    headers: authHeaders(host.token),
+  });
+  assert.equal(sqlAdminSearch.response.status, 200, JSON.stringify(sqlAdminSearch.data));
+  assert.equal(sqlAdminSearch.data.length, 0, 'Parameterized admin search must not expand SQL predicates');
+
 
   const quarantineOutsider = await jsonRequest('/api/admin/users/'+outsider.user.id, {
     method: 'PUT',
@@ -661,6 +697,12 @@ try {
   assert.ok(outsiderThread.data.some((item) => item.text === 'Message user vers user CI' && Number(item.userId) === Number(participant.user.id)));
   outsiderMessageSocket.close();
 
+  const idorThread = await jsonRequest('/api/conversations/'+encodeURIComponent(userToUserConversation.data.id)+'/messages', {
+    headers: authHeaders(attacker.token),
+  });
+  assert.equal(idorThread.response.status, 403, 'A non-member must not read another direct conversation');
+
+
   const adminToUserConversation = await jsonRequest('/api/conversations/direct', {
     method: 'POST',
     headers: authHeaders(host.token),
@@ -705,6 +747,89 @@ try {
     body: JSON.stringify({ contactUserId: bannedMessagingUser.user.id }),
   });
   assert.equal(bannedDirectAttempt.response.status, 404, JSON.stringify(bannedDirectAttempt.data));
+
+  const deniedAdAdmin = await jsonRequest('/api/admin/ads', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ title: 'Interdit', body: 'Ne doit jamais être créé', isActive: true }),
+  });
+  assert.equal(deniedAdAdmin.response.status, 403, 'A normal user must not create advertising campaigns');
+
+  const unsafeAd = await jsonRequest('/api/admin/ads', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: 'URL dangereuse',
+      body: 'Test de sécurité',
+      actionLabel: 'Ouvrir',
+      actionUrl: 'javascript:alert(1)',
+      isActive: true,
+    }),
+  });
+  assert.equal(unsafeAd.response.status, 400, JSON.stringify(unsafeAd.data));
+  assert.equal(unsafeAd.data.code, 'AD_ACTION_INVALID');
+
+  const createdAd = await jsonRequest('/api/admin/ads', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: '<img src=x onerror=alert(1)>',
+      body: '<script>alert("xss")</script> Ceci doit rester du texte.',
+      actionLabel: 'Voir',
+      actionUrl: '/app/notifications',
+      audience: {
+        role: 'user',
+        accountStatus: 'active',
+        country: 'Congo-Brazzaville',
+        city: 'Brazzaville',
+      },
+      isActive: true,
+      maxImpressionsPerUser: 2,
+      cooldownHours: 0,
+      dismissible: true,
+      priority: 900,
+    }),
+  });
+  assert.equal(createdAd.response.status, 201, JSON.stringify(createdAd.data));
+  assert.equal(createdAd.data.title, '<img src=x onerror=alert(1)>');
+
+  const activeAd = await jsonRequest('/api/ads/active', { headers: authHeaders(participant.token) });
+  assert.equal(activeAd.response.status, 200, JSON.stringify(activeAd.data));
+  assert.equal(activeAd.data.id, createdAd.data.id);
+  assert.equal(activeAd.data.body, '<script>alert("xss")</script> Ceci doit rester du texte.');
+
+  const excludedAd = await jsonRequest('/api/ads/active', { headers: authHeaders(attacker.token) });
+  assert.equal(excludedAd.response.status, 204, 'A user outside the targeted city must not receive the campaign');
+
+  const forgedAdClick = await jsonRequest('/api/ads/'+encodeURIComponent(createdAd.data.id)+'/click', {
+    method: 'POST',
+    headers: authHeaders(attacker.token),
+  });
+  assert.equal(forgedAdClick.response.status, 403, 'A non-targeted account must not forge advertising statistics');
+
+  const impression = await jsonRequest('/api/ads/'+encodeURIComponent(createdAd.data.id)+'/impression', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(impression.response.status, 200, JSON.stringify(impression.data));
+  const adClick = await jsonRequest('/api/ads/'+encodeURIComponent(createdAd.data.id)+'/click', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(adClick.response.status, 200, JSON.stringify(adClick.data));
+  const adDismiss = await jsonRequest('/api/ads/'+encodeURIComponent(createdAd.data.id)+'/dismiss', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(adDismiss.response.status, 200, JSON.stringify(adDismiss.data));
+
+  const adStats = await jsonRequest('/api/admin/ads', { headers: authHeaders(host.token) });
+  assert.equal(adStats.response.status, 200, JSON.stringify(adStats.data));
+  const testedAd = adStats.data.find((item) => item.id === createdAd.data.id);
+  assert.equal(testedAd.impressions, 1);
+  assert.equal(testedAd.clicks, 1);
+  assert.equal(testedAd.dismissals, 1);
+  assert.equal(testedAd.uniqueViewers, 1);
 
   const audienceOptions = await jsonRequest('/api/admin/broadcasts/audience-options', { headers: authHeaders(host.token) });
   assert.equal(audienceOptions.response.status, 200, JSON.stringify(audienceOptions.data));
@@ -791,6 +916,18 @@ try {
 
   const adminDashboard = await jsonRequest('/api/admin/dashboard', { headers: authHeaders(host.token) });
   assert.equal(adminDashboard.response.status, 200, JSON.stringify(adminDashboard.data));
+
+  let rateLimitedStatus = 0;
+  for (let attempt = 0; attempt < 11; attempt += 1) {
+    const bruteForce = await jsonRequest('/api/auth/login', {
+      method: 'POST',
+      headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+      body: JSON.stringify({ email: 'rate.attack@mbote.test', password: 'WrongPassword2026!' }),
+    });
+    rateLimitedStatus = bruteForce.response.status;
+  }
+  assert.equal(rateLimitedStatus, 429, 'Repeated login attempts must be rate limited');
+
 
   const createMeeting = await jsonRequest('/api/meetings', {
     method: 'POST',
