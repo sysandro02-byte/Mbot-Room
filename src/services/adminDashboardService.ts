@@ -138,6 +138,58 @@ export type AdminDashboardPayload = {
   permissions: string[];
 };
 
+export type AdminAudienceFilters = {
+  country?: string;
+  city?: string;
+  role?: 'user'|'admin'|'all';
+  accountStatus?: 'active'|'quarantined'|'banned'|'all';
+  organization?: string;
+  jobTitle?: string;
+  userIds?: number[];
+};
+
+export type AdminAudienceOptions = {
+  countries: Array<{name:string;count:number;cities:Array<{name:string;count:number}>}>;
+  organizations: Array<{name:string;count:number}>;
+  jobTitles: Array<{name:string;count:number}>;
+  totals: {total:number;users:number;admins:number;active:number};
+};
+
+export type AdminAudiencePreview = {
+  count: number;
+  tooLarge: boolean;
+  sample: Array<{
+    id:number;name:string;email:string;country:string;city:string;organization:string;jobTitle:string;role:string;accountStatus:string;
+  }>;
+};
+
+export type AdminBroadcast = {
+  id:string;
+  title:string;
+  body:string;
+  actionPath:string;
+  audience:AdminAudienceFilters;
+  recipientCount:number;
+  pushSent:number;
+  pushFailed:number;
+  aiAssisted:boolean;
+  createdAt:string;
+  push?:{sent:number;failed:number;stale:number};
+};
+
+export type AdminAiInsights = {
+  metrics: {
+    users: Record<string,number>;
+    meetings: Record<string,number>;
+    reports: Record<string,number>;
+    notifications: Record<string,number>;
+    topCountries: Array<{country:string;count:number}>;
+  };
+  summary:string;
+  provider:string;
+  model:string|null;
+};
+
 const readJson = async <T>(response: Response): Promise<T> => {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -245,6 +297,48 @@ export const adminDashboardService = {
       body:JSON.stringify({status}),
     });
     return readJson<AdminReport>(response);
+  },
+
+  async getAudienceOptions(): Promise<AdminAudienceOptions> {
+    const response=await apiFetch(apiUrl('/api/admin/broadcasts/audience-options'),{headers:getAuthHeaders(),cache:'no-store'});
+    return readJson<AdminAudienceOptions>(response);
+  },
+
+  async previewAudience(audience:AdminAudienceFilters): Promise<AdminAudiencePreview> {
+    const response=await apiFetch(apiUrl('/api/admin/broadcasts/preview'),{
+      method:'POST',
+      headers:{...getAuthHeaders(),'Content-Type':'application/json'},
+      body:JSON.stringify({audience}),
+    });
+    return readJson<AdminAudiencePreview>(response);
+  },
+
+  async getBroadcasts(): Promise<AdminBroadcast[]> {
+    const response=await apiFetch(apiUrl('/api/admin/broadcasts'),{headers:getAuthHeaders(),cache:'no-store'});
+    return readJson<AdminBroadcast[]>(response);
+  },
+
+  async sendBroadcast(payload:{title:string;body:string;actionPath:string;audience:AdminAudienceFilters;push?:boolean;aiAssisted?:boolean}): Promise<AdminBroadcast> {
+    const response=await apiFetch(apiUrl('/api/admin/broadcasts'),{
+      method:'POST',
+      headers:{...getAuthHeaders(),'Content-Type':'application/json'},
+      body:JSON.stringify(payload),
+    });
+    return readJson<AdminBroadcast>(response);
+  },
+
+  async composeBroadcastWithAi(payload:{intent:string;title?:string;body?:string;tone?:string}): Promise<{title:string;body:string;provider:string;model:string}> {
+    const response=await apiFetch(apiUrl('/api/admin/ai/compose'),{
+      method:'POST',
+      headers:{...getAuthHeaders(),'Content-Type':'application/json'},
+      body:JSON.stringify(payload),
+    });
+    return readJson<{title:string;body:string;provider:string;model:string}>(response);
+  },
+
+  async getAiInsights(): Promise<AdminAiInsights> {
+    const response=await apiFetch(apiUrl('/api/admin/ai/insights'),{headers:getAuthHeaders(),cache:'no-store'},60_000);
+    return readJson<AdminAiInsights>(response);
   },
 
   async getDashboard(period: string): Promise<AdminDashboardPayload> {
