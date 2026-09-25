@@ -803,3 +803,39 @@
 .room-v2-action-modal>footer button.danger{background:#c9333d}
 .room-v2-action-modal>footer button:disabled,
 .room-v2-action-modal>header>button:disabled{opacity:.55;cursor:not-allowed}
+
+
+/* Mobile meeting side-panels: native-like bottom sheet for chat and polls. */
+@media(max-width:760px){
+  .room-v2-panel{
+    position:fixed!important;z-index:90!important;left:0!important;right:0!important;
+    top:max(96px,calc(env(safe-area-inset-top,0px) + 74px))!important;bottom:0!important;
+    width:100%!important;max-width:none!important;min-height:0!important;
+    border-left:0!important;border-top:1px solid #dce3ec!important;border-radius:20px 20px 0 0!important;
+    background:#f8fafc!important;box-shadow:0 -18px 50px rgba(0,0,0,.3)!important;overflow:hidden!important
+  }
+  .room-v2-panel:before{content:"";width:42px;height:4px;flex:0 0 auto;align-self:center;margin:7px auto -1px;border-radius:999px;background:#c7cfdb}
+  .room-v2-panel-title{flex:0 0 54px;height:54px;padding:0 14px;background:rgba(248,250,252,.98);border-bottom:1px solid #e2e7ef}
+  .room-v2-panel-title h2{font-size:16px}
+  .room-v2-panel-title button{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;background:#e9eef5}
+  .room-v2-chat{height:100%;min-height:0;background:#f5f7fb}
+  .room-v2-chat-list{padding:12px 10px 18px;overscroll-behavior:contain;scroll-padding-bottom:84px}
+  .room-v2-chat-list article{width:fit-content;max-width:88%;margin:0 12% 10px 0;padding:9px 11px;border-radius:14px 14px 14px 4px;background:#fff;border:1px solid #e3e8f0;box-shadow:0 2px 9px rgba(20,34,58,.06)}
+  .room-v2-chat-list article.mine{margin:0 0 10px auto;border-radius:14px 14px 4px 14px;background:#e3f7f5;border-color:#c6ece8}
+  .room-v2-chat-list article>div{min-width:130px}
+  .room-v2-chat-list p{font-size:13.5px;line-height:1.42}
+  .room-v2-chat-form{position:sticky;bottom:0;z-index:3;grid-template-columns:minmax(0,1fr) 48px;align-items:end;gap:8px;padding:10px 10px calc(10px + env(safe-area-inset-bottom,0px));background:rgba(255,255,255,.98);border-top:1px solid #dde4ed;box-shadow:0 -8px 22px rgba(21,34,53,.08)}
+  .room-v2-chat-form textarea{min-height:48px;max-height:112px;padding:12px 13px;border-radius:17px;background:#f7f9fc}
+  .room-v2-chat-form button{width:48px;height:48px;border-radius:50%;display:grid;place-items:center}
+  .room-v2-polls{flex:1;min-height:0;padding:12px 10px calc(24px + env(safe-area-inset-bottom,0px));background:#f5f7fb;overscroll-behavior:contain}
+  .room-v2-poll-create{gap:10px;padding:13px;border-radius:16px;box-shadow:0 4px 15px rgba(26,43,70,.06)}
+  .room-v2-poll-create input{height:44px;border-radius:11px;font-size:14px}
+  .room-v2-poll-create button,.room-v2-close-poll{min-height:44px;border-radius:11px}
+  .room-v2-poll{margin-top:11px;padding:13px;border-radius:16px;box-shadow:0 3px 14px rgba(26,43,70,.05)}
+  .room-v2-poll>strong{font-size:14px;line-height:1.4}
+  .room-v2-poll>button:not(.room-v2-close-poll){min-height:45px;align-items:center;padding:10px 12px;border-radius:11px;font-size:13px}
+}
+@media(max-width:420px){
+  .room-v2-panel{top:max(86px,calc(env(safe-area-inset-top,0px) + 66px))!important;border-radius:17px 17px 0 0!important}
+  .room-v2-chat-list article{max-width:92%}
+}
