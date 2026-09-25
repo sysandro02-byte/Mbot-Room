@@ -13,9 +13,8 @@ import { lazyWithRetry } from './lib/lazyWithRetry';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import AppLoader from './components/AppLoader';
 import GlobalHeader from './components/GlobalHeader';
-
-const RealMeetingList = lazyWithRetry(() => import('./components/RealMeetingList'));
-const AppShell = lazyWithRetry(() => import('./components/AppShell'));
+import RealMeetingList from './components/RealMeetingList';
+import AppShell from './components/AppShell';
 const RealJoinPage = lazyWithRetry(() => import('./pages/RealJoinPage'));
 const CalendarPage = lazyWithRetry(() => import('./pages/CalendarPage'));
 const GuestJoinPage = lazyWithRetry(() => import('./pages/GuestJoinPage'));
