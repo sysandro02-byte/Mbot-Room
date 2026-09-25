@@ -291,6 +291,18 @@ export const runExtraMigrations = async () => {
       version text NOT NULL,
       updated_at timestamptz NOT NULL DEFAULT now()
     );
+
+    CREATE TABLE IF NOT EXISTS room_public_pages (
+      key text PRIMARY KEY CHECK (key IN ('security','features','privacy')),
+      title text NOT NULL,
+      body text NOT NULL,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    INSERT INTO room_public_pages (key,title,body) VALUES
+      ('security','Sécurité MBotéRoom','MBotéRoom protège l’accès aux comptes et aux réunions grâce aux sessions sécurisées, au contrôle des origines autorisées, à l’OTP de connexion, aux salles d’attente, au verrouillage de réunion et aux contrôles hôte/co-hôte.\n\nLes mots de passe ne sont jamais envoyés en clair. Les actions sensibles sont validées côté serveur et les accès aux ressources sont contrôlés par compte et par réunion.\n\nPour une utilisation sûre, gardez votre appareil à jour, ne partagez jamais votre code OTP et vérifiez toujours l’identité des participants avant d’admettre une personne dans une réunion.'),
+      ('features','Fonctionnalités MBotéRoom','MBotéRoom permet de créer et rejoindre des réunions, utiliser l’audio/vidéo, le partage d’écran, la salle d’attente, le chat, les sondages, les sous-salles et les enregistrements selon les droits disponibles.\n\nVotre espace comprend également les messages directs, les contacts, les groupes de travail, les fichiers, le calendrier, les notifications, le tableau blanc, les paramètres de confidentialité et Luna IA.\n\nLes fonctions affichées dans votre compte sont raccordées aux API MBotéRoom et à la base PostgreSQL lorsqu’une persistance serveur est nécessaire.'),
+      ('privacy','Confidentialité','MBotéRoom utilise les informations nécessaires au fonctionnement du compte, des réunions, de la messagerie et des préférences. Les données applicatives persistantes sont stockées dans la base PostgreSQL configurée pour MBotéRoom.\n\nLes administrateurs disposent uniquement des outils nécessaires à l’exploitation et à la modération de la plateforme. Les accès aux conversations, fichiers, réunions et enregistrements sont contrôlés côté serveur.\n\nVous pouvez gérer plusieurs préférences de confidentialité et de notification depuis les paramètres de votre compte.')
+    ON CONFLICT (key) DO NOTHING;
     INSERT INTO room_legal_documents (key,title,body,version)
     VALUES (
       'terms',
