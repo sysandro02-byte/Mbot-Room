@@ -83,6 +83,7 @@ jobs:
         run: sha256sum MBoteRoom-Android.apk MBoteRoom-Android.aab > MBoteRoom-Android.sha256
 
       - name: Upload signed APK artifact
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: mboteroom-android-release
@@ -93,6 +94,7 @@ jobs:
           retention-days: 30
 
       - name: Upload Play Store bundle
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: mboteroom-android-play-bundle
