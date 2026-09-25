@@ -15,6 +15,8 @@ export default function GlobalHeader(){
   const navigate=useNavigate();
   const [user,setUser]=useState<RoomUser|null>(()=>authService.getCurrentUser());
   const [unread,setUnread]=useState(0);
+  const [notificationPulse,setNotificationPulse]=useState(false);
+  const notificationPulseTimerRef=useRef<number|null>(null);
   const [profileOpen,setProfileOpen]=useState(false);
   const [reportOpen,setReportOpen]=useState(false);
   const [reportKind,setReportKind]=useState<ReportKind>('bug');
@@ -40,7 +42,14 @@ export default function GlobalHeader(){
   useEffect(()=>{
     if(!authenticated||guestMode){setUnread(0);return undefined;}
     const refresh=()=>void notificationService.list().then((rows)=>setUnread(rows.filter((item)=>!item.readAt).length)).catch(()=>undefined);
-    const onNotification=()=>refresh();
+    const onNotification=()=>{
+      setUnread((current)=>current+1);
+      setNotificationPulse(false);
+      window.requestAnimationFrame(()=>setNotificationPulse(true));
+      if(notificationPulseTimerRef.current)window.clearTimeout(notificationPulseTimerRef.current);
+      notificationPulseTimerRef.current=window.setTimeout(()=>setNotificationPulse(false),4200);
+      refresh();
+    };
     const onRestrictionsUpdated=()=>void authService.refreshCurrentUser().then(()=>setUser(authService.getCurrentUser())).catch(()=>undefined);
     refresh();
     if(!socket.connected)socket.connect();
@@ -51,6 +60,7 @@ export default function GlobalHeader(){
       socket.off('notification:new',onNotification);
       socket.off('account:restrictions-updated',onRestrictionsUpdated);
       window.removeEventListener('focus',refresh);
+      if(notificationPulseTimerRef.current)window.clearTimeout(notificationPulseTimerRef.current);
     };
   },[authenticated,guestMode]);
 
@@ -124,7 +134,7 @@ export default function GlobalHeader(){
         {authenticated?<>
           <button type="button" className="global-header-action" onClick={()=>void openReport()} title="Signaler un problème"><Flag size={19}/><span>Signaler</span></button>
           <button type="button" className="global-header-icon" onClick={()=>navigate('/aide')} aria-label="Aide"><CircleHelp size={19}/></button>
-          {!guestMode?<button type="button" className="global-header-icon" onClick={()=>navigate('/app/notifications')} aria-label="Notifications"><Bell size={19}/>{unread>0?<b>{Math.min(99,unread)}</b>:null}</button>:null}
+          {!guestMode?<button type="button" className={`global-header-icon global-header-notification ${notificationPulse?'is-pulsing':''}`.trim()} onClick={()=>{setNotificationPulse(false);navigate('/app/notifications');}} aria-label="Notifications" aria-live="polite"><Bell size={19}/>{unread>0?<b>{Math.min(99,unread)}</b>:null}</button>:null}
           <div className="global-header-profile" ref={profileRef}>
             <button type="button" className="global-header-avatar" onClick={()=>setProfileOpen((value)=>!value)} aria-expanded={profileOpen}>
               <span>{user?.avatar?<img src={user.avatar} alt=""/>:<b>{initials}</b>}</span>
