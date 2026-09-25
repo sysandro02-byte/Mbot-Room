@@ -477,9 +477,11 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
       const maxImpressions = Math.max(1,Math.min(100,Number(request.body?.maxImpressionsPerUser || 1)));
       const cooldownHours = Math.max(0,Math.min(8760,Number(request.body?.cooldownHours ?? 24)));
       const priority = Math.max(0,Math.min(1000,Number(request.body?.priority || 0)));
+      const dismissible = request.body?.dismissible !== false;
       if (!title || !body) return sendApiError(response,400,'AD_CONTENT_REQUIRED','Ajoutez un titre et un message.');
       if (request.body?.imageUrl && !imageUrl) return sendApiError(response,400,'AD_IMAGE_INVALID','Utilisez une image HTTPS ou une ressource interne.');
       if (request.body?.actionUrl && !actionUrl) return sendApiError(response,400,'AD_ACTION_INVALID','Utilisez une destination interne ou HTTPS.');
+      if (!dismissible && (!actionUrl || !actionLabel)) return sendApiError(response,400,'AD_EXIT_REQUIRED','Une campagne non fermable doit proposer un bouton d’action valide.');
       if (endsAt && new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
         return sendApiError(response,400,'AD_DATE_INVALID','La date de fin doit être postérieure au début.');
       }
@@ -488,7 +490,7 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
           (id,created_by,title,body,image_url,action_label,action_url,audience,is_active,starts_at,ends_at,max_impressions_per_user,cooldown_hours,dismissible,priority)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15)
          RETURNING *`,
-        [createId(),request.user!.id,title,body,imageUrl,actionLabel,actionUrl,JSON.stringify(audience),request.body?.isActive===true,startsAt,endsAt,maxImpressions,cooldownHours,request.body?.dismissible!==false,priority],
+        [createId(),request.user!.id,title,body,imageUrl,actionLabel,actionUrl,JSON.stringify(audience),request.body?.isActive===true,startsAt,endsAt,maxImpressions,cooldownHours,dismissible,priority],
       );
       const payload=rowToAdCampaign(result.rows[0]);
       io.emit('ad:campaign-updated',{id:payload.id});
@@ -515,9 +517,11 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
       const maxImpressions=Math.max(1,Math.min(100,Number(request.body?.maxImpressionsPerUser ?? row.max_impressions_per_user ?? 1)));
       const cooldownHours=Math.max(0,Math.min(8760,Number(request.body?.cooldownHours ?? row.cooldown_hours ?? 24)));
       const priority=Math.max(0,Math.min(1000,Number(request.body?.priority ?? row.priority ?? 0)));
+      const dismissible=typeof request.body?.dismissible==='boolean'?request.body.dismissible:Boolean(row.dismissible);
       if(!title||!body)return sendApiError(response,400,'AD_CONTENT_REQUIRED','Ajoutez un titre et un message.');
       if(imageCandidate && !imageUrl)return sendApiError(response,400,'AD_IMAGE_INVALID','Utilisez une image HTTPS ou une ressource interne.');
       if(actionCandidate && !actionUrl)return sendApiError(response,400,'AD_ACTION_INVALID','Utilisez une destination interne ou HTTPS.');
+      if(!dismissible&&(!actionUrl||!actionLabel))return sendApiError(response,400,'AD_EXIT_REQUIRED','Une campagne non fermable doit proposer un bouton d’action valide.');
       if(endsAt&&new Date(endsAt).getTime()<=new Date(startsAt).getTime())return sendApiError(response,400,'AD_DATE_INVALID','La date de fin doit être postérieure au début.');
       const result=await query(
         `UPDATE room_ad_campaigns
@@ -525,7 +529,7 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
                 is_active=$8,starts_at=$9,ends_at=$10,max_impressions_per_user=$11,cooldown_hours=$12,
                 dismissible=$13,priority=$14,updated_at=now()
           WHERE id=$1 RETURNING *`,
-        [campaignId,title,body,imageUrl,actionLabel,actionUrl,JSON.stringify(audience),typeof request.body?.isActive==='boolean'?request.body.isActive:Boolean(row.is_active),startsAt,endsAt,maxImpressions,cooldownHours,typeof request.body?.dismissible==='boolean'?request.body.dismissible:Boolean(row.dismissible),priority],
+        [campaignId,title,body,imageUrl,actionLabel,actionUrl,JSON.stringify(audience),typeof request.body?.isActive==='boolean'?request.body.isActive:Boolean(row.is_active),startsAt,endsAt,maxImpressions,cooldownHours,dismissible,priority],
       );
       const payload=rowToAdCampaign(result.rows[0]);
       io.emit('ad:campaign-updated',{id:payload.id});
