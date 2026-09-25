@@ -1,23 +1,24 @@
 import { ChevronRight, Crown, Database, MonitorUp, UsersRound, CalendarDays, Clock3, MessageCircle, Video } from 'lucide-react';
 
 type Props = {
+  premiumAvailable: boolean;
   onPremium: () => void;
   onCreateGroup: () => void;
   onStorageData: () => void;
   onShareScreen: () => void;
 };
 
-export function HomeQuickActions({ onPremium, onCreateGroup, onStorageData, onShareScreen }: Props) {
+export function HomeQuickActions({ premiumAvailable, onPremium, onCreateGroup, onStorageData, onShareScreen }: Props) {
   return (
     <>
       <section className="home-quick-actions home-quick-actions-desktop" aria-label="Actions rapides">
-        <button className="is-premium" type="button" onClick={onPremium}><span><Crown/></span><div><strong>Premium</strong><small>Découvrir les options Premium</small></div><ChevronRight/></button>
+        {premiumAvailable?<button className="is-premium" type="button" onClick={onPremium}><span><Crown/></span><div><strong>Premium</strong><small>Découvrir les options Premium</small></div><ChevronRight/></button>:null}
         <button className="is-blue" type="button" onClick={onCreateGroup}><span><UsersRound/></span><div><strong>Créer un groupe</strong><small>Collaborer avec votre équipe</small></div><ChevronRight/></button>
         <button className="is-purple" type="button" onClick={onStorageData}><span><Database/></span><div><strong>Stockage & données</strong><small>Gérer l’espace et les données</small></div><ChevronRight/></button>
         <button className="is-coral" type="button" onClick={onShareScreen}><span><MonitorUp/></span><div><strong>Partager un écran</strong><small>Présenter et collaborer</small></div><ChevronRight/></button>
       </section>
       <section className="home-quick-actions home-quick-actions-mobile" aria-label="Actions rapides">
-        <button className="is-teal" type="button" onClick={onPremium}><span><Crown/></span><div><strong>Premium</strong><small>Options Premium</small></div><ChevronRight/></button>
+        {premiumAvailable?<button className="is-teal" type="button" onClick={onPremium}><span><Crown/></span><div><strong>Premium</strong><small>Options Premium</small></div><ChevronRight/></button>:null}
         <button className="is-blue" type="button" onClick={onCreateGroup}><span><UsersRound/></span><div><strong>Créer un groupe</strong><small>Votre équipe</small></div><ChevronRight/></button>
         <button className="is-purple" type="button" onClick={onStorageData}><span><Database/></span><div><strong>Stockage & données</strong><small>Gérer vos données</small></div><ChevronRight/></button>
         <button className="is-coral" type="button" onClick={onShareScreen}><span><MonitorUp/></span><div><strong>Partager l’écran</strong><small>Présenter</small></div><ChevronRight/></button>
