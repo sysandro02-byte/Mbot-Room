@@ -40,7 +40,7 @@ const TermsPage = lazyWithRetry(() => import('./pages/TermsPage'));
 function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: boolean }) {
   const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated());
-  const [checking, setChecking] = useState(true);
+  const [checking, setChecking] = useState(() => !authService.isAuthenticated());
 
   useEffect(() => {
     let active = true;
@@ -84,7 +84,7 @@ function AdminRoute({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated());
   const [isAdmin, setIsAdmin] = useState(authService.isAdmin());
-  const [checking, setChecking] = useState(true);
+  const [checking, setChecking] = useState(() => !(authService.isAuthenticated() && authService.isAdmin()));
 
   useEffect(() => {
     let active = true;
