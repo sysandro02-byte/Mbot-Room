@@ -1859,6 +1859,30 @@ html[data-native-app="android"] .android-download-card{
   border:0!important;
   background:linear-gradient(100deg,#1886df,#4155e8 58%,#5b37e8)!important;
   box-shadow:0 8px 18px rgba(45,76,220,.18)!important;
+  animation:apk-download-vibrate 5.5s ease-in-out infinite;
+  transform-origin:center;
+  will-change:transform;
+}
+.android-download-primary:hover,
+.android-download-primary:focus-visible{
+  animation:apk-download-vibrate-focus .55s ease-in-out;
+}
+@keyframes apk-download-vibrate{
+  0%,78%,100%{transform:translateX(0) rotate(0deg)}
+  80%{transform:translateX(-1.5px) rotate(-.35deg)}
+  82%{transform:translateX(1.5px) rotate(.35deg)}
+  84%{transform:translateX(-1.2px) rotate(-.25deg)}
+  86%{transform:translateX(1.2px) rotate(.25deg)}
+  88%{transform:translateX(-.7px) rotate(-.15deg)}
+  90%{transform:translateX(.7px) rotate(.15deg)}
+  92%{transform:translateX(0) rotate(0deg)}
+}
+@keyframes apk-download-vibrate-focus{
+  0%,100%{transform:translateX(0) rotate(0deg)}
+  20%{transform:translateX(-2px) rotate(-.4deg)}
+  40%{transform:translateX(2px) rotate(.4deg)}
+  60%{transform:translateX(-1.2px) rotate(-.25deg)}
+  80%{transform:translateX(1.2px) rotate(.25deg)}
 }
 .android-download-share{
   border:1px solid #c9d4e6!important;
@@ -2047,4 +2071,5 @@ html[data-native-app="android"] .android-download-card{
 }
 @media(prefers-reduced-motion:reduce){
   .google-config-progress span{animation:none;width:70%}
+  .android-download-primary{animation:none!important}
 }
