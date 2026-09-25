@@ -710,15 +710,20 @@
 
 .create-account-copy {
   display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 6px;
   margin: 29px 0 0;
   color: #697590;
   font-size: 14px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .create-account-copy button {
   padding: 0;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .login-benefits {
@@ -940,7 +945,9 @@
   }
 
   .create-account-copy {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    font-size: 13px;
   }
 
   .login-benefits {
@@ -1594,7 +1601,7 @@
   .auth-security-badges span{font-size:7.5px}
   .form-options{align-items:flex-start;flex-direction:column}
   .auth-text-link{align-self:flex-end;margin-top:-28px}
-  .create-account-copy{gap:6px;margin-top:18px}
+  .create-account-copy{gap:4px;margin-top:18px;font-size:12px;flex-wrap:nowrap;white-space:nowrap}
 }
 
 @keyframes auth-card-enter{
