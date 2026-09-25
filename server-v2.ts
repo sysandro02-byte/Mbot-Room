@@ -119,7 +119,7 @@ const rateLimit = (limit: number, windowMs: number): express.RequestHandler => (
     ? String(request.body?.challengeId || request.body?.email || request.body?.meetingCode || '')
         .trim().toLowerCase().slice(0, 180)
     : '';
-  const key = `${request.ip}:${routeKey}:${authIdentity || '-'}`;
+  const key = `${limit}:${windowMs}:${request.ip}:${routeKey}:${authIdentity || '-'}`;
   const current = rateBuckets.get(key);
   if (!current || current.resetAt <= now) {
     rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
