@@ -340,7 +340,6 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [apkShareMessage, setApkShareMessage] = useState('');
   const [formError, setFormError] = useState('');
   const [externalAuthModalMessage, setExternalAuthModalMessage] = useState('');
-  const [googleConfigModalOpen, setGoogleConfigModalOpen] = useState(false);
   const [otpChallengeId, setOtpChallengeId] = useState('');
   const [otpEmailHint, setOtpEmailHint] = useState('');
   const [otpRedirectTo, setOtpRedirectTo] = useState('');
@@ -970,17 +969,6 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                     <ChevronRight className="external-login-arrow" size={20} aria-hidden="true" />
                   </button>
 
-                  <button
-                    className="google-login-button google-oauth-button"
-                    type="button"
-                    onClick={() => setGoogleConfigModalOpen(true)}
-                    disabled={isLoading || isMboteLoading}
-                    aria-label="Google"
-                  >
-                    <span className="google-g" aria-hidden="true">G</span>
-                    <span>Google</span>
-                    <ChevronRight className="external-login-arrow" size={20} aria-hidden="true" />
-                  </button>
                 </div>
 
                 <button className="join-meeting-card" type="button" onClick={goToGuestJoin} onKeyDown={handleGuestKeyDown}>
@@ -1265,9 +1253,6 @@ export default function Login({ initialView = 'login' }: LoginProps) {
           onClose={() => setExternalAuthModalMessage('')}
         />
       )}
-      {googleConfigModalOpen && (
-        <GoogleConfigurationModal onClose={() => setGoogleConfigModalOpen(false)} />
-      )}
     </main>
   );
 }
@@ -1289,229 +1274,5 @@ function ExternalAuthErrorModal({ message, onClose }: { message: string; onClose
         <button type="button" onClick={onClose} autoFocus>Fermer</button>
       </section>
     </div>
-  );
-}
-
-function GoogleConfigurationModal({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="auth-modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <section
-        className="auth-modal google-config-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="google-config-title"
-        aria-describedby="google-config-message"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <span className="google-config-icon" aria-hidden="true">G</span>
-        <span className="google-config-kicker">Connexion Google</span>
-        <h2 id="google-config-title">Configuration en cours</h2>
-        <p id="google-config-message">
-          La connexion avec Google est en cours de configuration sur MBotéRoom.
-          Elle sera disponible prochainement.
-        </p>
-        <div className="google-config-progress" aria-hidden="true"><span /></div>
-        <button type="button" onClick={onClose} autoFocus>Compris</button>
-      </section>
-    </div>
-  );
-}
-
-function AuthBrandPanel({
-  copy,
-  language,
-  branding,
-  onLanguageChange,
-}: {
-  copy: (typeof translations)[Language];
-  language: Language;
-  branding: LoginBranding;
-  onLanguageChange: (language: Language) => void;
-}) {
-  const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
-  const navigateToAdmin = useNavigate();
-  const selectedLanguage = languageOptions.find((option) => option.value === language) || languageOptions[0];
-  const closeLanguageMenuOnBlur = (event: FocusEvent<HTMLDivElement>) => {
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-      setIsLanguageMenuOpen(false);
-    }
-  };
-
-  const selectLanguage = (nextLanguage: Language) => {
-    onLanguageChange(nextLanguage);
-    setIsLanguageMenuOpen(false);
-  };
-
-  return (
-    <aside className="brand-panel">
-      <span className="brand-dots" aria-hidden="true" />
-      <div className="language-selector" onBlur={closeLanguageMenuOnBlur}>
-        <button
-          type="button"
-          aria-label={copy.ariaLanguage}
-          aria-haspopup="listbox"
-          aria-expanded={isLanguageMenuOpen}
-          onClick={() => setIsLanguageMenuOpen((currentValue) => !currentValue)}
-        >
-          <Globe2 size={16} aria-hidden="true" />
-          <span>{selectedLanguage.label}</span>
-          <ChevronDown size={16} aria-hidden="true" />
-        </button>
-        {isLanguageMenuOpen && (
-          <div className="language-menu" role="listbox" aria-label={copy.ariaLanguage}>
-            {languageOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={option.value === language}
-                className={option.value === language ? 'is-selected' : ''}
-                onClick={() => selectLanguage(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      <button className="mbote-logo admin-entry" type="button" aria-label="Ouvrir la connexion administrateur" title="Administration" onClick={() => navigateToAdmin('/admin/login')}>
-        <img
-          className="mboteroom-wordmark"
-          src={branding.wordmarkUrl}
-          alt="MBotéRoom"
-          onError={(event) => { if (event.currentTarget.src !== defaultLoginBranding.wordmarkUrl) event.currentTarget.src = defaultLoginBranding.wordmarkUrl; }}
-        />
-      </button>
-
-      <div className="brand-panel-copy">
-        <h2>{copy.heroTitle.split('\n').map((line) => <span key={line}>{line}</span>)}</h2>
-        <p>{copy.heroDescription.split('\n').map((line) => <span key={line}>{line}</span>)}</p>
-      </div>
-
-      <div className="feature-list">
-        {features.map((feature, index) => {
-          const Icon = feature.icon;
-          const translatedFeature = copy.features[index] || [feature.title, feature.description];
-          return (
-            <article className="feature-item" key={feature.title}>
-              <span className={`feature-icon feature-icon-${feature.tone}`}>
-                <Icon size={27} aria-hidden="true" />
-              </span>
-              <span>
-                <strong>{translatedFeature[0]}</strong>
-                <small>{translatedFeature[1]}</small>
-              </span>
-            </article>
-          );
-        })}
-      </div>
-
-      <MeetingIllustration src={branding.illustrationUrl} />
-      <div className="auth-showcase-badge auth-showcase-badge-team" aria-hidden="true">
-        <UsersRound size={18} />
-        <span>Réunions plus<br/>productives</span>
-      </div>
-      <div className="auth-showcase-badge auth-showcase-badge-security" aria-hidden="true">
-        <Lock size={18} />
-        <span>Vos données<br/>en sécurité</span>
-      </div>
-      <span className="auth-showcase-note" aria-hidden="true">Travailler<br/>ensemble,<br/>simplement.</span>
-    </aside>
-  );
-}
-
-function MeetingIllustration({ src }: { src: string }) {
-  return (
-    <figure className="meeting-illustration">
-      <img
-        src={src || defaultLoginBranding.illustrationUrl}
-        alt="Participants en pleine réunion vidéo MBotéRoom"
-        loading="eager"
-        decoding="async"
-        onError={(event) => { if (event.currentTarget.src !== defaultLoginBranding.illustrationUrl) event.currentTarget.src = defaultLoginBranding.illustrationUrl; }}
-      />
-    </figure>
-  );
-}
-
-function FormField({
-  id,
-  label,
-  icon,
-  error,
-  children,
-}: {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="form-group">
-      <label htmlFor={id}>{label}</label>
-      <div className={error ? 'input-shell has-error' : 'input-shell'}>
-        <span className="input-icon">{icon}</span>
-        {children}
-      </div>
-      {error && <p id={`${id}-error`} className="field-error" role="alert">{error}</p>}
-    </div>
-  );
-}
-
-function CompactAuthCard({
-  title,
-  subtitle,
-  error,
-  isLoading,
-  submitLabel,
-  loadingLabel,
-  footer,
-  onSubmit,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  error: string;
-  isLoading: boolean;
-  submitLabel: string;
-  loadingLabel: string;
-  footer: React.ReactNode;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="login-card compact-auth-card" aria-labelledby="compact-auth-title">
-      <header className="login-card-header">
-        <h1 id="compact-auth-title">{title}</h1>
-        <p>{subtitle}</p>
-      </header>
-      <form className="login-form" onSubmit={onSubmit} noValidate>
-        {children}
-        {error && <p className="auth-error" role="alert">{error}</p>}
-        <button className="primary-login-button" type="submit" disabled={isLoading}>
-          {isLoading ? loadingLabel : submitLabel}
-        </button>
-        {footer}
-      </form>
-    </section>
-  );
-}
-
-function AuthFooterAction({ label, action, onClick }: { label: string; action: string; onClick: () => void }) {
-  return (
-    <p className="create-account-copy">
-      {label}
-      <button type="button" onClick={onClick}>{action}</button>
-    </p>
-  );
-}
-
-function MboteAuthIcon() {
-  return (
-    <span className="mbote-auth-icon" aria-hidden="true">
-      <UsersRound size={18} />
-      <Video size={10} />
-    </span>
   );
 }
