@@ -1470,11 +1470,146 @@ try {
   const bannedSession = await jsonRequest('/api/auth/me', { headers: authHeaders(outsider.token) });
   assert.equal(bannedSession.response.status, 401, 'Banning a user must revoke their existing sessions');
 
+  // Advertising campaign integration: real targeting, impression tracking and safe actions.
+  const invalidAdAction = await jsonRequest('/api/admin/ads', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: 'Action invalide',
+      body: 'Cette campagne doit être refusée.',
+      actionLabel: 'Ouvrir',
+      actionUrl: 'javascript:alert(1)',
+      audience: { role: 'user', accountStatus: 'active' },
+      isActive: true,
+    }),
+  });
+  assert.equal(invalidAdAction.response.status, 400, JSON.stringify(invalidAdAction.data));
+  assert.equal(invalidAdAction.data.code, 'AD_ACTION_INVALID');
+
+  const adCampaign = await jsonRequest('/api/admin/ads', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: 'Campagne intégration',
+      body: '<img src=x onerror=alert(1)> Texte publicitaire sûr.',
+      imageUrl: 'https://example.com/campaign.jpg',
+      actionLabel: 'Découvrir',
+      actionUrl: '/app/meetings',
+      audience: {
+        role: 'user',
+        accountStatus: 'active',
+        country: 'Congo-Brazzaville',
+        city: 'Brazzaville',
+        userIds: [participant.user.id],
+      },
+      isActive: true,
+      startsAt: new Date(Date.now() - 60_000).toISOString(),
+      endsAt: new Date(Date.now() + 3_600_000).toISOString(),
+      maxImpressionsPerUser: 1,
+      cooldownHours: 0,
+      dismissible: true,
+      priority: 50,
+    }),
+  });
+  assert.equal(adCampaign.response.status, 201, JSON.stringify(adCampaign.data));
+  assert.equal(adCampaign.data.body, '<img src=x onerror=alert(1)> Texte publicitaire sûr.');
+
+  const participantAd = await jsonRequest('/api/ads/active', { headers: authHeaders(participant.token) });
+  assert.equal(participantAd.response.status, 200, JSON.stringify(participantAd.data));
+  assert.equal(participantAd.data.id, adCampaign.data.id);
+
+  const outsiderAd = await jsonRequest('/api/ads/active', { headers: authHeaders(outsider.token) });
+  assert.equal(outsiderAd.response.status, 204, JSON.stringify(outsiderAd.data));
+
+  const adImpression = await jsonRequest('/api/ads/'+encodeURIComponent(adCampaign.data.id)+'/impression', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(adImpression.response.status, 200, JSON.stringify(adImpression.data));
+
+  const participantAdAfterLimit = await jsonRequest('/api/ads/active', { headers: authHeaders(participant.token) });
+  assert.equal(participantAdAfterLimit.response.status, 204, JSON.stringify(participantAdAfterLimit.data));
+
+  const adClick = await jsonRequest('/api/ads/'+encodeURIComponent(adCampaign.data.id)+'/click', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(adClick.response.status, 200, JSON.stringify(adClick.data));
+
+  const adDismiss = await jsonRequest('/api/ads/'+encodeURIComponent(adCampaign.data.id)+'/dismiss', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(adDismiss.response.status, 200, JSON.stringify(adDismiss.data));
+
+  const adStats = await jsonRequest('/api/admin/ads', { headers: authHeaders(host.token) });
+  assert.equal(adStats.response.status, 200, JSON.stringify(adStats.data));
+  const testedCampaign = adStats.data.find((item) => item.id === adCampaign.data.id);
+  assert.ok(testedCampaign);
+  assert.equal(Number(testedCampaign.impressions), 1);
+  assert.equal(Number(testedCampaign.uniqueViewers), 1);
+  assert.equal(Number(testedCampaign.clicks), 1);
+  assert.equal(Number(testedCampaign.dismissals), 1);
+
+  // Controlled adversarial checks. These run only against the disposable CI database.
+  const unauthenticatedAdmin = await jsonRequest('/api/admin/ads');
+  assert.equal(unauthenticatedAdmin.response.status, 401, JSON.stringify(unauthenticatedAdmin.data));
+
+  const userAdminBypass = await jsonRequest('/api/admin/ads', { headers: authHeaders(participant.token) });
+  assert.equal(userAdminBypass.response.status, 403, JSON.stringify(userAdminBypass.data));
+
+  const sqlInjectionSearch = await jsonRequest('/api/admin/users?q='+encodeURIComponent("' OR 1=1; DROP TABLE room_users; --"), {
+    headers: authHeaders(host.token),
+  });
+  assert.equal(sqlInjectionSearch.response.status, 200, JSON.stringify(sqlInjectionSearch.data));
+  assert.ok(Array.isArray(sqlInjectionSearch.data));
+  const usersTableStillExists = await jsonRequest('/api/admin/users?q=host.integration', {
+    headers: authHeaders(host.token),
+  });
+  assert.equal(usersTableStillExists.response.status, 200, JSON.stringify(usersTableStillExists.data));
+  assert.ok(usersTableStillExists.data.some((item) => item.email === 'host.integration@mbote.test'));
+
+  const idorConversation = await jsonRequest('/api/conversations/'+encodeURIComponent(adminToUserConversation.data.id)+'/messages', {
+    headers: authHeaders(outsider.token),
+  });
+  assert.ok([403,404].includes(idorConversation.response.status), JSON.stringify(idorConversation.data));
+
+  const idorUserMutation = await jsonRequest('/api/admin/users/'+participant.user.id, {
+    method: 'PUT',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ accountStatus: 'banned' }),
+  });
+  assert.equal(idorUserMutation.response.status, 403, JSON.stringify(idorUserMutation.data));
+
+  const forbiddenOriginResponse = await fetch(baseUrl+'/api/health', {
+    headers: { Origin: 'https://evil.example' },
+  });
+  assert.equal(forbiddenOriginResponse.status, 403);
+  const forbiddenOriginBody = await forbiddenOriginResponse.json();
+  assert.equal(forbiddenOriginBody.code, 'ORIGIN_DENIED');
+
+  const securityHeadersResponse = await fetch(baseUrl+'/api/health', { headers: { Origin: baseUrl } });
+  assert.equal(securityHeadersResponse.status, 200);
+  assert.equal(securityHeadersResponse.headers.get('x-frame-options'), 'DENY');
+  assert.equal(securityHeadersResponse.headers.get('x-content-type-options'), 'nosniff');
+  assert.ok(String(securityHeadersResponse.headers.get('content-security-policy') || '').includes("frame-ancestors 'none'"));
+
+  let forgotRateLimited = null;
+  for (let index = 0; index < 6; index += 1) {
+    forgotRateLimited = await jsonRequest('/api/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'rate-limit-'+index+'@mbote.test' }),
+    });
+  }
+  assert.equal(forgotRateLimited.response.status, 429, JSON.stringify(forgotRateLimited.data));
+  assert.equal(forgotRateLimited.data.code, 'RATE_LIMITED');
+  assert.ok(Number(forgotRateLimited.response.headers.get('retry-after') || 0) > 0);
+
   const finalHealth = await jsonRequest('/api/health');
   assert.equal(finalHealth.response.status, 200);
   assert.equal(finalHealth.data.database?.connected, true);
 
-  console.log('PostgreSQL + REST + Socket.IO integration checks passed.');
+  console.log('PostgreSQL + REST + Socket.IO + controlled adversarial checks passed.');
 } finally {
   participantSocket?.close();
   hostSocket?.close();
