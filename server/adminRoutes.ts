@@ -393,9 +393,18 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
   app.post('/api/ads/:campaignId/dismiss', ...userApi, async (request: AuthedRequest, response, next) => {
     try {
       const campaignId = String(request.params.campaignId || '').trim();
-      const campaign = await query('SELECT id,dismissible FROM room_ad_campaigns WHERE id=$1 LIMIT 1',[campaignId]);
-      if (!campaign.rows[0]) return sendApiError(response,404,'AD_NOT_FOUND','Campagne introuvable.');
-      if (!campaign.rows[0].dismissible) return sendApiError(response,409,'AD_NOT_DISMISSIBLE','Cette campagne doit être consultée avant de continuer.');
+      const [campaign,userResult]=await Promise.all([
+        query('SELECT id,dismissible,audience FROM room_ad_campaigns WHERE id=$1 LIMIT 1',[campaignId]),
+        query(`SELECT id,role,country,city,organization,job_title,COALESCE(account_status,'active') AS account_status,is_guest
+                 FROM room_users WHERE id=$1 LIMIT 1`,[request.user!.id]),
+      ]);
+      const row=campaign.rows[0];
+      const user=userResult.rows[0];
+      if (!row) return sendApiError(response,404,'AD_NOT_FOUND','Campagne introuvable.');
+      if (!user || user.is_guest || !adAudienceMatches(user,row.audience || {})) {
+        return sendApiError(response,403,'AD_AUDIENCE_DENIED','Cette campagne ne correspond pas à ce compte.');
+      }
+      if (!row.dismissible) return sendApiError(response,409,'AD_NOT_DISMISSIBLE','Cette campagne doit être consultée avant de continuer.');
       await query(
         `INSERT INTO room_ad_user_state (campaign_id,user_id,dismissals,last_dismissed_at)
          VALUES ($1,$2,1,now())
@@ -410,8 +419,17 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
   app.post('/api/ads/:campaignId/click', ...userApi, async (request: AuthedRequest, response, next) => {
     try {
       const campaignId = String(request.params.campaignId || '').trim();
-      const campaign = await query('SELECT id FROM room_ad_campaigns WHERE id=$1 LIMIT 1',[campaignId]);
-      if (!campaign.rows[0]) return sendApiError(response,404,'AD_NOT_FOUND','Campagne introuvable.');
+      const [campaign,userResult]=await Promise.all([
+        query('SELECT id,audience FROM room_ad_campaigns WHERE id=$1 LIMIT 1',[campaignId]),
+        query(`SELECT id,role,country,city,organization,job_title,COALESCE(account_status,'active') AS account_status,is_guest
+                 FROM room_users WHERE id=$1 LIMIT 1`,[request.user!.id]),
+      ]);
+      const row=campaign.rows[0];
+      const user=userResult.rows[0];
+      if (!row) return sendApiError(response,404,'AD_NOT_FOUND','Campagne introuvable.');
+      if (!user || user.is_guest || !adAudienceMatches(user,row.audience || {})) {
+        return sendApiError(response,403,'AD_AUDIENCE_DENIED','Cette campagne ne correspond pas à ce compte.');
+      }
       await query(
         `INSERT INTO room_ad_user_state (campaign_id,user_id,clicks,last_clicked_at)
          VALUES ($1,$2,1,now())
