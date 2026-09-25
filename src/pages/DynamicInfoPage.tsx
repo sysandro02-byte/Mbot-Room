@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, LockKeyhole, ShieldCheck, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch, apiUrl } from '../lib/api';
-import { socket } from '../lib/socket';
 import AppLoader from '../components/AppLoader';
 import './UtilityPages.css';
 
@@ -34,15 +33,6 @@ export default function DynamicInfoPage({pageKey}:{pageKey:PublicPageKey}){
   };
 
   useEffect(()=>{void load();},[pageKey]);
-
-  useEffect(()=>{
-    if(!socket.connected)socket.connect();
-    const onUpdated=(payload:PublicPage)=>{
-      if(payload?.key===pageKey)setPage(payload);
-    };
-    socket.on('public-page:updated',onUpdated);
-    return()=>{socket.off('public-page:updated',onUpdated);};
-  },[pageKey]);
 
   const paragraphs=useMemo(()=>String(page?.body||'').split(/\n{2,}/).map((item)=>item.trim()).filter(Boolean),[page?.body]);
 
