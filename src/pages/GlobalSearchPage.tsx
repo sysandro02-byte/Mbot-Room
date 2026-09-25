@@ -46,7 +46,7 @@ export default function GlobalSearchPage() {
 
   const filteredMeetings = useMemo(() => {
     if (!query) return [];
-    const compact = query.replace(/s+/g, '');
+    const compact = query.replace(/\s+/g, '');
     return meetings.filter((meeting) => [
       meeting.title,
       meeting.description,
@@ -54,7 +54,7 @@ export default function GlobalSearchPage() {
       String(meeting.id),
       getMeetingAccessCode(meeting),
       meeting.meeting_link,
-    ].some((value) => String(value || '').toLowerCase().replace(/s+/g, '').includes(compact))).slice(0, 30);
+    ].some((value) => String(value || '').toLowerCase().replace(/\s+/g, '').includes(compact))).slice(0, 30);
   }, [meetings, query]);
 
   const filteredContacts = useMemo(() => {
