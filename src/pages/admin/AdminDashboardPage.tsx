@@ -511,7 +511,15 @@ export default function AdminDashboardPage() {
             <kbd>Ctrl + K</kbd>
           </form>
           <nav className="admin-topbar-actions" aria-label="Actions administrateur">
-            <button className="admin-topbar-icon" type="button" aria-label="Notifications administrateur" onClick={() => navigate('/app/notifications')}>
+            <button
+              className="admin-topbar-icon"
+              type="button"
+              aria-label="Notifications administrateur"
+              onClick={() => {
+                window.history.replaceState(null, '', '/admin#admin-notifications');
+                document.getElementById('admin-notifications')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+            >
               <Bell size={22} aria-hidden="true" />
               <span>{dashboard?.recentActivity.length || 0}</span>
             </button>
@@ -738,7 +746,7 @@ function LiveMeetingsCard({
 
 function RecentActivityCard({ activities }: { activities: AdminActivity[] }) {
   return (
-    <section className="admin-activity-card">
+    <section className="admin-activity-card" id="admin-notifications" aria-label="Notifications administrateur">
       <header><h2>Activité récente</h2><span>Dernières actions serveur</span></header>
       {activities.length ? activities.map((activity) => (
         <article className={`admin-activity-row is-${activityTones[activity.type]}`} key={activity.id}>
