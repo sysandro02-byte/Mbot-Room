@@ -513,12 +513,30 @@ export default function AdminDashboardPage() {
           <button className="admin-mobile-menu" type="button" aria-label="Ouvrir le menu" onClick={() => setSidebarOpen(true)}>
             <Menu size={23} aria-hidden="true" />
           </button>
+          <Link className="admin-topbar-brand" to="/admin" aria-label="Accueil administration MBotéRoom">
+            <img src="/icons/mboteroom-symbol.png" alt="" />
+            <strong>MBoté<span>Room</span></strong>
+          </Link>
           <form className="admin-search" onSubmit={submitSearch}>
             <Search size={18} aria-hidden="true" />
             <input value={searchTerm} type="search" placeholder="Rechercher (utilisateurs, réunions, ID, ...)" aria-label="Rechercher dans l’administration" onChange={(event) => setSearchTerm(event.target.value)} />
             <kbd>Ctrl + K</kbd>
           </form>
           <nav className="admin-topbar-actions" aria-label="Actions administrateur">
+            <button
+              className="admin-topbar-icon admin-flag-action"
+              type="button"
+              aria-label="Signalements"
+              onClick={() => {
+                navigate('/admin#admin-reports');
+                document.getElementById('admin-reports')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+            >
+              <Flag size={21} aria-hidden="true" />
+            </button>
+            <button className="admin-topbar-icon admin-help-action" type="button" aria-label="Aide administrateur" onClick={() => navigate('/aide')}>
+              <CircleHelp size={21} aria-hidden="true" />
+            </button>
             <button
               className="admin-topbar-icon"
               type="button"
@@ -528,13 +546,13 @@ export default function AdminDashboardPage() {
                 document.getElementById('admin-notifications')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }}
             >
-              <Bell size={22} aria-hidden="true" />
-              <span>{dashboard?.recentActivity.length || 0}</span>
+              <Bell size={21} aria-hidden="true" />
+              {(dashboard?.recentActivity.length || 0) > 0 && <span>{dashboard?.recentActivity.length || 0}</span>}
             </button>
-            <button className="admin-topbar-icon" type="button" aria-label="Aide administrateur" onClick={() => navigate('/aide')}>
-              <CircleHelp size={22} aria-hidden="true" />
+            <button className="admin-topbar-avatar" type="button" aria-label="Ouvrir mon profil" onClick={() => navigate('/app/profile')}>
+              <Avatar name={currentUser?.name || currentUser?.email || 'Administrateur'} size="small" />
             </button>
-            <button className="admin-new-meeting-button" type="button" onClick={() => navigate('/reunions')}>
+            <button className="admin-new-meeting-button admin-desktop-new-meeting" type="button" onClick={() => navigate('/reunions')}>
               <Plus size={20} aria-hidden="true" />
               Nouvelle réunion
             </button>
@@ -555,6 +573,31 @@ export default function AdminDashboardPage() {
               <ChevronDown size={16} aria-hidden="true" />
             </label>
           </header>
+
+          <section className="admin-mobile-quick-actions" aria-label="Actions rapides administrateur">
+            <button
+              className="admin-mobile-notification-card"
+              type="button"
+              onClick={() => {
+                navigate('/admin#admin-notifications');
+                document.getElementById('admin-notifications')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+            >
+              <span className="admin-mobile-notification-icon">
+                <Bell size={22} aria-hidden="true" />
+                {(dashboard?.recentActivity.length || 0) > 0 && <b>{dashboard?.recentActivity.length || 0}</b>}
+              </span>
+              <span>
+                <strong>Notifications</strong>
+                <small>{dashboard?.recentActivity.length || 0} activité(s) récente(s)</small>
+              </span>
+              <i aria-hidden="true">›</i>
+            </button>
+            <button className="admin-new-meeting-button admin-mobile-new-meeting" type="button" onClick={() => navigate('/reunions')}>
+              <Plus size={22} aria-hidden="true" />
+              Nouvelle réunion
+            </button>
+          </section>
 
           {isLoading && <AppLoader label="Chargement des statistiques…" compact />}
           {error && dashboard && <p className="admin-inline-error" role="alert">{error}</p>}
