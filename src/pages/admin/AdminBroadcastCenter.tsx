@@ -81,7 +81,7 @@ export default function AdminBroadcastCenter(){
     return options.countries.find((item)=>item.name===audience.country)?.cities||[];
   },[audience.country,options.countries]);
 
-  const selectedIds=new Set(audience.userIds||[]);
+  const selectedIds=new Set<number>(audience.userIds||[]);
 
   const patchAudience=(patch:Partial<AdminAudienceFilters>)=>{
     setAudience((current)=>({...current,...patch}));
@@ -89,7 +89,7 @@ export default function AdminBroadcastCenter(){
   };
 
   const toggleUser=(userId:number)=>{
-    const next=new Set(audience.userIds||[]);
+    const next=new Set<number>(audience.userIds||[]);
     if(next.has(userId))next.delete(userId);else next.add(userId);
     patchAudience({userIds:[...next]});
   };
