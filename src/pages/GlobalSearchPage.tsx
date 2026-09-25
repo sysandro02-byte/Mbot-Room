@@ -76,6 +76,19 @@ export default function GlobalSearchPage() {
     return whiteboards.filter((board) => String(board.title || '').toLowerCase().includes(query)).slice(0, 20);
   }, [whiteboards, query]);
 
+  const openRecording=async(recording:Recording)=>{
+    try{
+      const access=await appDataService.getRecordingAccess(recording.id);
+      const link=document.createElement('a');
+      link.href=access.url;
+      link.target='_blank';
+      link.rel='noopener noreferrer';
+      link.click();
+    }catch(cause){
+      setError(cause instanceof Error?cause.message:'Accès à l’enregistrement impossible.');
+    }
+  };
+
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const next = draft.trim();
@@ -130,7 +143,7 @@ export default function GlobalSearchPage() {
             <strong>{recording.title}</strong>
             <small><CirclePlay size={13}/> Enregistrement</small>
           </div>
-          {recording.storage_url ? <a href={recording.storage_url} target="_blank" rel="noreferrer"><CirclePlay size={16}/> Ouvrir</a> : <button type="button" onClick={() => navigate('/app/recordings')}><CirclePlay size={16}/> Voir</button>}
+          <button type="button" onClick={() => void openRecording(recording)}><CirclePlay size={16}/> Ouvrir</button>
         </article>)}
         {filteredWhiteboards.map((board) => <article key={'board-' + board.id} className="utility-result">
           <div>
