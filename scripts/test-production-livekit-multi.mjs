@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import { chromium } from '@playwright/test';
 
 const frontendUrl=String(process.env.MBOTE_ROOM_FRONTEND_URL||'https://mbote-room.vercel.app').replace(/\/+$/,'');
 const backendUrl=String(process.env.MBOTE_ROOM_BACKEND_URL||'https://mbote-room-api.onrender.com').replace(/\/+$/,'');
 const appUrl=String(process.env.MBOTE_ROOM_SMOKE_APP_URL||'https://mboteroom.loukatech.com').replace(/\/+$/,'');
 const suffix=[process.env.GITHUB_RUN_ID,process.env.GITHUB_RUN_ATTEMPT,Date.now()].filter(Boolean).join('-').replace(/[^a-zA-Z0-9-]/g,'').slice(-48)||String(Date.now());
-const password='MboteRoom-LiveKit-2026!';
+const password='MbR!'+randomBytes(18).toString('base64url')+'9a';
 const sleep=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms));
 
 const parseBody=async(response)=>{
