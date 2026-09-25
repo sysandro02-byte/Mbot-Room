@@ -113,3 +113,42 @@ jobs:
           else
             gh release create android-latest MBoteRoom-Android.apk MBoteRoom-Android.aab MBoteRoom-Android.sha256               --target "${GITHUB_SHA}"               --title "MBotéRoom Android — dernière version signée"               --notes "$NOTES"
           fi
+
+      - name: Verify stable Android latest download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LOCAL_SHA="$(sha256sum MBoteRoom-Android.apk | awk '{print $1}')"
+          RELEASE_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/android-latest")"
+          RELEASE_BODY="$(printf '%s' "$RELEASE_JSON" | jq -r '.body // ""')"
+          APK_URL="$(printf '%s' "$RELEASE_JSON" | jq -r '.assets[] | select(.name=="MBoteRoom-Android.apk") | .browser_download_url')"
+          REMOTE_DIGEST="$(printf '%s' "$RELEASE_JSON" | jq -r '.assets[] | select(.name=="MBoteRoom-Android.apk") | .digest // empty')"
+          EXPECTED_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/android-latest/MBoteRoom-Android.apk"
+
+          printf '%s' "$RELEASE_BODY" | grep -F "Commit: ${GITHUB_SHA}" >/dev/null || {
+            echo "::error::La release android-latest ne référence pas le commit courant ${GITHUB_SHA}."
+            exit 1
+          }
+
+          test "$APK_URL" = "$EXPECTED_URL" || {
+            echo "::error::Le lien APK stable ne correspond pas au lien utilisé par la page login."
+            exit 1
+          }
+
+          if [ -n "$REMOTE_DIGEST" ]; then
+            test "$REMOTE_DIGEST" = "sha256:${LOCAL_SHA}" || {
+              echo "::error::L'APK android-latest ne correspond pas au build courant."
+              exit 1
+            }
+          else
+            ASSET_ID="$(printf '%s' "$RELEASE_JSON" | jq -r '.assets[] | select(.name=="MBoteRoom-Android.apk") | .id')"
+            test -n "$ASSET_ID" && test "$ASSET_ID" != "null"
+            gh api -H "Accept: application/octet-stream" "repos/${GITHUB_REPOSITORY}/releases/assets/${ASSET_ID}" > /tmp/MBoteRoom-Android.apk
+            DOWNLOADED_SHA="$(sha256sum /tmp/MBoteRoom-Android.apk | awk '{print $1}')"
+            test "$DOWNLOADED_SHA" = "$LOCAL_SHA" || {
+              echo "::error::Le fichier téléchargé par android-latest ne correspond pas au build courant."
+              exit 1
+            }
+          fi
+
+          echo "APK stable vérifié pour le commit ${GITHUB_SHA}: ${APK_URL}"
