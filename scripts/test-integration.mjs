@@ -816,12 +816,12 @@ try {
     method: 'POST',
     headers: authHeaders(participant.token),
   });
-  assert.equal(adClick.response.status, 200, JSON.stringify(adClick.data));
+  assert.equal(campaignAdClick.response.status, 200, JSON.stringify(campaignAdClick.data));
   const adDismiss = await jsonRequest('/api/ads/'+encodeURIComponent(createdAd.data.id)+'/dismiss', {
     method: 'POST',
     headers: authHeaders(participant.token),
   });
-  assert.equal(adDismiss.response.status, 200, JSON.stringify(adDismiss.data));
+  assert.equal(campaignAdDismiss.response.status, 200, JSON.stringify(campaignAdDismiss.data));
 
   const adStats = await jsonRequest('/api/admin/ads', { headers: authHeaders(host.token) });
   assert.equal(adStats.response.status, 200, JSON.stringify(adStats.data));
@@ -1530,17 +1530,17 @@ try {
   const participantAdAfterLimit = await jsonRequest('/api/ads/active', { headers: authHeaders(participant.token) });
   assert.equal(participantAdAfterLimit.response.status, 204, JSON.stringify(participantAdAfterLimit.data));
 
-  const adClick = await jsonRequest('/api/ads/'+encodeURIComponent(adCampaign.data.id)+'/click', {
+  const campaignAdClick = await jsonRequest('/api/ads/'+encodeURIComponent(adCampaign.data.id)+'/click', {
     method: 'POST',
     headers: authHeaders(participant.token),
   });
-  assert.equal(adClick.response.status, 200, JSON.stringify(adClick.data));
+  assert.equal(campaignAdClick.response.status, 200, JSON.stringify(campaignAdClick.data));
 
-  const adDismiss = await jsonRequest('/api/ads/'+encodeURIComponent(adCampaign.data.id)+'/dismiss', {
+  const campaignAdDismiss = await jsonRequest('/api/ads/'+encodeURIComponent(adCampaign.data.id)+'/dismiss', {
     method: 'POST',
     headers: authHeaders(participant.token),
   });
-  assert.equal(adDismiss.response.status, 200, JSON.stringify(adDismiss.data));
+  assert.equal(campaignAdDismiss.response.status, 200, JSON.stringify(campaignAdDismiss.data));
 
   const adStats = await jsonRequest('/api/admin/ads', { headers: authHeaders(host.token) });
   assert.equal(adStats.response.status, 200, JSON.stringify(adStats.data));
