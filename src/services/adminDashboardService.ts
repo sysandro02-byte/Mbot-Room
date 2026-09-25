@@ -177,6 +177,33 @@ export type AdminBroadcast = {
   push?:{sent:number;failed:number;stale:number};
 };
 
+export type AdminAdCampaign = {
+  id:string;
+  title:string;
+  body:string;
+  imageUrl:string;
+  actionLabel:string;
+  actionUrl:string;
+  audience:AdminAudienceFilters;
+  isActive:boolean;
+  startsAt:string;
+  endsAt:string|null;
+  maxImpressionsPerUser:number;
+  cooldownHours:number;
+  dismissible:boolean;
+  priority:number;
+  impressions:number;
+  uniqueViewers:number;
+  dismissals:number;
+  clicks:number;
+  createdAt:string;
+  updatedAt:string;
+};
+
+export type AdminAdCampaignDraft = Omit<AdminAdCampaign,
+  'id'|'impressions'|'uniqueViewers'|'dismissals'|'clicks'|'createdAt'|'updatedAt'
+>;
+
 export type AdminAiInsights = {
   metrics: {
     users: Record<string,number>;
@@ -339,6 +366,40 @@ export const adminDashboardService = {
   async getAiInsights(): Promise<AdminAiInsights> {
     const response=await apiFetch(apiUrl('/api/admin/ai/insights'),{headers:getAuthHeaders(),cache:'no-store'},60_000);
     return readJson<AdminAiInsights>(response);
+  },
+
+  async getAdCampaigns(): Promise<AdminAdCampaign[]> {
+    const response=await apiFetch(apiUrl('/api/admin/ads'),{headers:getAuthHeaders(),cache:'no-store'});
+    return readJson<AdminAdCampaign[]>(response);
+  },
+
+  async createAdCampaign(payload:AdminAdCampaignDraft): Promise<AdminAdCampaign> {
+    const response=await apiFetch(apiUrl('/api/admin/ads'),{
+      method:'POST',
+      headers:{...getAuthHeaders(),'Content-Type':'application/json'},
+      body:JSON.stringify(payload),
+    });
+    return readJson<AdminAdCampaign>(response);
+  },
+
+  async updateAdCampaign(campaignId:string,payload:Partial<AdminAdCampaignDraft>): Promise<AdminAdCampaign> {
+    const response=await apiFetch(apiUrl(`/api/admin/ads/${encodeURIComponent(campaignId)}`),{
+      method:'PUT',
+      headers:{...getAuthHeaders(),'Content-Type':'application/json'},
+      body:JSON.stringify(payload),
+    });
+    return readJson<AdminAdCampaign>(response);
+  },
+
+  async deleteAdCampaign(campaignId:string): Promise<void> {
+    const response=await apiFetch(apiUrl(`/api/admin/ads/${encodeURIComponent(campaignId)}`),{
+      method:'DELETE',
+      headers:getAuthHeaders(),
+    });
+    if(!response.ok){
+      const data=await response.json().catch(()=>({}));
+      throw new Error(typeof data?.error==='string'?data.error:'Suppression impossible.');
+    }
   },
 
   async getDashboard(period: string): Promise<AdminDashboardPayload> {
