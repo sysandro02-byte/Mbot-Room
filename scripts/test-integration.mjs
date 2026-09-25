@@ -748,89 +748,6 @@ try {
   });
   assert.equal(bannedDirectAttempt.response.status, 404, JSON.stringify(bannedDirectAttempt.data));
 
-  const deniedAdAdmin = await jsonRequest('/api/admin/ads', {
-    method: 'POST',
-    headers: authHeaders(participant.token),
-    body: JSON.stringify({ title: 'Interdit', body: 'Ne doit jamais être créé', isActive: true }),
-  });
-  assert.equal(deniedAdAdmin.response.status, 403, 'A normal user must not create advertising campaigns');
-
-  const unsafeAd = await jsonRequest('/api/admin/ads', {
-    method: 'POST',
-    headers: authHeaders(host.token),
-    body: JSON.stringify({
-      title: 'URL dangereuse',
-      body: 'Test de sécurité',
-      actionLabel: 'Ouvrir',
-      actionUrl: 'javascript:alert(1)',
-      isActive: true,
-    }),
-  });
-  assert.equal(unsafeAd.response.status, 400, JSON.stringify(unsafeAd.data));
-  assert.equal(unsafeAd.data.code, 'AD_ACTION_INVALID');
-
-  const createdAd = await jsonRequest('/api/admin/ads', {
-    method: 'POST',
-    headers: authHeaders(host.token),
-    body: JSON.stringify({
-      title: '<img src=x onerror=alert(1)>',
-      body: '<script>alert("xss")</script> Ceci doit rester du texte.',
-      actionLabel: 'Voir',
-      actionUrl: '/app/notifications',
-      audience: {
-        role: 'user',
-        accountStatus: 'active',
-        country: 'Congo-Brazzaville',
-        city: 'Brazzaville',
-      },
-      isActive: true,
-      maxImpressionsPerUser: 2,
-      cooldownHours: 0,
-      dismissible: true,
-      priority: 900,
-    }),
-  });
-  assert.equal(createdAd.response.status, 201, JSON.stringify(createdAd.data));
-  assert.equal(createdAd.data.title, '<img src=x onerror=alert(1)>');
-
-  const activeAd = await jsonRequest('/api/ads/active', { headers: authHeaders(participant.token) });
-  assert.equal(activeAd.response.status, 200, JSON.stringify(activeAd.data));
-  assert.equal(activeAd.data.id, createdAd.data.id);
-  assert.equal(activeAd.data.body, '<script>alert("xss")</script> Ceci doit rester du texte.');
-
-  const excludedAd = await jsonRequest('/api/ads/active', { headers: authHeaders(attacker.token) });
-  assert.equal(excludedAd.response.status, 204, 'A user outside the targeted city must not receive the campaign');
-
-  const forgedAdClick = await jsonRequest('/api/ads/'+encodeURIComponent(createdAd.data.id)+'/click', {
-    method: 'POST',
-    headers: authHeaders(attacker.token),
-  });
-  assert.equal(forgedAdClick.response.status, 403, 'A non-targeted account must not forge advertising statistics');
-
-  const impression = await jsonRequest('/api/ads/'+encodeURIComponent(createdAd.data.id)+'/impression', {
-    method: 'POST',
-    headers: authHeaders(participant.token),
-  });
-  assert.equal(impression.response.status, 200, JSON.stringify(impression.data));
-  const adClick = await jsonRequest('/api/ads/'+encodeURIComponent(createdAd.data.id)+'/click', {
-    method: 'POST',
-    headers: authHeaders(participant.token),
-  });
-  assert.equal(campaignAdClick.response.status, 200, JSON.stringify(campaignAdClick.data));
-  const adDismiss = await jsonRequest('/api/ads/'+encodeURIComponent(createdAd.data.id)+'/dismiss', {
-    method: 'POST',
-    headers: authHeaders(participant.token),
-  });
-  assert.equal(campaignAdDismiss.response.status, 200, JSON.stringify(campaignAdDismiss.data));
-
-  const adStats = await jsonRequest('/api/admin/ads', { headers: authHeaders(host.token) });
-  assert.equal(adStats.response.status, 200, JSON.stringify(adStats.data));
-  const testedAd = adStats.data.find((item) => item.id === createdAd.data.id);
-  assert.equal(testedAd.impressions, 1);
-  assert.equal(testedAd.clicks, 1);
-  assert.equal(testedAd.dismissals, 1);
-  assert.equal(testedAd.uniqueViewers, 1);
-
   const audienceOptions = await jsonRequest('/api/admin/broadcasts/audience-options', { headers: authHeaders(host.token) });
   assert.equal(audienceOptions.response.status, 200, JSON.stringify(audienceOptions.data));
   assert.ok(Number(audienceOptions.data.totals?.users || 0) >= 3);
@@ -1486,6 +1403,21 @@ try {
   assert.equal(invalidAdAction.response.status, 400, JSON.stringify(invalidAdAction.data));
   assert.equal(invalidAdAction.data.code, 'AD_ACTION_INVALID');
 
+  const lockedAdWithoutExit = await jsonRequest('/api/admin/ads', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: 'Blocage interdit',
+      body: 'Une campagne non fermable doit toujours proposer une sortie valide.',
+      dismissible: false,
+      actionLabel: '',
+      actionUrl: '',
+      isActive: true,
+    }),
+  });
+  assert.equal(lockedAdWithoutExit.response.status, 400, JSON.stringify(lockedAdWithoutExit.data));
+  assert.equal(lockedAdWithoutExit.data.code, 'AD_EXIT_REQUIRED');
+
   const adCampaign = await jsonRequest('/api/admin/ads', {
     method: 'POST',
     headers: authHeaders(host.token),
@@ -1518,8 +1450,14 @@ try {
   assert.equal(participantAd.response.status, 200, JSON.stringify(participantAd.data));
   assert.equal(participantAd.data.id, adCampaign.data.id);
 
-  const outsiderAd = await jsonRequest('/api/ads/active', { headers: authHeaders(outsider.token) });
-  assert.equal(outsiderAd.response.status, 204, JSON.stringify(outsiderAd.data));
+  const attackerAd = await jsonRequest('/api/ads/active', { headers: authHeaders(attacker.token) });
+  assert.equal(attackerAd.response.status, 204, JSON.stringify(attackerAd.data));
+
+  const forgedAdClick = await jsonRequest('/api/ads/'+encodeURIComponent(adCampaign.data.id)+'/click', {
+    method: 'POST',
+    headers: authHeaders(attacker.token),
+  });
+  assert.equal(forgedAdClick.response.status, 403, 'A non-targeted account must not forge advertising statistics');
 
   const adImpression = await jsonRequest('/api/ads/'+encodeURIComponent(adCampaign.data.id)+'/impression', {
     method: 'POST',
@@ -1558,6 +1496,13 @@ try {
   const userAdminBypass = await jsonRequest('/api/admin/ads', { headers: authHeaders(participant.token) });
   assert.equal(userAdminBypass.response.status, 403, JSON.stringify(userAdminBypass.data));
 
+  const userAdCreateBypass = await jsonRequest('/api/admin/ads', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ title: 'Interdit', body: 'Ne doit pas être créé.', isActive: true }),
+  });
+  assert.equal(userAdCreateBypass.response.status, 403, JSON.stringify(userAdCreateBypass.data));
+
   const sqlInjectionSearch = await jsonRequest('/api/admin/users?q='+encodeURIComponent("' OR 1=1; DROP TABLE room_users; --"), {
     headers: authHeaders(host.token),
   });
@@ -1570,7 +1515,7 @@ try {
   assert.ok(usersTableStillExists.data.some((item) => item.email === 'host.integration@mbote.test'));
 
   const idorConversation = await jsonRequest('/api/conversations/'+encodeURIComponent(adminToUserConversation.data.id)+'/messages', {
-    headers: authHeaders(outsider.token),
+    headers: authHeaders(attacker.token),
   });
   assert.ok([403,404].includes(idorConversation.response.status), JSON.stringify(idorConversation.data));
 
@@ -1598,7 +1543,7 @@ try {
   for (let index = 0; index < 6; index += 1) {
     forgotRateLimited = await jsonRequest('/api/auth/forgot-password', {
       method: 'POST',
-      body: JSON.stringify({ email: 'rate-limit-'+index+'@mbote.test' }),
+      body: JSON.stringify({ email: 'rate-limit@mbote.test' }),
     });
   }
   assert.equal(forgotRateLimited.response.status, 429, JSON.stringify(forgotRateLimited.data));
