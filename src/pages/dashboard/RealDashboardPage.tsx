@@ -240,6 +240,7 @@ export default function RealDashboardPage() {
     {error ? <div className="real-dashboard-error">{error}</div> : null}
 
     <HomeQuickActions
+      premiumAvailable={Boolean(platformSettings?.premiumCheckoutReady)}
       onPremium={() => setPremiumOpen(true)}
       onCreateGroup={() => navigate('/app/groups?new=1')}
       onStorageData={() => setStorageOpen(true)}
