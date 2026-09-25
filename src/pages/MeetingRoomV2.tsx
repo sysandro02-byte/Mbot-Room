@@ -67,7 +67,123 @@ type DisplayCaptureNavigator = Navigator & {
   getDisplayMedia?: (options?: DisplayMediaStreamOptions) => Promise<MediaStream>;
 };
 
+type AndroidScreenCaptureBridge = {
+  requestScreenCapture: () => void;
+  stopScreenCapture: () => void;
+  isScreenCaptureSupported?: () => boolean;
+};
+
+declare global {
+  interface Window {
+    MBoteRoomAndroid?: AndroidScreenCaptureBridge;
+    __mboteAndroidScreenStarted?: (width: number, height: number) => void;
+    __mboteAndroidScreenFrame?: (dataUrl: string, width: number, height: number) => void;
+    __mboteAndroidScreenEnded?: () => void;
+    __mboteAndroidScreenError?: (message: string) => void;
+  }
+}
+
+const requestAndroidDisplayCapture = async (): Promise<MediaStream> => {
+  const bridge = window.MBoteRoomAndroid;
+  if (!bridge?.requestScreenCapture) {
+    throw new DOMException('Android screen capture bridge is unavailable.', 'NotSupportedError');
+  }
+
+  return new Promise<MediaStream>((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 540;
+    canvas.height = 960;
+    const context = canvas.getContext('2d', { alpha: false });
+    if (!context || typeof canvas.captureStream !== 'function') {
+      reject(new DOMException('Android screen capture cannot create a video stream.', 'NotSupportedError'));
+      return;
+    }
+
+    let activeStream: MediaStream | null = null;
+    let settled = false;
+    let disposed = false;
+    let lastFrameUrl = '';
+    const clearCallbacks = () => {
+      delete window.__mboteAndroidScreenStarted;
+      delete window.__mboteAndroidScreenFrame;
+      delete window.__mboteAndroidScreenEnded;
+      delete window.__mboteAndroidScreenError;
+    };
+    const fail = (message: string, name: 'AbortError' | 'NotAllowedError' | 'NotSupportedError' = 'NotAllowedError') => {
+      if (disposed) return;
+      disposed = true;
+      window.clearTimeout(timeout);
+      activeStream?.getTracks().forEach((track) => track.stop());
+      clearCallbacks();
+      reject(new DOMException(message, name));
+    };
+    const timeout = window.setTimeout(() => {
+      fail('La demande de partage d’écran Android a expiré.', 'AbortError');
+    }, 20_000);
+
+    window.__mboteAndroidScreenFrame = (dataUrl, width, height) => {
+      if (disposed || !dataUrl) return;
+      const nextWidth = Math.max(2, Math.floor(Number(width) || canvas.width));
+      const nextHeight = Math.max(2, Math.floor(Number(height) || canvas.height));
+      if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+        canvas.width = nextWidth;
+        canvas.height = nextHeight;
+      }
+      lastFrameUrl = dataUrl;
+      const image = new Image();
+      image.onload = () => {
+        if (disposed || lastFrameUrl !== dataUrl) return;
+        try {
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        } catch {
+          // A single late frame must not stop the projection.
+        }
+      };
+      image.src = dataUrl;
+    };
+
+    window.__mboteAndroidScreenStarted = (width, height) => {
+      if (disposed || settled) return;
+      canvas.width = Math.max(2, Math.floor(Number(width) || canvas.width));
+      canvas.height = Math.max(2, Math.floor(Number(height) || canvas.height));
+      const stream = canvas.captureStream(10);
+      if (!stream.getVideoTracks()[0]) {
+        fail('Le flux de partage Android n’a pas pu être créé.', 'NotSupportedError');
+        return;
+      }
+      activeStream = stream;
+      settled = true;
+      window.clearTimeout(timeout);
+      resolve(stream);
+    };
+
+    window.__mboteAndroidScreenEnded = () => {
+      if (disposed) return;
+      disposed = true;
+      window.clearTimeout(timeout);
+      activeStream?.getTracks().forEach((track) => track.stop());
+      clearCallbacks();
+      window.dispatchEvent(new Event('mbote:android-screen-ended'));
+    };
+
+    window.__mboteAndroidScreenError = (message) => {
+      const normalized = String(message || 'Partage d’écran Android impossible.');
+      fail(normalized, /annul|cancel/i.test(normalized) ? 'AbortError' : 'NotAllowedError');
+    };
+
+    try {
+      bridge.requestScreenCapture();
+    } catch (cause) {
+      fail(cause instanceof Error ? cause.message : 'Partage d’écran Android impossible.', 'NotSupportedError');
+    }
+  });
+};
+
 const requestDisplayCapture = async () => {
+  if (window.MBoteRoomAndroid?.requestScreenCapture) {
+    return requestAndroidDisplayCapture();
+  }
+
   const mediaDevices = navigator.mediaDevices as DisplayCaptureMediaDevices | undefined;
   const legacyNavigator = navigator as DisplayCaptureNavigator;
   const capture = mediaDevices?.getDisplayMedia
@@ -299,6 +415,7 @@ export default function MeetingRoomV2() {
   const [cameraEnabled, setCameraEnabled] = useState(initialCamera);
   const [screenSharing, setScreenSharing] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [endingMeeting, setEndingMeeting] = useState(false);
   const [recordingMode, setRecordingMode] = useState<'local' | 'server' | null>(null);
   const [serverRecordingId, setServerRecordingId] = useState<string | null>(null);
   const [handRaised, setHandRaised] = useState(false);
@@ -1157,6 +1274,11 @@ export default function MeetingRoomV2() {
   }, [cameraEnabled, canUseCamera, canUseMic, micEnabled, refreshMediaDevices, screenSharing, selectedAudioInputId, selectedVideoInputId]);
 
   const stopScreenShare = useCallback(() => {
+    try {
+      window.MBoteRoomAndroid?.stopScreenCapture?.();
+    } catch {
+      // Native cleanup is best-effort; web tracks are always stopped below.
+    }
     screenStreamRef.current?.getTracks().forEach((track) => track.stop());
     screenStreamRef.current = null;
 
@@ -1182,6 +1304,12 @@ export default function MeetingRoomV2() {
     setScreenSharing(false);
     setLocalStream(cameraStream);
   }, [cameraEnabled, canUseCamera, canUseMic, meeting?.id, micEnabled]);
+
+  useEffect(() => {
+    const onAndroidScreenEnded = () => stopScreenShare();
+    window.addEventListener('mbote:android-screen-ended', onAndroidScreenEnded);
+    return () => window.removeEventListener('mbote:android-screen-ended', onAndroidScreenEnded);
+  }, [stopScreenShare]);
 
   useEffect(() => {
     if (!meeting) return;
@@ -1314,25 +1442,61 @@ export default function MeetingRoomV2() {
 
   const startLocalRecording = useCallback(async () => {
     if (!localStream || typeof MediaRecorder === 'undefined') {
-      setNotice('L’enregistrement n’est pas disponible dans ce navigateur.');
+      setNotice('L’enregistrement local n’est pas pris en charge sur cet appareil.');
       return;
     }
+
     const sources = [
       { stream: localStream, label: `${localName} (vous)` },
       ...remoteParticipants.map((participant) => ({ stream: participant.stream, label: participant.name })),
     ];
-    const session = await createCompositeMeetingRecording(sources);
-    recordingSessionRef.current = session;
-    const stream = session.stream;
-    const preferred = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-      ? 'video/webm;codecs=vp9,opus'
-      : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') ? 'video/webm;codecs=vp8,opus' : 'video/webm';
+
+    let stream: MediaStream;
+    let composite = false;
+    try {
+      const session = await createCompositeMeetingRecording(sources);
+      recordingSessionRef.current = session;
+      stream = session.stream;
+      composite = true;
+    } catch {
+      const liveTracks = localStream.getTracks().filter((track) => track.readyState === 'live');
+      if (!liveTracks.length) {
+        setNotice('Aucun flux média actif à enregistrer.');
+        return;
+      }
+      recordingSessionRef.current = null;
+      stream = new MediaStream(liveTracks);
+    }
+
+    const mimeCandidates = [
+      'video/webm;codecs=vp8,opus',
+      'video/webm;codecs=vp8',
+      'video/webm',
+      'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+      'video/mp4',
+    ];
+    const preferred = mimeCandidates.find((type) => {
+      try { return MediaRecorder.isTypeSupported(type); } catch { return false; }
+    }) || '';
+
     try {
       recordingChunksRef.current = [];
-      const recorder = new MediaRecorder(stream, { mimeType: preferred });
-      recorder.ondataavailable = (event) => { if (event.data.size > 0) recordingChunksRef.current.push(event.data); };
+      const touchDevice = navigator.maxTouchPoints > 0 || window.matchMedia?.('(pointer: coarse)').matches;
+      const recorderOptions: MediaRecorderOptions = {
+        ...(preferred ? { mimeType: preferred } : {}),
+        videoBitsPerSecond: touchDevice ? 1_500_000 : 2_800_000,
+        audioBitsPerSecond: 128_000,
+      };
+      const recorder = new MediaRecorder(stream, recorderOptions);
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) recordingChunksRef.current.push(event.data);
+      };
+      recorder.onerror = () => {
+        setNotice('Une erreur média est survenue pendant l’enregistrement.');
+      };
       recorder.onstop = async () => {
-        const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'video/webm' });
+        const mimeType = recorder.mimeType || preferred || 'video/webm';
+        const blob = new Blob(recordingChunksRef.current, { type: mimeType });
         const durationSeconds = Math.max(1, Math.round((Date.now() - recordingStartedAtRef.current) / 1000));
         await recordingSessionRef.current?.stop();
         recordingSessionRef.current = null;
@@ -1341,16 +1505,18 @@ export default function MeetingRoomV2() {
         setRecordingMode(null);
 
         const downloadLocalCopy = (message: string) => {
+          const extension = mimeType.includes('mp4') ? 'mp4' : 'webm';
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = url;
-          link.download = `mboteroom-${meeting?.id || 'reunion'}-${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+          link.download = `mboteroom-${meeting?.id || 'reunion'}-${new Date().toISOString().replace(/[:.]/g, '-') }.${extension}`;
           link.click();
           setTimeout(() => URL.revokeObjectURL(url), 1000);
           setNotice(message);
         };
 
         try {
+          if (!blob.size) throw new Error('Le fichier d’enregistrement est vide.');
           if (!meeting?.id) throw new Error('Réunion introuvable pour cet enregistrement.');
           if (mediaTransportStatus?.recordingStorageReady === false) {
             downloadLocalCopy('Enregistrement terminé. Le stockage cloud est indisponible : une copie locale a été téléchargée.');
@@ -1365,22 +1531,28 @@ export default function MeetingRoomV2() {
             setNotice('Enregistrement sauvegardé dans Supabase et disponible dans vos enregistrements.');
           }
         } catch (cause) {
-          downloadLocalCopy(`${cause instanceof Error ? cause.message : 'Envoi vers Supabase impossible.'} Une copie locale de sécurité a été téléchargée.`);
+          downloadLocalCopy(`${cause instanceof Error ? cause.message : 'Envoi vers Supabase impossible.'} Une copie locale de sécurité a été préparée.`);
         } finally {
           recordingChunksRef.current = [];
           recordingStartedAtRef.current = 0;
         }
       };
+
       recordingStartedAtRef.current = Date.now();
       recorder.start(1000);
       recorderRef.current = recorder;
       setRecordingMode('local');
       setRecording(true);
-      setNotice(`Enregistrement composite local démarré pour ${sources.filter((source) => source.stream).length} flux.`);
-    } catch {
+      setNotice(composite
+        ? `Enregistrement composite démarré pour ${sources.filter((source) => source.stream).length} flux.`
+        : 'Enregistrement compatible mobile démarré.');
+    } catch (cause) {
       void recordingSessionRef.current?.stop();
       recordingSessionRef.current = null;
-      setNotice('Impossible de démarrer l’enregistrement local.');
+      recorderRef.current = null;
+      setRecording(false);
+      setRecordingMode(null);
+      setNotice(cause instanceof Error ? `Impossible de démarrer l’enregistrement : ${cause.message}` : 'Impossible de démarrer l’enregistrement local.');
     }
   }, [localName, localStream, mediaTransportStatus?.recordingStorageReady, meeting?.id, remoteParticipants]);
 
@@ -1691,17 +1863,31 @@ export default function MeetingRoomV2() {
   };
 
   const leaveMeeting = async (endForAll = false) => {
-    if (!meeting?.id) return;
+    if (!meeting?.id || (endForAll && endingMeeting)) return;
+    if (endForAll && !canEndForAll) {
+      setNotice('Seul l’hôte actif peut terminer la réunion pour tout le monde.');
+      return;
+    }
+
+    if (endForAll) {
+      setEndingMeeting(true);
+      setMoreMenuOpen(false);
+      setNotice('Fin de la réunion en cours…');
+    }
+
     try {
-      if (endForAll && canEndForAll) await collaborationService.endMeeting(meeting.id);
+      if (endForAll) await collaborationService.endMeeting(meeting.id);
     } catch (cause) {
+      if (endForAll) setEndingMeeting(false);
       setNotice(cause instanceof Error ? cause.message : 'Impossible de terminer la réunion.');
       return;
     }
+
     socket.emit('meeting:leave', { meetingId: meeting.id });
-    await stopActiveRecording();
+    await stopActiveRecording().catch(() => undefined);
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
     screenStreamRef.current?.getTracks().forEach((track) => track.stop());
+    try { window.MBoteRoomAndroid?.stopScreenCapture?.(); } catch { /* no-op */ }
     navigate(`/reunions/${meeting.meeting_link}/terminee`, { replace: true });
   };
 
@@ -2319,7 +2505,7 @@ export default function MeetingRoomV2() {
             <button type="button" onClick={() => {void inviteParticipants();setMoreMenuOpen(false);}}><UsersRound/><span>Inviter</span></button>
             <div/>
             <button type="button" className="danger" onClick={() => void leaveMeeting(false)}><LogOut/><span>Quitter la réunion</span></button>
-            {canEndForAll ? <button type="button" className="danger" onClick={() => void leaveMeeting(true)}><PhoneOff/><span>Terminer pour tous</span></button> : null}
+            {canEndForAll ? <button type="button" className="danger" data-testid="end-meeting-for-all" disabled={endingMeeting} onClick={() => void leaveMeeting(true)}><PhoneOff/><span>{endingMeeting ? 'Fin en cours…' : 'Terminer pour tous'}</span></button> : null}
           </div> : null}
         </div>
         </div>
