@@ -896,11 +896,36 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
     try {
       const meeting = await getMeetingById(Number(request.params.meetingId));
       if (!meeting) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
-      if (meeting.host_id !== request.user!.id && meeting.temporary_host_id !== request.user!.id && request.user!.role !== 'admin') return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte actif peut terminer la réunion pour tout le monde.');
-      const updated = await query(`UPDATE room_meetings SET status='ended',is_active=false,ended_at=now(),updated_at=now() WHERE id=$1 RETURNING *`, [meeting.id]);
-      if (meeting.settings.lunaSummary !== false) await generateSummary(mapMeeting(updated.rows[0])).catch(() => null);
+      if (meeting.host_id !== request.user!.id && meeting.temporary_host_id !== request.user!.id && request.user!.role !== 'admin') {
+        return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte actif peut terminer la réunion pour tout le monde.');
+      }
+
+      const updated = await query(
+        `UPDATE room_meetings
+            SET status='ended',is_active=false,ended_at=COALESCE(ended_at,now()),temporary_host_id=NULL,updated_at=now()
+          WHERE id=$1
+          RETURNING *`,
+        [meeting.id],
+      );
+      await query(
+        `UPDATE room_meeting_members
+            SET left_at=COALESCE(left_at,now()),updated_at=now()
+          WHERE meeting_id=$1 AND left_at IS NULL`,
+        [meeting.id],
+      );
+
+      const endedMeeting = mapMeeting(updated.rows[0]);
       io.to(`meeting:${meeting.id}`).emit('meeting:ended', { meetingId: meeting.id, endedBy: request.user!.id });
+      io.to('admins').emit('meeting:ended', { meetingId: meeting.id, endedBy: request.user!.id });
       response.json({ success: true, meeting: publicMeeting(updated.rows[0]) });
+
+      // Summary generation is intentionally detached from the client response:
+      // ending a meeting must never wait for Luna/network processing.
+      if (meeting.settings.lunaSummary !== false) {
+        void generateSummary(endedMeeting).catch((error) => {
+          console.warn('[meeting:end] Luna summary generation failed', { meetingId: meeting.id, error });
+        });
+      }
     } catch (error) { next(error); }
   });
 
