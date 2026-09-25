@@ -34,3 +34,40 @@
   .global-header-brand img{width:92px;max-width:29vw}
   .global-header-login,.global-header-register{padding:0 6px;font-size:8.5px}
 }
+
+
+/* Realtime notification attention state */
+.global-header-notification.is-pulsing{
+  animation:mbote-notification-pulse 1.05s ease-in-out 4;
+  border-color:#f0b6bd;
+  background:#fff7f8;
+  color:#c83b49;
+  box-shadow:0 0 0 0 rgba(218,72,88,.28);
+}
+.global-header-notification.is-pulsing svg{
+  transform-origin:50% 5%;
+  animation:mbote-notification-ring .72s ease-in-out 5;
+}
+.global-header-notification.is-pulsing b{
+  animation:mbote-notification-badge .8s ease-in-out 5;
+}
+@keyframes mbote-notification-pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(218,72,88,.12)}
+  50%{box-shadow:0 0 0 7px rgba(218,72,88,.12)}
+}
+@keyframes mbote-notification-ring{
+  0%,100%{transform:rotate(0deg)}
+  18%{transform:rotate(-14deg)}
+  36%{transform:rotate(12deg)}
+  54%{transform:rotate(-9deg)}
+  72%{transform:rotate(7deg)}
+}
+@keyframes mbote-notification-badge{
+  0%,100%{transform:scale(1)}
+  50%{transform:scale(1.18)}
+}
+@media(prefers-reduced-motion:reduce){
+  .global-header-notification.is-pulsing,
+  .global-header-notification.is-pulsing svg,
+  .global-header-notification.is-pulsing b{animation:none!important}
+}
