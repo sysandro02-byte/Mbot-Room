@@ -149,6 +149,43 @@ export const runExtraMigrations = async () => {
     CREATE INDEX IF NOT EXISTS room_admin_broadcasts_created_idx
       ON room_admin_broadcasts(created_at DESC);
 
+    CREATE TABLE IF NOT EXISTS room_ad_campaigns (
+      id uuid PRIMARY KEY,
+      created_by integer REFERENCES room_users(id) ON DELETE SET NULL,
+      title text NOT NULL,
+      body text NOT NULL DEFAULT '',
+      image_url text NOT NULL DEFAULT '',
+      action_label text NOT NULL DEFAULT '',
+      action_url text NOT NULL DEFAULT '',
+      audience jsonb NOT NULL DEFAULT '{"role":"user","accountStatus":"active"}'::jsonb,
+      is_active boolean NOT NULL DEFAULT false,
+      starts_at timestamptz NOT NULL DEFAULT now(),
+      ends_at timestamptz,
+      max_impressions_per_user integer NOT NULL DEFAULT 1 CHECK (max_impressions_per_user BETWEEN 1 AND 100),
+      cooldown_hours integer NOT NULL DEFAULT 24 CHECK (cooldown_hours BETWEEN 0 AND 8760),
+      dismissible boolean NOT NULL DEFAULT true,
+      priority integer NOT NULL DEFAULT 0 CHECK (priority BETWEEN 0 AND 1000),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS room_ad_campaigns_active_idx
+      ON room_ad_campaigns(is_active, starts_at, ends_at, priority DESC);
+
+    CREATE TABLE IF NOT EXISTS room_ad_user_state (
+      campaign_id uuid NOT NULL REFERENCES room_ad_campaigns(id) ON DELETE CASCADE,
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      impressions integer NOT NULL DEFAULT 0,
+      dismissals integer NOT NULL DEFAULT 0,
+      clicks integer NOT NULL DEFAULT 0,
+      first_impression_at timestamptz,
+      last_impression_at timestamptz,
+      last_dismissed_at timestamptz,
+      last_clicked_at timestamptz,
+      PRIMARY KEY (campaign_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS room_ad_user_state_user_idx
+      ON room_ad_user_state(user_id, last_impression_at DESC);
+
     ALTER TABLE room_calendar_events ADD COLUMN IF NOT EXISTS google_event_id text;
     ALTER TABLE room_calendar_events ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'mboteroom';
     ALTER TABLE room_calendar_events ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
