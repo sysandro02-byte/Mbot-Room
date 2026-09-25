@@ -41,6 +41,7 @@ import {
 import { DashboardTip, getMeetingAccessCode, Meeting } from '../../services/meetingService';
 import { collaborationService } from '../../services/collaborationService';
 import AdminControlCenter from './AdminControlCenter';
+import AdminBroadcastCenter from './AdminBroadcastCenter';
 import './AdminDashboardPage.css';
 import AppLoader from '../../components/AppLoader';
 
@@ -556,6 +557,7 @@ export default function AdminDashboardPage() {
             />
             <RecentActivityCard activities={dashboard?.recentActivity || []} />
             <AdminControlCenter />
+            <AdminBroadcastCenter />
             <HomeSlidesCard
               slides={homeSlides}
               selectedSlot={selectedHomeSlot}
