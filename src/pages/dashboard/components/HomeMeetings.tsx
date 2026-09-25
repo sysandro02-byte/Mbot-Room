@@ -80,12 +80,13 @@ type RecentProps = {
   meetings: Meeting[];
   recordings: Recording[];
   onOpen: (meeting: Meeting) => void;
+  onOpenRecording: (recording: Recording) => void;
   onManage: (meeting: Meeting) => void;
   canManage: (meeting: Meeting) => boolean;
   onAll: () => void;
 };
 
-export function RecentMeetings({ meetings, recordings, onOpen, onManage, canManage, onAll }: RecentProps) {
+export function RecentMeetings({ meetings, recordings, onOpen, onOpenRecording, onManage, canManage, onAll }: RecentProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
   const share = async (meeting: Meeting) => {
@@ -104,13 +105,13 @@ export function RecentMeetings({ meetings, recordings, onOpen, onManage, canMana
           return <article key={meeting.id}>
             <span className="home-recent-thumb">{meeting.host_avatar ? <img src={meeting.host_avatar} alt="" /> : <Video size={18}/>}</span>
             <div><strong>{meeting.title}</strong><small>{formatDate(meeting.start_time)} · {meeting.duration} min</small></div>
-            {recording?.storage_url ? <a href={recording.storage_url} target="_blank" rel="noreferrer" aria-label={`Ouvrir l'enregistrement de ${meeting.title}`}><Play size={16}/></a> : <button type="button" aria-label={`Voir le résumé de ${meeting.title}`} onClick={() => onOpen(meeting)}><Play size={16}/></button>}
+            {recording ? <button type="button" aria-label={`Ouvrir l'enregistrement de ${meeting.title}`} onClick={() => onOpenRecording(recording)}><Play size={16}/></button> : <button type="button" aria-label={`Voir le résumé de ${meeting.title}`} onClick={() => onOpen(meeting)}><Play size={16}/></button>}
             <div className="home-meeting-menu-wrap">
               <button className="home-row-more" type="button" aria-label={`Options pour ${meeting.title}`} aria-expanded={openMenuId===meeting.id} onClick={() => setOpenMenuId((current)=>current===meeting.id?null:meeting.id)}><EllipsisVertical size={17}/></button>
               {openMenuId===meeting.id?<div className="home-meeting-menu home-recent-menu" role="menu">
                 <button type="button" onClick={() => { setOpenMenuId(null); onOpen(meeting); }}><ExternalLink size={16}/> Voir les détails</button>
                 <button type="button" onClick={() => { setOpenMenuId(null); onOpen(meeting); }}><Play size={16}/> Résumé Luna</button>
-                {recording?.storage_url ? <a className="home-meeting-menu-link" href={recording.storage_url} target="_blank" rel="noreferrer" onClick={() => setOpenMenuId(null)}><Video size={16}/> Voir l’enregistrement</a> : null}
+                {recording ? <button type="button" onClick={() => { setOpenMenuId(null); onOpenRecording(recording); }}><Video size={16}/> Voir l’enregistrement</button> : null}
                 <button type="button" onClick={() => void share(meeting)}><Share2 size={16}/> Partager</button>
                 {canManage(meeting)?<button type="button" onClick={() => { setOpenMenuId(null); onManage(meeting); }}><EllipsisVertical size={16}/> Gérer / supprimer</button>:null}
               </div>:null}
