@@ -186,6 +186,9 @@ export const runExtraMigrations = async () => {
     CREATE INDEX IF NOT EXISTS room_ad_user_state_user_idx
       ON room_ad_user_state(user_id, last_impression_at DESC);
 
+    ALTER TABLE room_ad_campaigns ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE room_ad_user_state ENABLE ROW LEVEL SECURITY;
+
     ALTER TABLE room_calendar_events ADD COLUMN IF NOT EXISTS google_event_id text;
     ALTER TABLE room_calendar_events ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'mboteroom';
     ALTER TABLE room_calendar_events ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
