@@ -78,6 +78,19 @@ export default function FilesPage() {
     }
   };
 
+  const openRecording=async(recording:Recording)=>{
+    try{
+      const access=await appDataService.getRecordingAccess(recording.id);
+      const link=document.createElement('a');
+      link.href=access.url;
+      link.target='_blank';
+      link.rel='noopener noreferrer';
+      link.click();
+    }catch(cause){
+      showAppMessage(cause instanceof Error?cause.message:'Accès à l’enregistrement impossible.',{tone:'error'});
+    }
+  };
+
   const shouldDownloadMedia=()=>{
     if(preferences.mediaDownload==='always')return true;
     if(preferences.mediaDownload==='never')return false;
@@ -124,7 +137,7 @@ export default function FilesPage() {
         {visibleRecordings.length ? visibleRecordings.map((recording) => <article key={recording.id}>
           <span><CirclePlay size={18}/></span>
           <div><strong>{recording.title}</strong><small>{Math.max(0, Math.round(recording.duration_seconds / 60))} min · {Math.round(recording.size_bytes / 1024 / 1024)} Mo</small></div>
-          {recording.storage_url ? <a href={recording.storage_url} target="_blank" rel="noreferrer">Ouvrir</a> : <button type="button" onClick={() => navigate('/app/recordings')}>Voir</button>}
+          <button type="button" onClick={() => void openRecording(recording)}>Ouvrir</button>
         </article>) : <p className="files-empty">Aucun enregistrement correspondant.</p>}
       </section>
 
