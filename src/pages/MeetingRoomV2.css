@@ -801,6 +801,32 @@
 }
 .room-v2-action-modal>footer button.secondary{background:#14324b;color:#d9e8f0}
 .room-v2-action-modal>footer button.danger{background:#c9333d}
+.room-v2-confirm-modal{gap:14px}
+.room-v2-confirm-modal>p{
+  margin:0;
+  padding:12px 13px;
+  border:1px solid rgba(121,169,202,.18);
+  border-radius:11px;
+  background:#07192b;
+  color:#c9d8e3;
+  font-size:12px;
+  line-height:1.55;
+}
+.room-v2-confirm-modal.is-danger{border-color:rgba(255,91,99,.42)}
+.room-v2-confirm-modal.is-danger>header strong{color:#ff8a90}
+.room-v2-confirm-modal.is-warning{border-color:rgba(250,190,75,.32)}
+.room-v2-confirm-modal.is-warning>header strong{color:#ffd27c}
+.room-v2-confirm-modal>footer button:disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:600px){
+  .room-v2-action-modal-backdrop{padding:12px;align-items:end}
+  .room-v2-confirm-modal{
+    width:100%;
+    border-radius:18px 18px 12px 12px;
+    padding:16px 14px calc(14px + env(safe-area-inset-bottom,0px));
+  }
+  .room-v2-confirm-modal>footer{display:grid;grid-template-columns:1fr 1fr}
+  .room-v2-confirm-modal>footer button{min-height:46px}
+}
 .room-v2-action-modal>footer button:disabled,
 .room-v2-action-modal>header>button:disabled{opacity:.55;cursor:not-allowed}
 
