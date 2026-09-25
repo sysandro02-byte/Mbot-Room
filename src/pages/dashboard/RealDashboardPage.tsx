@@ -208,6 +208,16 @@ export default function RealDashboardPage() {
     else navigate('/app/meetings');
   };
 
+  const openRecording = async (recording: Recording) => {
+    try {
+      const access = await appDataService.getRecordingAccess(recording.id);
+      const opened = window.open(access.url, '_blank', 'noopener,noreferrer');
+      if (!opened) window.location.assign(access.url);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Accès à l’enregistrement impossible.');
+    }
+  };
+
   const openLunaTarget = (meeting: Meeting) => {
     if (getMeetingPhase(meeting) === 'ended') {
       navigate(`/reunions/${meeting.meeting_link}/terminee`, { state: { meeting } });
@@ -251,6 +261,7 @@ export default function RealDashboardPage() {
           meetings={recent}
           recordings={recordings}
           onOpen={openLunaTarget}
+          onOpenRecording={(recording) => void openRecording(recording)}
           onManage={manageMeeting}
           canManage={(meeting) => canManage(meeting)}
           onAll={() => navigate('/app/meetings')}
