@@ -137,12 +137,15 @@ function SimpleInfoPage({ title, description }: { title: string; description: st
 }
 
 export default function App() {
+  const location = useLocation();
+  const hideGlobalHeader = /^\/reunions\/[^/]+(?:\/luna)?$/.test(location.pathname);
+
   useEffect(() => {
     const timer = window.setTimeout(() => sessionStorage.removeItem('mboteroom-runtime-recovery'), 5000);
     return () => window.clearTimeout(timer);
   }, []);
 
-  return <AppErrorBoundary><><AppLanguageBridge/><UserPreferencesRuntime/><AppMessageModal/><MobileSplash/><PwaExperience/><SessionSecurity/><GlobalHeader/><Suspense fallback={<AppLoader label="Chargement de MBotéRoom…" fullScreen />}><Routes>
+  return <AppErrorBoundary><><AppLanguageBridge/><UserPreferencesRuntime/><AppMessageModal/><MobileSplash/><PwaExperience/><SessionSecurity/>{!hideGlobalHeader ? <GlobalHeader/> : null}<Suspense fallback={<AppLoader label="Chargement de MBotéRoom…" fullScreen />}><Routes>
     <Route path="/login" element={<Login />} />
     <Route path="/connexion" element={<Login />} />
     <Route path="/inscription" element={<Login initialView="register" />} />
