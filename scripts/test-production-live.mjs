@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
 import { chromium } from '@playwright/test';
 
 // This suite targets the already deployed production services.
@@ -12,7 +13,7 @@ const runSuffix = [process.env.GITHUB_RUN_ID, process.env.GITHUB_RUN_ATTEMPT, Da
   .slice(-48) || String(Date.now());
 const hostEmail = `prod.smoke.host+${runSuffix}@mbote.test`;
 const guestName = `Invité Smoke ${runSuffix}`;
-const password = 'MboteRoom-Smoke-2026!';
+const password = 'MbR!'+randomBytes(18).toString('base64url')+'9a';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
