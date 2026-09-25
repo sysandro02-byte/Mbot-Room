@@ -183,6 +183,62 @@ const safeHomeSlidePath = (value: unknown) => {
   return path;
 };
 
+
+const safeAdActionUrl = (value: unknown) => {
+  const target = String(value || '').trim().slice(0, 1000);
+  if (!target) return '';
+  if (target.startsWith('/') && !target.startsWith('//') && !target.includes('\\')) return target;
+  try {
+    const parsed = new URL(target);
+    return parsed.protocol === 'https:' ? parsed.href : '';
+  } catch {
+    return '';
+  }
+};
+
+const normalizeAdDate = (value: unknown, fallback?: Date) => {
+  if (!value) return fallback ? fallback.toISOString() : null;
+  const date = new Date(String(value));
+  if (!Number.isFinite(date.getTime())) return fallback ? fallback.toISOString() : null;
+  return date.toISOString();
+};
+
+const rowToAdCampaign = (row: any) => ({
+  id: String(row.id),
+  title: String(row.title || ''),
+  body: String(row.body || ''),
+  imageUrl: String(row.image_url || ''),
+  actionLabel: String(row.action_label || ''),
+  actionUrl: String(row.action_url || ''),
+  audience: row.audience && typeof row.audience === 'object' ? row.audience : {},
+  isActive: Boolean(row.is_active),
+  startsAt: new Date(row.starts_at).toISOString(),
+  endsAt: row.ends_at ? new Date(row.ends_at).toISOString() : null,
+  maxImpressionsPerUser: Number(row.max_impressions_per_user || 1),
+  cooldownHours: Number(row.cooldown_hours || 0),
+  dismissible: Boolean(row.dismissible),
+  priority: Number(row.priority || 0),
+  impressions: Number(row.impressions || 0),
+  uniqueViewers: Number(row.unique_viewers || 0),
+  dismissals: Number(row.dismissals || 0),
+  clicks: Number(row.clicks || 0),
+  createdAt: new Date(row.created_at).toISOString(),
+  updatedAt: new Date(row.updated_at).toISOString(),
+});
+
+const adAudienceMatches = (user: any, audience: AdminAudienceFilters) => {
+  const normalized = normalizeAudienceFilters(audience || {});
+  const lower = (value: unknown) => String(value || '').trim().toLowerCase();
+  if (normalized.role && normalized.role !== 'all' && lower(user.role) !== normalized.role) return false;
+  if (normalized.accountStatus && normalized.accountStatus !== 'all' && lower(user.account_status || 'active') !== normalized.accountStatus) return false;
+  if (normalized.country && lower(user.country) !== lower(normalized.country)) return false;
+  if (normalized.city && lower(user.city) !== lower(normalized.city)) return false;
+  if (normalized.organization && !lower(user.organization).includes(lower(normalized.organization))) return false;
+  if (normalized.jobTitle && !lower(user.job_title).includes(lower(normalized.jobTitle))) return false;
+  if (normalized.userIds?.length && !normalized.userIds.includes(Number(user.id))) return false;
+  return true;
+};
+
 const periodDays = (period: unknown) => {
   const value = String(period || '30d');
   if (value === '7d') return 7;
@@ -208,6 +264,7 @@ const realSparkline = async (days: number) => {
 };
 
 export const registerAdminRoutes = (app: express.Express, io: Server) => {
+  const userApi = [requireDatabase, authenticateToken] as const;
   const adminApi = [requireDatabase, authenticateToken, requireAdmin] as const;
 
   app.get('/api/public/pages/:pageKey', requireDatabase, async (request,response,next)=>{
@@ -248,6 +305,223 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
       io.emit('public-page:updated',payload);
       response.json(payload);
     }catch(error){next(error);}
+  });
+
+
+  app.get('/api/ads/active', ...userApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const userResult = await query(
+        `SELECT id,role,country,city,organization,job_title,COALESCE(account_status,'active') AS account_status,is_guest
+           FROM room_users WHERE id=$1 LIMIT 1`,
+        [request.user!.id],
+      );
+      const user = userResult.rows[0];
+      if (!user || user.is_guest) return response.status(204).end();
+
+      const candidates = await query(
+        `SELECT c.*,
+                COALESCE(s.impressions,0)::int AS user_impressions,
+                s.last_impression_at
+           FROM room_ad_campaigns c
+           LEFT JOIN room_ad_user_state s ON s.campaign_id=c.id AND s.user_id=$1
+          WHERE c.is_active=true
+            AND c.starts_at<=now()
+            AND (c.ends_at IS NULL OR c.ends_at>now())
+          ORDER BY c.priority DESC,c.created_at DESC
+          LIMIT 50`,
+        [request.user!.id],
+      );
+
+      const now = Date.now();
+      const campaign = candidates.rows.find((row) => {
+        if (!adAudienceMatches(user,row.audience || {})) return false;
+        const impressions = Number(row.user_impressions || 0);
+        if (impressions >= Number(row.max_impressions_per_user || 1)) return false;
+        if (row.last_impression_at && Number(row.cooldown_hours || 0) > 0) {
+          const elapsed = now - new Date(row.last_impression_at).getTime();
+          if (elapsed < Number(row.cooldown_hours) * 3_600_000) return false;
+        }
+        return true;
+      });
+
+      if (!campaign) return response.status(204).end();
+      response.json(rowToAdCampaign(campaign));
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/ads/:campaignId/impression', ...userApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const campaignId = String(request.params.campaignId || '').trim();
+      const campaign = await query(
+        `SELECT c.* FROM room_ad_campaigns c
+          WHERE c.id=$1 AND c.is_active=true AND c.starts_at<=now()
+            AND (c.ends_at IS NULL OR c.ends_at>now()) LIMIT 1`,
+        [campaignId],
+      );
+      if (!campaign.rows[0]) return sendApiError(response,404,'AD_NOT_AVAILABLE','Cette campagne n’est plus disponible.');
+      const userResult = await query(
+        `SELECT id,role,country,city,organization,job_title,COALESCE(account_status,'active') AS account_status,is_guest
+           FROM room_users WHERE id=$1 LIMIT 1`,
+        [request.user!.id],
+      );
+      const user = userResult.rows[0];
+      if (!user || user.is_guest || !adAudienceMatches(user,campaign.rows[0].audience || {})) {
+        return sendApiError(response,403,'AD_AUDIENCE_DENIED','Cette campagne ne correspond pas à ce compte.');
+      }
+      const state = await query('SELECT impressions,last_impression_at FROM room_ad_user_state WHERE campaign_id=$1 AND user_id=$2 LIMIT 1',[campaignId,request.user!.id]);
+      const existing = state.rows[0];
+      const impressions = Number(existing?.impressions || 0);
+      const max = Number(campaign.rows[0].max_impressions_per_user || 1);
+      if (impressions >= max) return sendApiError(response,409,'AD_IMPRESSION_LIMIT','Limite d’affichage atteinte.');
+      const cooldown = Number(campaign.rows[0].cooldown_hours || 0);
+      if (existing?.last_impression_at && cooldown > 0 && Date.now()-new Date(existing.last_impression_at).getTime() < cooldown*3_600_000) {
+        return sendApiError(response,409,'AD_COOLDOWN_ACTIVE','Cette campagne a déjà été affichée récemment.');
+      }
+      await query(
+        `INSERT INTO room_ad_user_state (campaign_id,user_id,impressions,first_impression_at,last_impression_at)
+         VALUES ($1,$2,1,now(),now())
+         ON CONFLICT (campaign_id,user_id) DO UPDATE
+           SET impressions=room_ad_user_state.impressions+1,
+               first_impression_at=COALESCE(room_ad_user_state.first_impression_at,now()),
+               last_impression_at=now()`,
+        [campaignId,request.user!.id],
+      );
+      response.json({success:true});
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/ads/:campaignId/dismiss', ...userApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const campaignId = String(request.params.campaignId || '').trim();
+      const campaign = await query('SELECT id,dismissible FROM room_ad_campaigns WHERE id=$1 LIMIT 1',[campaignId]);
+      if (!campaign.rows[0]) return sendApiError(response,404,'AD_NOT_FOUND','Campagne introuvable.');
+      if (!campaign.rows[0].dismissible) return sendApiError(response,409,'AD_NOT_DISMISSIBLE','Cette campagne doit être consultée avant de continuer.');
+      await query(
+        `INSERT INTO room_ad_user_state (campaign_id,user_id,dismissals,last_dismissed_at)
+         VALUES ($1,$2,1,now())
+         ON CONFLICT (campaign_id,user_id) DO UPDATE
+           SET dismissals=room_ad_user_state.dismissals+1,last_dismissed_at=now()`,
+        [campaignId,request.user!.id],
+      );
+      response.json({success:true});
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/ads/:campaignId/click', ...userApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const campaignId = String(request.params.campaignId || '').trim();
+      const campaign = await query('SELECT id FROM room_ad_campaigns WHERE id=$1 LIMIT 1',[campaignId]);
+      if (!campaign.rows[0]) return sendApiError(response,404,'AD_NOT_FOUND','Campagne introuvable.');
+      await query(
+        `INSERT INTO room_ad_user_state (campaign_id,user_id,clicks,last_clicked_at)
+         VALUES ($1,$2,1,now())
+         ON CONFLICT (campaign_id,user_id) DO UPDATE
+           SET clicks=room_ad_user_state.clicks+1,last_clicked_at=now()`,
+        [campaignId,request.user!.id],
+      );
+      response.json({success:true});
+    } catch (error) { next(error); }
+  });
+
+  app.get('/api/admin/ads', ...adminApi, async (_request, response, next) => {
+    try {
+      const result = await query(
+        `SELECT c.*,
+                COALESCE(stats.impressions,0)::int AS impressions,
+                COALESCE(stats.unique_viewers,0)::int AS unique_viewers,
+                COALESCE(stats.dismissals,0)::int AS dismissals,
+                COALESCE(stats.clicks,0)::int AS clicks
+           FROM room_ad_campaigns c
+           LEFT JOIN (
+             SELECT campaign_id,
+                    SUM(impressions)::int AS impressions,
+                    COUNT(*) FILTER (WHERE impressions>0)::int AS unique_viewers,
+                    SUM(dismissals)::int AS dismissals,
+                    SUM(clicks)::int AS clicks
+               FROM room_ad_user_state GROUP BY campaign_id
+           ) stats ON stats.campaign_id=c.id
+          ORDER BY c.created_at DESC`,
+      );
+      response.json(result.rows.map(rowToAdCampaign));
+    } catch (error) { next(error); }
+  });
+
+  app.post('/api/admin/ads', ...adminApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const title = normalizeText(request.body?.title).slice(0,160);
+      const body = normalizeText(request.body?.body).slice(0,1600);
+      const imageUrl = safeManagedImageUrl(request.body?.imageUrl);
+      const actionLabel = normalizeText(request.body?.actionLabel).slice(0,80);
+      const actionUrl = safeAdActionUrl(request.body?.actionUrl);
+      const audience = normalizeAudienceFilters(request.body?.audience || {role:'user',accountStatus:'active'});
+      const startsAt = normalizeAdDate(request.body?.startsAt,new Date())!;
+      const endsAt = normalizeAdDate(request.body?.endsAt);
+      const maxImpressions = Math.max(1,Math.min(100,Number(request.body?.maxImpressionsPerUser || 1)));
+      const cooldownHours = Math.max(0,Math.min(8760,Number(request.body?.cooldownHours ?? 24)));
+      const priority = Math.max(0,Math.min(1000,Number(request.body?.priority || 0)));
+      if (!title || !body) return sendApiError(response,400,'AD_CONTENT_REQUIRED','Ajoutez un titre et un message.');
+      if (request.body?.imageUrl && !imageUrl) return sendApiError(response,400,'AD_IMAGE_INVALID','Utilisez une image HTTPS ou une ressource interne.');
+      if (request.body?.actionUrl && !actionUrl) return sendApiError(response,400,'AD_ACTION_INVALID','Utilisez une destination interne ou HTTPS.');
+      if (endsAt && new Date(endsAt).getTime() <= new Date(startsAt).getTime()) {
+        return sendApiError(response,400,'AD_DATE_INVALID','La date de fin doit être postérieure au début.');
+      }
+      const result = await query(
+        `INSERT INTO room_ad_campaigns
+          (id,created_by,title,body,image_url,action_label,action_url,audience,is_active,starts_at,ends_at,max_impressions_per_user,cooldown_hours,dismissible,priority)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15)
+         RETURNING *`,
+        [createId(),request.user!.id,title,body,imageUrl,actionLabel,actionUrl,JSON.stringify(audience),request.body?.isActive===true,startsAt,endsAt,maxImpressions,cooldownHours,request.body?.dismissible!==false,priority],
+      );
+      const payload=rowToAdCampaign(result.rows[0]);
+      io.emit('ad:campaign-updated',{id:payload.id});
+      response.status(201).json(payload);
+    } catch (error) { next(error); }
+  });
+
+  app.put('/api/admin/ads/:campaignId', ...adminApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const campaignId=String(request.params.campaignId||'').trim();
+      const current=await query('SELECT * FROM room_ad_campaigns WHERE id=$1 LIMIT 1',[campaignId]);
+      const row=current.rows[0];
+      if(!row)return sendApiError(response,404,'AD_NOT_FOUND','Campagne introuvable.');
+      const title=normalizeText(request.body?.title ?? row.title).slice(0,160);
+      const body=normalizeText(request.body?.body ?? row.body).slice(0,1600);
+      const imageCandidate=request.body?.imageUrl ?? row.image_url;
+      const imageUrl=safeManagedImageUrl(imageCandidate);
+      const actionCandidate=request.body?.actionUrl ?? row.action_url;
+      const actionUrl=safeAdActionUrl(actionCandidate);
+      const actionLabel=normalizeText(request.body?.actionLabel ?? row.action_label).slice(0,80);
+      const audience=normalizeAudienceFilters(request.body?.audience ?? row.audience ?? {});
+      const startsAt=normalizeAdDate(request.body?.startsAt ?? row.starts_at,new Date())!;
+      const endsAt=request.body?.endsAt===null ? null : normalizeAdDate(request.body?.endsAt ?? row.ends_at);
+      const maxImpressions=Math.max(1,Math.min(100,Number(request.body?.maxImpressionsPerUser ?? row.max_impressions_per_user ?? 1)));
+      const cooldownHours=Math.max(0,Math.min(8760,Number(request.body?.cooldownHours ?? row.cooldown_hours ?? 24)));
+      const priority=Math.max(0,Math.min(1000,Number(request.body?.priority ?? row.priority ?? 0)));
+      if(!title||!body)return sendApiError(response,400,'AD_CONTENT_REQUIRED','Ajoutez un titre et un message.');
+      if(imageCandidate && !imageUrl)return sendApiError(response,400,'AD_IMAGE_INVALID','Utilisez une image HTTPS ou une ressource interne.');
+      if(actionCandidate && !actionUrl)return sendApiError(response,400,'AD_ACTION_INVALID','Utilisez une destination interne ou HTTPS.');
+      if(endsAt&&new Date(endsAt).getTime()<=new Date(startsAt).getTime())return sendApiError(response,400,'AD_DATE_INVALID','La date de fin doit être postérieure au début.');
+      const result=await query(
+        `UPDATE room_ad_campaigns
+            SET title=$2,body=$3,image_url=$4,action_label=$5,action_url=$6,audience=$7::jsonb,
+                is_active=$8,starts_at=$9,ends_at=$10,max_impressions_per_user=$11,cooldown_hours=$12,
+                dismissible=$13,priority=$14,updated_at=now()
+          WHERE id=$1 RETURNING *`,
+        [campaignId,title,body,imageUrl,actionLabel,actionUrl,JSON.stringify(audience),typeof request.body?.isActive==='boolean'?request.body.isActive:Boolean(row.is_active),startsAt,endsAt,maxImpressions,cooldownHours,typeof request.body?.dismissible==='boolean'?request.body.dismissible:Boolean(row.dismissible),priority],
+      );
+      const payload=rowToAdCampaign(result.rows[0]);
+      io.emit('ad:campaign-updated',{id:payload.id});
+      response.json(payload);
+    } catch (error) { next(error); }
+  });
+
+  app.delete('/api/admin/ads/:campaignId', ...adminApi, async (request, response, next) => {
+    try {
+      const result=await query('DELETE FROM room_ad_campaigns WHERE id=$1 RETURNING id',[request.params.campaignId]);
+      if(!result.rows[0])return sendApiError(response,404,'AD_NOT_FOUND','Campagne introuvable.');
+      io.emit('ad:campaign-updated',{id:String(request.params.campaignId),deleted:true});
+      response.status(204).end();
+    } catch (error) { next(error); }
   });
 
   app.get('/api/admin/settings', ...adminApi, async (_request, response, next) => {
