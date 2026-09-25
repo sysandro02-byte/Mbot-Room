@@ -139,6 +139,7 @@ app.post('/api/auth/login/otp/resend', rateLimit(3, 60_000));
 app.post('/api/auth/login/otp', rateLimit(10, 60_000));
 app.post('/api/auth/login', rateLimit(10, 60_000));
 app.post('/api/auth/register', rateLimit(8, 60_000));
+app.post('/api/auth/admin/register', rateLimit(5, 60_000));
 app.post('/api/auth/forgot-password', rateLimit(5, 60_000));
 app.use('/api/auth', rateLimit(60, 60_000));
 app.post('/api/meetings/:meetingId/join-request', rateLimit(20, 60_000));
@@ -147,6 +148,9 @@ app.post('/api/meetings/:meetingId/lobby/admit-all', rateLimit(20, 60_000));
 app.post('/api/meetings/:meetingId/luna/catch-up', rateLimit(10, 60_000));
 app.use('/api/meetings', rateLimit(240, 60_000));
 app.use('/api/ai', rateLimit(30, 60_000));
+app.post('/api/admin/broadcasts', rateLimit(10, 60_000));
+app.use('/api/admin/ai', rateLimit(20, 60_000));
+app.use('/api/admin', rateLimit(300, 60_000));
 app.use('/api', rateLimit(600, 60_000));
 
 registerAuthRoutes(app, io);
