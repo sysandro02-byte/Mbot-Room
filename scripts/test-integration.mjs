@@ -381,6 +381,47 @@ try {
   assert.match(String(hostWelcomeMail?.body?.subject || ''), /Bienvenue sur MBotéRoom/i);
   assert.doesNotMatch(String(hostWelcomeMail?.body?.text || ''), /Password2026!/i, 'Welcome email must never expose the password');
 
+  const deniedSecondAdmin = await jsonRequest('/api/auth/admin/register', {
+    method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+    body: JSON.stringify({ name: 'Admin Sans Invitation', email: 'second.admin@mbote.test', password: 'Password2026!' }),
+  });
+  assert.equal(deniedSecondAdmin.response.status, 403, JSON.stringify(deniedSecondAdmin.data));
+  assert.equal(deniedSecondAdmin.data.code, 'ADMIN_INVITE_REQUIRED');
+
+  const adminInvite = await jsonRequest('/api/admin/admin-invites', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ email: 'second.admin@mbote.test' }),
+  });
+  assert.equal(adminInvite.response.status, 201, JSON.stringify(adminInvite.data));
+  const inviteUrl = new URL(adminInvite.data.invitePath, baseUrl);
+  const inviteToken = inviteUrl.searchParams.get('invite');
+  assert.ok(inviteToken, 'Admin invite must expose a one-time invitation token to the authenticated creator');
+
+  const invitedAdminRegister = await jsonRequest('/api/auth/admin/register', {
+    method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+    body: JSON.stringify({
+      name: 'Second Admin Integration',
+      email: 'second.admin@mbote.test',
+      password: 'Password2026!',
+      inviteToken,
+    }),
+  });
+  assert.equal(invitedAdminRegister.response.status, 201, JSON.stringify(invitedAdminRegister.data));
+  const invitedAdminOtpMail = mailRelayRequests.at(-1);
+  const invitedAdminOtp = String(invitedAdminOtpMail?.body?.text || '').match(/\b\d{6}\b/)?.[0];
+  assert.ok(invitedAdminOtp, 'Invited admin registration must send an OTP');
+  const invitedAdminVerify = await jsonRequest('/api/auth/login/otp', {
+    method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+    body: JSON.stringify({ challengeId: invitedAdminRegister.data.challengeId, code: invitedAdminOtp }),
+  });
+  assert.equal(invitedAdminVerify.response.status, 200, JSON.stringify(invitedAdminVerify.data));
+  assert.equal(invitedAdminVerify.data.user?.role, 'admin');
+  assert.ok(invitedAdminVerify.data.token);
+
   const browserLogin = await jsonRequest('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({
@@ -572,6 +613,65 @@ try {
     body: JSON.stringify({ accountStatus: 'active', featureRestrictions: [] }),
   });
   assert.equal(restoreOutsider.response.status, 200, JSON.stringify(restoreOutsider.data));
+
+  const audienceOptions = await jsonRequest('/api/admin/broadcasts/audience-options', { headers: authHeaders(host.token) });
+  assert.equal(audienceOptions.response.status, 200, JSON.stringify(audienceOptions.data));
+  assert.ok(Number(audienceOptions.data.totals?.users || 0) >= 3);
+
+  const audiencePreview = await jsonRequest('/api/admin/broadcasts/preview', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      audience: {
+        role: 'user',
+        accountStatus: 'active',
+        country: 'Congo-Brazzaville',
+        city: 'Brazzaville',
+      },
+    }),
+  });
+  assert.equal(audiencePreview.response.status, 200, JSON.stringify(audiencePreview.data));
+  assert.ok(audiencePreview.data.count >= 3);
+
+  const participantBroadcastSocket = await socketConnect(participant.token);
+  const participantBroadcastEvent = waitForSocketEvent(
+    participantBroadcastSocket,
+    'notification:new',
+    (payload) => payload?.type === 'ADMIN_BROADCAST' && payload?.title === 'Information ciblée CI',
+  );
+  const sentBroadcast = await jsonRequest('/api/admin/broadcasts', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: 'Information ciblée CI',
+      body: 'Message administrateur ciblé par pays et ville.',
+      actionPath: '/app/notifications',
+      push: false,
+      audience: {
+        role: 'user',
+        accountStatus: 'active',
+        country: 'Congo-Brazzaville',
+        city: 'Brazzaville',
+      },
+    }),
+  });
+  assert.equal(sentBroadcast.response.status, 201, JSON.stringify(sentBroadcast.data));
+  assert.ok(sentBroadcast.data.recipientCount >= 3);
+  const realtimeBroadcast = await participantBroadcastEvent;
+  assert.equal(realtimeBroadcast.body, 'Message administrateur ciblé par pays et ville.');
+  participantBroadcastSocket.close();
+
+  const participantNotifications = await jsonRequest('/api/notifications', { headers: authHeaders(participant.token) });
+  assert.equal(participantNotifications.response.status, 200, JSON.stringify(participantNotifications.data));
+  assert.ok(participantNotifications.data.some((item) => item.type === 'ADMIN_BROADCAST' && item.title === 'Information ciblée CI'));
+
+  const broadcastHistory = await jsonRequest('/api/admin/broadcasts', { headers: authHeaders(host.token) });
+  assert.equal(broadcastHistory.response.status, 200, JSON.stringify(broadcastHistory.data));
+  assert.equal(broadcastHistory.data[0]?.title, 'Information ciblée CI');
+
+  const aiInsights = await jsonRequest('/api/admin/ai/insights', { headers: authHeaders(host.token) });
+  assert.equal(aiInsights.response.status, 200, JSON.stringify(aiInsights.data));
+  assert.equal(aiInsights.data.provider, 'local-metrics');
 
   const hostMe = await jsonRequest('/api/auth/me', { headers: authHeaders(host.token) });
   assert.equal(hostMe.response.status, 200);
