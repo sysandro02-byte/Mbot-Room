@@ -193,7 +193,8 @@ public class MainActivity extends Activity {
 
     private void beginScreenProjection(int resultCode, Intent data) {
         try {
-            releaseScreenCapture(true, false);
+            // The foreground mediaProjection service is already running here.
+            // Do not stop it before getMediaProjection(): Android 14+ rejects that order.
             mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, data);
             if (mediaProjection == null) {
                 ScreenCaptureService.stop(this);
