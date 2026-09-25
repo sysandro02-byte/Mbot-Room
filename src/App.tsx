@@ -13,6 +13,7 @@ import { lazyWithRetry } from './lib/lazyWithRetry';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import AppLoader from './components/AppLoader';
 import GlobalHeader from './components/GlobalHeader';
+import UserAdModal from './components/UserAdModal';
 import RealMeetingList from './components/RealMeetingList';
 import AppShell from './components/AppShell';
 import RealJoinPage from './pages/RealJoinPage';
@@ -134,7 +135,7 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  return <AppErrorBoundary><><AppLanguageBridge/><UserPreferencesRuntime/><AppMessageModal/><MobileSplash/><PwaExperience/><SessionSecurity/>{!hideGlobalHeader ? <GlobalHeader/> : null}<Suspense fallback={<AppLoader label="Chargement de MBotéRoom…" fullScreen />}><Routes>
+  return <AppErrorBoundary><><AppLanguageBridge/><UserPreferencesRuntime/><AppMessageModal/><MobileSplash/><PwaExperience/><SessionSecurity/><UserAdModal/>{!hideGlobalHeader ? <GlobalHeader/> : null}<Suspense fallback={<AppLoader label="Chargement de MBotéRoom…" fullScreen />}><Routes>
     <Route path="/login" element={<Login />} />
     <Route path="/connexion" element={<Login />} />
     <Route path="/inscription" element={<Login initialView="register" />} />
