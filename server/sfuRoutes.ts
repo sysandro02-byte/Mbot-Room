@@ -116,7 +116,7 @@ export const registerSfuRoutes = (app: express.Express) => {
         return;
       }
       const moderator = canModerateMeeting(meeting, user);
-      const guestScreenAllowed = !user.isGuest || await isPlatformFeatureEnabled('guestScreenShareEnabled');
+      const guestScreenAllowed = moderator || !user.isGuest || await isPlatformFeatureEnabled('guestScreenShareEnabled');
       const accountScreenAllowed = canUseAccountFeature(user, 'screenShare');
       const canPublishSources = moderator
         ? [
