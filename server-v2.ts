@@ -167,6 +167,18 @@ registerTranscriptionRoutes(app, io);
 registerLegalAndReportRoutes(app, io);
 registerRealtime(io);
 
+const androidApkSourceUrl = String(
+  process.env.MBOTEROOM_ANDROID_APK_SOURCE_URL
+    || 'https://github.com/sysandro02-byte/Mbot-Room/releases/download/android-latest/MBoteRoom-Android.apk',
+).trim();
+
+app.get('/api/public/android/download', rateLimit(60, 60_000), (_request, response) => {
+  response.setHeader('Cache-Control', 'no-store, max-age=0');
+  response.setHeader('Pragma', 'no-cache');
+  response.setHeader('Content-Disposition', 'attachment; filename="MBoteRoom-Android.apk"');
+  response.redirect(302, androidApkSourceUrl);
+});
+
 app.use('/api', (_request, response) => {
   response.status(404).json({ error: 'API introuvable.', code: 'API_NOT_FOUND' });
 });
