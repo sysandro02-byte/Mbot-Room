@@ -50,7 +50,7 @@ const loadLive=async(id:string,userId:number)=>{
 const allowed=async(row:any,user:NonNullable<AuthedRequest['user']>,invite='')=>{
   if(Number(row.host_id)===user.id||user.role==='admin')return true;
   if(row.visibility==='public')return true;
-  if(row.visibility==='private')return Boolean(invite&&crypto.timingSafeEqual(Buffer.from(String(row.share_token||'')),Buffer.from(invite)));
+  if(row.visibility==='private'){const a=Buffer.from(String(row.share_token||''));const b=Buffer.from(invite);return Boolean(invite&&a.length===b.length&&crypto.timingSafeEqual(a,b));}
   if(row.visibility==='followers'){
     const result=await query('SELECT 1 FROM room_live_follows WHERE creator_id=$1 AND follower_id=$2 LIMIT 1',[row.host_id,user.id]);
     return Boolean(result.rows[0]);
@@ -179,7 +179,9 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
       const viewers=Number(count.rows[0]?.count||0);
       await query('UPDATE room_live_sessions SET viewer_count=$2,peak_viewer_count=GREATEST(peak_viewer_count,$2),updated_at=now() WHERE id=$1',[row.id,viewers]);
       io.to(`live:${row.id}`).emit('live:presence',{liveId:row.id,viewerCount:viewers});
-      response.json({success:true,meetingId:Number(row.meeting_id),viewerCount:viewers,role:Number(row.host_id)===request.user!.id?'host':'viewer'});
+      const roleRow=await query('SELECT co_host_id FROM room_meetings WHERE id=$1 LIMIT 1',[row.meeting_id]);
+      const role=Number(row.host_id)===request.user!.id?'host':Number(roleRow.rows[0]?.co_host_id||0)===request.user!.id?'cohost':'viewer';
+      response.json({success:true,meetingId:Number(row.meeting_id),viewerCount:viewers,role});
     }catch(error){next(error);}
   });
 
@@ -192,6 +194,46 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
       await query('UPDATE room_live_sessions SET viewer_count=$2,updated_at=now() WHERE id=$1',[id,viewers]);
       io.to(`live:${id}`).emit('live:presence',{liveId:id,viewerCount:viewers});
       response.json({success:true,viewerCount:viewers});
+    }catch(error){next(error);}
+  });
+
+  app.post('/api/live/:liveId/heartbeat',...protectedApi,async(request:AuthedRequest,response,next)=>{
+    try{
+      const id=String(request.params.liveId);
+      await query('UPDATE room_live_viewers SET last_seen_at=now(),left_at=NULL WHERE live_id=$1 AND user_id=$2',[id,request.user!.id]);
+      const count=await query(`SELECT COUNT(*)::int AS count FROM room_live_viewers WHERE live_id=$1 AND left_at IS NULL AND last_seen_at>now()-interval '2 minutes'`,[id]);
+      const viewerCount=Number(count.rows[0]?.count||0);
+      await query('UPDATE room_live_sessions SET viewer_count=$2,peak_viewer_count=GREATEST(peak_viewer_count,$2),updated_at=now() WHERE id=$1',[id,viewerCount]);
+      io.to(`live:${id}`).emit('live:presence',{liveId:id,viewerCount});
+      response.json({success:true,viewerCount});
+    }catch(error){next(error);}
+  });
+
+  app.patch('/api/live/:liveId/settings',...protectedApi,async(request:AuthedRequest,response,next)=>{
+    try{
+      const row=await loadLive(String(request.params.liveId),request.user!.id);
+      if(!row)return sendApiError(response,404,'LIVE_NOT_FOUND','Live introuvable.');
+      if(Number(row.host_id)!==request.user!.id&&request.user!.role!=='admin')return sendApiError(response,403,'LIVE_HOST_REQUIRED','Accès hôte requis.');
+      const chatEnabled=Object.prototype.hasOwnProperty.call(request.body||{},'chatEnabled')?request.body.chatEnabled!==false:row.chat_enabled!==false;
+      const moderationEnabled=Object.prototype.hasOwnProperty.call(request.body||{},'moderationEnabled')?request.body.moderationEnabled!==false:row.moderation_enabled!==false;
+      const cohostsEnabled=Object.prototype.hasOwnProperty.call(request.body||{},'cohostsEnabled')?request.body.cohostsEnabled!==false:row.cohosts_enabled!==false;
+      const result=await query('UPDATE room_live_sessions SET chat_enabled=$2,moderation_enabled=$3,cohosts_enabled=$4,updated_at=now() WHERE id=$1 RETURNING *',[row.id,chatEnabled,moderationEnabled,cohostsEnabled]);
+      io.to(`live:${row.id}`).emit('live:settings',{liveId:row.id,chatEnabled,moderationEnabled,cohostsEnabled});
+      response.json(mapLive({...result.rows[0],host_name:row.host_name,host_avatar:row.host_avatar,is_host:true}));
+    }catch(error){next(error);}
+  });
+
+  app.delete('/api/live/:liveId/comments/:commentId',...protectedApi,async(request:AuthedRequest,response,next)=>{
+    try{
+      const row=await loadLive(String(request.params.liveId),request.user!.id);
+      if(!row)return sendApiError(response,404,'LIVE_NOT_FOUND','Live introuvable.');
+      const comment=await query('SELECT user_id FROM room_live_comments WHERE id=$1 AND live_id=$2 LIMIT 1',[request.params.commentId,row.id]);
+      if(!comment.rows[0])return sendApiError(response,404,'LIVE_COMMENT_NOT_FOUND','Commentaire introuvable.');
+      const canDelete=request.user!.role==='admin'||Number(row.host_id)===request.user!.id||Number(comment.rows[0].user_id)===request.user!.id;
+      if(!canDelete)return sendApiError(response,403,'LIVE_MODERATION_DENIED','Action de modération refusée.');
+      await query('UPDATE room_live_comments SET deleted_at=now() WHERE id=$1 AND live_id=$2',[request.params.commentId,row.id]);
+      io.to(`live:${row.id}`).emit('live:comment-deleted',{liveId:row.id,commentId:String(request.params.commentId)});
+      response.status(204).end();
     }catch(error){next(error);}
   });
 
