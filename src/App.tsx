@@ -128,7 +128,8 @@ function AdminRoute({ children }: { children: ReactNode }) {
 
 export default function App() {
   const location = useLocation();
-  const hideGlobalHeader = /^\/reunions\/(?!recentes(?:\/|$)|terminee(?:\/|$))[^/]+(?:\/(?:luna|salle-attente))?$/.test(location.pathname);
+  const hideGlobalHeader = location.pathname.startsWith('/admin')
+    || /^\/reunions\/(?!recentes(?:\/|$)|terminee(?:\/|$))[^/]+(?:\/(?:luna|salle-attente))?$/.test(location.pathname);
 
   useEffect(() => {
     const timer = window.setTimeout(() => sessionStorage.removeItem('mboteroom-runtime-recovery'), 5000);
