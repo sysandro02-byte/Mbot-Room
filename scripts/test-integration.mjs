@@ -1050,9 +1050,9 @@ try {
   assert.equal(privateLive.response.status, 201, JSON.stringify(privateLive.data));
   const privateDenied = await jsonRequest(`/api/live/${privateLive.data.id}`, { headers: authHeaders(participant.token) });
   assert.equal(privateDenied.response.status, 403, JSON.stringify(privateDenied.data));
-  const inviteToken = new URL(privateLive.data.shareUrl, 'https://mboteroom.test').searchParams.get('invite');
-  assert.ok(inviteToken);
-  const privateAllowed = await jsonRequest(`/api/live/${privateLive.data.id}?invite=${encodeURIComponent(inviteToken)}`, { headers: authHeaders(participant.token) });
+  const privateLiveInviteToken = new URL(privateLive.data.shareUrl, 'https://mboteroom.test').searchParams.get('invite');
+  assert.ok(privateLiveInviteToken);
+  const privateAllowed = await jsonRequest(`/api/live/${privateLive.data.id}?invite=${encodeURIComponent(privateLiveInviteToken)}`, { headers: authHeaders(participant.token) });
   assert.equal(privateAllowed.response.status, 200, JSON.stringify(privateAllowed.data));
   const privateEnd = await jsonRequest(`/api/live/${privateLive.data.id}/end`, {
     method: 'POST',
