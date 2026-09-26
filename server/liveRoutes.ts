@@ -331,7 +331,15 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
   });
 
   app.post('/api/live/:liveId/share',...protectedApi,async(request:AuthedRequest,response,next)=>{
-    try{const result=await query('UPDATE room_live_sessions SET share_count=share_count+1 WHERE id=$1 RETURNING share_count,share_token',[request.params.liveId]);if(!result.rows[0])return sendApiError(response,404,'LIVE_NOT_FOUND','Live introuvable.');response.json({shareCount:Number(result.rows[0].share_count),url:liveUrl(String(request.params.liveId),String(result.rows[0].share_token||''))});}catch(error){next(error);}
+    try{
+      const row=await loadLive(String(request.params.liveId),request.user!.id);
+      if(!row)return sendApiError(response,404,'LIVE_NOT_FOUND','Live introuvable.');
+      if(!(await allowed(row,request.user!,clean(request.body?.inviteToken,200))))return sendApiError(response,403,'LIVE_ACCESS_DENIED','Ce Live est privé.');
+      const privateOwner=Number(row.host_id)===request.user!.id||request.user!.role==='admin';
+      if(row.visibility==='private'&&!privateOwner)return sendApiError(response,403,'LIVE_PRIVATE_SHARE_DENIED','Seul l’hôte peut partager un Live privé.');
+      const result=await query('UPDATE room_live_sessions SET share_count=share_count+1 WHERE id=$1 RETURNING share_count,share_token',[row.id]);
+      response.json({shareCount:Number(result.rows[0].share_count),url:liveUrl(row.id,row.visibility==='private'?String(result.rows[0].share_token||''):'')});
+    }catch(error){next(error);}
   });
 
   app.post('/api/live/:liveId/follow',...protectedApi,async(request:AuthedRequest,response,next)=>{
@@ -442,7 +450,7 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
       const target=Number(request.params.userId);const status=request.body?.status==='accepted'?'accepted':'rejected';
       await query('UPDATE room_live_participation_requests SET status=$3,responded_at=now() WHERE live_id=$1 AND user_id=$2',[row.id,target,status]);
       if(status==='accepted'){
-        await query('UPDATE room_meetings SET co_host_id=$2,updated_at=now() WHERE id=$1',[row.meeting_id,target]);
+        await query('UPDATE room_meetings SET co_host_id=COALESCE(co_host_id,$2),updated_at=now() WHERE id=$1',[row.meeting_id,target]);
         await query(`INSERT INTO room_meeting_members(meeting_id,user_id,role,status,joined_at) VALUES($1,$2,'cohost','accepted',now())
           ON CONFLICT(meeting_id,user_id) DO UPDATE SET role='cohost',status='accepted',left_at=NULL,updated_at=now()`,[row.meeting_id,target]);
       }
