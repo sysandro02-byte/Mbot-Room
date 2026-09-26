@@ -1996,3 +1996,268 @@
   }
 }
 
+
+
+/* Admin dashboard resilience + analytics 2026-09-26 */
+.admin-dashboard-page button,
+.admin-dashboard-page [role="button"]{
+  box-sizing:border-box;
+  max-width:100%;
+  min-width:0;
+  line-height:1.2;
+  word-break:normal;
+  overflow-wrap:normal;
+}
+.admin-dashboard-page button>svg,
+.admin-dashboard-page [role="button"]>svg{flex:0 0 auto}
+
+.admin-insights-grid{
+  display:grid;
+  grid-template-columns:minmax(0,.92fr) minmax(0,1.35fr);
+  gap:18px;
+  margin:0 0 18px;
+}
+.admin-meeting-totals-card,
+.admin-ai-report-card,
+.admin-guest-history-card{
+  min-width:0;
+  padding:20px;
+  border:1px solid var(--admin-line,#dce6ea);
+  border-radius:20px;
+  background:#fff;
+  box-shadow:0 12px 32px rgba(20,55,75,.06);
+}
+.admin-meeting-totals-card>header,
+.admin-ai-report-card>header,
+.admin-guest-history-card>header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:16px;
+}
+.admin-meeting-totals-card h2,
+.admin-ai-report-card h2,
+.admin-guest-history-card h2{
+  margin:0;
+  color:#173953;
+  font-size:18px;
+}
+.admin-meeting-totals-card header p,
+.admin-ai-report-card header p,
+.admin-guest-history-card header p{
+  margin:5px 0 0;
+  color:#748396;
+  font-size:12px;
+  line-height:1.5;
+}
+.admin-meeting-totals-card>header>svg,
+.admin-ai-report-card>header>svg{
+  flex:0 0 auto;
+  padding:10px;
+  width:44px;
+  height:44px;
+  border-radius:14px;
+  background:#eaf7f5;
+  color:#007e83;
+}
+.admin-meeting-totals-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+}
+.admin-meeting-totals-grid article{
+  min-width:0;
+  padding:14px 12px;
+  border:1px solid #e1ebee;
+  border-radius:15px;
+  background:linear-gradient(180deg,#fff,#f7fbfb);
+}
+.admin-meeting-totals-grid span,
+.admin-meeting-totals-grid strong{display:block}
+.admin-meeting-totals-grid span{
+  color:#708096;
+  font-size:11px;
+  font-weight:750;
+}
+.admin-meeting-totals-grid strong{
+  margin-top:7px;
+  color:#102d46;
+  font-size:25px;
+}
+.admin-ai-report-placeholder,
+.admin-ai-report-summary{
+  margin:0 0 15px;
+  padding:14px 15px;
+  border:1px solid #e3ecef;
+  border-radius:15px;
+  background:#f8fbfb;
+  color:#40566c;
+  font-size:13px;
+  line-height:1.65;
+}
+.admin-ai-report-summary p{
+  margin:0;
+  white-space:pre-wrap;
+}
+.admin-ai-report-summary small{
+  display:block;
+  margin-top:10px;
+  color:#7c8998;
+}
+.admin-ai-report-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
+.admin-ai-report-actions button{
+  display:inline-flex;
+  min-height:44px;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:0 15px;
+  border:1px solid #d8e4e8;
+  border-radius:12px;
+  background:#fff;
+  color:#24516a;
+  cursor:pointer;
+  font:inherit;
+  font-size:12px;
+  font-weight:850;
+}
+.admin-ai-report-actions button:first-child{
+  border-color:transparent;
+  background:linear-gradient(135deg,#007e83,#0d5663);
+  color:#fff;
+}
+.admin-ai-report-actions button:disabled{
+  cursor:not-allowed;
+  opacity:.58;
+}
+.admin-guest-history-card>header>span{
+  flex:0 0 auto;
+  padding:7px 10px;
+  border-radius:999px;
+  background:#eaf7f5;
+  color:#06766f;
+  font-size:11px;
+  font-weight:850;
+}
+.admin-guest-history-list{
+  display:grid;
+  max-height:420px;
+  overflow:auto;
+}
+.admin-guest-history-list article{
+  display:grid;
+  grid-template-columns:40px minmax(0,1fr) auto;
+  gap:11px;
+  align-items:center;
+  min-height:60px;
+  border-top:1px solid #edf2f4;
+}
+.admin-guest-history-list article:first-child{border-top:0}
+.admin-guest-history-avatar{
+  display:grid;
+  width:38px;
+  height:38px;
+  place-items:center;
+  border-radius:13px;
+  background:#edf8f6;
+  color:#08766f;
+  font-size:11px;
+  font-weight:900;
+}
+.admin-guest-history-list strong,
+.admin-guest-history-list small{display:block;min-width:0}
+.admin-guest-history-list strong{
+  overflow:hidden;
+  color:#18364d;
+  font-size:13px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.admin-guest-history-list small{
+  margin-top:3px;
+  overflow:hidden;
+  color:#788697;
+  font-size:11px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.admin-guest-history-list time{
+  color:#8591a0;
+  font-size:10px;
+  white-space:nowrap;
+}
+
+@media(max-width:1024px){
+  .admin-insights-grid{grid-template-columns:1fr}
+  .admin-topbar{
+    position:sticky;
+    top:0;
+    z-index:30;
+  }
+}
+@media(max-width:760px){
+  .admin-topbar{
+    grid-template-columns:auto minmax(0,1fr) auto!important;
+    align-items:center;
+    gap:8px!important;
+    padding:10px 12px!important;
+  }
+  .admin-topbar-brand{min-width:0}
+  .admin-topbar-brand strong{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .admin-search{display:none!important}
+  .admin-topbar-actions{
+    grid-column:auto!important;
+    width:auto!important;
+    padding:0!important;
+    border:0!important;
+    gap:6px!important;
+  }
+  .admin-flag-action,
+  .admin-help-action,
+  .admin-desktop-new-meeting{display:none!important}
+  .admin-mobile-quick-actions{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) minmax(170px,.7fr)!important;
+    gap:10px!important;
+  }
+  .admin-mobile-new-meeting{
+    width:100%!important;
+    min-width:0!important;
+    min-height:64px!important;
+    padding:0 16px!important;
+    font-size:12px!important;
+    white-space:nowrap;
+  }
+  .admin-meeting-totals-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .admin-ai-report-actions button{flex:1 1 180px}
+  .admin-guest-history-list article{grid-template-columns:38px minmax(0,1fr)}
+  .admin-guest-history-list time{grid-column:2}
+}
+@media(max-width:520px){
+  .admin-dashboard-content{padding:16px 12px 24px!important}
+  .admin-mobile-quick-actions{grid-template-columns:1fr!important}
+  .admin-mobile-new-meeting{
+    width:100%!important;
+    height:auto!important;
+    min-height:58px!important;
+    padding:0 14px!important;
+    font-size:13px!important;
+  }
+  .admin-meeting-totals-card,
+  .admin-ai-report-card,
+  .admin-guest-history-card{padding:15px;border-radius:18px}
+  .admin-meeting-totals-grid{grid-template-columns:1fr 1fr}
+  .admin-meeting-totals-grid article{padding:12px}
+  .admin-meeting-totals-grid strong{font-size:22px}
+  .admin-ai-report-actions{display:grid;grid-template-columns:1fr}
+  .admin-ai-report-actions button{width:100%;min-height:48px}
+}
