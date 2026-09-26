@@ -44,3 +44,113 @@
 .calendar-event-detail-modal>header>div{display:flex;align-items:center;gap:10px}.calendar-event-detail-modal>header>div>span{display:grid;width:42px;height:42px;place-items:center;border-radius:12px;background:#e4f6f3;color:#078d88}.calendar-event-detail-modal>header small{display:block;color:#7d8d9d;font-size:8px;text-transform:uppercase;letter-spacing:.08em}.calendar-event-detail-modal>header h2{margin:3px 0 0;color:#183955;font-size:17px}.calendar-event-detail-modal>header>button{display:grid;width:34px;height:34px;place-items:center;border:1px solid #dce5ea;border-radius:10px;background:#fff;color:#5d7388;cursor:pointer}.calendar-event-detail-modal>header>button svg{width:17px}
 .calendar-event-detail-body{display:grid;gap:10px;padding:16px 18px}.calendar-event-detail-body article{display:grid;grid-template-columns:34px minmax(0,1fr);align-items:center;gap:9px;padding:10px;border:1px solid #e5ebef;border-radius:12px;background:#fbfdfd}.calendar-event-detail-body article>svg{width:20px;color:#0a8f8b}.calendar-event-detail-body article small,.calendar-event-detail-body article strong{display:block}.calendar-event-detail-body article small{color:#8191a0;font-size:8px}.calendar-event-detail-body article strong{margin-top:2px;color:#2c4962;font-size:10px}.calendar-event-detail-body>p{margin:0;padding:11px;border-radius:11px;background:#f5f8fa;color:#62778b;font-size:9px;line-height:1.55}
 .calendar-event-detail-modal>footer{display:flex;justify-content:flex-end;gap:8px;padding:13px 18px 17px;border-top:1px solid #edf1f4}.calendar-event-detail-modal>footer button{min-height:38px;display:inline-flex;align-items:center;gap:6px;padding:0 11px;border-radius:10px;font-size:9px;font-weight:850;cursor:pointer}.calendar-event-detail-modal>footer button.secondary{border:1px solid #dce5ea;background:#fff;color:#526b81}.calendar-event-detail-modal>footer button.primary{border:0;background:#078f8c;color:#fff}.calendar-event-detail-modal>footer button svg{width:15px}
+
+
+/* Administrator calendar */
+.admin-calendar-shell{
+  min-height:100dvh;
+  background:#f3faf9;
+}
+.is-admin-calendar{
+  max-width:1600px;
+  padding-top:16px;
+}
+.admin-calendar-topbar{
+  position:sticky;
+  top:0;
+  z-index:90;
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:14px;
+  padding:12px 14px;
+  border:1px solid #dce7eb;
+  border-radius:16px;
+  background:rgba(255,255,255,.96);
+  box-shadow:0 10px 30px rgba(18,54,80,.07);
+  backdrop-filter:blur(14px);
+}
+.admin-calendar-topbar>div{
+  display:flex;
+  min-width:0;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  color:#173953;
+}
+.admin-calendar-topbar>div>svg{
+  width:22px;
+  color:#078f8c;
+}
+.admin-calendar-topbar>div>span{
+  min-width:0;
+}
+.admin-calendar-topbar strong,
+.admin-calendar-topbar small{
+  display:block;
+}
+.admin-calendar-topbar strong{
+  font-size:14px;
+}
+.admin-calendar-topbar small{
+  margin-top:2px;
+  overflow:hidden;
+  color:#7a8b9a;
+  font-size:9px;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.admin-calendar-topbar>button{
+  min-height:42px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  padding:0 13px;
+  border:1px solid #d9e4e8;
+  border-radius:12px;
+  background:#fff;
+  color:#31546c;
+  font-size:10px;
+  font-weight:850;
+  cursor:pointer;
+}
+.admin-calendar-topbar>button.primary{
+  border-color:transparent;
+  background:linear-gradient(135deg,#078f8d,#0ba49d);
+  color:#fff;
+}
+.admin-calendar-topbar>button svg{
+  width:16px;
+}
+.is-admin-calendar .calendar-create-card label>svg{
+  display:inline-block;
+  width:14px;
+  margin-right:4px;
+  vertical-align:-2px;
+}
+@media(max-width:820px){
+  .admin-calendar-topbar{
+    grid-template-columns:auto minmax(0,1fr) auto;
+    gap:8px;
+    padding:10px;
+  }
+  .admin-calendar-topbar>div{
+    justify-content:flex-start;
+  }
+  .admin-calendar-topbar>div>svg{
+    display:none;
+  }
+  .admin-calendar-topbar>button{
+    width:42px;
+    min-width:42px;
+    padding:0;
+    font-size:0;
+  }
+  .admin-calendar-topbar>button svg{
+    width:19px;
+  }
+  .admin-calendar-topbar small{
+    display:none;
+  }
+}
