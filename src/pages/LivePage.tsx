@@ -15,7 +15,7 @@ import { useMeetingLiveKit } from '../hooks/useMeetingLiveKit';
 import './LivePage.css';
 
 const categories:Array<{value:string;label:string;icon?:typeof Radio}>=[
-  {value:'',label:'En direct',icon:Radio},{value:'business',label:'Business'},{value:'music',label:'Musique',icon:Music2},
+  {value:'',label:'En direct',icon:Radio},{value:'trending',label:'Tendance'},{value:'business',label:'Business'},{value:'music',label:'Musique',icon:Music2},
   {value:'games',label:'Jeux',icon:Gamepad2},{value:'events',label:'Événements'},{value:'wellness',label:'Bien-être'},
   {value:'education',label:'Éducation'},{value:'tech',label:'Tech'},{value:'community',label:'Communauté'},
 ];
@@ -44,7 +44,7 @@ export function LiveFeedPage(){
 
   const load=async()=>{
     setLoading(true);setError('');
-    try{setItems(await liveService.getFeed({q,category}));}
+    try{setItems(await liveService.getFeed({q,category:category==='trending'?'':category,mode:category==='trending'?'trending':'live'}));}
     catch(cause){setError(cause instanceof Error?cause.message:'Impossible de charger les Lives.');}
     finally{setLoading(false);}
   };
@@ -155,7 +155,7 @@ export function LiveCreatePage(){
         {error?<div className="live-error">{error}</div>:null}
         <label>Titre du live *<input maxLength={100} value={title} onChange={(event)=>setTitle(event.target.value)} placeholder="Ex. Parler de son parcours, astuces, Q&R…"/><small>{title.length}/100</small></label>
         <label>Description<textarea maxLength={500} value={description} onChange={(event)=>setDescription(event.target.value)} placeholder="Décrivez votre live…"/><small>{description.length}/500</small></label>
-        <label>Catégorie *<select value={category} onChange={(event)=>setCategory(event.target.value as LiveCategory)}>{categories.filter((item)=>item.value).map((item)=><option value={item.value} key={item.value}>{item.label}</option>)}</select></label>
+        <label>Catégorie *<select value={category} onChange={(event)=>setCategory(event.target.value as LiveCategory)}>{categories.filter((item)=>item.value&&item.value!=='trending').map((item)=><option value={item.value} key={item.value}>{item.label}</option>)}</select></label>
 
         <fieldset className="live-visibility"><legend>Visibilité *</legend>
           {([
@@ -333,7 +333,7 @@ export function LiveRoomPage(){
   };
   const like=async()=>{if(!live)return;const result=await liveService.toggleLike(live.id,inviteToken);setLive({...live,isLiked:result.liked,likeCount:result.likeCount});};
   const share=async()=>{
-    if(!live)return;const result=await liveService.share(live.id);const url=absoluteUrl(result.url);
+    if(!live)return;const result=await liveService.share(live.id,inviteToken);const url=absoluteUrl(result.url);
     setLive({...live,shareCount:result.shareCount});
     try{if(navigator.share)await navigator.share({title:live.title,text:'Rejoignez ce Live MBotéRoom',url});else{await navigator.clipboard.writeText(url);setNotice('Lien du Live copié.');}}catch{}
   };
@@ -390,7 +390,7 @@ export function LiveRoomPage(){
         {!publisher?<aside className="live-viewer-actions">
           <button className={live.isLiked?'liked':''} onClick={()=>void like()}><Heart/><span>{fmtCount(live.likeCount)}</span></button>
           <button onClick={()=>document.querySelector<HTMLInputElement>('.live-comment-form input')?.focus()}><Send/><span>{comments.length}</span></button>
-          <button onClick={()=>void share()}><Share2/><span>{fmtCount(live.shareCount)}</span></button>
+          {live.canShare?<button onClick={()=>void share()}><Share2/><span>{fmtCount(live.shareCount)}</span></button>:null}
           <button onClick={()=>void sendGift()}><Gift/><span>{live.giftCount?fmtCount(live.giftCount):'Cadeau'}</span></button>
         </aside>:null}
 
