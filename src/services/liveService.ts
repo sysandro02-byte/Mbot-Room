@@ -34,6 +34,7 @@ export type LiveSession={
   likeCount:number;
   commentCount:number;
   shareCount:number;
+  giftCount:number;
   isLiked:boolean;
   isFollowing:boolean;
   isHost:boolean;
@@ -46,6 +47,11 @@ export type LiveComment={id:string;userId:number;name:string;avatar:string;text:
 export type LiveJoinResult={success:boolean;meetingId:number;viewerCount:number;role:'host'|'cohost'|'viewer'};
 export type LiveParticipationRequest={userId:number;name:string;avatar:string;status:'pending'|'accepted'|'rejected';createdAt:string};
 
+export const liveMediaUrl=(value:string)=>{
+  const raw=String(value||'').trim();
+  return raw.startsWith('/api/')?apiUrl(raw):raw;
+};
+
 export const liveService={
   async getFeed(filters:{q?:string;category?:string}={}){
     const params=new URLSearchParams();
@@ -56,6 +62,15 @@ export const liveService={
   async getLive(id:string,invite=''){
     const suffix=invite?'?invite='+encodeURIComponent(invite):'';
     return readJson<LiveSession>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}${suffix}`),{headers:getAuthHeaders(),cache:'no-store'}));
+  },
+  async uploadCover(file:File){
+    const response=await apiFetch(apiUrl('/api/live/assets/cover'),{
+      method:'POST',
+      headers:{...getAuthHeaders(),'Content-Type':file.type},
+      body:file,
+    },60_000);
+    const data=await readJson<{id:string;url:string;mimeType:string;sizeBytes:number}>(response);
+    return {...data,url:liveMediaUrl(data.url)};
   },
   async createLive(payload:{
     title:string;description?:string;category:LiveCategory|string;visibility:LiveVisibility;
@@ -76,6 +91,20 @@ export const liveService={
   async share(id:string){return readJson<{shareCount:number;url:string}>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/share`),{method:'POST',headers:getAuthHeaders(),body:'{}'}));},
   async toggleFollow(id:string){return readJson<{following:boolean}>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/follow`),{method:'POST',headers:getAuthHeaders(),body:'{}'}));},
   async updateSettings(id:string,payload:{chatEnabled?:boolean;moderationEnabled?:boolean;cohostsEnabled?:boolean}){return readJson<LiveSession>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/settings`),{method:'PATCH',headers:getAuthHeaders(),body:JSON.stringify(payload)}));},
+  async sendGift(id:string,giftType='star',inviteToken=''){
+    return readJson<{id:string;liveId:string;userId:number;name:string;avatar:string;giftType:string;giftCount:number;createdAt:string}>(
+      await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/gifts`),{
+        method:'POST',headers:getAuthHeaders(),body:JSON.stringify({giftType,inviteToken}),
+      })
+    );
+  },
+  async invite(id:string,email:string){
+    return readJson<{success:boolean;email:string;registered:boolean;url:string}>(
+      await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/invitations`),{
+        method:'POST',headers:getAuthHeaders(),body:JSON.stringify({email}),
+      })
+    );
+  },
   async requestParticipation(id:string,inviteToken=''){return readJson<{success:boolean;status:string}>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/participation-requests`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({inviteToken})}));},
   async react(id:string,reaction='👏',inviteToken=''){return readJson<{liveId:string;userId:number;name:string;reaction:string;createdAt:string}>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/reactions`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({reaction,inviteToken})}));},
   async getParticipationRequests(id:string){return readJson<LiveParticipationRequest[]>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/participation-requests`),{headers:getAuthHeaders(),cache:'no-store'}));},
