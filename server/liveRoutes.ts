@@ -230,8 +230,8 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
       const viewers=Number(count.rows[0]?.count||0);
       await query('UPDATE room_live_sessions SET viewer_count=$2,peak_viewer_count=GREATEST(peak_viewer_count,$2),updated_at=now() WHERE id=$1',[row.id,viewers]);
       io.to(`live:${row.id}`).emit('live:presence',{liveId:row.id,viewerCount:viewers});
-      const roleRow=await query('SELECT co_host_id FROM room_meetings WHERE id=$1 LIMIT 1',[row.meeting_id]);
-      const role=Number(row.host_id)===request.user!.id?'host':Number(roleRow.rows[0]?.co_host_id||0)===request.user!.id?'cohost':'viewer';
+      const roleRow=await query("SELECT role FROM room_meeting_members WHERE meeting_id=$1 AND user_id=$2 AND status='accepted' LIMIT 1",[row.meeting_id,request.user!.id]);
+      const role=Number(row.host_id)===request.user!.id?'host':roleRow.rows[0]?.role==='cohost'?'cohost':'viewer';
       response.json({success:true,meetingId:Number(row.meeting_id),viewerCount:viewers,role});
     }catch(error){next(error);}
   });
