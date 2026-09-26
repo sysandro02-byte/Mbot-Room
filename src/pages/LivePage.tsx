@@ -9,7 +9,7 @@ import AppShell from '../components/AppShell';
 import AppLoader from '../components/AppLoader';
 import { authService } from '../services/authService';
 import { collaborationService } from '../services/collaborationService';
-import { liveCategoryLabel, liveService, type LiveCategory, type LiveComment, type LiveParticipationRequest, type LiveSession, type LiveVisibility } from '../services/liveService';
+import { liveCategoryLabel, liveMediaUrl, liveService, type LiveCategory, type LiveComment, type LiveParticipationRequest, type LiveSession, type LiveVisibility } from '../services/liveService';
 import { socket } from '../lib/socket';
 import { useMeetingLiveKit } from '../hooks/useMeetingLiveKit';
 import './LivePage.css';
@@ -77,7 +77,7 @@ export function LiveFeedPage(){
       <section className="live-feed-grid">
         {items.map((item)=><article key={item.id} className="live-feed-card" onClick={()=>navigate('/app/live/'+item.id)}>
           <div className="live-feed-cover">
-            {item.coverUrl?<img src={item.coverUrl} alt=""/>:<div className="live-cover-fallback"><Avatar name={item.hostName} src={item.hostAvatar}/><Radio/></div>}
+            {item.coverUrl?<img src={liveMediaUrl(item.coverUrl)} alt=""/>:<div className="live-cover-fallback"><Avatar name={item.hostName} src={item.hostAvatar}/><Radio/></div>}
             <span className={item.status==='live'?'live-badge':'live-badge scheduled'}>{item.status==='live'?'EN DIRECT':'PROGRAMMÉ'}</span>
             {item.status==='live'?<span className="live-viewers"><Eye/> {fmtCount(item.viewerCount)}</span>:<span className="live-scheduled-date"><CalendarDays/> {item.scheduledFor?new Intl.DateTimeFormat('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(item.scheduledFor)):''}</span>}
           </div>
@@ -112,6 +112,16 @@ export function LiveCreatePage(){
   const [busy,setBusy]=useState('');
   const [error,setError]=useState('');
 
+  const uploadCover=async(file:File|null)=>{
+    if(!file)return;
+    setBusy('cover');setError('');
+    try{
+      const uploaded=await liveService.uploadCover(file);
+      setCoverUrl(uploaded.url);
+    }catch(cause){setError(cause instanceof Error?cause.message:'Téléversement de la couverture impossible.');}
+    finally{setBusy('');}
+  };
+
   const submit=async(startNow:boolean,forceSchedule=false)=>{
     if(!title.trim()){setError('Ajoutez un titre au Live.');return;}
     setBusy(startNow?'start':'schedule');setError('');
@@ -134,8 +144,12 @@ export function LiveCreatePage(){
       <header className="live-create-header"><button onClick={()=>navigate('/app/live')}><ChevronLeft/></button><h1>Créer un live</h1></header>
       <section className="live-create-card">
         <div className="live-cover-editor">
-          {coverUrl?<img src={coverUrl} alt="Couverture du Live"/>:<div><Camera/><strong>Ajouter une couverture du live</strong><small>Utilisez une URL d’image sécurisée ou laissez MBotéRoom utiliser votre profil.</small></div>}
-          <input aria-label="URL de couverture" value={coverUrl} onChange={(event)=>setCoverUrl(event.target.value)} placeholder="https://…"/>
+          {coverUrl?<img src={liveMediaUrl(coverUrl)} alt="Couverture du Live"/>:<div><Camera/><strong>Ajouter une couverture du live</strong><small>JPG, PNG ou WebP · 5 Mo maximum · stockée sur le serveur MBotéRoom.</small></div>}
+          <label className="live-cover-upload">
+            {busy==='cover'?<LoaderCircle className="spin"/>:<Camera/>}
+            <span>{busy==='cover'?'Téléversement…':coverUrl?'Changer la couverture':'Choisir une couverture'}</span>
+            <input aria-label="Choisir une couverture" type="file" accept="image/jpeg,image/png,image/webp" disabled={Boolean(busy)} onChange={(event)=>void uploadCover(event.target.files?.[0]||null)}/>
+          </label>
         </div>
 
         {error?<div className="live-error">{error}</div>:null}
@@ -177,6 +191,8 @@ export function LiveRoomPage(){
   const [live,setLive]=useState<LiveSession|null>(null);
   const [comments,setComments]=useState<LiveComment[]>([]);
   const [requests,setRequests]=useState<LiveParticipationRequest[]>([]);
+  const [inviteOpen,setInviteOpen]=useState(false);
+  const [inviteEmail,setInviteEmail]=useState('');
   const [joinRole,setJoinRole]=useState<'host'|'cohost'|'viewer'>('viewer');
   const [joined,setJoined]=useState(false);
   const [localStream,setLocalStream]=useState<MediaStream|null>(null);
@@ -242,6 +258,10 @@ export function LiveRoomPage(){
     const onSettings=(payload:{chatEnabled:boolean;cohostsEnabled:boolean;moderationEnabled:boolean})=>setLive((current)=>current?{...current,...payload}:current);
     const onRequest=()=>{if(live.isHost)void liveService.getParticipationRequests(liveId).then(setRequests).catch(()=>undefined);};
     const onReaction=(payload:{name:string;reaction:string})=>setNotice(`${payload.name} ${payload.reaction}`);
+    const onGift=(payload:{name:string;giftType:string;giftCount:number})=>{
+      setLive((current)=>current?{...current,giftCount:Number(payload.giftCount||current.giftCount||0)}:current);
+      setNotice(`${payload.name} a envoyé un cadeau ✨`);
+    };
     const onParticipation=(payload:{status:string})=>{
       if(payload.status==='accepted'){
         setNotice('Votre demande a été acceptée. Activation de votre caméra et micro…');
@@ -249,13 +269,13 @@ export function LiveRoomPage(){
         setMediaSessionKey((value)=>value+1);
       }else setNotice('Votre demande de participation n’a pas été retenue.');
     };
-    socket.on('connect',joinRealtime).on('live:comment',onComment).on('live:comment-deleted',onDeleted).on('live:presence',onPresence).on('live:likes',onLikes).on('live:status',onStatus).on('live:settings',onSettings).on('live:reaction',onReaction).on('live:participation-request',onRequest).on('live:participation-response',onParticipation);
+    socket.on('connect',joinRealtime).on('live:comment',onComment).on('live:comment-deleted',onDeleted).on('live:presence',onPresence).on('live:likes',onLikes).on('live:status',onStatus).on('live:settings',onSettings).on('live:reaction',onReaction).on('live:gift',onGift).on('live:participation-request',onRequest).on('live:participation-response',onParticipation);
     if(socket.connected)joinRealtime();else socket.connect();
     const heartbeat=window.setInterval(()=>void liveService.heartbeat(liveId).catch(()=>undefined),45_000);
     return()=>{
       window.clearInterval(heartbeat);
       socket.emit('live:leave',{liveId});
-      socket.off('connect',joinRealtime).off('live:comment',onComment).off('live:comment-deleted',onDeleted).off('live:presence',onPresence).off('live:likes',onLikes).off('live:status',onStatus).off('live:settings',onSettings).off('live:reaction',onReaction).off('live:participation-request',onRequest).off('live:participation-response',onParticipation);
+      socket.off('connect',joinRealtime).off('live:comment',onComment).off('live:comment-deleted',onDeleted).off('live:presence',onPresence).off('live:likes',onLikes).off('live:status',onStatus).off('live:settings',onSettings).off('live:reaction',onReaction).off('live:gift',onGift).off('live:participation-request',onRequest).off('live:participation-response',onParticipation);
     };
   },[joined,live?.isHost,liveId]);
 
@@ -318,6 +338,25 @@ export function LiveRoomPage(){
     try{if(navigator.share)await navigator.share({title:live.title,text:'Rejoignez ce Live MBotéRoom',url});else{await navigator.clipboard.writeText(url);setNotice('Lien du Live copié.');}}catch{}
   };
   const follow=async()=>{if(!live)return;const result=await liveService.toggleFollow(live.id);setLive({...live,isFollowing:result.following});};
+  const sendGift=async()=>{
+    if(!live)return;
+    try{
+      const result=await liveService.sendGift(live.id,'star',inviteToken);
+      setLive((current)=>current?{...current,giftCount:result.giftCount}:current);
+      setNotice('Cadeau envoyé ✨');
+    }catch(cause){setNotice(cause instanceof Error?cause.message:'Cadeau impossible.');}
+  };
+  const sendInvite=async(event:FormEvent)=>{
+    event.preventDefault();
+    if(!live||!inviteEmail.trim())return;
+    setBusy('invite');
+    try{
+      const result=await liveService.invite(live.id,inviteEmail.trim());
+      setNotice(result.registered?'Invitation envoyée dans MBotéRoom et par e-mail.':'Invitation envoyée par e-mail.');
+      setInviteEmail('');setInviteOpen(false);
+    }catch(cause){setNotice(cause instanceof Error?cause.message:'Invitation impossible.');}
+    finally{setBusy('');}
+  };
   const requestParticipation=async()=>{if(!live)return;try{await liveService.requestParticipation(live.id,inviteToken);setNotice('Demande envoyée à l’animateur.');}catch(cause){setNotice(cause instanceof Error?cause.message:'Demande impossible.');}};
   const toggleChat=async()=>{if(!live)return;const updated=await liveService.updateSettings(live.id,{chatEnabled:!live.chatEnabled});setLive(updated);};
   const generateSummary=async()=>{if(!live)return;setBusy('summary');try{setSummary(await collaborationService.generateSummary(live.meetingId));}catch(cause){setNotice(cause instanceof Error?cause.message:'Résumé Luna indisponible.');}finally{setBusy('');}};
@@ -352,7 +391,7 @@ export function LiveRoomPage(){
           <button className={live.isLiked?'liked':''} onClick={()=>void like()}><Heart/><span>{fmtCount(live.likeCount)}</span></button>
           <button onClick={()=>document.querySelector<HTMLInputElement>('.live-comment-form input')?.focus()}><Send/><span>{comments.length}</span></button>
           <button onClick={()=>void share()}><Share2/><span>{fmtCount(live.shareCount)}</span></button>
-          <button onClick={()=>void liveService.react(live.id,'👏',inviteToken).catch(()=>setNotice('Réaction impossible.'))}><Gift/><span>Réagir</span></button>
+          <button onClick={()=>void sendGift()}><Gift/><span>{live.giftCount?fmtCount(live.giftCount):'Cadeau'}</span></button>
         </aside>:null}
 
         <div className="live-comment-overlay">{comments.slice(-5).map((comment)=><div key={comment.id}><Avatar name={comment.name} src={comment.avatar}/><span><strong>{comment.name}</strong> {comment.text}</span></div>)}</div>
@@ -364,10 +403,15 @@ export function LiveRoomPage(){
           <button className={media.audio?'active':''} onClick={toggleMic}>{media.audio?<Mic/>:<MicOff/>}<span>Micro<small>{media.audio?'Activé':'Muet'}</small></span></button>
           <button className={media.video?'active':''} onClick={toggleCamera}>{media.video?<Video/>:<VideoOff/>}<span>Caméra<small>{media.video?'Activée':'Coupée'}</small></span></button>
           <button className={media.screen?'active':''} onClick={()=>void shareScreen()}><Camera/><span>Partager<small>l’écran</small></span></button>
-          <button onClick={()=>{void liveService.getParticipationRequests(live.id).then(setRequests);}}><UserPlus/><span>Inviter<small>un invité</small></span></button>
+          <button onClick={()=>{setInviteOpen((value)=>!value);void liveService.getParticipationRequests(live.id).then(setRequests);}}><UserPlus/><span>Inviter<small>un invité</small></span></button>
           <button className={!live.chatEnabled?'active danger':''} onClick={()=>void toggleChat()}><Send/><span>Chat<small>{live.chatEnabled?'Actif':'Muet'}</small></span></button>
           <button className="danger" disabled={busy==='end'} onClick={()=>void endLive()}><X/><span>Terminer<small>le Live</small></span></button>
         </div>
+
+        {inviteOpen?<section className="live-invite-panel">
+          <header><div><UserPlus/><span><strong>Inviter un co-animateur</strong><small>Une notification MBotéRoom et un e-mail seront envoyés.</small></span></div><button onClick={()=>setInviteOpen(false)}><X/></button></header>
+          <form onSubmit={sendInvite}><input type="email" value={inviteEmail} onChange={(event)=>setInviteEmail(event.target.value)} placeholder="partenaire@exemple.com" required/><button disabled={busy==='invite'}>{busy==='invite'?<LoaderCircle className="spin"/>:<Send/>} Envoyer l’invitation</button></form>
+        </section>:null}
 
         {requests.some((request)=>request.status==='pending')?<section className="live-requests"><h2>Demandes de participation</h2>{requests.filter((request)=>request.status==='pending').map((request)=><article key={request.userId}><Avatar name={request.name} src={request.avatar}/><strong>{request.name}</strong><button onClick={()=>void respond(request,'accepted')}>Accepter</button><button className="danger" onClick={()=>void respond(request,'rejected')}>Refuser</button></article>)}</section>:null}
 
