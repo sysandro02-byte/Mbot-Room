@@ -85,6 +85,12 @@ jobs:
           MBOTEROOM_KEY_PASSWORD: ${{ secrets.MBOTEROOM_ANDROID_KEY_PASSWORD }}
         run: gradle --no-daemon :app:assembleRelease :app:bundleRelease
 
+      - name: Verify bundled offline shell
+        run: |
+          unzip -l android/app/build/outputs/apk/release/app-release.apk | grep -F "assets/index.html"
+          unzip -l android/app/build/outputs/apk/release/app-release.apk | grep -E "assets/assets/.+\.js"
+          unzip -l android/app/build/outputs/apk/release/app-release.apk | grep -F "assets/icons/"
+
       - name: Verify APK alignment and signature
         run: |
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
