@@ -106,7 +106,7 @@ export default function AdminBroadcastCenter(){
       setTitle(result.title);
       setBody(result.body);
       setAiAssisted(true);
-      setMessage('Luna IA a préparé le message. Relisez-le avant l’envoi.');
+      setMessage('Le message a été généré avec Luna IA. Relisez le titre et le contenu avant l’envoi.');
     }catch(error){setMessage(error instanceof Error?error.message:'Luna IA est indisponible.');}
     finally{setBusy('');}
   };
@@ -154,7 +154,7 @@ export default function AdminBroadcastCenter(){
 
         <div className="admin-ai-compose">
           <label>Instruction pour Luna IA<textarea rows={2} value={aiIntent} onChange={(event)=>setAiIntent(event.target.value)} placeholder="Ex. Informer les utilisateurs de Brazzaville d’une maintenance ce soir à 22 h."/></label>
-          <div><select value={aiTone} onChange={(event)=>setAiTone(event.target.value)}><option value="professionnel">Professionnel</option><option value="chaleureux">Chaleureux</option><option value="court et direct">Court et direct</option><option value="institutionnel">Institutionnel</option></select><button type="button" onClick={()=>void composeWithAi()} disabled={busy==='ai'}>{busy==='ai'?<LoaderCircle className="spin"/>:<Sparkles/>} Améliorer avec Luna IA</button></div>
+          <div><select value={aiTone} onChange={(event)=>setAiTone(event.target.value)} aria-label="Ton du message généré par IA"><option value="professionnel">Professionnel</option><option value="chaleureux">Chaleureux</option><option value="court et direct">Court et direct</option><option value="institutionnel">Institutionnel</option></select><button type="button" aria-label="Générer le message avec IA" onClick={()=>void composeWithAi()} disabled={busy==='ai'}>{busy==='ai'?<LoaderCircle className="spin"/>:<Sparkles/>} {busy==='ai'?'Génération…':'Générer le message avec IA'}</button></div>
         </div>
 
         <label>Titre<input value={title} onChange={(event)=>setTitle(event.target.value)} maxLength={160} placeholder="Titre de la notification" required/></label>
