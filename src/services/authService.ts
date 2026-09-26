@@ -102,6 +102,18 @@ const saveSession = ({ user, token, expiresAt }: AuthResponse, persist: boolean)
   window.dispatchEvent(new CustomEvent('mbote-room-auth-changed'));
 };
 
+const persistAdminSession = (user: RoomUser) => {
+  if (user.role !== 'admin') return;
+  const token = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || '';
+  const expiresAt = localStorage.getItem(EXPIRY_KEY) || sessionStorage.getItem(EXPIRY_KEY) || '';
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  if (expiresAt) localStorage.setItem(EXPIRY_KEY, expiresAt);
+  sessionStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(EXPIRY_KEY);
+};
+
 const authRequestHeaders = () => ({
   'Content-Type': 'application/json',
   ...(getApiBaseUrl() ? { 'X-MBote-Room-Session-Mode': 'bearer' } : {}),
@@ -224,7 +236,7 @@ export const authService = {
       token: String(result.token || ''),
       expiresAt: typeof result.expiresAt === 'string' ? result.expiresAt : undefined,
     };
-    saveSession(session, rememberMe);
+    saveSession(session, rememberMe || session.user.role === 'admin');
     return session;
   },
 
@@ -377,8 +389,9 @@ export const authService = {
     }
     const result = await readJson(response);
     const user = normalizeUser(result.user);
-    const persist = Boolean(localStorage.getItem(USER_KEY));
+    const persist = user.role === 'admin' || Boolean(localStorage.getItem(USER_KEY));
     getStorage(persist).setItem(USER_KEY, JSON.stringify(user));
+    if (user.role === 'admin') persistAdminSession(user);
     return user;
   },
 
@@ -416,7 +429,10 @@ export const authService = {
     try {
       const raw = localStorage.getItem(USER_KEY);
       const sessionRaw = sessionStorage.getItem(USER_KEY);
-      return raw || sessionRaw ? normalizeUser(JSON.parse(raw || sessionRaw || '{}')) : null;
+      if (!raw && !sessionRaw) return null;
+      const user = normalizeUser(JSON.parse(raw || sessionRaw || '{}'));
+      if (user.role === 'admin') persistAdminSession(user);
+      return user;
     } catch {
       return null;
     }
