@@ -655,6 +655,33 @@ export const registerAuthRoutes = (app: express.Express, io: Server) => {
     } catch (error) { next(error); }
   });
 
+  app.delete('/api/auth/test-account-cleanup', requireDatabase, authenticateToken, async (request: AuthedRequest, response, next) => {
+    try {
+      const current = await query('SELECT id,name,email,is_guest FROM room_users WHERE id=$1 LIMIT 1', [request.user!.id]);
+      const row = current.rows[0];
+      const smokeHost = row
+        && row.is_guest === false
+        && /^Hôte Smoke /i.test(String(row.name || ''))
+        && /^prod\.smoke\.host\+[^@]+@mbote\.test$/i.test(String(row.email || ''));
+      if (!smokeHost) return sendApiError(response, 403, 'SMOKE_CLEANUP_FORBIDDEN', 'Nettoyage de test non autorisé.');
+
+      const guestUserId = Number(request.body?.guestUserId || 0);
+      if (Number.isSafeInteger(guestUserId) && guestUserId > 0) {
+        await query(
+          `DELETE FROM room_users
+            WHERE id=$1 AND is_guest=true
+              AND name ILIKE 'Invité Smoke %'
+              AND email LIKE 'guest-%@guest.mbote.local'`,
+          [guestUserId],
+        );
+      }
+
+      await query('DELETE FROM room_users WHERE id=$1', [request.user!.id]);
+      clearSessionCookie(response);
+      response.status(204).end();
+    } catch (error) { next(error); }
+  });
+
   app.post('/api/auth/forgot-password', requireDatabase, async (request, response, next) => {
     try {
       const email = normalizeEmail(request.body?.email);
