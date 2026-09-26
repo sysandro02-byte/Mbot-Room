@@ -117,6 +117,10 @@
   ],
   "rewrites": [
     {
+      "source": "/download/android",
+      "destination": "https://mbote-room-api.onrender.com/api/public/android/download"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
