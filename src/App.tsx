@@ -31,6 +31,7 @@ import RecordingsPage from './pages/RecordingsPage';
 import ProfilePage from './pages/ProfilePage';
 import FilesPage from './pages/FilesPage';
 import WorkGroupsPage from './pages/WorkGroupsPage';
+import { LiveCreatePage, LiveFeedPage, LiveRoomPage } from './pages/LivePage';
 const GuestJoinPage = lazyWithRetry(() => import('./pages/GuestJoinPage'));
 const MeetingRoomV2 = lazyWithRetry(() => import('./pages/MeetingRoomV2'));
 const GuestWaitingRoomPage = lazyWithRetry(() => import('./pages/GuestWaitingRoomPage'));
@@ -129,7 +130,8 @@ function AdminRoute({ children }: { children: ReactNode }) {
 export default function App() {
   const location = useLocation();
   const hideGlobalHeader = location.pathname.startsWith('/admin')
-    || /^\/reunions\/(?!recentes(?:\/|$)|terminee(?:\/|$))[^/]+(?:\/(?:luna|salle-attente))?$/.test(location.pathname);
+    || /^\/reunions\/(?!recentes(?:\/|$)|terminee(?:\/|$))[^/]+(?:\/(?:luna|salle-attente))?$/.test(location.pathname)
+    || /^\/app\/live\/[^/]+$/.test(location.pathname);
 
   useEffect(() => {
     const timer = window.setTimeout(() => sessionStorage.removeItem('mboteroom-runtime-recovery'), 5000);
@@ -157,6 +159,9 @@ export default function App() {
     <Route path="/app/meetings" element={<ProtectedRoute><AppShell title="Réunions"><RealMeetingList /></AppShell></ProtectedRoute>} />
     <Route path="/app/search" element={<ProtectedRoute><AppShell title="Recherche"><GlobalSearchPage /></AppShell></ProtectedRoute>} />
     <Route path="/app/calendar" element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
+    <Route path="/app/live" element={<ProtectedRoute><LiveFeedPage /></ProtectedRoute>} />
+    <Route path="/app/live/new" element={<ProtectedRoute><LiveCreatePage /></ProtectedRoute>} />
+    <Route path="/app/live/:liveId" element={<ProtectedRoute><LiveRoomPage /></ProtectedRoute>} />
     <Route path="/app/recordings" element={<ProtectedRoute><AppShell title="Enregistrements"><RecordingsPage /></AppShell></ProtectedRoute>} />
     <Route path="/app/messages" element={<ProtectedRoute><AppShell title="Messages"><MessagesPage /></AppShell></ProtectedRoute>} />
     <Route path="/app/contacts" element={<ProtectedRoute><AppShell title="Contacts"><ContactsPage /></AppShell></ProtectedRoute>} />
