@@ -413,7 +413,7 @@ try {
 
   await page.goto('/app/live', { waitUntil: 'domcontentloaded', timeout: 20_000 });
   await page.getByRole('heading', { name: 'Live', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
-  assert.equal(await page.getByRole('button', { name: /Créer un live/i }).count(), 1, 'Live feed must expose creation action');
+  assert.equal(await page.locator('.live-feed-hero > button').filter({ hasText: 'Créer un live' }).count(), 1, 'Live feed must expose one primary creation action in its header');
   assert.equal(await page.getByPlaceholder('Rechercher un live, un créateur, un sujet…').count(), 1, 'Live feed must expose search');
   assert.equal(await page.locator('.app-shell-bottom-nav a[href="/app/live"]').count(), 1, 'Mobile navigation must expose Live');
 
