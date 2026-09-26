@@ -131,7 +131,7 @@ export default function App() {
   const location = useLocation();
   const hideGlobalHeader = location.pathname.startsWith('/admin')
     || /^\/reunions\/(?!recentes(?:\/|$)|terminee(?:\/|$))[^/]+(?:\/(?:luna|salle-attente))?$/.test(location.pathname)
-    || /^\/app\/live\/[^/]+$/.test(location.pathname);
+    || /^\/app\/live\/(?!new(?:\/|$))[^/]+$/.test(location.pathname);
 
   useEffect(() => {
     const timer = window.setTimeout(() => sessionStorage.removeItem('mboteroom-runtime-recovery'), 5000);
