@@ -339,7 +339,7 @@
 .room-v2-shell.more-menu-open .room-v2-body{pointer-events:none}
 .room-v2-shell.more-menu-open .room-v2-more-menu,
 .room-v2-shell.more-menu-open .room-v2-controls{pointer-events:auto}
-.room-v2-more-menu{position:absolute;z-index:1000;pointer-events:auto;right:0;bottom:78px;width:230px;padding:7px;border:1px solid rgba(115,172,211,.24);border-radius:15px;background:#0a2037;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+.room-v2-more-menu{position:fixed;z-index:1200;pointer-events:auto;left:50%;right:auto;bottom:98px;transform:translateX(-50%);width:230px;padding:7px;border:1px solid rgba(115,172,211,.24);border-radius:15px;background:#0a2037;box-shadow:0 20px 60px rgba(0,0,0,.45)}
 .room-v2-more-menu>button{width:100%;min-height:38px;display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:8px;padding:0 10px;border:0;border-radius:9px;background:transparent;color:#e6f1f7;text-align:left;font-size:10px;font-weight:750;cursor:pointer}
 .room-v2-more-menu>button:hover{background:#11314e}.room-v2-more-menu>button:disabled{opacity:.4;cursor:not-allowed}.room-v2-more-menu svg{width:17px}.room-v2-more-menu b{min-width:20px;padding:3px 5px;border-radius:999px;background:#0b5365;color:#10e0df;text-align:center;font-size:8px}.room-v2-more-menu>div{height:1px;margin:5px;background:rgba(118,173,211,.16)}.room-v2-more-menu>button.danger{color:#ff8589}.room-v2-more-emoji{font-size:17px}
 .room-v2-leave-actions{position:absolute;right:20px;margin:0}
@@ -395,7 +395,7 @@
   .room-v2-controls{min-height:90px;flex-basis:90px;justify-content:flex-start;gap:2px;padding:7px 8px;overflow-x:auto;overflow-y:visible}
   .room-v2-control{width:66px;min-width:66px;height:72px}.room-v2-control>span{width:48px;height:48px}.room-v2-control small{font-size:8px}
   .room-v2-leave-actions{display:none}
-  .room-v2-more-menu{position:fixed;left:10px;right:10px;bottom:96px;width:auto;max-height:52vh;overflow:auto}
+  .room-v2-more-menu{position:fixed;left:10px;right:10px;bottom:96px;width:auto;max-height:52vh;overflow:auto;transform:none}
   .room-v2-hand-toast{bottom:99px}
   .room-v2-notice{top:190px}
   .room-v2-catchup-offer{top:190px}
