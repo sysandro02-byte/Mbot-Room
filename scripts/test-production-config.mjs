@@ -230,8 +230,14 @@ const androidWorkflow = fs.readFileSync(new URL('../.github/workflows/android-ap
 if (!androidWorkflow.includes('branches: [main]') || androidWorkflow.includes('paths:')) {
   throw new Error('Android APK must rebuild on every main publication');
 }
-if (!androidWorkflow.includes('contents: write') || !androidWorkflow.includes('gh release upload android-latest') || !androidWorkflow.includes('MBoteRoom-Android.apk')) {
-  throw new Error('Android APK workflow must publish a stable public latest-download release');
+if (!androidWorkflow.includes('id-token: write') || !androidWorkflow.includes('mboteroom-android-publish') || !androidWorkflow.includes('mboteroom-releases')) {
+  throw new Error('Android APK workflow must publish to Supabase Storage through GitHub OIDC');
+}
+if (androidWorkflow.includes('gh release upload android-latest') || androidWorkflow.includes('gh release create android-latest')) {
+  throw new Error('Android APK workflow must not publish public GitHub Releases');
+}
+if (!androidWorkflow.includes('Publish Android packages to LoukaTech Supabase Storage') || !androidWorkflow.includes('Verify Supabase Android publication')) {
+  throw new Error('Android APK workflow must upload and verify the Supabase release');
 }
 if (!loginSource.includes('ANDROID_APK_URL') || !loginSource.includes('https://mboteroom.loukatech.com/download/android') || !loginSource.includes('navigator.share')) {
   throw new Error('Login page must expose the branded MBoteRoom Android APK download and native share action');
@@ -251,6 +257,19 @@ if (!apiClient.includes('appassets.androidplatform.net') || !originPolicy.includ
 }
 if (!server.includes("/api/public/android/download") || !vercelConfig.rewrites?.some((rewrite) => rewrite.source === '/download/android')) {
   throw new Error('Branded Android download route must hide the repository URL from the public interface');
+}
+if (!server.includes('mboteroom-releases') || !server.includes('android/latest.json')) {
+  throw new Error('Branded Android download route must resolve the latest Supabase Storage manifest');
+}
+if (server.includes('github.com/sysandro02-byte/Mbot-Room/releases/download')) {
+  throw new Error('Production download route must not fall back to GitHub Releases');
+}
+const androidPublisherFunction = fs.readFileSync(new URL('../supabase/functions/mboteroom-android-publish/index.ts', import.meta.url), 'utf8');
+if (!androidPublisherFunction.includes('token.actions.githubusercontent.com') || !androidPublisherFunction.includes('mboteroom-supabase-storage')) {
+  throw new Error('Supabase Android publisher must validate GitHub Actions OIDC');
+}
+if (!androidPublisherFunction.includes('repository !== REPOSITORY') || !androidPublisherFunction.includes('workflowRef.includes(WORKFLOW_FRAGMENT)')) {
+  throw new Error('Supabase Android publisher must restrict repository and workflow claims');
 }
 
 const meetingRoomSource = fs.readFileSync(new URL('../src/pages/MeetingRoomV2.tsx', import.meta.url), 'utf8');
