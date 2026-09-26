@@ -109,6 +109,7 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
     try{
       const q=clean(request.query.q,120).toLowerCase();
       const category=clean(request.query.category,40).toLowerCase();
+      const mode=clean(request.query.mode,20).toLowerCase();
       const user=request.user!;
       const result=await query(`
         SELECT l.*,u.name AS host_name,u.avatar AS host_avatar,
@@ -124,8 +125,12 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
           )
           AND ($2='' OR l.category=$2)
           AND ($3='' OR lower(l.title) LIKE '%'||$3||'%' OR lower(l.description) LIKE '%'||$3||'%' OR lower(u.name) LIKE '%'||$3||'%')
-        ORDER BY CASE WHEN l.status='live' THEN 0 ELSE 1 END,l.viewer_count DESC,l.scheduled_for ASC
-        LIMIT 100`,[user.id,category&&categories.has(category)?category:'',q]);
+          AND ($4<>'live' OR l.status='live')
+        ORDER BY
+          CASE WHEN $4='trending' THEN (l.viewer_count*5 + l.like_count*2 + l.share_count*3 + l.gift_count*4) ELSE 0 END DESC,
+          CASE WHEN l.status='live' THEN 0 ELSE 1 END,
+          l.viewer_count DESC,l.scheduled_for ASC
+        LIMIT 100`,[user.id,category&&categories.has(category)?category:'',q,mode==='trending'?'trending':'live']);
       response.json(result.rows.map((row:any)=>mapLive({...row,can_comment:!user.isGuest&&row.chat_enabled!==false,can_request_participation:!user.isGuest&&row.cohosts_enabled!==false})));
     }catch(error){next(error);}
   });
