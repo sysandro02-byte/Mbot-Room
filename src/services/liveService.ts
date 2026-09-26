@@ -40,6 +40,7 @@ export type LiveSession={
   isHost:boolean;
   canComment:boolean;
   canRequestParticipation:boolean;
+  canShare:boolean;
   shareUrl:string;
 };
 
@@ -53,10 +54,11 @@ export const liveMediaUrl=(value:string)=>{
 };
 
 export const liveService={
-  async getFeed(filters:{q?:string;category?:string}={}){
+  async getFeed(filters:{q?:string;category?:string;mode?:'live'|'trending'}={}){
     const params=new URLSearchParams();
     if(filters.q)params.set('q',filters.q);
     if(filters.category)params.set('category',filters.category);
+    if(filters.mode)params.set('mode',filters.mode);
     return readJson<LiveSession[]>(await apiFetch(apiUrl('/api/live/feed'+(params.size?'?'+params.toString():'')),{headers:getAuthHeaders(),cache:'no-store'}));
   },
   async getLive(id:string,invite=''){
@@ -88,7 +90,7 @@ export const liveService={
   async comment(id:string,text:string,inviteToken=''){return readJson<LiveComment>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/comments`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({text,inviteToken})}));},
   async deleteComment(id:string,commentId:string){const response=await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`),{method:'DELETE',headers:getAuthHeaders()});if(!response.ok)throw new Error((await response.json().catch(()=>({}))).error||'Suppression impossible.');},
   async toggleLike(id:string,inviteToken=''){return readJson<{liked:boolean;likeCount:number}>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/like`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({inviteToken})}));},
-  async share(id:string){return readJson<{shareCount:number;url:string}>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/share`),{method:'POST',headers:getAuthHeaders(),body:'{}'}));},
+  async share(id:string,inviteToken=''){return readJson<{shareCount:number;url:string}>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/share`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({inviteToken})}));},
   async toggleFollow(id:string){return readJson<{following:boolean}>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/follow`),{method:'POST',headers:getAuthHeaders(),body:'{}'}));},
   async updateSettings(id:string,payload:{chatEnabled?:boolean;moderationEnabled?:boolean;cohostsEnabled?:boolean}){return readJson<LiveSession>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/settings`),{method:'PATCH',headers:getAuthHeaders(),body:JSON.stringify(payload)}));},
   async sendGift(id:string,giftType='star',inviteToken=''){
