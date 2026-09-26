@@ -6,8 +6,9 @@ import {
   CirclePlay,
   FolderOpen,
   Home,
-  Plus,
   MessageCircle,
+  Radio,
+  UserRound,
   Settings,
   Download,
   MonitorSmartphone,
@@ -27,6 +28,7 @@ type AppShellProps = {
 const primaryNavItems = [
   { label: 'Accueil', icon: Home, to: '/app' },
   { label: 'Réunions', icon: CalendarDays, to: '/app/meetings' },
+  { label: 'Live', icon: Radio, to: '/app/live' },
   { label: 'Rejoindre', icon: SquareArrowOutUpRight, to: '/join' },
   { label: 'Calendrier', icon: CalendarDays, to: '/app/calendar' },
   { label: 'Messages', icon: MessageCircle, to: '/app/messages' },
@@ -43,9 +45,9 @@ const secondaryNavItems = [
 const mobileNavItems = [
   { label: 'Accueil', icon: Home, to: '/app' },
   { label: 'Réunions', icon: CalendarDays, to: '/app/meetings' },
-  { label: 'Rejoindre', icon: Plus, to: '/join', primary: true },
+  { label: 'Live', icon: Radio, to: '/app/live', primary: true },
   { label: 'Messages', icon: MessageCircle, to: '/app/messages' },
-  { label: 'Paramètres', icon: Settings, to: '/app/settings' },
+  { label: 'Profil', icon: UserRound, to: '/app/profile' },
 ];
 
 export default function AppShell({ children }: AppShellProps) {
