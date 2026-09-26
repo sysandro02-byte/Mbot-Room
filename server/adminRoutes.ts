@@ -100,7 +100,7 @@ const callAdminGroq = async (system: string, prompt: string) => {
     .filter(Boolean);
   for (const model of models) {
     try {
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      const response = await fetch(String(process.env.GROQ_CHAT_URL || 'https://api.groq.com/openai/v1/chat/completions').trim(), {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
         body: JSON.stringify({
