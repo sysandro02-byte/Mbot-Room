@@ -233,8 +233,24 @@ if (!androidWorkflow.includes('branches: [main]') || androidWorkflow.includes('p
 if (!androidWorkflow.includes('contents: write') || !androidWorkflow.includes('gh release upload android-latest') || !androidWorkflow.includes('MBoteRoom-Android.apk')) {
   throw new Error('Android APK workflow must publish a stable public latest-download release');
 }
-if (!loginSource.includes('ANDROID_APK_URL') || !loginSource.includes('android-latest/MBoteRoom-Android.apk') || !loginSource.includes('navigator.share')) {
-  throw new Error('Login page must expose the latest Android APK download and native share action');
+if (!loginSource.includes('ANDROID_APK_URL') || !loginSource.includes('https://mboteroom.loukatech.com/download/android') || !loginSource.includes('navigator.share')) {
+  throw new Error('Login page must expose the branded MBoteRoom Android APK download and native share action');
+}
+if (loginSource.includes('github.com/sysandro02-byte/Mbot-Room/releases/download')) {
+  throw new Error('Public login UI must not expose the GitHub release URL');
+}
+const androidMainActivity = fs.readFileSync(new URL('../android/app/src/main/java/com/loukatech/mboteroom/MainActivity.java', import.meta.url), 'utf8');
+if (!androidMainActivity.includes('WebViewAssetLoader') || !androidMainActivity.includes('LOCAL_APP_URL') || !androidMainActivity.includes('appassets.androidplatform.net') && !androidMainActivity.includes('WebViewAssetLoader.DEFAULT_DOMAIN')) {
+  throw new Error('Android APK must load a bundled HTTPS app shell instead of depending on the remote website');
+}
+if (!androidWorkflow.includes('MBOTEROOM_ANDROID_BUILD') || !androidWorkflow.includes('android/app/src/main/assets') || !androidWorkflow.includes('Verify bundled offline shell')) {
+  throw new Error('Android APK workflow must build and verify the bundled offline application shell');
+}
+if (!apiClient.includes('appassets.androidplatform.net') || !originPolicy.includes('appassets.androidplatform.net')) {
+  throw new Error('Native Android app origin must use the production API and be allowed by server CORS');
+}
+if (!server.includes("/api/public/android/download") || !vercelConfig.rewrites?.some((rewrite) => rewrite.source === '/download/android')) {
+  throw new Error('Branded Android download route must hide the repository URL from the public interface');
 }
 
 const meetingRoomSource = fs.readFileSync(new URL('../src/pages/MeetingRoomV2.tsx', import.meta.url), 'utf8');
