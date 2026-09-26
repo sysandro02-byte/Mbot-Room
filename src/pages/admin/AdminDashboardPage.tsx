@@ -729,7 +729,7 @@ function AdminSidebar({ userName, open, onClose }: { userName: string; open: boo
     { label: 'Enregistrements', icon: CirclePlay, path: '/app/recordings' },
     { label: 'Messages', icon: MessageCircle, path: '/app/messages' },
     { label: 'Notifications', icon: Bell, path: '/admin#admin-notifications' },
-    { label: 'Calendrier', icon: CalendarDays, path: '/app/calendar' },
+    { label: 'Calendrier', icon: CalendarDays, path: '/admin/calendar' },
     { label: 'Tableau blanc', icon: BarChart3, path: '/app/whiteboard' },
     { label: 'Paramètres', icon: Settings, path: '/app/settings' },
     { label: 'Aide', icon: CircleHelp, path: '/aide' },
