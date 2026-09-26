@@ -18,6 +18,7 @@ import { registerSfuRoutes } from './server/sfuRoutes.js';
 import { registerRecordingRoutes } from './server/recordingRoutes.js';
 import { registerTranscriptionRoutes } from './server/transcriptionRoutes.js';
 import { registerLegalAndReportRoutes } from './server/legalReportRoutes.js';
+import { registerLiveRoutes } from './server/liveRoutes.js';
 import { getRuntimeReadiness } from './server/readiness.js';
 import { isAllowedOrigin } from './server/originPolicy.js';
 import { getEmailDeliveryStatus, sendTransactionalEmail } from './server/emailDelivery.js';
@@ -153,6 +154,7 @@ app.post('/api/admin/broadcasts', rateLimit(10, 60_000));
 app.use('/api/admin/ai', rateLimit(20, 60_000));
 app.use('/api/admin', rateLimit(300, 60_000));
 app.use('/api/ads', rateLimit(90, 60_000));
+app.use('/api/live', rateLimit(240, 60_000));
 app.use('/api', rateLimit(600, 60_000));
 
 registerAuthRoutes(app, io);
@@ -165,6 +167,7 @@ registerSfuRoutes(app);
 registerRecordingRoutes(app, io);
 registerTranscriptionRoutes(app, io);
 registerLegalAndReportRoutes(app, io);
+registerLiveRoutes(app, io);
 registerRealtime(io);
 
 const androidReleaseBaseUrl = String(
