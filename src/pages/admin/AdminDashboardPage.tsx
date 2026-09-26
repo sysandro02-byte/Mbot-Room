@@ -7,6 +7,7 @@ import {
   BarChart3,
   Bell,
   CalendarDays,
+  CalendarPlus,
   ChevronDown,
   CircleHelp,
   CirclePlay,
@@ -584,7 +585,7 @@ export default function AdminDashboardPage() {
             <button className="admin-topbar-avatar" type="button" aria-label="Ouvrir mon profil" onClick={() => navigate('/app/profile')}>
               <Avatar name={currentUser?.name || currentUser?.email || 'Administrateur'} size="small" />
             </button>
-            <button className="admin-new-meeting-button admin-desktop-new-meeting" type="button" onClick={() => navigate('/reunions')}>
+            <button className="admin-new-meeting-button admin-desktop-new-meeting" type="button" onClick={() => navigate('/reunions?new=1&intent=admin')}>
               <Plus size={20} aria-hidden="true" />
               Nouvelle réunion
             </button>
@@ -625,7 +626,7 @@ export default function AdminDashboardPage() {
               </span>
               <i aria-hidden="true">›</i>
             </button>
-            <button className="admin-new-meeting-button admin-mobile-new-meeting" type="button" onClick={() => navigate('/reunions')}>
+            <button className="admin-new-meeting-button admin-mobile-new-meeting" type="button" onClick={() => navigate('/reunions?new=1&intent=admin')}>
               <Plus size={22} aria-hidden="true" />
               Nouvelle réunion
             </button>
@@ -723,6 +724,7 @@ function AdminSidebar({ userName, open, onClose }: { userName: string; open: boo
     { label: 'Page de connexion', icon: ImageIcon, path: '/admin#admin-login-branding' },
     { label: 'Accueil des invités', icon: Video, path: '/admin#admin-guest-slides' },
     { label: 'Conseils d’accueil', icon: CircleHelp, path: '/admin#admin-tips' },
+    { label: 'Réunion', icon: CalendarPlus, path: '/reunions?new=1&intent=admin' },
     { label: 'Réunions', icon: CalendarDays, path: '/app/meetings' },
     { label: 'Enregistrements', icon: CirclePlay, path: '/app/recordings' },
     { label: 'Messages', icon: MessageCircle, path: '/app/messages' },
