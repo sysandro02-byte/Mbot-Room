@@ -2068,7 +2068,7 @@ export default function MeetingRoomV2() {
     : activeMembers;
 
   return (
-    <main className="room-v2-shell">
+    <main className={`room-v2-shell${moreMenuOpen ? ' more-menu-open' : ''}`}>
       <header className="room-v2-header">
         <div className="room-v2-brand">
           <img src="/icons/mboteroom-wordmark.png" alt="MBotéRoom"/>
