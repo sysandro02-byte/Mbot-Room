@@ -115,7 +115,8 @@ export const registerSfuRoutes = (app: express.Express) => {
         sendApiError(response, 410, 'MEETING_ENDED', 'Cette réunion est terminée ou annulée.');
         return;
       }
-      const moderator = canModerateMeeting(meeting, user);
+      const memberRoleResult=await query("SELECT role FROM room_meeting_members WHERE meeting_id=$1 AND user_id=$2 AND status='accepted' LIMIT 1",[meetingId,user.id]);
+      const moderator = canModerateMeeting(meeting, user) || memberRoleResult.rows[0]?.role==='cohost';
       const guestScreenAllowed = moderator || !user.isGuest || await isPlatformFeatureEnabled('guestScreenShareEnabled');
       const accountScreenAllowed = canUseAccountFeature(user, 'screenShare');
       const canPublishSources = moderator
