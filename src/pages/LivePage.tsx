@@ -1,0 +1,379 @@
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Bell, CalendarDays, Camera, ChevronLeft, Eye, Gamepad2, Gift, Heart, LoaderCircle, Mic,
+  MicOff, MoreVertical, Music2, Radio, Search, Send, Share2, Sparkles, Square, UserPlus,
+  UsersRound, Video, VideoOff, X,
+} from 'lucide-react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import AppShell from '../components/AppShell';
+import AppLoader from '../components/AppLoader';
+import { authService } from '../services/authService';
+import { collaborationService } from '../services/collaborationService';
+import { liveCategoryLabel, liveService, type LiveCategory, type LiveComment, type LiveParticipationRequest, type LiveSession, type LiveVisibility } from '../services/liveService';
+import { socket } from '../lib/socket';
+import { useMeetingLiveKit } from '../hooks/useMeetingLiveKit';
+import './LivePage.css';
+
+const categories:Array<{value:string;label:string;icon?:typeof Radio}>=[
+  {value:'',label:'En direct',icon:Radio},{value:'business',label:'Business'},{value:'music',label:'Musique',icon:Music2},
+  {value:'games',label:'Jeux',icon:Gamepad2},{value:'events',label:'Événements'},{value:'wellness',label:'Bien-être'},
+  {value:'education',label:'Éducation'},{value:'tech',label:'Tech'},{value:'community',label:'Communauté'},
+];
+
+const initials=(name:string)=>name.split(/\s+/).filter(Boolean).slice(0,2).map((part)=>part[0]?.toUpperCase()).join('')||'MB';
+const fmtCount=(value:number)=>value>=1_000_000?(value/1_000_000).toFixed(1).replace('.0','')+'M':value>=1_000?(value/1_000).toFixed(1).replace('.0','')+'K':String(value||0);
+const liveDuration=(startedAt:string|null)=>{
+  if(!startedAt)return '';
+  const seconds=Math.max(0,Math.floor((Date.now()-new Date(startedAt).getTime())/1000));
+  const h=Math.floor(seconds/3600);const m=Math.floor((seconds%3600)/60);const s=seconds%60;
+  return [h,m,s].map((value)=>String(value).padStart(2,'0')).join(':');
+};
+const absoluteUrl=(path:string)=>path.startsWith('http')?path:window.location.origin+path;
+
+function Avatar({name,src,className=''}:{name:string;src?:string;className?:string}){
+  return <span className={`live-avatar ${className}`}>{src?<img src={src} alt=""/>:initials(name)}</span>;
+}
+
+export function LiveFeedPage(){
+  const navigate=useNavigate();
+  const [items,setItems]=useState<LiveSession[]>([]);
+  const [q,setQ]=useState('');
+  const [category,setCategory]=useState('');
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState('');
+
+  const load=async()=>{
+    setLoading(true);setError('');
+    try{setItems(await liveService.getFeed({q,category}));}
+    catch(cause){setError(cause instanceof Error?cause.message:'Impossible de charger les Lives.');}
+    finally{setLoading(false);}
+  };
+  useEffect(()=>{const timer=window.setTimeout(()=>void load(),q?300:0);return()=>window.clearTimeout(timer);},[q,category]);
+
+  return <AppShell title="Live">
+    <main className="live-feed-page">
+      <header className="live-feed-hero">
+        <div><span><Radio/></span><div><h1>Live</h1><p>Découvrez des directs, des idées et des expériences en temps réel.</p></div></div>
+        <button onClick={()=>navigate('/app/live/new')}><Video/> Créer un live</button>
+      </header>
+
+      <section className="live-feed-search">
+        <Search/>
+        <input value={q} onChange={(event)=>setQ(event.target.value)} placeholder="Rechercher un live, un créateur, un sujet…"/>
+      </section>
+
+      <nav className="live-feed-categories" aria-label="Catégories Live">
+        {categories.map((item)=>{
+          const Icon=item.icon;
+          return <button key={item.value||'all'} className={category===item.value?'active':''} onClick={()=>setCategory(item.value)}>
+            {Icon?<Icon/>:null}{item.label}
+          </button>;
+        })}
+      </nav>
+
+      {error?<div className="live-error">{error}</div>:null}
+      {!loading&&items.length===0?<section className="live-empty"><Radio/><h2>Aucun Live pour le moment</h2><p>Créez le premier direct ou revenez un peu plus tard.</p><button onClick={()=>navigate('/app/live/new')}>Créer un Live</button></section>:null}
+
+      <section className="live-feed-grid">
+        {items.map((item)=><article key={item.id} className="live-feed-card" onClick={()=>navigate('/app/live/'+item.id)}>
+          <div className="live-feed-cover">
+            {item.coverUrl?<img src={item.coverUrl} alt=""/>:<div className="live-cover-fallback"><Avatar name={item.hostName} src={item.hostAvatar}/><Radio/></div>}
+            <span className={item.status==='live'?'live-badge':'live-badge scheduled'}>{item.status==='live'?'EN DIRECT':'PROGRAMMÉ'}</span>
+            {item.status==='live'?<span className="live-viewers"><Eye/> {fmtCount(item.viewerCount)}</span>:<span className="live-scheduled-date"><CalendarDays/> {item.scheduledFor?new Intl.DateTimeFormat('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(item.scheduledFor)):''}</span>}
+          </div>
+          <div className="live-feed-card-body">
+            <div className="live-feed-host"><Avatar name={item.hostName} src={item.hostAvatar}/><div><strong>{item.hostName}</strong><small>{liveCategoryLabel(item.category)}</small></div></div>
+            <h2>{item.title}</h2>
+            <p>{item.description||'Rejoignez ce Live MBotéRoom.'}</p>
+            <div className="live-feed-meta"><span><Heart/> {fmtCount(item.likeCount)}</span><span>{item.visibility==='public'?'Public':item.visibility==='followers'?'Abonnés':'Privé'}</span></div>
+          </div>
+        </article>)}
+      </section>
+      {loading?<AppLoader label="Chargement des Lives…"/>:null}
+    </main>
+  </AppShell>;
+}
+
+export function LiveCreatePage(){
+  const navigate=useNavigate();
+  const user=authService.getCurrentUser();
+  const [title,setTitle]=useState('');
+  const [description,setDescription]=useState('');
+  const [category,setCategory]=useState<LiveCategory>('business');
+  const [visibility,setVisibility]=useState<LiveVisibility>('public');
+  const [coverUrl,setCoverUrl]=useState('');
+  const [scheduleLater,setScheduleLater]=useState(false);
+  const [date,setDate]=useState(()=>new Date(Date.now()+3600_000).toISOString().slice(0,10));
+  const [time,setTime]=useState(()=>new Date(Date.now()+3600_000).toTimeString().slice(0,5));
+  const [chatEnabled,setChatEnabled]=useState(true);
+  const [cohostsEnabled,setCohostsEnabled]=useState(false);
+  const [recordingEnabled,setRecordingEnabled]=useState(true);
+  const [moderationEnabled,setModerationEnabled]=useState(true);
+  const [busy,setBusy]=useState('');
+  const [error,setError]=useState('');
+
+  const submit=async(startNow:boolean)=>{
+    if(!title.trim()){setError('Ajoutez un titre au Live.');return;}
+    setBusy(startNow?'start':'schedule');setError('');
+    try{
+      const scheduledFor=scheduleLater?new Date(`${date}T${time}`).toISOString():undefined;
+      const created=await liveService.createLive({
+        title:title.trim(),description:description.trim(),category,visibility,coverUrl:coverUrl.trim(),
+        scheduledFor,startNow:startNow&&!scheduleLater,chatEnabled,cohostsEnabled,recordingEnabled,moderationEnabled,
+      });
+      navigate(startNow&&!scheduleLater?'/app/live/'+created.id:'/app/live');
+    }catch(cause){setError(cause instanceof Error?cause.message:'Création du Live impossible.');}
+    finally{setBusy('');}
+  };
+
+  if(user?.isGuest)return <AppShell title="Créer un Live"><main className="live-create-page"><section className="live-empty"><Radio/><h2>Compte requis</h2><p>Créez un compte MBotéRoom pour lancer vos propres Lives.</p></section></main></AppShell>;
+
+  return <AppShell title="Créer un Live">
+    <main className="live-create-page">
+      <header className="live-create-header"><button onClick={()=>navigate('/app/live')}><ChevronLeft/></button><h1>Créer un live</h1></header>
+      <section className="live-create-card">
+        <div className="live-cover-editor">
+          {coverUrl?<img src={coverUrl} alt="Couverture du Live"/>:<div><Camera/><strong>Ajouter une couverture du live</strong><small>Utilisez une URL d’image sécurisée ou laissez MBotéRoom utiliser votre profil.</small></div>}
+          <input aria-label="URL de couverture" value={coverUrl} onChange={(event)=>setCoverUrl(event.target.value)} placeholder="https://…"/>
+        </div>
+
+        {error?<div className="live-error">{error}</div>:null}
+        <label>Titre du live *<input maxLength={100} value={title} onChange={(event)=>setTitle(event.target.value)} placeholder="Ex. Parler de son parcours, astuces, Q&R…"/><small>{title.length}/100</small></label>
+        <label>Description<textarea maxLength={500} value={description} onChange={(event)=>setDescription(event.target.value)} placeholder="Décrivez votre live…"/><small>{description.length}/500</small></label>
+        <label>Catégorie *<select value={category} onChange={(event)=>setCategory(event.target.value as LiveCategory)}>{categories.filter((item)=>item.value).map((item)=><option value={item.value} key={item.value}>{item.label}</option>)}</select></label>
+
+        <fieldset className="live-visibility"><legend>Visibilité *</legend>
+          {([
+            ['public','Public','Tout le monde'],['private','Privé','Sur invitation'],['followers','Abonnés','Mes abonnés'],
+          ] as Array<[LiveVisibility,string,string]>).map(([value,label,caption])=><button type="button" key={value} className={visibility===value?'active':''} onClick={()=>setVisibility(value)}><strong>{label}</strong><small>{caption}</small></button>)}
+        </fieldset>
+
+        <div className="live-option schedule"><div><CalendarDays/><span><strong>Programmer pour plus tard</strong><small>Choisissez la date et l’heure du direct.</small></span></div><button className={scheduleLater?'switch on':'switch'} type="button" onClick={()=>setScheduleLater((value)=>!value)}><i/></button></div>
+        {scheduleLater?<div className="live-schedule-fields"><label>Date<input type="date" value={date} onChange={(event)=>setDate(event.target.value)}/></label><label>Heure<input type="time" value={time} onChange={(event)=>setTime(event.target.value)}/></label></div>:null}
+
+        <section className="live-options">
+          {[
+            {label:'Activer le chat',caption:'Commentaires en temps réel',value:chatEnabled,set:setChatEnabled,icon:Send},
+            {label:'Inviter des co-animateurs',caption:'Permettre les demandes de participation',value:cohostsEnabled,set:setCohostsEnabled,icon:UsersRound},
+            {label:'Enregistrer le live',caption:'Replay via LiveKit + stockage MBotéRoom',value:recordingEnabled,set:setRecordingEnabled,icon:Video},
+            {label:'Mode modération',caption:'Outils de suppression et contrôle du chat',value:moderationEnabled,set:setModerationEnabled,icon:Bell},
+          ].map((item)=>{const Icon=item.icon;return <div className="live-option" key={item.label}><div><Icon/><span><strong>{item.label}</strong><small>{item.caption}</small></span></div><button className={item.value?'switch on':'switch'} type="button" onClick={()=>item.set(!item.value)}><i/></button></div>;})}
+        </section>
+
+        <button className="live-primary-action" disabled={Boolean(busy)} onClick={()=>void submit(true)}>{busy==='start'?<LoaderCircle className="spin"/>:<Radio/>}{scheduleLater?'Créer le Live':'Lancer le live'}</button>
+        <button className="live-secondary-action" disabled={Boolean(busy)} onClick={()=>{setScheduleLater(true);void submit(false);}}>{busy==='schedule'?<LoaderCircle className="spin"/>:<CalendarDays/>} Programmer</button>
+      </section>
+    </main>
+  </AppShell>;
+}
+
+export function LiveRoomPage(){
+  const {liveId=''}=useParams();
+  const navigate=useNavigate();
+  const location=useLocation();
+  const inviteToken=new URLSearchParams(location.search).get('invite')||'';
+  const user=authService.getCurrentUser();
+  const [live,setLive]=useState<LiveSession|null>(null);
+  const [comments,setComments]=useState<LiveComment[]>([]);
+  const [requests,setRequests]=useState<LiveParticipationRequest[]>([]);
+  const [joinRole,setJoinRole]=useState<'host'|'cohost'|'viewer'>('viewer');
+  const [joined,setJoined]=useState(false);
+  const [localStream,setLocalStream]=useState<MediaStream|null>(null);
+  const cameraStreamRef=useRef<MediaStream|null>(null);
+  const [media,setMedia]=useState({audio:true,video:true,screen:false});
+  const [commentText,setCommentText]=useState('');
+  const [notice,setNotice]=useState('');
+  const [error,setError]=useState('');
+  const [busy,setBusy]=useState('');
+  const [duration,setDuration]=useState('');
+  const [summary,setSummary]=useState<{bullets:string[];decisions:string[];actions:string[]}|null>(null);
+  const recordingIdRef=useRef('');
+  const localVideoRef=useRef<HTMLVideoElement|null>(null);
+  const remoteVideoRef=useRef<HTMLVideoElement|null>(null);
+  const publisher=joinRole==='host'||joinRole==='cohost';
+
+  const liveKit=useMeetingLiveKit({
+    meetingId:live?.meetingId||0,
+    localStream:publisher?localStream:null,
+    media:publisher?media:{audio:false,video:false,screen:false},
+    enabled:Boolean(joined&&live?.status==='live'&&live?.meetingId),
+    onFailure:(message)=>setError(message),
+    onNotice:(message)=>setNotice(message),
+  });
+
+  const hostRemote=useMemo(()=>liveKit.remoteParticipants.find((participant)=>String(participant.userId)===String(live?.hostId))||liveKit.remoteParticipants[0]||null,[liveKit.remoteParticipants,live?.hostId]);
+
+  useEffect(()=>{if(localVideoRef.current)localVideoRef.current.srcObject=localStream;},[localStream]);
+  useEffect(()=>{if(remoteVideoRef.current)remoteVideoRef.current.srcObject=publisher?hostRemote?.stream||null:hostRemote?.stream||null;},[hostRemote?.stream,publisher]);
+
+  useEffect(()=>{
+    let active=true;
+    const init=async()=>{
+      setError('');
+      try{
+        const detail=await liveService.getLive(liveId,inviteToken);
+        if(!active)return;
+        setLive(detail);
+        setComments(await liveService.getComments(liveId).catch(()=>[]));
+        if(detail.status==='live'){
+          const joinedResult=await liveService.join(liveId,inviteToken);
+          if(!active)return;
+          setJoinRole(joinedResult.role);setJoined(true);
+        }
+      }catch(cause){if(active)setError(cause instanceof Error?cause.message:'Impossible d’ouvrir ce Live.');}
+    };
+    void init();
+    return()=>{active=false;void liveService.leave(liveId).catch(()=>undefined);};
+  },[liveId,inviteToken]);
+
+  useEffect(()=>{
+    if(!joined||!live)return;
+    const token=authService.getToken();
+    socket.auth=token?{token}:{};
+    const joinRealtime=()=>socket.emit('live:join',{liveId});
+    const onComment=(comment:LiveComment)=>setComments((current)=>current.some((item)=>item.id===comment.id)?current:[...current,comment].slice(-150));
+    const onDeleted=(payload:{commentId:string})=>setComments((current)=>current.filter((item)=>item.id!==payload.commentId));
+    const onPresence=(payload:{viewerCount:number})=>setLive((current)=>current?{...current,viewerCount:Number(payload.viewerCount||0)}:current);
+    const onLikes=(payload:{likeCount:number})=>setLive((current)=>current?{...current,likeCount:Number(payload.likeCount||0)}:current);
+    const onStatus=(payload:{status:string;startedAt?:string;endedAt?:string})=>setLive((current)=>current?{...current,status:payload.status,startedAt:payload.startedAt||current.startedAt,endedAt:payload.endedAt||current.endedAt}:current);
+    const onSettings=(payload:{chatEnabled:boolean;cohostsEnabled:boolean;moderationEnabled:boolean})=>setLive((current)=>current?{...current,...payload}:current);
+    const onRequest=()=>{if(live.isHost)void liveService.getParticipationRequests(liveId).then(setRequests).catch(()=>undefined);};
+    const onParticipation=(payload:{status:string})=>{
+      if(payload.status==='accepted'){
+        setNotice('Votre demande a été acceptée. Activation de votre caméra et micro…');
+        setJoinRole('cohost');
+      }else setNotice('Votre demande de participation n’a pas été retenue.');
+    };
+    socket.on('connect',joinRealtime).on('live:comment',onComment).on('live:comment-deleted',onDeleted).on('live:presence',onPresence).on('live:likes',onLikes).on('live:status',onStatus).on('live:settings',onSettings).on('live:participation-request',onRequest).on('live:participation-response',onParticipation);
+    if(socket.connected)joinRealtime();else socket.connect();
+    const heartbeat=window.setInterval(()=>void liveService.heartbeat(liveId).catch(()=>undefined),45_000);
+    return()=>{
+      window.clearInterval(heartbeat);
+      socket.emit('live:leave',{liveId});
+      socket.off('connect',joinRealtime).off('live:comment',onComment).off('live:comment-deleted',onDeleted).off('live:presence',onPresence).off('live:likes',onLikes).off('live:status',onStatus).off('live:settings',onSettings).off('live:participation-request',onRequest).off('live:participation-response',onParticipation);
+    };
+  },[joined,live?.isHost,liveId]);
+
+  useEffect(()=>{
+    if(!publisher||live?.status!=='live'){cameraStreamRef.current?.getTracks().forEach((track)=>track.stop());cameraStreamRef.current=null;setLocalStream(null);return;}
+    let cancelled=false;
+    void navigator.mediaDevices.getUserMedia({audio:true,video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'}}).then((stream)=>{
+      if(cancelled){stream.getTracks().forEach((track)=>track.stop());return;}
+      cameraStreamRef.current=stream;setLocalStream(stream);setMedia({audio:true,video:true,screen:false});
+    }).catch(()=>setError('Autorisez la caméra et le microphone pour diffuser.'));
+    return()=>{cancelled=true;};
+  },[publisher,live?.status]);
+
+  useEffect(()=>{
+    if(!live?.startedAt||live.status!=='live')return;
+    const tick=()=>setDuration(liveDuration(live.startedAt));
+    tick();const timer=window.setInterval(tick,1000);return()=>window.clearInterval(timer);
+  },[live?.startedAt,live?.status]);
+
+  useEffect(()=>{
+    if(!live?.isHost||!live.recordingEnabled||!joined||!liveKit.connected||recordingIdRef.current)return;
+    void collaborationService.startServerRecording(live.meetingId,{layout:'speaker'}).then((recording)=>{recordingIdRef.current=recording.id;setNotice('Enregistrement du Live activé.');}).catch(()=>setNotice('Le Live continue, mais l’enregistrement serveur n’a pas pu démarrer.'));
+  },[joined,live?.isHost,live?.recordingEnabled,live?.meetingId,liveKit.connected]);
+
+  useEffect(()=>()=>{cameraStreamRef.current?.getTracks().forEach((track)=>track.stop());localStream?.getTracks().forEach((track)=>track.stop());},[]);
+
+  const startLive=async()=>{
+    if(!live)return;setBusy('start');
+    try{const updated=await liveService.start(live.id);setLive(updated);const joinedResult=await liveService.join(live.id,inviteToken);setJoinRole(joinedResult.role);setJoined(true);}
+    catch(cause){setError(cause instanceof Error?cause.message:'Impossible de lancer le Live.');}
+    finally{setBusy('');}
+  };
+  const endLive=async()=>{
+    if(!live||!window.confirm('Terminer ce Live pour tous les spectateurs ?'))return;setBusy('end');
+    try{
+      if(recordingIdRef.current)await collaborationService.stopServerRecording(live.meetingId,recordingIdRef.current).catch(()=>undefined);
+      await liveService.end(live.id);setLive((current)=>current?{...current,status:'ended',viewerCount:0}:current);setJoined(false);
+    }catch(cause){setError(cause instanceof Error?cause.message:'Impossible de terminer le Live.');}
+    finally{setBusy('');}
+  };
+  const toggleMic=()=>{localStream?.getAudioTracks().forEach((track)=>{track.enabled=!media.audio;});setMedia((current)=>({...current,audio:!current.audio}));};
+  const toggleCamera=()=>{localStream?.getVideoTracks().forEach((track)=>{track.enabled=!media.video;});setMedia((current)=>({...current,video:!current.video}));};
+  const shareScreen=async()=>{
+    if(media.screen){const camera=cameraStreamRef.current;if(camera)setLocalStream(camera);setMedia((current)=>({...current,screen:false}));return;}
+    try{
+      const display=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
+      const mic=cameraStreamRef.current?.getAudioTracks()[0];if(mic&&!display.getAudioTracks().length)display.addTrack(mic);
+      display.getVideoTracks()[0]?.addEventListener('ended',()=>{if(cameraStreamRef.current)setLocalStream(cameraStreamRef.current);setMedia((current)=>({...current,screen:false}));},{once:true});
+      setLocalStream(display);setMedia((current)=>({...current,screen:true,video:true}));
+    }catch{}
+  };
+  const sendComment=async(event:FormEvent)=>{
+    event.preventDefault();if(!commentText.trim()||!live)return;
+    try{await liveService.comment(live.id,commentText.trim());setCommentText('');}catch(cause){setNotice(cause instanceof Error?cause.message:'Commentaire impossible.');}
+  };
+  const like=async()=>{if(!live)return;const result=await liveService.toggleLike(live.id);setLive({...live,isLiked:result.liked,likeCount:result.likeCount});};
+  const share=async()=>{
+    if(!live)return;const result=await liveService.share(live.id);const url=absoluteUrl(result.url);
+    setLive({...live,shareCount:result.shareCount});
+    try{if(navigator.share)await navigator.share({title:live.title,text:'Rejoignez ce Live MBotéRoom',url});else{await navigator.clipboard.writeText(url);setNotice('Lien du Live copié.');}}catch{}
+  };
+  const follow=async()=>{if(!live)return;const result=await liveService.toggleFollow(live.id);setLive({...live,isFollowing:result.following});};
+  const requestParticipation=async()=>{if(!live)return;try{await liveService.requestParticipation(live.id);setNotice('Demande envoyée à l’animateur.');}catch(cause){setNotice(cause instanceof Error?cause.message:'Demande impossible.');}};
+  const toggleChat=async()=>{if(!live)return;const updated=await liveService.updateSettings(live.id,{chatEnabled:!live.chatEnabled});setLive(updated);};
+  const generateSummary=async()=>{if(!live)return;setBusy('summary');try{setSummary(await collaborationService.generateSummary(live.meetingId));}catch(cause){setNotice(cause instanceof Error?cause.message:'Résumé Luna indisponible.');}finally{setBusy('');}};
+  const respond=async(request:LiveParticipationRequest,status:'accepted'|'rejected')=>{if(!live)return;await liveService.respondParticipation(live.id,request.userId,status);setRequests((current)=>current.map((item)=>item.userId===request.userId?{...item,status}:item));};
+
+  if(!live&&!error)return <AppShell title="Live"><AppLoader label="Connexion au Live…"/></AppShell>;
+  if(!live)return <AppShell title="Live"><main className="live-room-error"><Radio/><h1>Live indisponible</h1><p>{error}</p><button onClick={()=>navigate('/app/live')}>Retour aux Lives</button></main></AppShell>;
+
+  const mainStream=publisher?localStream:hostRemote?.stream||null;
+
+  return <main className={publisher?'live-room-page host-mode':'live-room-page viewer-mode'}>
+    <header className="live-room-topbar">
+      <button onClick={()=>navigate('/app/live')}><ChevronLeft/></button>
+      <div className="live-room-host"><Avatar name={live.hostName} src={live.hostAvatar}/><span><strong>{live.hostName}</strong><small>{duration||liveCategoryLabel(live.category)}</small></span></div>
+      {live.status==='live'?<span className="live-badge">EN DIRECT</span>:<span className="live-badge scheduled">{live.status==='scheduled'?'PROGRAMMÉ':'TERMINÉ'}</span>}
+      {!live.isHost?<button className={live.isFollowing?'live-follow following':'live-follow'} onClick={()=>void follow()}>{live.isFollowing?'Suivi':'Suivre'}</button>:null}
+      <button><MoreVertical/></button>
+    </header>
+
+    {notice?<div className="live-toast" onClick={()=>setNotice('')}>{notice}</div>:null}
+    {error?<div className="live-toast error" onClick={()=>setError('')}>{error}</div>:null}
+
+    {live.status==='scheduled'?<section className="live-scheduled-panel"><CalendarDays/><h1>{live.title}</h1><p>{live.scheduledFor?new Intl.DateTimeFormat('fr-FR',{dateStyle:'full',timeStyle:'short'}).format(new Date(live.scheduledFor)):''}</p>{live.isHost?<button className="live-primary-action" disabled={busy==='start'} onClick={()=>void startLive()}>{busy==='start'?<LoaderCircle className="spin"/>:<Radio/>} Lancer le Live maintenant</button>:<span>Ce Live n’a pas encore commencé.</span>}</section>:
+    live.status==='ended'?<section className="live-scheduled-panel"><Square/><h1>Live terminé</h1><p>{live.title}</p>{live.recordingEnabled?<span>Le replay apparaîtra dans vos enregistrements lorsqu’il sera prêt.</span>:null}<button onClick={()=>navigate('/app/live')}>Découvrir d’autres Lives</button></section>:
+    <>
+      <section className="live-stage">
+        <video ref={publisher?localVideoRef:remoteVideoRef} autoPlay playsInline muted={publisher} className="live-main-video"/>
+        {!mainStream?<div className="live-video-wait"><LoaderCircle className="spin"/><strong>{liveKit.connected?'Connexion vidéo…':'Connexion au serveur média…'}</strong></div>:null}
+        <div className="live-stage-stats"><span><Eye/> {fmtCount(live.viewerCount)}</span><span><Heart/> {fmtCount(live.likeCount)}</span><span><Send/> {fmtCount(live.commentCount+comments.length)}</span></div>
+
+        {!publisher?<aside className="live-viewer-actions">
+          <button className={live.isLiked?'liked':''} onClick={()=>void like()}><Heart/><span>{fmtCount(live.likeCount)}</span></button>
+          <button onClick={()=>document.querySelector<HTMLInputElement>('.live-comment-form input')?.focus()}><Send/><span>{comments.length}</span></button>
+          <button onClick={()=>void share()}><Share2/><span>{fmtCount(live.shareCount)}</span></button>
+          <button><Gift/><span>Réagir</span></button>
+        </aside>:null}
+
+        <div className="live-comment-overlay">{comments.slice(-5).map((comment)=><div key={comment.id}><Avatar name={comment.name} src={comment.avatar}/><span><strong>{comment.name}</strong> {comment.text}</span></div>)}</div>
+      </section>
+
+      {publisher?<section className="live-host-dashboard">
+        <div className="live-host-stats"><span><Eye/><strong>{fmtCount(live.viewerCount)}</strong><small>spectateurs</small></span><span><Heart/><strong>{fmtCount(live.likeCount)}</strong><small>j’aime</small></span><span><Send/><strong>{comments.length}</strong><small>commentaires</small></span><span><Share2/><strong>{fmtCount(live.shareCount)}</strong><small>partages</small></span></div>
+        <div className="live-host-controls">
+          <button className={media.audio?'active':''} onClick={toggleMic}>{media.audio?<Mic/>:<MicOff/>}<span>Micro<small>{media.audio?'Activé':'Muet'}</small></span></button>
+          <button className={media.video?'active':''} onClick={toggleCamera}>{media.video?<Video/>:<VideoOff/>}<span>Caméra<small>{media.video?'Activée':'Coupée'}</small></span></button>
+          <button className={media.screen?'active':''} onClick={()=>void shareScreen()}><Camera/><span>Partager<small>l’écran</small></span></button>
+          <button onClick={()=>{void liveService.getParticipationRequests(live.id).then(setRequests);}}><UserPlus/><span>Inviter<small>un invité</small></span></button>
+          <button className={!live.chatEnabled?'active danger':''} onClick={()=>void toggleChat()}><Send/><span>Chat<small>{live.chatEnabled?'Actif':'Muet'}</small></span></button>
+          <button className="danger" disabled={busy==='end'} onClick={()=>void endLive()}><X/><span>Terminer<small>le Live</small></span></button>
+        </div>
+
+        {requests.some((request)=>request.status==='pending')?<section className="live-requests"><h2>Demandes de participation</h2>{requests.filter((request)=>request.status==='pending').map((request)=><article key={request.userId}><Avatar name={request.name} src={request.avatar}/><strong>{request.name}</strong><button onClick={()=>void respond(request,'accepted')}>Accepter</button><button className="danger" onClick={()=>void respond(request,'rejected')}>Refuser</button></article>)}</section>:null}
+
+        <section className="live-host-comments"><header><button className="active">Public</button><button>Commentaires <b>{comments.length}</b></button><button>Modération</button></header>{comments.slice(-20).reverse().map((comment)=><article key={comment.id}><Avatar name={comment.name} src={comment.avatar}/><div><strong>{comment.name}</strong><p>{comment.text}</p></div>{live.moderationEnabled?<button onClick={()=>void liveService.deleteComment(live.id,comment.id)}><X/></button>:null}</article>)}</section>
+
+        <section className="live-luna-card"><header><div><Sparkles/><span><strong>Résumé Luna IA</strong><small>Analyse du direct et points importants</small></span></div><button disabled={busy==='summary'} onClick={()=>void generateSummary()}>{busy==='summary'?<LoaderCircle className="spin"/>:<Sparkles/>} Générer</button></header>{summary?<ul>{summary.bullets.slice(0,5).map((item)=><li key={item}>{item}</li>)}</ul>:<p>Luna peut générer les points clés, décisions et actions du Live.</p>}</section>
+        <button className="live-end-button" disabled={busy==='end'} onClick={()=>void endLive()}><Square/> Terminer le live</button>
+      </section>:<section className="live-viewer-bottom">
+        {live.chatEnabled&&live.canComment?<form className="live-comment-form" onSubmit={sendComment}><input value={commentText} onChange={(event)=>setCommentText(event.target.value)} placeholder="Écrire un commentaire…"/><button><Send/></button></form>:<div className="live-chat-disabled">{user?.isGuest?'Créez un compte pour commenter.':'Le chat est désactivé pour ce Live.'}</div>}
+        {live.cohostsEnabled&&live.canRequestParticipation?<button className="live-request-button" onClick={()=>void requestParticipation()}><UserPlus/> Demander à participer</button>:null}
+      </section>}
+    </>}
+  </main>;
+}
