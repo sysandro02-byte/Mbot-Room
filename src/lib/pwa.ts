@@ -11,6 +11,7 @@ const reloadWhenSafe = () => {
 
 export const registerPwa = () => {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
+  if (window.location.hostname === 'appassets.androidplatform.net' || /MBoteRoomAndroid/i.test(navigator.userAgent)) return;
   const hadController = Boolean(navigator.serviceWorker.controller);
 
   window.addEventListener('load', () => {
