@@ -217,7 +217,7 @@ export function LiveRoomPage(){
         const detail=await liveService.getLive(liveId,inviteToken);
         if(!active)return;
         setLive(detail);
-        setComments(await liveService.getComments(liveId).catch(()=>[]));
+        setComments(await liveService.getComments(liveId,inviteToken).catch(()=>[]));
         if(detail.status==='live'){
           const joinedResult=await liveService.join(liveId,inviteToken);
           if(!active)return;
@@ -241,6 +241,7 @@ export function LiveRoomPage(){
     const onStatus=(payload:{status:string;startedAt?:string;endedAt?:string})=>setLive((current)=>current?{...current,status:payload.status,startedAt:payload.startedAt||current.startedAt,endedAt:payload.endedAt||current.endedAt}:current);
     const onSettings=(payload:{chatEnabled:boolean;cohostsEnabled:boolean;moderationEnabled:boolean})=>setLive((current)=>current?{...current,...payload}:current);
     const onRequest=()=>{if(live.isHost)void liveService.getParticipationRequests(liveId).then(setRequests).catch(()=>undefined);};
+    const onReaction=(payload:{name:string;reaction:string})=>setNotice(`${payload.name} ${payload.reaction}`);
     const onParticipation=(payload:{status:string})=>{
       if(payload.status==='accepted'){
         setNotice('Votre demande a été acceptée. Activation de votre caméra et micro…');
@@ -248,13 +249,13 @@ export function LiveRoomPage(){
         setMediaSessionKey((value)=>value+1);
       }else setNotice('Votre demande de participation n’a pas été retenue.');
     };
-    socket.on('connect',joinRealtime).on('live:comment',onComment).on('live:comment-deleted',onDeleted).on('live:presence',onPresence).on('live:likes',onLikes).on('live:status',onStatus).on('live:settings',onSettings).on('live:participation-request',onRequest).on('live:participation-response',onParticipation);
+    socket.on('connect',joinRealtime).on('live:comment',onComment).on('live:comment-deleted',onDeleted).on('live:presence',onPresence).on('live:likes',onLikes).on('live:status',onStatus).on('live:settings',onSettings).on('live:reaction',onReaction).on('live:participation-request',onRequest).on('live:participation-response',onParticipation);
     if(socket.connected)joinRealtime();else socket.connect();
     const heartbeat=window.setInterval(()=>void liveService.heartbeat(liveId).catch(()=>undefined),45_000);
     return()=>{
       window.clearInterval(heartbeat);
       socket.emit('live:leave',{liveId});
-      socket.off('connect',joinRealtime).off('live:comment',onComment).off('live:comment-deleted',onDeleted).off('live:presence',onPresence).off('live:likes',onLikes).off('live:status',onStatus).off('live:settings',onSettings).off('live:participation-request',onRequest).off('live:participation-response',onParticipation);
+      socket.off('connect',joinRealtime).off('live:comment',onComment).off('live:comment-deleted',onDeleted).off('live:presence',onPresence).off('live:likes',onLikes).off('live:status',onStatus).off('live:settings',onSettings).off('live:reaction',onReaction).off('live:participation-request',onRequest).off('live:participation-response',onParticipation);
     };
   },[joined,live?.isHost,liveId]);
 
@@ -308,16 +309,16 @@ export function LiveRoomPage(){
   };
   const sendComment=async(event:FormEvent)=>{
     event.preventDefault();if(!commentText.trim()||!live)return;
-    try{await liveService.comment(live.id,commentText.trim());setCommentText('');}catch(cause){setNotice(cause instanceof Error?cause.message:'Commentaire impossible.');}
+    try{await liveService.comment(live.id,commentText.trim(),inviteToken);setCommentText('');}catch(cause){setNotice(cause instanceof Error?cause.message:'Commentaire impossible.');}
   };
-  const like=async()=>{if(!live)return;const result=await liveService.toggleLike(live.id);setLive({...live,isLiked:result.liked,likeCount:result.likeCount});};
+  const like=async()=>{if(!live)return;const result=await liveService.toggleLike(live.id,inviteToken);setLive({...live,isLiked:result.liked,likeCount:result.likeCount});};
   const share=async()=>{
     if(!live)return;const result=await liveService.share(live.id);const url=absoluteUrl(result.url);
     setLive({...live,shareCount:result.shareCount});
     try{if(navigator.share)await navigator.share({title:live.title,text:'Rejoignez ce Live MBotéRoom',url});else{await navigator.clipboard.writeText(url);setNotice('Lien du Live copié.');}}catch{}
   };
   const follow=async()=>{if(!live)return;const result=await liveService.toggleFollow(live.id);setLive({...live,isFollowing:result.following});};
-  const requestParticipation=async()=>{if(!live)return;try{await liveService.requestParticipation(live.id);setNotice('Demande envoyée à l’animateur.');}catch(cause){setNotice(cause instanceof Error?cause.message:'Demande impossible.');}};
+  const requestParticipation=async()=>{if(!live)return;try{await liveService.requestParticipation(live.id,inviteToken);setNotice('Demande envoyée à l’animateur.');}catch(cause){setNotice(cause instanceof Error?cause.message:'Demande impossible.');}};
   const toggleChat=async()=>{if(!live)return;const updated=await liveService.updateSettings(live.id,{chatEnabled:!live.chatEnabled});setLive(updated);};
   const generateSummary=async()=>{if(!live)return;setBusy('summary');try{setSummary(await collaborationService.generateSummary(live.meetingId));}catch(cause){setNotice(cause instanceof Error?cause.message:'Résumé Luna indisponible.');}finally{setBusy('');}};
   const respond=async(request:LiveParticipationRequest,status:'accepted'|'rejected')=>{if(!live)return;await liveService.respondParticipation(live.id,request.userId,status);setRequests((current)=>current.map((item)=>item.userId===request.userId?{...item,status}:item));};
@@ -351,7 +352,7 @@ export function LiveRoomPage(){
           <button className={live.isLiked?'liked':''} onClick={()=>void like()}><Heart/><span>{fmtCount(live.likeCount)}</span></button>
           <button onClick={()=>document.querySelector<HTMLInputElement>('.live-comment-form input')?.focus()}><Send/><span>{comments.length}</span></button>
           <button onClick={()=>void share()}><Share2/><span>{fmtCount(live.shareCount)}</span></button>
-          <button><Gift/><span>Réagir</span></button>
+          <button onClick={()=>void liveService.react(live.id,'👏',inviteToken).catch(()=>setNotice('Réaction impossible.'))}><Gift/><span>Réagir</span></button>
         </aside>:null}
 
         <div className="live-comment-overlay">{comments.slice(-5).map((comment)=><div key={comment.id}><Avatar name={comment.name} src={comment.avatar}/><span><strong>{comment.name}</strong> {comment.text}</span></div>)}</div>
