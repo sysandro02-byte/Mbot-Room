@@ -2,9 +2,9 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import {
   Bell, CalendarDays, CalendarSync, ChevronLeft, ChevronRight, Clock3, Copy, Eye, Link2,
   MoreVertical, Pencil, Play, Plus, RefreshCw, Repeat2, ShieldCheck, Trash2, Unlink,
-  UserPlus, UsersRound, Video, X,
+  UserPlus, UsersRound, Video, X, MapPin, Flag, ArrowLeft, BriefcaseBusiness,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import AppShell from '../components/AppShell';
 import { appDataService, type CalendarEvent } from '../services/appDataService';
 import { getMeetingJoinUrl, meetingService, type Meeting } from '../services/meetingService';
@@ -15,7 +15,7 @@ import './CalendarPage.css';
 import AppLoader from '../components/AppLoader';
 
 type CalendarView='month'|'week'|'day';
-type EventKind='meeting'|'event';
+type EventKind='meeting'|'appointment'|'client'|'loukatech'|'deadline'|'reminder'|'event';
 type Recurrence='none'|'daily'|'weekly'|'monthly';
 
 type CalendarForm={
@@ -31,6 +31,8 @@ type CalendarForm={
   reminderMinutes:number;
   waitingRoom:boolean;
   recurrence:Recurrence;
+  location:string;
+  priority:'low'|'normal'|'high';
 };
 
 type CalendarItem={
@@ -79,6 +81,8 @@ const makeInitialForm=():CalendarForm=>{
     reminderMinutes:15,
     waitingRoom:preferences.waitingRoomDefault!==false,
     recurrence:'none',
+    location:'',
+    priority:'normal',
   };
 };
 
@@ -91,6 +95,8 @@ const eventColor=(item:CalendarItem)=>{
 
 export default function CalendarPage(){
   const navigate=useNavigate();
+  const location=useLocation();
+  const adminMode=location.pathname.startsWith('/admin/calendar');
   const [events,setEvents]=useState<CalendarEvent[]>([]);
   const [meetings,setMeetings]=useState<Meeting[]>([]);
   const [google,setGoogle]=useState<GoogleCalendarStatus>({configured:false,connected:false,scope:''});
@@ -205,7 +211,7 @@ export default function CalendarPage(){
   const connectGoogle=async()=>{
     setGoogleBusy(true);
     try{
-      const result=await workspaceService.connectGoogleCalendar('/app/calendar');
+      const result=await workspaceService.connectGoogleCalendar(adminMode?'/admin/calendar':'/app/calendar');
       window.location.assign(result.url);
     }catch(cause){
       setGoogleBusy(false);
@@ -253,6 +259,9 @@ export default function CalendarPage(){
         reminderMinutes:form.reminder?form.reminderMinutes:0,
         waitingRoom:form.waitingRoom,
         recurrence:form.recurrence,
+        location:form.location.trim(),
+        priority:form.priority,
+        createdFrom:adminMode?'admin-calendar':'user-calendar',
       };
 
       if(editingItem){
@@ -382,12 +391,18 @@ export default function CalendarPage(){
       startTime:timeInput(item.start),
       endDate:dateInput(item.end),
       endTime:timeInput(item.end),
-      eventType:item.meetingId?'meeting':(metadata.eventType==='meeting'?'meeting':'event'),
+      eventType:item.meetingId
+        ?'meeting'
+        :(['appointment','client','loukatech','deadline','reminder','event'].includes(String(metadata.eventType))
+          ?String(metadata.eventType) as EventKind
+          :'event'),
       participants:(meeting?.settings?.participants||metadataParticipants).join('; '),
       reminder:metadata.reminderEnabled!==false,
       reminderMinutes:Number(metadata.reminderMinutes||15),
       waitingRoom:meeting?.settings?.waitingRoom!==false&&metadata.waitingRoom!==false,
       recurrence:(['daily','weekly','monthly'].includes(String(metadata.recurrence))?metadata.recurrence:'none') as Recurrence,
+      location:String(metadata.location||''),
+      priority:(['low','normal','high'].includes(String(metadata.priority))?metadata.priority:'normal') as 'low'|'normal'|'high',
     });
     window.setTimeout(()=>document.querySelector('.calendar-create-card')?.scrollIntoView({behavior:'smooth',block:'start'}),40);
   };
@@ -419,10 +434,25 @@ export default function CalendarPage(){
 
   const goToday=()=>{const today=new Date();setCursor(today);setSelectedDate(today);};
 
-  return <AppShell title="Calendrier">
-    <main className="calendar-pro-page">
+  const eventTypeLabel=(item:CalendarItem)=>{
+    if(item.meetingId)return 'Réunion MBotéRoom';
+    const type=String(item.metadata?.eventType||'event');
+    return type==='appointment'?'Rendez-vous'
+      :type==='client'?'Client / partenaire'
+      :type==='loukatech'?'Événement LoukaTech'
+      :type==='deadline'?'Échéance'
+      :type==='reminder'?'Rappel'
+      :'Événement';
+  };
+
+  const calendarContent=<main className={adminMode?'calendar-pro-page is-admin-calendar':'calendar-pro-page'}>
+      {adminMode?<header className="admin-calendar-topbar">
+        <button type="button" onClick={()=>navigate('/admin')}><ArrowLeft/> Retour administration</button>
+        <div><BriefcaseBusiness/><span><strong>Calendrier administrateur</strong><small>Organisation LoukaTech · clients · partenaires · équipe</small></span></div>
+        <button type="button" className="primary" onClick={()=>navigate('/reunions?new=1&intent=admin')}><Video/> Nouvelle réunion</button>
+      </header>:null}
       <section className="calendar-pro-hero">
-        <div className="calendar-pro-title"><span><CalendarDays/></span><div><h1>Calendrier</h1><p>Organisez vos réunions, événements et synchronisations MBotéRoom.</p></div></div>
+        <div className="calendar-pro-title"><span><CalendarDays/></span><div><h1>{adminMode?'Calendrier administrateur':'Calendrier'}</h1><p>{adminMode?'Programmez les réunions, rendez-vous, échéances, événements LoukaTech, rencontres clients et activités de l’équipe.':'Organisez vos réunions, événements et synchronisations MBotéRoom.'}</p></div></div>
         <div className="calendar-pro-hero-stats">
           <article><span><UsersRound/></span><strong>{monthMeetings}</strong><small>Réunions ce mois</small></article>
           <article><span><CalendarDays/></span><strong>{upcoming.length}</strong><small>Événements à venir</small></article>
@@ -446,7 +476,7 @@ export default function CalendarPage(){
 
       <div className="calendar-pro-grid">
         <section className="calendar-create-card">
-          <header><span>{editingItem?<Pencil/>:<Plus/>}</span><div><h2>{editingItem?'Modifier l’événement':'Créer un événement'}</h2><p>{editingItem?'Mettez à jour les informations puis enregistrez vos modifications.':'Planifiez une réunion ou un événement pour vous et votre équipe.'}</p></div>{editingItem?<button className="calendar-edit-cancel" type="button" onClick={()=>{setEditingItem(null);setForm(makeInitialForm());}}><X/> Annuler</button>:null}</header>
+          <header><span>{editingItem?<Pencil/>:<Plus/>}</span><div><h2>{editingItem?'Modifier l’événement':adminMode?'Programmer une activité':'Créer un événement'}</h2><p>{editingItem?'Mettez à jour les informations puis enregistrez vos modifications.':adminMode?'Planifiez une réunion, un rendez-vous, une échéance ou un événement pour LoukaTech.':'Planifiez une réunion ou un événement pour vous et votre équipe.'}</p></div>{editingItem?<button className="calendar-edit-cancel" type="button" onClick={()=>{setEditingItem(null);setForm(makeInitialForm());}}><X/> Annuler</button>:null}</header>
           <form onSubmit={createEvent}>
             <label>Titre *<input value={form.title} onChange={(event)=>setForm((current)=>({...current,title:event.target.value}))} placeholder="Ex. Réunion d’équipe, Formation, etc." required/></label>
             <label>Description<textarea value={form.description} onChange={(event)=>setForm((current)=>({...current,description:event.target.value}))} placeholder="Ajoutez une description (ordre du jour, objectifs…)"/></label>
@@ -455,8 +485,20 @@ export default function CalendarPage(){
               <fieldset><legend>Fin *</legend><input type="date" value={form.endDate} onChange={(event)=>setForm((current)=>({...current,endDate:event.target.value}))}/><input type="time" value={form.endTime} onChange={(event)=>setForm((current)=>({...current,endTime:event.target.value}))}/></fieldset>
             </div>
             <div className="calendar-form-row">
-              <label>Type<select value={form.eventType} onChange={(event)=>setForm((current)=>({...current,eventType:event.target.value as EventKind}))}><option value="meeting">Réunion MBotéRoom</option><option value="event">Événement personnel</option></select></label>
+              <label>Type<select aria-label="Type d’activité" value={form.eventType} onChange={(event)=>setForm((current)=>({...current,eventType:event.target.value as EventKind}))}>
+                <option value="meeting">Réunion MBotéRoom</option>
+                <option value="appointment">Rendez-vous</option>
+                <option value="client">Client / partenaire</option>
+                <option value="loukatech">Événement LoukaTech</option>
+                <option value="deadline">Échéance / date limite</option>
+                <option value="reminder">Rappel</option>
+                <option value="event">Autre événement</option>
+              </select></label>
               <label>Participants<input value={form.participants} onChange={(event)=>setForm((current)=>({...current,participants:event.target.value}))} placeholder="Emails séparés par ;"/></label>
+            </div>
+            <div className="calendar-form-row">
+              <label><MapPin size={15}/> Lieu / canal<input value={form.location} onChange={(event)=>setForm((current)=>({...current,location:event.target.value}))} placeholder="Ex. Siège LoukaTech, Brazzaville ou visioconférence"/></label>
+              <label><Flag size={15}/> Priorité<select aria-label="Priorité" value={form.priority} onChange={(event)=>setForm((current)=>({...current,priority:event.target.value as 'low'|'normal'|'high'}))}><option value="low">Faible</option><option value="normal">Normale</option><option value="high">Haute</option></select></label>
             </div>
             <div className="calendar-advanced-title"><ShieldCheck/> Options avancées</div>
             <div className="calendar-advanced-grid">
@@ -522,7 +564,9 @@ export default function CalendarPage(){
           <div className="calendar-event-detail-body">
             <article><Clock3/><div><small>Date et horaire</small><strong>{formatDate(detailItem.start)} · {formatTime(detailItem.start)} – {formatTime(detailItem.end)}</strong></div></article>
             <article><UsersRound/><div><small>Participants</small><strong>{detailItem.participants||0} participant{detailItem.participants>1?'s':''}</strong></div></article>
-            <article><ShieldCheck/><div><small>Type</small><strong>{detailItem.meetingId?'Réunion MBotéRoom':detailItem.source==='google'?'Google Calendar':'Événement MBotéRoom'}</strong></div></article>
+            <article><ShieldCheck/><div><small>Type</small><strong>{detailItem.source==='google'?'Google Calendar':eventTypeLabel(detailItem)}</strong></div></article>
+            {detailItem.metadata?.location?<article><MapPin/><div><small>Lieu / canal</small><strong>{String(detailItem.metadata.location)}</strong></div></article>:null}
+            <article><Flag/><div><small>Priorité</small><strong>{detailItem.metadata?.priority==='high'?'Haute':detailItem.metadata?.priority==='low'?'Faible':'Normale'}</strong></div></article>
             {detailItem.description?<p>{detailItem.description}</p>:null}
           </div>
           <footer>
@@ -533,6 +577,9 @@ export default function CalendarPage(){
         </section>
       </div>:null}
       {loading?<AppLoader label="Chargement du calendrier…" />:null}
-    </main>
-  </AppShell>;
+    </main>;
+
+  return adminMode
+    ? <section className="admin-calendar-shell">{calendarContent}</section>
+    : <AppShell title="Calendrier">{calendarContent}</AppShell>;
 }
