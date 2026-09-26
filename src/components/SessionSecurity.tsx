@@ -28,7 +28,8 @@ const LAST_ROUTE_KEY = 'mboteroom-last-safe-route';
 const RESUME_DONE_KEY = 'mboteroom-pwa-resume-done';
 
 const isStandalone = () => window.matchMedia?.('(display-mode: standalone)').matches
-  || Boolean((navigator as Navigator & {standalone?:boolean}).standalone);
+  || Boolean((navigator as Navigator & {standalone?:boolean}).standalone)
+  || /MBoteRoomAndroid\/\d+(?:\.\d+)*/i.test(navigator.userAgent);
 
 const nowActivity = () => Number(localStorage.getItem(LAST_ACTIVITY_KEY) || Date.now());
 
