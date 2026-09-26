@@ -36,6 +36,7 @@ export const isAllowedOrigin = (origin?: string) => {
   if (!origin) return true;
   const normalized = normalizeOrigin(origin);
   if (!normalized) return false;
+  if (normalized === 'https://appassets.androidplatform.net') return true;
   if (configuredOrigins.includes(normalized)) return true;
   if (configuredOriginPatterns.some((pattern) => pattern.test(normalized))) return true;
   if (process.env.NODE_ENV !== 'production') {
