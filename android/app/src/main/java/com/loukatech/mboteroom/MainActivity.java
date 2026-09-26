@@ -141,9 +141,33 @@ public class MainActivity extends Activity {
         });
 
         requestRuntimePermissions();
-        // The application shell is packaged inside the APK, so it opens even with no network.
-        // Network-only features continue to call the production API when connectivity returns.
-        webView.loadUrl(LOCAL_APP_URL);
+        // Preserve the exact SPA route when Android recreates the activity after app switching.
+        // If no WebView state exists, the bundled shell still opens without a network connection.
+        boolean restored = savedInstanceState != null && webView.restoreState(savedInstanceState) != null;
+        if (!restored) webView.loadUrl(LOCAL_APP_URL);
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        if (webView != null) webView.saveState(outState);
+        super.onSaveInstanceState(outState);
+    }
+
+    @Override
+    protected void onPause() {
+        if (webView != null) webView.onPause();
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (webView == null) return;
+        webView.onResume();
+        String currentUrl = webView.getUrl();
+        if (currentUrl == null || currentUrl.isBlank() || "about:blank".equals(currentUrl)) {
+            webView.loadUrl(LOCAL_APP_URL);
+        }
     }
 
     private final class AndroidBridge {
