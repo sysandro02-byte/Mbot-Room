@@ -336,6 +336,9 @@
 .room-v2-control.active>span{border-color:#0ce1e9;background:linear-gradient(145deg,#0cb9c4,#087989);box-shadow:0 0 20px rgba(8,220,230,.32)}
 .room-v2-control svg{width:24px;height:24px}.room-v2-control small{font-size:9px;font-weight:800}
 .room-v2-more-wrap{position:relative;z-index:320}
+.room-v2-shell.more-menu-open .room-v2-body{pointer-events:none}
+.room-v2-shell.more-menu-open .room-v2-more-menu,
+.room-v2-shell.more-menu-open .room-v2-controls{pointer-events:auto}
 .room-v2-more-menu{position:absolute;z-index:1000;pointer-events:auto;right:0;bottom:78px;width:230px;padding:7px;border:1px solid rgba(115,172,211,.24);border-radius:15px;background:#0a2037;box-shadow:0 20px 60px rgba(0,0,0,.45)}
 .room-v2-more-menu>button{width:100%;min-height:38px;display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:8px;padding:0 10px;border:0;border-radius:9px;background:transparent;color:#e6f1f7;text-align:left;font-size:10px;font-weight:750;cursor:pointer}
 .room-v2-more-menu>button:hover{background:#11314e}.room-v2-more-menu>button:disabled{opacity:.4;cursor:not-allowed}.room-v2-more-menu svg{width:17px}.room-v2-more-menu b{min-width:20px;padding:3px 5px;border-radius:999px;background:#0b5365;color:#10e0df;text-align:center;font-size:8px}.room-v2-more-menu>div{height:1px;margin:5px;background:rgba(118,173,211,.16)}.room-v2-more-menu>button.danger{color:#ff8589}.room-v2-more-emoji{font-size:17px}
