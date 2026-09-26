@@ -373,6 +373,21 @@ try {
       assert.equal(await page.locator('.global-app-header').count(), 0, 'Admin must render only its dedicated header');
       assert.equal(await page.locator('.admin-mobile-menu').count(), 1, 'Admin must render one menu trigger');
       assert.equal(await page.locator('.admin-topbar [aria-label="Notifications administrateur"]').count(), 1, 'Admin must render one notification trigger');
+
+      const adminMenu = page.locator('.admin-mobile-menu');
+      await adminMenu.evaluate((element) => element.click());
+      await page.waitForFunction(() => document.querySelector('.admin-sidebar')?.classList.contains('is-open'));
+      assert.equal(await page.locator('.admin-sidebar-overlay').count(), 1, 'Opening the admin menu must render one overlay');
+      await page.locator('.admin-sidebar-overlay').evaluate((element) => element.click());
+      await page.waitForFunction(() => !document.querySelector('.admin-sidebar')?.classList.contains('is-open'));
+      assert.equal(await page.locator('.admin-sidebar-overlay').count(), 0, 'Closing the admin menu must remove the overlay');
+
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 20_000 });
+      await page.waitForFunction(() => !document.querySelector('.route-loading'), undefined, { timeout: 15_000 });
+      assert.ok(!page.url().includes('/login'), 'Admin session must survive a page reload');
+      await page.locator('.admin-topbar').waitFor({ state: 'visible', timeout: 10_000 });
+      assert.equal(await page.locator('.global-app-header').count(), 0, 'Reloaded admin must still render only its dedicated header');
+      assert.equal(await page.locator('.admin-topbar [aria-label="Notifications administrateur"]').count(), 1, 'Reloaded admin must keep one notification trigger');
     } else {
       const globalHeader = page.locator('.global-app-header');
       await globalHeader.waitFor({ state: 'visible', timeout: 10_000 });
