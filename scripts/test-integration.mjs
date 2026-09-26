@@ -894,6 +894,173 @@ try {
     && item.metadata?.priority === 'high'
   ), 'Admin calendar event must persist in PostgreSQL with its metadata');
 
+  // Live: real persistence, feed, realtime comments/reactions and co-host promotion.
+  const liveCreate = await jsonRequest('/api/live', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: 'Live intégration LoukaTech',
+      description: 'Validation réelle du nouveau module Live.',
+      category: 'business',
+      visibility: 'public',
+      startNow: true,
+      chatEnabled: true,
+      cohostsEnabled: true,
+      recordingEnabled: false,
+      moderationEnabled: true,
+    }),
+  });
+  assert.equal(liveCreate.response.status, 201, JSON.stringify(liveCreate.data));
+  assert.equal(liveCreate.data.status, 'live');
+  assert.ok(liveCreate.data.id);
+  assert.ok(Number(liveCreate.data.meetingId) > 0);
+
+  const liveFeed = await jsonRequest('/api/live/feed?category=business', { headers: authHeaders(participant.token) });
+  assert.equal(liveFeed.response.status, 200, JSON.stringify(liveFeed.data));
+  assert.ok(liveFeed.data.some((item) => item.id === liveCreate.data.id && item.status === 'live'));
+
+  const liveHostSocket = await socketConnect(host.token);
+  const liveParticipantSocket = await socketConnect(participant.token);
+  assert.equal((await socketAck(liveHostSocket, 'live:join', { liveId: liveCreate.data.id }))?.ok, true);
+  assert.equal((await socketAck(liveParticipantSocket, 'live:join', { liveId: liveCreate.data.id }))?.ok, true);
+
+  const joinedLive = await jsonRequest(`/api/live/${liveCreate.data.id}/join`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({}),
+  });
+  assert.equal(joinedLive.response.status, 200, JSON.stringify(joinedLive.data));
+  assert.equal(joinedLive.data.role, 'viewer');
+  assert.equal(Number(joinedLive.data.meetingId), Number(liveCreate.data.meetingId));
+
+  const commentEventPromise = waitForSocketEvent(
+    liveHostSocket,
+    'live:comment',
+    (payload) => payload?.text === 'Bonjour depuis le Live CI',
+  );
+  const liveComment = await jsonRequest(`/api/live/${liveCreate.data.id}/comments`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ text: 'Bonjour depuis le Live CI' }),
+  });
+  assert.equal(liveComment.response.status, 201, JSON.stringify(liveComment.data));
+  const liveCommentEvent = await commentEventPromise;
+  assert.equal(liveCommentEvent.text, 'Bonjour depuis le Live CI');
+
+  const likeEventPromise = waitForSocketEvent(
+    liveHostSocket,
+    'live:likes',
+    (payload) => payload?.liveId === liveCreate.data.id && Number(payload?.likeCount) >= 1,
+  );
+  const liveLike = await jsonRequest(`/api/live/${liveCreate.data.id}/like`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({}),
+  });
+  assert.equal(liveLike.response.status, 200, JSON.stringify(liveLike.data));
+  assert.equal(liveLike.data.liked, true);
+  assert.ok(Number((await likeEventPromise).likeCount) >= 1);
+
+  const reactionEventPromise = waitForSocketEvent(
+    liveHostSocket,
+    'live:reaction',
+    (payload) => payload?.reaction === '👏' && Number(payload?.userId) === Number(participant.user.id),
+  );
+  const liveReaction = await jsonRequest(`/api/live/${liveCreate.data.id}/reactions`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ reaction: '👏' }),
+  });
+  assert.equal(liveReaction.response.status, 201, JSON.stringify(liveReaction.data));
+  assert.equal((await reactionEventPromise).reaction, '👏');
+
+  const participationEventPromise = waitForSocketEvent(
+    liveHostSocket,
+    'live:participation-request',
+    (payload) => Number(payload?.userId) === Number(participant.user.id),
+  );
+  const liveParticipationRequest = await jsonRequest(`/api/live/${liveCreate.data.id}/participation-requests`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({}),
+  });
+  assert.equal(liveParticipationRequest.response.status, 201, JSON.stringify(liveParticipationRequest.data));
+  assert.equal((await participationEventPromise).name, participant.user.name);
+
+  const participationResponsePromise = waitForSocketEvent(
+    liveParticipantSocket,
+    'live:participation-response',
+    (payload) => payload?.status === 'accepted',
+  );
+  const liveParticipationAccept = await jsonRequest(`/api/live/${liveCreate.data.id}/participation-requests/${participant.user.id}`, {
+    method: 'PATCH',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ status: 'accepted' }),
+  });
+  assert.equal(liveParticipationAccept.response.status, 200, JSON.stringify(liveParticipationAccept.data));
+  assert.equal((await participationResponsePromise).status, 'accepted');
+
+  const rejoinedLive = await jsonRequest(`/api/live/${liveCreate.data.id}/join`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({}),
+  });
+  assert.equal(rejoinedLive.response.status, 200, JSON.stringify(rejoinedLive.data));
+  assert.equal(rejoinedLive.data.role, 'cohost');
+
+  const liveDisableChat = await jsonRequest(`/api/live/${liveCreate.data.id}/settings`, {
+    method: 'PATCH',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ chatEnabled: false }),
+  });
+  assert.equal(liveDisableChat.response.status, 200, JSON.stringify(liveDisableChat.data));
+  assert.equal(liveDisableChat.data.chatEnabled, false);
+  const blockedLiveComment = await jsonRequest(`/api/live/${liveCreate.data.id}/comments`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ text: 'Ce commentaire doit être bloqué.' }),
+  });
+  assert.equal(blockedLiveComment.response.status, 403, JSON.stringify(blockedLiveComment.data));
+  assert.equal(blockedLiveComment.data.code, 'LIVE_CHAT_DISABLED');
+
+  const liveEnd = await jsonRequest(`/api/live/${liveCreate.data.id}/end`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({}),
+  });
+  assert.equal(liveEnd.response.status, 200, JSON.stringify(liveEnd.data));
+  assert.equal(liveEnd.data.status, 'ended');
+  liveParticipantSocket.close();
+  liveHostSocket.close();
+
+  // Private Live must require the generated invitation token.
+  const privateLive = await jsonRequest('/api/live', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: 'Live privé CI',
+      category: 'tech',
+      visibility: 'private',
+      startNow: true,
+      chatEnabled: true,
+      cohostsEnabled: false,
+      recordingEnabled: false,
+    }),
+  });
+  assert.equal(privateLive.response.status, 201, JSON.stringify(privateLive.data));
+  const privateDenied = await jsonRequest(`/api/live/${privateLive.data.id}`, { headers: authHeaders(participant.token) });
+  assert.equal(privateDenied.response.status, 403, JSON.stringify(privateDenied.data));
+  const inviteToken = new URL(privateLive.data.shareUrl, 'https://mboteroom.test').searchParams.get('invite');
+  assert.ok(inviteToken);
+  const privateAllowed = await jsonRequest(`/api/live/${privateLive.data.id}?invite=${encodeURIComponent(inviteToken)}`, { headers: authHeaders(participant.token) });
+  assert.equal(privateAllowed.response.status, 200, JSON.stringify(privateAllowed.data));
+  const privateEnd = await jsonRequest(`/api/live/${privateLive.data.id}/end`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({}),
+  });
+  assert.equal(privateEnd.response.status, 200, JSON.stringify(privateEnd.data));
+
   const hostMe = await jsonRequest('/api/auth/me', { headers: authHeaders(host.token) });
   assert.equal(hostMe.response.status, 200);
   assert.equal(hostMe.data.user.email, 'host.integration@mbote.test');
