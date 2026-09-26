@@ -419,7 +419,7 @@ try {
 
   await page.goto('/app/live/new', { waitUntil: 'domcontentloaded', timeout: 20_000 });
   await page.getByRole('heading', { name: 'Créer un live', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
-  assert.equal(await page.getByLabel('URL de couverture').count(), 1, 'Live creation must expose cover image configuration');
+  assert.equal(await page.getByLabel('Choisir une couverture').count(), 1, 'Live creation must expose real cover image upload');
   assert.equal(await page.getByText('Activer le chat', { exact: true }).count(), 1, 'Live creation must expose chat configuration');
   assert.equal(await page.getByText('Inviter des co-animateurs', { exact: true }).count(), 1, 'Live creation must expose co-host configuration');
   assert.equal(await page.getByText('Enregistrer le live', { exact: true }).count(), 1, 'Live creation must expose recording configuration');
