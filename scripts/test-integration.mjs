@@ -116,6 +116,32 @@ const mockMailRelayServer = createServer(async (request, response) => {
 });
 await new Promise((resolve) => mockMailRelayServer.listen(mailRelayPort, '127.0.0.1', resolve));
 
+
+const groqChatPort = port + 4;
+const groqChatRequests = [];
+const mockGroqChatServer = createServer(async (request, response) => {
+  let rawBody = '';
+  for await (const chunk of request) rawBody += chunk.toString();
+  const body = rawBody ? JSON.parse(rawBody) : {};
+  groqChatRequests.push({
+    path: request.url,
+    authorization: request.headers.authorization || '',
+    body,
+  });
+  response.setHeader('Content-Type', 'application/json');
+  response.end(JSON.stringify({
+    choices: [{
+      message: {
+        content: JSON.stringify({
+          title: 'Maintenance MBotéRoom',
+          body: 'Une maintenance est prévue ce soir à 22 h à Brazzaville. Merci de votre compréhension.',
+        }),
+      },
+    }],
+  }));
+});
+await new Promise((resolve) => mockGroqChatServer.listen(groqChatPort, '127.0.0.1', resolve));
+
 const pool = new pg.Pool({ connectionString: databaseUrl, ssl: false });
 
 await pool.query('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
@@ -136,7 +162,9 @@ const server = spawn(process.execPath, ['dist/server.js'], {
     BREVO_API_KEY: '',
     ADMIN_EMAILS: 'host.integration@mbote.test',
     RESEND_API_KEY: '',
-    GROQ_API_KEY: '',
+    GROQ_API_KEY: 'groq-chat-test-key',
+    GROQ_CHAT_URL: `http://127.0.0.1:${groqChatPort}/openai/v1/chat/completions`,
+    GROQ_MODEL: 'integration-chat-model',
     GROQ_TRANSCRIPTION_API_KEY: 'transcription-test-key',
     GROQ_TRANSCRIPTION_URL: `http://127.0.0.1:${transcriptionPort}/transcriptions`,
     GROQ_TRANSCRIPTION_MODEL: 'whisper-large-v3-turbo',
@@ -803,9 +831,31 @@ try {
   assert.equal(broadcastHistory.response.status, 200, JSON.stringify(broadcastHistory.data));
   assert.equal(broadcastHistory.data[0]?.title, 'Information ciblée CI');
 
+  const aiCompose = await jsonRequest('/api/admin/ai/compose', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      intent: 'Informer les utilisateurs de Brazzaville d’une maintenance ce soir à 22 h.',
+      title: '',
+      body: '',
+      tone: 'court et direct',
+    }),
+  });
+  assert.equal(aiCompose.response.status, 200, JSON.stringify(aiCompose.data));
+  assert.equal(aiCompose.data.title, 'Maintenance MBotéRoom');
+  assert.match(aiCompose.data.body, /maintenance/i);
+  assert.equal(aiCompose.data.provider, 'groq');
+  assert.equal(aiCompose.data.model, 'integration-chat-model');
+  assert.ok(groqChatRequests.some((item) =>
+    item.path === '/openai/v1/chat/completions'
+    && item.authorization === 'Bearer groq-chat-test-key'
+    && item.body?.model === 'integration-chat-model'
+    && item.body?.messages?.some((message) => String(message?.content || '').includes('Brazzaville'))
+  ), 'Admin IA compose must call Groq with the requested instruction');
+
   const aiInsights = await jsonRequest('/api/admin/ai/insights', { headers: authHeaders(host.token) });
   assert.equal(aiInsights.response.status, 200, JSON.stringify(aiInsights.data));
-  assert.equal(aiInsights.data.provider, 'local-metrics');
+  assert.equal(aiInsights.data.provider, 'groq');
 
   const hostMe = await jsonRequest('/api/auth/me', { headers: authHeaders(host.token) });
   assert.equal(hostMe.response.status, 200);
@@ -1566,4 +1616,5 @@ try {
   await new Promise((resolve) => mockEgressServer.close(() => resolve()));
   await new Promise((resolve) => mockTranscriptionServer.close(() => resolve()));
   await new Promise((resolve) => mockMailRelayServer.close(() => resolve()));
+  await new Promise((resolve) => mockGroqChatServer.close(() => resolve()));
 }
