@@ -238,9 +238,21 @@ export const registerRealtime = (io: Server) => {
       try {
         const liveId=String(payload?.liveId||'').trim();
         if(!liveId)return callback?.(fail('LIVE_INVALID','Live invalide.'));
-        const row=await query('SELECT id,host_id,status FROM room_live_sessions WHERE id=$1 LIMIT 1',[liveId]);
+        const row=await query('SELECT id,host_id,status,visibility,share_token FROM room_live_sessions WHERE id=$1 LIMIT 1',[liveId]);
         if(!row.rows[0])return callback?.(fail('LIVE_NOT_FOUND','Live introuvable.'));
         if(row.rows[0].status==='ended'||row.rows[0].status==='cancelled')return callback?.(fail('LIVE_ENDED','Ce Live est terminé.'));
+        const liveRow=row.rows[0];
+        let liveAllowed=Number(liveRow.host_id)===user.id||user.role==='admin'||liveRow.visibility==='public';
+        if(!liveAllowed&&liveRow.visibility==='followers'){
+          const follow=await query('SELECT 1 FROM room_live_follows WHERE creator_id=$1 AND follower_id=$2 LIMIT 1',[liveRow.host_id,user.id]);
+          liveAllowed=Boolean(follow.rows[0]);
+        }
+        if(!liveAllowed&&liveRow.visibility==='private'){
+          const invite=String(payload?.inviteToken||'');
+          const expected=String(liveRow.share_token||'');
+          liveAllowed=Boolean(invite&&invite===expected);
+        }
+        if(!liveAllowed)return callback?.(fail('LIVE_ACCESS_DENIED','Ce Live est privé.'));
         socket.join(`live:${liveId}`);
         if(Number(row.rows[0].host_id)===user.id||user.role==='admin')socket.join(`live:${liveId}:host`);
         socket.data.liveId=liveId;
