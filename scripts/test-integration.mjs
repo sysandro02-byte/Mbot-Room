@@ -894,7 +894,21 @@ try {
     && item.metadata?.priority === 'high'
   ), 'Admin calendar event must persist in PostgreSQL with its metadata');
 
-  // Live: real persistence, feed, realtime comments/reactions and co-host promotion.
+  // Live: real persistence, cover storage, feed, realtime interactions and co-host promotion.
+  const liveCoverBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlK8v8AAAAASUVORK5CYII=', 'base64');
+  const liveCoverResponse = await fetch(`${baseUrl}/api/live/assets/cover`, {
+    method: 'POST',
+    headers: {
+      ...authHeaders(host.token),
+      Origin: baseUrl,
+      'Content-Type': 'image/png',
+    },
+    body: liveCoverBytes,
+  });
+  assert.equal(liveCoverResponse.status, 201, await liveCoverResponse.text().catch(()=>''));
+  const liveCoverData = await liveCoverResponse.json();
+  assert.match(String(liveCoverData.url||''), /^\/api\/live\/assets\//);
+
   const liveCreate = await jsonRequest('/api/live', {
     method: 'POST',
     headers: authHeaders(host.token),
@@ -903,6 +917,7 @@ try {
       description: 'Validation réelle du nouveau module Live.',
       category: 'business',
       visibility: 'public',
+      coverUrl: liveCoverData.url,
       startNow: true,
       chatEnabled: true,
       cohostsEnabled: true,
@@ -914,6 +929,11 @@ try {
   assert.equal(liveCreate.data.status, 'live');
   assert.ok(liveCreate.data.id);
   assert.ok(Number(liveCreate.data.meetingId) > 0);
+  assert.equal(liveCreate.data.coverUrl, liveCoverData.url);
+  const storedCover = await fetch(`${baseUrl}${liveCoverData.url}`, { headers:{Origin:baseUrl} });
+  assert.equal(storedCover.status, 200);
+  assert.equal(storedCover.headers.get('content-type'), 'image/png');
+  assert.ok((await storedCover.arrayBuffer()).byteLength > 0);
 
   const liveFeed = await jsonRequest('/api/live/feed?category=business', { headers: authHeaders(participant.token) });
   assert.equal(liveFeed.response.status, 200, JSON.stringify(liveFeed.data));
@@ -960,6 +980,29 @@ try {
   assert.equal(liveLike.response.status, 200, JSON.stringify(liveLike.data));
   assert.equal(liveLike.data.liked, true);
   assert.ok(Number((await likeEventPromise).likeCount) >= 1);
+
+  const giftEventPromise = waitForSocketEvent(
+    liveHostSocket,
+    'live:gift',
+    (payload) => payload?.giftType === 'star' && Number(payload?.userId) === Number(participant.user.id),
+  );
+  const liveGift = await jsonRequest(`/api/live/${liveCreate.data.id}/gifts`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ giftType: 'star' }),
+  });
+  assert.equal(liveGift.response.status, 201, JSON.stringify(liveGift.data));
+  assert.ok(Number(liveGift.data.giftCount) >= 1);
+  assert.equal((await giftEventPromise).giftType, 'star');
+
+  const liveInvite = await jsonRequest(`/api/live/${liveCreate.data.id}/invitations`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ email: participant.user.email }),
+  });
+  assert.equal(liveInvite.response.status, 201, JSON.stringify(liveInvite.data));
+  assert.equal(liveInvite.data.registered, true);
+  assert.equal(liveInvite.data.email, participant.user.email);
 
   const reactionEventPromise = waitForSocketEvent(
     liveHostSocket,
