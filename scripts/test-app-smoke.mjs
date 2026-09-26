@@ -373,6 +373,9 @@ try {
       assert.equal(await page.locator('.global-app-header').count(), 0, 'Admin must render only its dedicated header');
       assert.equal(await page.locator('.admin-mobile-menu').count(), 1, 'Admin must render one menu trigger');
       assert.equal(await page.locator('.admin-topbar [aria-label="Notifications administrateur"]').count(), 1, 'Admin must render one notification trigger');
+      const aiGenerateButton = page.getByRole('button', { name: 'Générer le message avec IA' });
+      await aiGenerateButton.waitFor({ state: 'visible', timeout: 10_000 });
+      assert.equal(await aiGenerateButton.count(), 1, 'Admin must expose one AI message generation action');
 
       const adminMenu = page.locator('.admin-mobile-menu');
       await adminMenu.evaluate((element) => element.click());
