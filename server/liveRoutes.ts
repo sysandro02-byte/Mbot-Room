@@ -12,10 +12,25 @@ import {
   sendApiError,
 } from './core.js';
 import { createNotificationAndPush } from './pushService.js';
+import { sendTransactionalEmail } from './emailDelivery.js';
 
 const categories = new Set(['business','music','games','events','wellness','education','tech','community','other']);
 const visibilities = new Set(['public','private','followers']);
+const giftTypes = new Set(['star','heart','fire','applause','celebrate']);
+const coverTypes = new Set(['image/jpeg','image/png','image/webp']);
+const MAX_COVER_BYTES = 5 * 1024 * 1024;
 const clean = (value:unknown,max=500)=>String(value||'').trim().slice(0,max);
+const normalizeEmail=(value:unknown)=>String(value||'').trim().toLowerCase().slice(0,254);
+const readCoverBody=async(request:express.Request)=>{
+  const chunks:Buffer[]=[];let size=0;
+  for await(const chunk of request){
+    const buffer=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);
+    size+=buffer.length;
+    if(size>MAX_COVER_BYTES)throw Object.assign(new Error('Image trop volumineuse.'),{code:'LIVE_COVER_TOO_LARGE'});
+    chunks.push(buffer);
+  }
+  return Buffer.concat(chunks);
+};
 const liveUrl=(id:string,token='')=>`/app/live/${id}${token?`?invite=${encodeURIComponent(token)}`:''}`;
 
 const mapLive=(row:any)=>({
@@ -29,7 +44,7 @@ const mapLive=(row:any)=>({
   chatEnabled:row.chat_enabled!==false,cohostsEnabled:row.cohosts_enabled!==false,
   recordingEnabled:row.recording_enabled===true,moderationEnabled:row.moderation_enabled!==false,
   viewerCount:Number(row.viewer_count||0),peakViewerCount:Number(row.peak_viewer_count||0),
-  likeCount:Number(row.like_count||0),commentCount:Number(row.comment_count||0),shareCount:Number(row.share_count||0),
+  likeCount:Number(row.like_count||0),commentCount:Number(row.comment_count||0),shareCount:Number(row.share_count||0),giftCount:Number(row.gift_count||0),
   isLiked:Boolean(row.is_liked),isFollowing:Boolean(row.is_following),isHost:Boolean(row.is_host),
   canComment:Boolean(row.can_comment),canRequestParticipation:Boolean(row.can_request_participation),
   shareUrl:liveUrl(String(row.id),String(row.share_token||'')),
@@ -60,6 +75,34 @@ const allowed=async(row:any,user:NonNullable<AuthedRequest['user']>,invite='')=>
 
 export const registerLiveRoutes=(app:express.Express,io:Server)=>{
   const protectedApi=[requireDatabase,authenticateToken] as const;
+
+  app.get('/api/live/assets/:assetId',requireDatabase,async(request,response,next)=>{
+    try{
+      const result=await query('SELECT mime_type,size_bytes,content FROM room_live_assets WHERE id=$1 LIMIT 1',[request.params.assetId]);
+      const asset=result.rows[0];
+      if(!asset)return sendApiError(response,404,'LIVE_ASSET_NOT_FOUND','Image introuvable.');
+      response.setHeader('Content-Type',asset.mime_type);
+      response.setHeader('Content-Length',String(asset.size_bytes));
+      response.setHeader('Cache-Control','public, max-age=31536000, immutable');
+      response.send(asset.content);
+    }catch(error){next(error);}
+  });
+
+  app.post('/api/live/assets/cover',...protectedApi,async(request:AuthedRequest,response,next)=>{
+    try{
+      if(request.user!.isGuest)return sendApiError(response,403,'LIVE_ACCOUNT_REQUIRED','Créez un compte pour ajouter une couverture.');
+      const mime=String(request.headers['content-type']||'').split(';')[0].toLowerCase();
+      if(!coverTypes.has(mime))return sendApiError(response,415,'LIVE_COVER_TYPE_INVALID','Utilisez une image JPG, PNG ou WebP.');
+      const content=await readCoverBody(request);
+      if(!content.length)return sendApiError(response,400,'LIVE_COVER_EMPTY','L’image est vide.');
+      const id=createId();
+      await query('INSERT INTO room_live_assets(id,owner_id,mime_type,size_bytes,content) VALUES($1,$2,$3,$4,$5)',[id,request.user!.id,mime,content.length,content]);
+      response.status(201).json({id,url:`/api/live/assets/${id}`,mimeType:mime,sizeBytes:content.length});
+    }catch(error:any){
+      if(error?.code==='LIVE_COVER_TOO_LARGE')return sendApiError(response,413,'LIVE_COVER_TOO_LARGE','La couverture ne doit pas dépasser 5 Mo.');
+      next(error);
+    }
+  });
 
   app.get('/api/live/feed',...protectedApi,async(request:AuthedRequest,response,next)=>{
     try{
@@ -305,6 +348,61 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
       const payload={liveId:row.id,userId:request.user!.id,name:request.user!.name,reaction,createdAt:new Date().toISOString()};
       io.to(`live:${row.id}`).emit('live:reaction',payload);
       response.status(201).json(payload);
+    }catch(error){next(error);}
+  });
+
+  app.post('/api/live/:liveId/gifts',...protectedApi,async(request:AuthedRequest,response,next)=>{
+    try{
+      const row=await loadLive(String(request.params.liveId),request.user!.id);
+      if(!row)return sendApiError(response,404,'LIVE_NOT_FOUND','Live introuvable.');
+      if(!(await allowed(row,request.user!,clean(request.body?.inviteToken,200))))return sendApiError(response,403,'LIVE_ACCESS_DENIED','Ce Live est privé.');
+      if(row.status!=='live')return sendApiError(response,409,'LIVE_NOT_ACTIVE','Le Live doit être en cours.');
+      const requested=clean(request.body?.giftType,30).toLowerCase();
+      const giftType=giftTypes.has(requested)?requested:'star';
+      const id=createId();
+      await query('INSERT INTO room_live_gifts(id,live_id,user_id,gift_type) VALUES($1,$2,$3,$4)',[id,row.id,request.user!.id,giftType]);
+      const updated=await query('UPDATE room_live_sessions SET gift_count=gift_count+1,updated_at=now() WHERE id=$1 RETURNING gift_count',[row.id]);
+      const giftCount=Number(updated.rows[0]?.gift_count||0);
+      const payload={id,liveId:row.id,userId:request.user!.id,name:request.user!.name,avatar:request.user!.avatar||'',giftType,giftCount,createdAt:new Date().toISOString()};
+      io.to(`live:${row.id}`).emit('live:gift',payload);
+      response.status(201).json(payload);
+    }catch(error){next(error);}
+  });
+
+  app.post('/api/live/:liveId/invitations',...protectedApi,async(request:AuthedRequest,response,next)=>{
+    try{
+      const row=await loadLive(String(request.params.liveId),request.user!.id);
+      if(!row)return sendApiError(response,404,'LIVE_NOT_FOUND','Live introuvable.');
+      if(Number(row.host_id)!==request.user!.id&&request.user!.role!=='admin')return sendApiError(response,403,'LIVE_HOST_REQUIRED','Accès hôte requis.');
+      const email=normalizeEmail(request.body?.email);
+      if(!email||!email.includes('@'))return sendApiError(response,400,'LIVE_INVITE_EMAIL_INVALID','Saisissez une adresse e-mail valide.');
+      const account=await query('SELECT id,name FROM room_users WHERE lower(email)=lower($1) AND is_guest=false LIMIT 1',[email]);
+      const invitedUserId=account.rows[0]?.id?Number(account.rows[0].id):null;
+      await query(`INSERT INTO room_live_invitations(live_id,email,invited_by,invited_user_id)
+        VALUES($1,$2,$3,$4)
+        ON CONFLICT(live_id,email) DO UPDATE SET invited_by=excluded.invited_by,invited_user_id=excluded.invited_user_id,created_at=now()`,
+        [row.id,email,request.user!.id,invitedUserId]);
+      const appOrigin=String(process.env.MBOTE_ROOM_APP_URL||'').replace(/\/+$/,'');
+      const relative=liveUrl(row.id,row.visibility==='private'?String(row.share_token||''):'');
+      const link=appOrigin?appOrigin+relative:relative;
+      if(invitedUserId){
+        const notification=await createNotificationAndPush(invitedUserId,{
+          type:'LIVE_INVITATION',
+          title:`${request.user!.name} vous invite à un Live`,
+          body:String(row.title||'Live MBotéRoom'),
+          url:relative,
+          tag:`live-invite-${row.id}`,
+          data:{liveId:row.id,invitedBy:request.user!.id},
+        });
+        io.to(`user:${invitedUserId}`).emit('notification:new',notification);
+      }
+      await sendTransactionalEmail({
+        to:email,
+        subject:`Invitation Live MBotéRoom · ${row.title}`,
+        text:[`${request.user!.name} vous invite au Live « ${row.title} ».`,link].join('\n\n'),
+        html:`<p><strong>${request.user!.name}</strong> vous invite au Live <strong>${row.title}</strong>.</p><p><a href="${link}">Rejoindre le Live</a></p>`,
+      }).catch(()=>false);
+      response.status(201).json({success:true,email,registered:Boolean(invitedUserId),url:relative});
     }catch(error){next(error);}
   });
 
