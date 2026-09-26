@@ -271,7 +271,7 @@ export const registerRealtime = (io: Server) => {
           breakoutRoomId = requestedBreakoutId;
         }
         const requestedMedia = cleanMedia(payload?.media);
-        const guestScreenAllowed = !user.isGuest || await isPlatformFeatureEnabled('guestScreenShareEnabled');
+        const guestScreenAllowed = moderator || !user.isGuest || await isPlatformFeatureEnabled('guestScreenShareEnabled');
         const accountScreenAllowed = canUseAccountFeature(user, 'screenShare');
         const allowedMedia: MediaState = {
           audio: (moderator || meeting.settings.participantAudio !== false) ? requestedMedia.audio : false,
@@ -328,10 +328,15 @@ export const registerRealtime = (io: Server) => {
       }
     });
 
-    socket.on('meeting:leave', async () => {
+    socket.on('meeting:leave', async (_payload: any, callback?: Ack) => {
       const meetingId = Number(socket.data.meetingId || 0);
-      await removeSocketFromMeeting(io, socket);
-      if (meetingId) await rebalanceTemporaryHost(io, meetingId);
+      try {
+        await removeSocketFromMeeting(io, socket);
+        if (meetingId) await rebalanceTemporaryHost(io, meetingId);
+        callback?.({ ok: true });
+      } catch {
+        callback?.(fail('REALTIME_LEAVE_FAILED', 'Impossible de quitter proprement la réunion.'));
+      }
     });
 
     socket.on('meeting:media-updated', async (payload: any, callback?: Ack) => {
@@ -343,7 +348,7 @@ export const registerRealtime = (io: Server) => {
       if (!meeting) return callback?.(fail('REALTIME_MEETING_INVALID', 'Réunion invalide.'));
       const moderator = canModerateMeeting(meeting, user);
       const requestedMedia = cleanMedia(payload?.media);
-      const guestScreenAllowed = !user.isGuest || await isPlatformFeatureEnabled('guestScreenShareEnabled');
+      const guestScreenAllowed = moderator || !user.isGuest || await isPlatformFeatureEnabled('guestScreenShareEnabled');
       const accountScreenAllowed = canUseAccountFeature(user, 'screenShare');
       participant.media = {
         audio: (moderator || meeting.settings.participantAudio !== false) ? requestedMedia.audio : false,
@@ -369,13 +374,15 @@ export const registerRealtime = (io: Server) => {
       try {
         if (!meetingId || Number(payload?.meetingId || meetingId) !== meetingId) return callback?.(fail('REALTIME_NOT_JOINED', 'Vous devez rejoindre la réunion.'));
         const meeting = await getMeetingById(meetingId);
+        if (!meeting) return callback?.(fail('REALTIME_MEETING_INVALID', 'Réunion invalide.'));
+        const moderator = canModerateMeeting(meeting, user);
         if (!canUseAccountFeature(user, 'messages')) {
           return callback?.(fail(user.accountStatus === 'quarantined' ? 'ACCOUNT_QUARANTINED' : 'FEATURE_RESTRICTED', 'La messagerie a été désactivée pour ce compte.'));
         }
-        if (user.isGuest && !(await isPlatformFeatureEnabled('guestChatEnabled'))) {
+        if (user.isGuest && !moderator && !(await isPlatformFeatureEnabled('guestChatEnabled'))) {
           return callback?.(fail('GUEST_CHAT_DISABLED', 'Les invités ne sont pas autorisés à envoyer des messages.'));
         }
-        if (meeting?.settings.chat === false) return callback?.(fail('REALTIME_CHAT_DISABLED', 'Le chat est désactivé pour cette réunion.'));
+        if (!moderator && meeting.settings.chat === false) return callback?.(fail('REALTIME_CHAT_DISABLED', 'Le chat est désactivé pour cette réunion.'));
         const message = await insertChatMessage(meetingId, user, payload?.text);
         if (!message) return callback?.(fail('VALIDATION_ERROR', 'Message vide.'));
         io.to(`meeting:${meetingId}`).emit('meeting:chat-message', message);
@@ -397,9 +404,14 @@ export const registerRealtime = (io: Server) => {
 
     socket.on('meeting:hand-raised', async (payload: any, callback?: Ack) => {
       const meetingId = Number(socket.data.meetingId || 0);
-      if (!meetingId) return callback?.(fail('REALTIME_NOT_JOINED', 'Vous devez rejoindre la réunion.'));
+      if (!meetingId || Number(payload?.meetingId || meetingId) !== meetingId) {
+        return callback?.(fail('REALTIME_NOT_JOINED', 'Vous devez rejoindre la réunion.'));
+      }
+      const meeting = await getMeetingById(meetingId);
+      if (!meeting) return callback?.(fail('REALTIME_MEETING_INVALID', 'Réunion invalide.'));
+      const moderator = canModerateMeeting(meeting, user);
       const raised = Boolean(payload?.raised);
-      if (raised && user.isGuest && !(await isPlatformFeatureEnabled('guestRaiseHandEnabled'))) {
+      if (raised && user.isGuest && !moderator && !(await isPlatformFeatureEnabled('guestRaiseHandEnabled'))) {
         return callback?.(fail('GUEST_RAISE_HAND_DISABLED', 'Les invités ne sont pas autorisés à lever la main.'));
       }
       const meetingHands = raisedHands.get(meetingId) || new Map<number, { userId:number; name:string; raisedAt:string }>();
