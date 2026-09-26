@@ -482,20 +482,23 @@ export default function MeetingRoomV2() {
   const isAdmin = currentUser?.role === 'admin';
   const isModerator = Boolean(meeting && currentUser && (isHost || isCoHost || isAdmin));
   const guestMode = currentUser?.isGuest === true;
-  const guestRaiseHandAllowed = !guestMode || platformSettings?.guestRaiseHandEnabled === true;
-  const guestRecordingAllowed = !guestMode || platformSettings?.guestRecordingEnabled === true;
-  const guestScreenShareAllowed = !guestMode || platformSettings?.guestScreenShareEnabled === true;
-  const guestLunaAllowed = !guestMode || platformSettings?.guestLunaEnabled === true;
-  const guestTranscriptionAllowed = !guestMode || platformSettings?.guestTranscriptionEnabled === true;
-  const guestChatAllowed = !guestMode || platformSettings?.guestChatEnabled === true;
+  // A guest promoted to co-host/host temporarily inherits all in-meeting capabilities.
+  // As soon as that meeting role is revoked, the normal guest policy applies again.
+  const guestRoleOverride = guestMode && isModerator;
+  const guestRaiseHandAllowed = !guestMode || guestRoleOverride || platformSettings?.guestRaiseHandEnabled === true;
+  const guestRecordingAllowed = !guestMode || guestRoleOverride || platformSettings?.guestRecordingEnabled === true;
+  const guestScreenShareAllowed = !guestMode || guestRoleOverride || platformSettings?.guestScreenShareEnabled === true;
+  const guestLunaAllowed = !guestMode || guestRoleOverride || platformSettings?.guestLunaEnabled === true;
+  const guestTranscriptionAllowed = !guestMode || guestRoleOverride || platformSettings?.guestTranscriptionEnabled === true;
+  const guestChatAllowed = !guestMode || guestRoleOverride || platformSettings?.guestChatEnabled === true;
   const canUseMic = Boolean(meeting && (isModerator || meeting.settings?.participantAudio !== false));
   const canUseCamera = Boolean(meeting && meeting.settings?.callType !== 'audio' && (isModerator || meeting.settings?.participantVideo !== false));
-  const canShareScreen = Boolean(meeting && guestScreenShareAllowed && (isModerator || meeting.settings?.screenShare !== false));
+  const canShareScreen = Boolean(meeting && (isModerator || (guestScreenShareAllowed && meeting.settings?.screenShare !== false)));
   const canUseReactions = Boolean(meeting && (isModerator || meeting.settings?.reactions !== false));
-  const canUseChat = Boolean(meeting && guestChatAllowed && meeting.settings?.chat !== false);
-  const canUseLuna = Boolean(meeting && guestLunaAllowed && (isModerator || meeting.settings?.lunaSummary !== false));
-  const canUseTranscription = Boolean(meeting && guestTranscriptionAllowed);
-  const canRecord = Boolean(meeting && guestRecordingAllowed && (isModerator || meeting.settings?.recording === true));
+  const canUseChat = Boolean(meeting && (isModerator || (guestChatAllowed && meeting.settings?.chat !== false)));
+  const canUseLuna = Boolean(meeting && (isModerator || (guestLunaAllowed && meeting.settings?.lunaSummary !== false)));
+  const canUseTranscription = Boolean(meeting && (isModerator || guestTranscriptionAllowed));
+  const canRecord = Boolean(meeting && (isModerator || (guestRecordingAllowed && meeting.settings?.recording === true)));
   const canCreatePoll = isModerator;
   const canEndForAll = Boolean(meeting && currentUser && (isHost || isAdmin));
 
@@ -969,6 +972,7 @@ export default function MeetingRoomV2() {
     const onHandRaised = (payload: { meetingId: number; userId: number; raised: boolean; raisedAt?: string | null }) => {
       if (Number(payload.meetingId) !== id) return;
       const userId = Number(payload.userId);
+      if (userId === Number(currentUser?.id || 0)) setHandRaised(Boolean(payload.raised));
       setRaisedHands((current) => {
         const next = new Set(current);
         if (payload.raised) next.add(userId);
@@ -985,6 +989,8 @@ export default function MeetingRoomV2() {
     const onHandsSnapshot = (payload: { meetingId:number; hands?: Array<{userId:number;raisedAt?:string}> }) => {
       if (Number(payload.meetingId) !== id) return;
       const hands = Array.isArray(payload.hands) ? payload.hands : [];
+      const localId = Number(currentUser?.id || 0);
+      setHandRaised(hands.some((item) => Number(item.userId) === localId));
       setRaisedHands(new Set(hands.map((item) => Number(item.userId))));
       const times: Record<number,string> = {};
       hands.forEach((item) => { if (item.raisedAt) times[Number(item.userId)] = String(item.raisedAt); });
@@ -1067,6 +1073,23 @@ export default function MeetingRoomV2() {
         cameraStreamRef.current?.getVideoTracks().forEach((track) => { track.enabled = false; });
         setCameraEnabled(false);
         setNotice('L’hôte a désactivé votre caméra.');
+      }
+      if (payload.role === 'cohost' || payload.role === 'participant') {
+        const nextRole = payload.role;
+        const ownUserId = Number(currentUser?.id || 0);
+        setParticipants((current) => current.map((participant) =>
+          participant.userId === ownUserId ? { ...participant, role: nextRole } : participant
+        ));
+        setMeeting((current) => {
+          if (!current) return current;
+          if (nextRole === 'cohost') return { ...current, co_host_id: ownUserId };
+          return Number(current.co_host_id || 0) === ownUserId ? { ...current, co_host_id: undefined } : current;
+        });
+        setNotice(nextRole === 'cohost'
+          ? 'Vous êtes maintenant co-hôte : les fonctionnalités de modération sont activées.'
+          : guestMode
+            ? 'Votre rôle de co-hôte a été retiré : les restrictions invité sont réappliquées.'
+            : 'Votre rôle de co-hôte a été retiré.');
       }
       void refreshParticipants();
     };
@@ -1912,12 +1935,21 @@ export default function MeetingRoomV2() {
       return;
     }
 
-    socket.emit('meeting:leave', { meetingId: meeting.id });
-    await stopActiveRecording().catch(() => undefined);
+    // Do not block the exit UI on media/recording teardown. The socket leave is
+    // acknowledged server-side when possible; unmount/disconnect remains a fallback.
+    if (socket.connected) {
+      socket.timeout(1500).emit('meeting:leave', { meetingId: meeting.id }, () => undefined);
+    }
+    void stopActiveRecording().catch(() => undefined);
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
     screenStreamRef.current?.getTracks().forEach((track) => track.stop());
     try { window.MBoteRoomAndroid?.stopScreenCapture?.(); } catch { /* no-op */ }
-    navigate(`/reunions/${meeting.meeting_link}/terminee`, { replace: true });
+
+    if (endForAll) {
+      navigate(`/reunions/${meeting.id}/terminee`, { replace: true });
+    } else {
+      navigate('/reunions', { replace: true });
+    }
   };
 
   const confirmLeaveMeeting = () => requestConfirmation({
@@ -2306,9 +2338,18 @@ export default function MeetingRoomV2() {
                             {guestRaiseHandAllowed?<button type="button" onClick={()=>{
                               setMenuUserId(null);
                               const raised=!handRaised;
-                              setHandRaised(raised);
-                              setRaisedHands((current)=>{const next=new Set(current);if(raised)next.add(Number(currentUser?.id||0));else next.delete(Number(currentUser?.id||0));return next;});
-                              socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised});
+                              if (!socket.connected) {
+                                setNotice('Connexion temps réel indisponible. Réessayez dans un instant.');
+                                return;
+                              }
+                              socket.timeout(5000).emit('meeting:hand-raised',{meetingId:meeting.id,raised},(error:any,response:any)=>{
+                                if (error || response?.ok === false) {
+                                  setNotice(response?.error || 'Impossible de mettre à jour la main levée.');
+                                  socket.emit('meeting:hands-request',{meetingId:meeting.id});
+                                  return;
+                                }
+                                setHandRaised(raised);
+                              });
                             }}>{handRaised?'Baisser la main':'Lever la main'}</button>:null}
                             <button type="button" className="danger" onClick={confirmLeaveMeeting}>Quitter la réunion</button>
                           </>
