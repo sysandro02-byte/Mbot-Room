@@ -94,9 +94,11 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
       if(!title)return sendApiError(response,400,'LIVE_TITLE_REQUIRED','Ajoutez un titre au Live.');
       const category=categories.has(clean(request.body?.category,40).toLowerCase())?clean(request.body.category,40).toLowerCase():'other';
       const visibility=visibilities.has(clean(request.body?.visibility,20).toLowerCase())?clean(request.body.visibility,20).toLowerCase():'public';
-      const scheduledRaw=request.body?.scheduledFor?new Date(request.body.scheduledFor):new Date();
+      const hasScheduledFor=Boolean(request.body?.scheduledFor);
+      const scheduledRaw=hasScheduledFor?new Date(request.body.scheduledFor):new Date();
       const scheduledFor=Number.isFinite(scheduledRaw.getTime())?scheduledRaw:new Date();
-      const startNow=request.body?.startNow===true||scheduledFor.getTime()<=Date.now()+30_000;
+      const explicitStart=request.body?.startNow;
+      const startNow=explicitStart===false?false:explicitStart===true||!hasScheduledFor||scheduledFor.getTime()<=Date.now()+30_000;
       const meetingLink=createMeetingLink();
       const settings={
         liveBroadcast:true,
@@ -239,6 +241,9 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
 
   app.get('/api/live/:liveId/comments',...protectedApi,async(request:AuthedRequest,response,next)=>{
     try{
+      const live=await loadLive(String(request.params.liveId),request.user!.id);
+      if(!live)return sendApiError(response,404,'LIVE_NOT_FOUND','Live introuvable.');
+      if(!(await allowed(live,request.user!,clean(request.query.invite,200))))return sendApiError(response,403,'LIVE_ACCESS_DENIED','Ce Live est privé.');
       const result=await query(`SELECT c.id,c.user_id,c.text,c.created_at,u.name,u.avatar FROM room_live_comments c JOIN room_users u ON u.id=c.user_id
         WHERE c.live_id=$1 AND c.deleted_at IS NULL ORDER BY c.created_at DESC LIMIT 150`,[request.params.liveId]);
       response.json(result.rows.reverse().map((r:any)=>({id:r.id,userId:Number(r.user_id),name:r.name,avatar:r.avatar||'',text:r.text,createdAt:new Date(r.created_at).toISOString()})));
@@ -249,7 +254,9 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
     try{
       if(request.user!.isGuest)return sendApiError(response,403,'LIVE_COMMENT_ACCOUNT_REQUIRED','Connectez-vous avec un compte pour commenter.');
       const row=await loadLive(String(request.params.liveId),request.user!.id);
-      if(!row||row.chat_enabled===false)return sendApiError(response,403,'LIVE_CHAT_DISABLED','Le chat est désactivé.');
+      if(!row)return sendApiError(response,404,'LIVE_NOT_FOUND','Live introuvable.');
+      if(!(await allowed(row,request.user!,clean(request.body?.inviteToken,200))))return sendApiError(response,403,'LIVE_ACCESS_DENIED','Ce Live est privé.');
+      if(row.chat_enabled===false)return sendApiError(response,403,'LIVE_CHAT_DISABLED','Le chat est désactivé.');
       const text=clean(request.body?.text,500);if(!text)return sendApiError(response,400,'LIVE_COMMENT_EMPTY','Écrivez un commentaire.');
       const id=createId();
       const result=await query('INSERT INTO room_live_comments(id,live_id,user_id,text) VALUES($1,$2,$3,$4) RETURNING *',[id,row.id,request.user!.id,text]);
@@ -261,6 +268,9 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
   app.post('/api/live/:liveId/like',...protectedApi,async(request:AuthedRequest,response,next)=>{
     try{
       const id=String(request.params.liveId);
+      const row=await loadLive(id,request.user!.id);
+      if(!row)return sendApiError(response,404,'LIVE_NOT_FOUND','Live introuvable.');
+      if(!(await allowed(row,request.user!,clean(request.body?.inviteToken,200))))return sendApiError(response,403,'LIVE_ACCESS_DENIED','Ce Live est privé.');
       const existing=await query('SELECT 1 FROM room_live_likes WHERE live_id=$1 AND user_id=$2',[id,request.user!.id]);
       const liked=!existing.rows[0];
       if(liked)await query('INSERT INTO room_live_likes(live_id,user_id) VALUES($1,$2)',[id,request.user!.id]);
@@ -285,10 +295,26 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
     }catch(error){next(error);}
   });
 
+  app.post('/api/live/:liveId/reactions',...protectedApi,async(request:AuthedRequest,response,next)=>{
+    try{
+      const row=await loadLive(String(request.params.liveId),request.user!.id);
+      if(!row)return sendApiError(response,404,'LIVE_NOT_FOUND','Live introuvable.');
+      if(!(await allowed(row,request.user!,clean(request.body?.inviteToken,200))))return sendApiError(response,403,'LIVE_ACCESS_DENIED','Ce Live est privé.');
+      const allowedReactions=new Set(['👏','🔥','❤️','💯','🎉','👍']);
+      const reaction=allowedReactions.has(String(request.body?.reaction||''))?String(request.body.reaction):'👏';
+      const payload={liveId:row.id,userId:request.user!.id,name:request.user!.name,reaction,createdAt:new Date().toISOString()};
+      io.to(`live:${row.id}`).emit('live:reaction',payload);
+      response.status(201).json(payload);
+    }catch(error){next(error);}
+  });
+
   app.post('/api/live/:liveId/participation-requests',...protectedApi,async(request:AuthedRequest,response,next)=>{
     try{
       if(request.user!.isGuest)return sendApiError(response,403,'LIVE_PARTICIPATION_ACCOUNT_REQUIRED','Créez un compte pour demander à participer.');
-      const row=await loadLive(String(request.params.liveId),request.user!.id);if(!row||row.cohosts_enabled===false)return sendApiError(response,403,'LIVE_COHOSTS_DISABLED','Les demandes de participation sont fermées.');
+      const row=await loadLive(String(request.params.liveId),request.user!.id);
+      if(!row)return sendApiError(response,404,'LIVE_NOT_FOUND','Live introuvable.');
+      if(!(await allowed(row,request.user!,clean(request.body?.inviteToken,200))))return sendApiError(response,403,'LIVE_ACCESS_DENIED','Ce Live est privé.');
+      if(row.cohosts_enabled===false)return sendApiError(response,403,'LIVE_COHOSTS_DISABLED','Les demandes de participation sont fermées.');
       await query(`INSERT INTO room_live_participation_requests(live_id,user_id,status) VALUES($1,$2,'pending')
         ON CONFLICT(live_id,user_id) DO UPDATE SET status='pending',created_at=now(),responded_at=NULL`,[row.id,request.user!.id]);
       io.to(`live:${row.id}:host`).emit('live:participation-request',{liveId:row.id,userId:request.user!.id,name:request.user!.name,avatar:request.user!.avatar||''});
