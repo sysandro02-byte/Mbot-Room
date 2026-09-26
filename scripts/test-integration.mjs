@@ -905,8 +905,9 @@ try {
     },
     body: liveCoverBytes,
   });
-  assert.equal(liveCoverResponse.status, 201, await liveCoverResponse.text().catch(()=>''));
-  const liveCoverData = await liveCoverResponse.json();
+  const liveCoverResponseText = await liveCoverResponse.text();
+  assert.equal(liveCoverResponse.status, 201, liveCoverResponseText);
+  const liveCoverData = JSON.parse(liveCoverResponseText);
   assert.match(String(liveCoverData.url||''), /^\/api\/live\/assets\//);
 
   const liveCreate = await jsonRequest('/api/live', {
