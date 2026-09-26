@@ -19,6 +19,7 @@ const isUsableConfiguredUrl = (value: string) => {
 const shouldUseProductionFallback = () => {
   if (typeof window === 'undefined') return false;
   const host = window.location.hostname.toLowerCase();
+  if (host === 'appassets.androidplatform.net' || /MBoteRoomAndroid/i.test(navigator.userAgent)) return true;
   if (host === 'localhost' || host === '127.0.0.1') return false;
   if (host === 'mbote-room-api.onrender.com') return false;
   return host.endsWith('.vercel.app');
