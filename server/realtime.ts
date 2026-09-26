@@ -234,6 +234,38 @@ export const registerRealtime = (io: Server) => {
       next();
     });
 
+    socket.on('live:join', async (payload: any, callback?: Ack) => {
+      try {
+        const liveId=String(payload?.liveId||'').trim();
+        if(!liveId)return callback?.(fail('LIVE_INVALID','Live invalide.'));
+        const row=await query('SELECT id,host_id,status FROM room_live_sessions WHERE id=$1 LIMIT 1',[liveId]);
+        if(!row.rows[0])return callback?.(fail('LIVE_NOT_FOUND','Live introuvable.'));
+        if(row.rows[0].status==='ended'||row.rows[0].status==='cancelled')return callback?.(fail('LIVE_ENDED','Ce Live est terminé.'));
+        socket.join(`live:${liveId}`);
+        if(Number(row.rows[0].host_id)===user.id||user.role==='admin')socket.join(`live:${liveId}:host`);
+        socket.data.liveId=liveId;
+        await query('UPDATE room_live_viewers SET last_seen_at=now(),left_at=NULL WHERE live_id=$1 AND user_id=$2',[liveId,user.id]).catch(()=>undefined);
+        callback?.({ok:true});
+      } catch {
+        callback?.(fail('LIVE_JOIN_FAILED','Connexion temps réel au Live impossible.'));
+      }
+    });
+
+    socket.on('live:leave', async (_payload:any,callback?:Ack)=>{
+      const liveId=String(socket.data.liveId||'');
+      try{
+        if(liveId){
+          socket.leave(`live:${liveId}`);
+          socket.leave(`live:${liveId}:host`);
+          await query('UPDATE room_live_viewers SET left_at=now(),last_seen_at=now() WHERE live_id=$1 AND user_id=$2',[liveId,user.id]).catch(()=>undefined);
+        }
+        socket.data.liveId=null;
+        callback?.({ok:true});
+      }catch{
+        callback?.(fail('LIVE_LEAVE_FAILED','Impossible de quitter proprement le Live.'));
+      }
+    });
+
     socket.on('meeting:join', async (payload: any, callback?: Ack) => {
       try {
         const meetingId = Number(payload?.meetingId);
