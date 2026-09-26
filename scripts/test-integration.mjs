@@ -857,6 +857,43 @@ try {
   assert.equal(aiInsights.response.status, 200, JSON.stringify(aiInsights.data));
   assert.equal(aiInsights.data.provider, 'groq');
 
+  const adminCalendarStart = new Date(Date.now() + 24 * 60 * 60_000);
+  const adminCalendarEnd = new Date(adminCalendarStart.getTime() + 90 * 60_000);
+  const adminCalendarCreate = await jsonRequest('/api/calendar/events', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: 'Rendez-vous partenaire LoukaTech CI',
+      description: 'Validation du calendrier administrateur.',
+      startsAt: adminCalendarStart.toISOString(),
+      endsAt: adminCalendarEnd.toISOString(),
+      metadata: {
+        eventType: 'client',
+        participants: ['partenaire@mbote.test'],
+        reminderEnabled: true,
+        reminderMinutes: 30,
+        recurrence: 'none',
+        location: 'Siège LoukaTech, Brazzaville',
+        priority: 'high',
+        createdFrom: 'admin-calendar',
+      },
+    }),
+  });
+  assert.equal(adminCalendarCreate.response.status, 201, JSON.stringify(adminCalendarCreate.data));
+  assert.equal(adminCalendarCreate.data.title, 'Rendez-vous partenaire LoukaTech CI');
+  assert.equal(adminCalendarCreate.data.metadata?.eventType, 'client');
+  assert.equal(adminCalendarCreate.data.metadata?.location, 'Siège LoukaTech, Brazzaville');
+  assert.equal(adminCalendarCreate.data.metadata?.priority, 'high');
+  assert.equal(adminCalendarCreate.data.metadata?.createdFrom, 'admin-calendar');
+
+  const adminCalendarList = await jsonRequest('/api/calendar/events', { headers: authHeaders(host.token) });
+  assert.equal(adminCalendarList.response.status, 200, JSON.stringify(adminCalendarList.data));
+  assert.ok(adminCalendarList.data.some((item) =>
+    item.id === adminCalendarCreate.data.id
+    && item.metadata?.eventType === 'client'
+    && item.metadata?.priority === 'high'
+  ), 'Admin calendar event must persist in PostgreSQL with its metadata');
+
   const hostMe = await jsonRequest('/api/auth/me', { headers: authHeaders(host.token) });
   assert.equal(hostMe.response.status, 200);
   assert.equal(hostMe.data.user.email, 'host.integration@mbote.test');
