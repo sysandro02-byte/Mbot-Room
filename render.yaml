@@ -140,3 +140,5 @@ services:
         value: mboteroom-recordings
       - key: MBOTE_RECORDING_MAX_BYTES
         value: "2147483648"
+      - key: MBOTEROOM_ANDROID_RELEASE_BASE_URL
+        value: https://jyaqdzkkxvrxxrseqyhy.supabase.co/storage/v1/object/public/mboteroom-releases
