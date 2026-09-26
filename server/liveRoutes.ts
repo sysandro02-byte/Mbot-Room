@@ -47,7 +47,8 @@ const mapLive=(row:any)=>({
   likeCount:Number(row.like_count||0),commentCount:Number(row.comment_count||0),shareCount:Number(row.share_count||0),giftCount:Number(row.gift_count||0),
   isLiked:Boolean(row.is_liked),isFollowing:Boolean(row.is_following),isHost:Boolean(row.is_host),
   canComment:Boolean(row.can_comment),canRequestParticipation:Boolean(row.can_request_participation),
-  shareUrl:liveUrl(String(row.id),String(row.share_token||'')),
+  canShare:Boolean(row.can_share ?? (row.visibility!=='private'||row.is_host)),
+  shareUrl:liveUrl(String(row.id),row.visibility==='private'&&(row.can_share ?? row.is_host)?String(row.share_token||''):''),
 });
 
 const loadLive=async(id:string,userId:number)=>{
