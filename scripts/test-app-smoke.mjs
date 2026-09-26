@@ -373,6 +373,7 @@ try {
       assert.equal(await page.locator('.global-app-header').count(), 0, 'Admin must render only its dedicated header');
       assert.equal(await page.locator('.admin-mobile-menu').count(), 1, 'Admin must render one menu trigger');
       assert.equal(await page.locator('.admin-topbar [aria-label="Notifications administrateur"]').count(), 1, 'Admin must render one notification trigger');
+      assert.equal(await page.getByRole('link', { name: 'Réunion', exact: true }).count(), 1, 'Admin menu must expose one direct meeting creation entry');
       const aiGenerateButton = page.getByRole('button', { name: 'Générer le message avec IA' });
       await aiGenerateButton.waitFor({ state: 'visible', timeout: 10_000 });
       assert.equal(await aiGenerateButton.count(), 1, 'Admin must expose one AI message generation action');
@@ -446,6 +447,18 @@ try {
   await page.waitForFunction(() => !document.querySelector('.route-loading'), undefined, { timeout: 15_000 });
   assert.ok(!page.url().includes('/login'), 'Admin session must remain active after a compact/mobile reload');
   await page.locator('.admin-topbar').waitFor({ state: 'visible', timeout: 10_000 });
+
+  await page.locator('.admin-mobile-menu').click();
+  await page.locator('#admin-navigation.is-open').waitFor({ state: 'visible', timeout: 5_000 });
+  const adminMeetingLink = page.getByRole('link', { name: 'Réunion', exact: true });
+  await adminMeetingLink.waitFor({ state: 'visible', timeout: 5_000 });
+  await adminMeetingLink.click();
+  await page.getByRole('heading', { name: 'Planifier une réunion', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+  assert.ok(page.url().includes('/reunions'), 'Admin meeting menu must open the meeting creation route');
+  assert.equal(await page.getByLabel('Invités (emails)').count(), 1, 'Admin meeting creation must allow inviting partners and clients by email');
+  assert.equal(await page.getByRole('button', { name: 'Créer la réunion', exact: true }).count(), 1, 'Admin meeting creation must expose the create action');
+  const adminMeetingNotice = (await page.locator('.real-meeting-notice').allTextContents().catch(() => [])).join(' ');
+  assert.match(adminMeetingNotice, /partenaires|clients|LoukaTech/i, 'Admin meeting creation must explain its partner/client/team use case');
 
   assert.deepEqual(serverErrors, [], `Server 5xx responses detected:\n${serverErrors.join('\n')}`);
   assert.deepEqual(pageErrors, [], `Browser errors detected:\n${pageErrors.join('\n')}`);
