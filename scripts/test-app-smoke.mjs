@@ -450,6 +450,24 @@ try {
 
   await page.locator('.admin-mobile-menu').click();
   await page.locator('#admin-navigation.is-open').waitFor({ state: 'visible', timeout: 5_000 });
+  const adminCalendarLink = page.getByRole('link', { name: 'Calendrier', exact: true });
+  await adminCalendarLink.waitFor({ state: 'visible', timeout: 5_000 });
+  await adminCalendarLink.click();
+  await page.getByRole('heading', { name: 'Calendrier administrateur', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+  assert.ok(page.url().includes('/admin/calendar'), 'Admin calendar menu must open the protected administrator calendar');
+  assert.equal(await page.getByLabel('Type d’activité').count(), 1, 'Admin calendar must expose activity types');
+  assert.equal(await page.getByLabel('Priorité').count(), 1, 'Admin calendar must expose event priority');
+  assert.equal(await page.getByLabel('Lieu / canal').count(), 1, 'Admin calendar must expose location or channel');
+  const typeOptions = await page.getByLabel('Type d’activité').locator('option').allTextContents();
+  assert.ok(typeOptions.some((value) => /Client \/ partenaire/i.test(value)), 'Admin calendar must support client/partner appointments');
+  assert.ok(typeOptions.some((value) => /Événement LoukaTech/i.test(value)), 'Admin calendar must support LoukaTech events');
+  assert.ok(typeOptions.some((value) => /Échéance/i.test(value)), 'Admin calendar must support deadlines');
+  assert.equal(await page.getByRole('button', { name: /Nouvelle réunion/i }).count(), 1, 'Admin calendar must offer a direct meeting creation action');
+
+  await page.getByRole('button', { name: /Retour administration/i }).click();
+  await page.locator('.admin-topbar').waitFor({ state: 'visible', timeout: 10_000 });
+  await page.locator('.admin-mobile-menu').click();
+  await page.locator('#admin-navigation.is-open').waitFor({ state: 'visible', timeout: 5_000 });
   const adminMeetingLink = page.getByRole('link', { name: 'Réunion', exact: true });
   await adminMeetingLink.waitFor({ state: 'visible', timeout: 5_000 });
   await adminMeetingLink.click();
