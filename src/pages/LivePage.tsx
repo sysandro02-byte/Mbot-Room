@@ -112,16 +112,17 @@ export function LiveCreatePage(){
   const [busy,setBusy]=useState('');
   const [error,setError]=useState('');
 
-  const submit=async(startNow:boolean)=>{
+  const submit=async(startNow:boolean,forceSchedule=false)=>{
     if(!title.trim()){setError('Ajoutez un titre au Live.');return;}
     setBusy(startNow?'start':'schedule');setError('');
     try{
-      const scheduledFor=scheduleLater?new Date(`${date}T${time}`).toISOString():undefined;
+      const shouldSchedule=scheduleLater||forceSchedule;
+      const scheduledFor=shouldSchedule?new Date(`${date}T${time}`).toISOString():undefined;
       const created=await liveService.createLive({
         title:title.trim(),description:description.trim(),category,visibility,coverUrl:coverUrl.trim(),
-        scheduledFor,startNow:startNow&&!scheduleLater,chatEnabled,cohostsEnabled,recordingEnabled,moderationEnabled,
+        scheduledFor,startNow:startNow&&!shouldSchedule,chatEnabled,cohostsEnabled,recordingEnabled,moderationEnabled,
       });
-      navigate(startNow&&!scheduleLater?'/app/live/'+created.id:'/app/live');
+      navigate(startNow&&!shouldSchedule?'/app/live/'+created.id:'/app/live');
     }catch(cause){setError(cause instanceof Error?cause.message:'Création du Live impossible.');}
     finally{setBusy('');}
   };
@@ -161,7 +162,7 @@ export function LiveCreatePage(){
         </section>
 
         <button className="live-primary-action" disabled={Boolean(busy)} onClick={()=>void submit(true)}>{busy==='start'?<LoaderCircle className="spin"/>:<Radio/>}{scheduleLater?'Créer le Live':'Lancer le live'}</button>
-        <button className="live-secondary-action" disabled={Boolean(busy)} onClick={()=>{setScheduleLater(true);void submit(false);}}>{busy==='schedule'?<LoaderCircle className="spin"/>:<CalendarDays/>} Programmer</button>
+        <button className="live-secondary-action" disabled={Boolean(busy)} onClick={()=>{setScheduleLater(true);void submit(false,true);}}>{busy==='schedule'?<LoaderCircle className="spin"/>:<CalendarDays/>} Programmer</button>
       </section>
     </main>
   </AppShell>;
@@ -185,6 +186,7 @@ export function LiveRoomPage(){
   const [notice,setNotice]=useState('');
   const [error,setError]=useState('');
   const [busy,setBusy]=useState('');
+  const [mediaSessionKey,setMediaSessionKey]=useState(0);
   const [duration,setDuration]=useState('');
   const [summary,setSummary]=useState<{bullets:string[];decisions:string[];actions:string[]}|null>(null);
   const recordingIdRef=useRef('');
@@ -197,6 +199,7 @@ export function LiveRoomPage(){
     localStream:publisher?localStream:null,
     media:publisher?media:{audio:false,video:false,screen:false},
     enabled:Boolean(joined&&live?.status==='live'&&live?.meetingId),
+    sessionKey:mediaSessionKey,
     onFailure:(message)=>setError(message),
     onNotice:(message)=>setNotice(message),
   });
@@ -230,7 +233,7 @@ export function LiveRoomPage(){
     if(!joined||!live)return;
     const token=authService.getToken();
     socket.auth=token?{token}:{};
-    const joinRealtime=()=>socket.emit('live:join',{liveId});
+    const joinRealtime=()=>socket.emit('live:join',{liveId,inviteToken});
     const onComment=(comment:LiveComment)=>setComments((current)=>current.some((item)=>item.id===comment.id)?current:[...current,comment].slice(-150));
     const onDeleted=(payload:{commentId:string})=>setComments((current)=>current.filter((item)=>item.id!==payload.commentId));
     const onPresence=(payload:{viewerCount:number})=>setLive((current)=>current?{...current,viewerCount:Number(payload.viewerCount||0)}:current);
@@ -242,6 +245,7 @@ export function LiveRoomPage(){
       if(payload.status==='accepted'){
         setNotice('Votre demande a été acceptée. Activation de votre caméra et micro…');
         setJoinRole('cohost');
+        setMediaSessionKey((value)=>value+1);
       }else setNotice('Votre demande de participation n’a pas été retenue.');
     };
     socket.on('connect',joinRealtime).on('live:comment',onComment).on('live:comment-deleted',onDeleted).on('live:presence',onPresence).on('live:likes',onLikes).on('live:status',onStatus).on('live:settings',onSettings).on('live:participation-request',onRequest).on('live:participation-response',onParticipation);
@@ -341,7 +345,7 @@ export function LiveRoomPage(){
       <section className="live-stage">
         <video ref={publisher?localVideoRef:remoteVideoRef} autoPlay playsInline muted={publisher} className="live-main-video"/>
         {!mainStream?<div className="live-video-wait"><LoaderCircle className="spin"/><strong>{liveKit.connected?'Connexion vidéo…':'Connexion au serveur média…'}</strong></div>:null}
-        <div className="live-stage-stats"><span><Eye/> {fmtCount(live.viewerCount)}</span><span><Heart/> {fmtCount(live.likeCount)}</span><span><Send/> {fmtCount(live.commentCount+comments.length)}</span></div>
+        <div className="live-stage-stats"><span><Eye/> {fmtCount(live.viewerCount)}</span><span><Heart/> {fmtCount(live.likeCount)}</span><span><Send/> {fmtCount(comments.length)}</span></div>
 
         {!publisher?<aside className="live-viewer-actions">
           <button className={live.isLiked?'liked':''} onClick={()=>void like()}><Heart/><span>{fmtCount(live.likeCount)}</span></button>
