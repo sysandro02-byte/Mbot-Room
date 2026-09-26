@@ -307,7 +307,7 @@ const features = [
 ] as const;
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-const ANDROID_APK_URL = 'https://github.com/sysandro02-byte/Mbot-Room/releases/download/android-latest/MBoteRoom-Android.apk';
+const ANDROID_APK_URL = 'https://mboteroom.loukatech.com/download/android';
 
 export default function Login({ initialView = 'login' }: LoginProps) {
   const [language, setLanguage] = useState<Language>(() => getStoredLanguage());
