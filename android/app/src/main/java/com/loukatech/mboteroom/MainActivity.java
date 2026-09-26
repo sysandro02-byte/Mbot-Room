@@ -28,9 +28,12 @@ import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+
+import androidx.webkit.WebViewAssetLoader;
 
 import org.json.JSONObject;
 
@@ -40,14 +43,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends Activity {
-    private static final String APP_URL = "https://mboteroom.loukatech.com/";
-    private static final String TRUSTED_HOST = "mboteroom.loukatech.com";
+    private static final String REMOTE_APP_HOST = "mboteroom.loukatech.com";
+    private static final String LOCAL_APP_HOST = WebViewAssetLoader.DEFAULT_DOMAIN;
+    private static final String LOCAL_APP_URL = "https://" + LOCAL_APP_HOST + "/index.html";
     private static final int REQUEST_SCREEN_CAPTURE = 2002;
     private static final long FRAME_INTERVAL_MS = 125L;
     private static final int MAX_CAPTURE_EDGE = 960;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private WebView webView;
+    private WebViewAssetLoader assetLoader;
     private MediaProjectionManager mediaProjectionManager;
     private MediaProjection mediaProjection;
     private VirtualDisplay virtualDisplay;
@@ -69,6 +74,10 @@ public class MainActivity extends Activity {
         WebView.setWebContentsDebuggingEnabled(false);
 
         mediaProjectionManager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+        assetLoader = new WebViewAssetLoader.Builder()
+                .setDomain(LOCAL_APP_HOST)
+                .addPathHandler("/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .build();
         webView = new WebView(this);
         setContentView(webView);
 
@@ -87,6 +96,12 @@ public class MainActivity extends Activity {
         webView.addJavascriptInterface(new AndroidBridge(), "MBoteRoomAndroid");
 
         webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                WebResourceResponse local = assetLoader.shouldInterceptRequest(request.getUrl());
+                return local != null ? local : super.shouldInterceptRequest(view, request);
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
@@ -126,7 +141,9 @@ public class MainActivity extends Activity {
         });
 
         requestRuntimePermissions();
-        if (savedInstanceState == null) webView.loadUrl(APP_URL);
+        // The application shell is packaged inside the APK, so it opens even with no network.
+        // Network-only features continue to call the production API when connectivity returns.
+        webView.loadUrl(LOCAL_APP_URL);
     }
 
     private final class AndroidBridge {
@@ -358,9 +375,9 @@ public class MainActivity extends Activity {
     }
 
     private boolean isTrustedAppUri(Uri uri) {
-        return uri != null
-                && "https".equalsIgnoreCase(uri.getScheme())
-                && TRUSTED_HOST.equalsIgnoreCase(uri.getHost());
+        if (uri == null || !"https".equalsIgnoreCase(uri.getScheme())) return false;
+        String host = uri.getHost();
+        return LOCAL_APP_HOST.equalsIgnoreCase(host) || REMOTE_APP_HOST.equalsIgnoreCase(host);
     }
 
     private void requestRuntimePermissions() {
