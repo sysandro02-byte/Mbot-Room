@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { chromium } from '@playwright/test';
 
 // This suite targets the already deployed production services.
@@ -53,6 +54,34 @@ const waitForFrontendPwa = async () => {
   throw new Error(`Production frontend PWA did not reach the expected manifest/service worker. Last state: ${last || 'unavailable'}`);
 };
 
+const deployedContainsExpectedCommit = (expected, deployed) => {
+  if (!expected || !deployed) return false;
+  if (expected === deployed) return true;
+  if (!/^[0-9a-f]{40}$/i.test(expected) || !/^[0-9a-f]{40}$/i.test(deployed)) return false;
+  try {
+    execFileSync('git', ['fetch', '--quiet', '--no-tags', 'origin', deployed], {
+      stdio: 'ignore',
+      timeout: 30_000,
+    });
+  } catch {
+    try {
+      execFileSync('git', ['fetch', '--quiet', '--no-tags', 'origin', 'main'], {
+        stdio: 'ignore',
+        timeout: 30_000,
+      });
+    } catch {}
+  }
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', expected, deployed], {
+      stdio: 'ignore',
+      timeout: 10_000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const waitForProductionCommit = async () => {
   const expected = String(process.env.GITHUB_SHA || '').trim();
   if (!expected) return;
@@ -60,14 +89,21 @@ const waitForProductionCommit = async () => {
   let lastSeen = '';
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(`${backendUrl}/api/health`, { headers: { Origin: frontendUrl } });
+      const response = await fetch(`${backendUrl}/api/health`, { headers: { Origin: frontendUrl }, cache: 'no-store' });
       const data = await response.json().catch(() => ({}));
-      lastSeen = String(data?.deployment?.commit || '');
-      if (response.ok && lastSeen === expected) return;
+      lastSeen = String(data?.deployment?.commit || '').trim();
+      if (response.ok && deployedContainsExpectedCommit(expected, lastSeen)) {
+        console.log('PRODUCTION_COMMIT_READY', JSON.stringify({
+          expected,
+          deployed: lastSeen,
+          exact: expected === lastSeen,
+        }));
+        return;
+      }
     } catch {}
     await sleep(5_000);
   }
-  throw new Error(`Production backend did not reach commit ${expected}. Last deployed commit: ${lastSeen || 'unknown'}`);
+  throw new Error(`Production backend did not reach commit ${expected} or a newer descendant. Last deployed commit: ${lastSeen || 'unknown'}`);
 };
 
 const parseBody = async (response) => {
