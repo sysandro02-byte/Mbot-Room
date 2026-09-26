@@ -147,6 +147,7 @@ export default function App() {
     <Route path="/admin/inscription" element={<AdminAuthPage mode="register" />} />
     <Route path="/admin/mot-de-passe-oublie" element={<AdminAuthPage mode="forgot" />} />
     <Route path="/admin" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
+    <Route path="/admin/calendar" element={<AdminRoute><CalendarPage /></AdminRoute>} />
     <Route path="/reunions/recentes" element={<Navigate to="/app?tab=reunions" replace />} />
     <Route path="/aide" element={<HelpPage />} />
     <Route path="/securite" element={<DynamicInfoPage pageKey="security" />} />
