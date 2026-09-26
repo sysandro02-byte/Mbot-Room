@@ -347,6 +347,8 @@ try {
     ['/app/meetings', 'Réunions'],
     ['/app/search', 'Recherche'],
     ['/app/calendar', 'Calendrier'],
+    ['/app/live', 'Live'],
+    ['/app/live/new', 'Créer un live'],
     ['/app/recordings', 'Enregistrements'],
     ['/app/files', 'Fichiers'],
     ['/app/groups', 'Groupes de travail'],
@@ -408,6 +410,20 @@ try {
     ).filter({ visible: true }).allTextContents().catch(() => []);
     assert.deepEqual(visibleFunctionalError, [], `${route} rendered functional errors: ${visibleFunctionalError.join(' | ')}`);
   }
+
+  await page.goto('/app/live', { waitUntil: 'domcontentloaded', timeout: 20_000 });
+  await page.getByRole('heading', { name: 'Live', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+  assert.equal(await page.getByRole('button', { name: /Créer un live/i }).count(), 1, 'Live feed must expose creation action');
+  assert.equal(await page.getByPlaceholder('Rechercher un live, un créateur, un sujet…').count(), 1, 'Live feed must expose search');
+  assert.equal(await page.locator('.app-shell-bottom-nav a[href="/app/live"]').count(), 1, 'Mobile navigation must expose Live');
+
+  await page.goto('/app/live/new', { waitUntil: 'domcontentloaded', timeout: 20_000 });
+  await page.getByRole('heading', { name: 'Créer un live', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+  assert.equal(await page.getByLabel('URL de couverture').count(), 1, 'Live creation must expose cover image configuration');
+  assert.equal(await page.getByText('Activer le chat', { exact: true }).count(), 1, 'Live creation must expose chat configuration');
+  assert.equal(await page.getByText('Inviter des co-animateurs', { exact: true }).count(), 1, 'Live creation must expose co-host configuration');
+  assert.equal(await page.getByText('Enregistrer le live', { exact: true }).count(), 1, 'Live creation must expose recording configuration');
+  assert.equal(await page.getByText('Mode modération', { exact: true }).count(), 1, 'Live creation must expose moderation configuration');
 
   // Real compact/mobile interaction regression: use an actual Playwright click,
   // not element.click(), so hit-testing and responsive layering are validated.
