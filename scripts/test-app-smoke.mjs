@@ -405,6 +405,45 @@ try {
     assert.deepEqual(visibleFunctionalError, [], `${route} rendered functional errors: ${visibleFunctionalError.join(' | ')}`);
   }
 
+  // Real compact/mobile interaction regression: use an actual Playwright click,
+  // not element.click(), so hit-testing and responsive layering are validated.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/admin', { waitUntil: 'domcontentloaded', timeout: 20_000 });
+  await page.waitForFunction(() => !document.querySelector('.route-loading'), undefined, { timeout: 15_000 });
+  await page.locator('.admin-topbar').waitFor({ state: 'visible', timeout: 10_000 });
+
+  const mobileMenuButton = page.locator('.admin-mobile-menu');
+  const mobileBellButton = page.locator('.admin-topbar [aria-label="Notifications administrateur"]');
+  const mobileAvatarButton = page.locator('.admin-topbar-avatar');
+  const [menuBox, bellBox, avatarBox] = await Promise.all([
+    mobileMenuButton.boundingBox(),
+    mobileBellButton.boundingBox(),
+    mobileAvatarButton.boundingBox(),
+  ]);
+  assert.ok(menuBox && bellBox && avatarBox, 'Admin mobile header controls must be visible');
+  assert.ok(Math.abs(menuBox.y - bellBox.y) < 16, 'Admin mobile notification control must stay on the same row as the menu');
+  assert.ok(Math.abs(menuBox.y - avatarBox.y) < 16, 'Admin mobile avatar must stay on the same row as the menu');
+
+  await mobileMenuButton.click();
+  await page.locator('#admin-navigation.is-open').waitFor({ state: 'visible', timeout: 5_000 });
+  assert.equal(await mobileMenuButton.getAttribute('aria-expanded'), 'true', 'Admin mobile menu must expose its open state');
+  assert.equal(await page.locator('.admin-sidebar-overlay').count(), 1, 'Admin mobile menu must render exactly one dismiss overlay');
+
+  await page.locator('.admin-sidebar-close').click();
+  await page.waitForFunction(() => !document.querySelector('#admin-navigation')?.classList.contains('is-open'));
+  assert.equal(await mobileMenuButton.getAttribute('aria-expanded'), 'false', 'Admin mobile menu must expose its closed state');
+
+  await mobileMenuButton.click();
+  await page.locator('#admin-navigation.is-open').waitFor({ state: 'visible', timeout: 5_000 });
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('#admin-navigation')?.classList.contains('is-open'));
+  assert.equal(await mobileMenuButton.getAttribute('aria-expanded'), 'false', 'Escape must close the admin mobile menu');
+
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 20_000 });
+  await page.waitForFunction(() => !document.querySelector('.route-loading'), undefined, { timeout: 15_000 });
+  assert.ok(!page.url().includes('/login'), 'Admin session must remain active after a compact/mobile reload');
+  await page.locator('.admin-topbar').waitFor({ state: 'visible', timeout: 10_000 });
+
   assert.deepEqual(serverErrors, [], `Server 5xx responses detected:\n${serverErrors.join('\n')}`);
   assert.deepEqual(pageErrors, [], `Browser errors detected:\n${pageErrors.join('\n')}`);
 
