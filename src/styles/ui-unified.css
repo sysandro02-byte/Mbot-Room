@@ -667,3 +667,47 @@ textarea,
     height: 44px !important;
   }
 }
+
+
+/* Cross-app button geometry hardening 2026-09-26 */
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"]{
+  box-sizing:border-box;
+  max-inline-size:100%;
+  min-inline-size:0;
+  font-family:inherit;
+  line-height:1.2;
+  word-break:normal;
+  overflow-wrap:normal;
+}
+button>svg,
+[role="button"]>svg{
+  flex:0 0 auto;
+}
+button>span,
+[role="button"]>span{
+  min-width:0;
+}
+@media(max-width:800px){
+  button,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"]{
+    touch-action:manipulation;
+  }
+  .dashboard-create-button,
+  .admin-new-meeting-button,
+  .primary-login-button,
+  .guest-join-submit,
+  .meeting-join-button,
+  .join-primary-btn,
+  .new-meeting-create,
+  .meeting-new-button{
+    min-height:48px!important;
+    padding-inline:16px!important;
+  }
+}

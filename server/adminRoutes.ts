@@ -241,6 +241,7 @@ const adAudienceMatches = (user: any, audience: AdminAudienceFilters) => {
 
 const periodDays = (period: unknown) => {
   const value = String(period || '30d');
+  if (value === '1d') return 1;
   if (value === '7d') return 7;
   if (value === '90d') return 90;
   if (value === '365d') return 365;
@@ -257,7 +258,7 @@ const realSparkline = async (days: number) => {
             COUNT(DISTINCT u.id)::int AS users
        FROM series s
        LEFT JOIN room_meetings m ON m.created_at::date=s.day AND m.status<>'cancelled'
-       LEFT JOIN room_users u ON u.created_at::timestamptz::date=s.day
+       LEFT JOIN room_users u ON u.created_at::timestamptz::date=s.day AND u.is_guest=false
       GROUP BY s.day ORDER BY s.day`, [Math.min(days, 31)],
   );
   return result.rows.map((row) => ({ label: row.label, meetings: Number(row.meetings), users: Number(row.users) }));
@@ -656,9 +657,10 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
                 COALESCE(feature_restrictions,'[]'::jsonb) AS feature_restrictions,
                 created_at
            FROM room_users
-          WHERE (lower(name) LIKE $1 OR lower(email) LIKE $1 OR lower(username) LIKE $1
+          WHERE is_guest=false
+            AND (lower(name) LIKE $1 OR lower(email) LIKE $1 OR lower(username) LIKE $1
                  OR lower(COALESCE(organization,'')) LIKE $1 OR lower(COALESCE(country,'')) LIKE $1 OR lower(COALESCE(city,'')) LIKE $1)
-          ORDER BY is_guest ASC, created_at::timestamptz DESC
+          ORDER BY created_at::timestamptz DESC
           LIMIT $2 OFFSET $3`,
         [term, limit, offset],
       );
@@ -944,24 +946,38 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
   app.get('/api/admin/dashboard', ...adminApi, async (request, response, next) => {
     try {
       const days = periodDays(request.query.period);
-      const [usersResult, meetingsResult, liveResult, recordingsResult, guestsResult, bansResult, minutesResult, liveMeetingsResult] = await Promise.all([
-        query(`SELECT COUNT(*)::int AS count FROM room_users WHERE created_at::timestamptz >= now() - ($1::int || ' days')::interval`, [days]),
+      const [usersResult, meetingsResult, liveResult, recordingsResult, guestsResult, bansResult, minutesResult, liveMeetingsResult, meetingTotalsResult, guestHistoryResult] = await Promise.all([
+        query(`SELECT COUNT(*)::int AS count FROM room_users WHERE is_guest=false AND created_at::timestamptz >= now() - ($1::int || ' days')::interval`, [days]),
         query(`SELECT COUNT(*)::int AS count FROM room_meetings WHERE status<>'cancelled' AND created_at >= now() - ($1::int || ' days')::interval`, [days]),
         query(`SELECT COUNT(*)::int AS count FROM room_meetings WHERE status='live' AND is_active=true`),
         query(`SELECT COUNT(*)::int AS count FROM room_recordings`),
-        query(`SELECT COUNT(*)::int AS count FROM room_users WHERE is_guest=true`),
+        query(`SELECT COUNT(*)::int AS count FROM room_users WHERE is_guest=true AND lower(name) NOT LIKE '%smoke%'`),
         query(`SELECT COUNT(DISTINCT user_id)::int AS count FROM room_meeting_bans`),
         query(`SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(ended_at,now())-started_at))/60),0)::int AS minutes FROM room_meetings WHERE started_at IS NOT NULL`),
         query(`SELECT * FROM room_meetings WHERE status='live' AND is_active=true ORDER BY started_at DESC LIMIT 20`),
+        query(`SELECT
+          COUNT(*) FILTER (WHERE created_at >= date_trunc('day',now()))::int AS day,
+          COUNT(*) FILTER (WHERE created_at >= date_trunc('week',now()))::int AS week,
+          COUNT(*) FILTER (WHERE created_at >= date_trunc('month',now()))::int AS month,
+          COUNT(*) FILTER (WHERE created_at >= date_trunc('year',now()))::int AS year
+          FROM room_meetings WHERE status<>'cancelled'`),
+        query(`SELECT u.id,u.name,u.created_at,l.meeting_id,l.status,m.title AS meeting_title
+          FROM room_users u
+          LEFT JOIN LATERAL (
+            SELECT meeting_id,status FROM room_lobby WHERE user_id=u.id ORDER BY meeting_id DESC LIMIT 1
+          ) l ON true
+          LEFT JOIN room_meetings m ON m.id=l.meeting_id
+          WHERE u.is_guest=true AND lower(u.name) NOT LIKE '%smoke%'
+          ORDER BY u.created_at::timestamptz DESC LIMIT 50`),
       ]);
-      const allUsers = await query(`SELECT COUNT(*)::int AS count FROM room_users`);
+      const allUsers = await query(`SELECT COUNT(*)::int AS count FROM room_users WHERE is_guest=false`);
       const usage = await realSparkline(days);
       const totalUsers = Number(allUsers.rows[0]?.count || 0);
       const guests = Number(guestsResult.rows[0]?.count || 0);
       const activities = await query(`
         SELECT 'meeting' AS type,id::text AS id,title AS title,'Réunion créée' AS description,created_at AS created_at FROM room_meetings
         UNION ALL
-        SELECT 'user' AS type,id::text AS id,name AS title,'Compte créé' AS description,created_at::timestamptz AS created_at FROM room_users
+        SELECT 'user' AS type,id::text AS id,name AS title,'Compte créé' AS description,created_at::timestamptz AS created_at FROM room_users WHERE is_guest=false
         ORDER BY created_at DESC LIMIT 10
       `);
       const stats = [
@@ -976,7 +992,16 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
         liveMeetings: liveMeetingsResult.rows.map(publicMeeting),
         recentActivity: activities.rows.map((row)=>({ id:`${row.type}-${row.id}`,type:row.type,title:row.title,description:row.description,createdAt:new Date(row.created_at).toISOString() })),
         usage,
-        distribution:{ active:Math.max(0,totalUsers-guests),guests,inactive:0,banned:Number(bansResult.rows[0]?.count||0) },
+        distribution:{ active:totalUsers,guests:0,inactive:0,banned:Number(bansResult.rows[0]?.count||0) },
+        guestAttendanceCount:guests,
+        guestHistory:guestHistoryResult.rows.map((row)=>({
+          id:Number(row.id),name:String(row.name||'Invité'),meetingId:row.meeting_id?Number(row.meeting_id):null,
+          meetingTitle:String(row.meeting_title||''),status:String(row.status||''),createdAt:new Date(row.created_at).toISOString(),
+        })),
+        meetingTotals:{
+          day:Number(meetingTotalsResult.rows[0]?.day||0),week:Number(meetingTotalsResult.rows[0]?.week||0),
+          month:Number(meetingTotalsResult.rows[0]?.month||0),year:Number(meetingTotalsResult.rows[0]?.year||0),
+        },
         countries:[],
         permissions:adminPermissions,
       });
@@ -988,7 +1013,7 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
       const term = `%${normalizeText(request.query.q).toLowerCase()}%`;
       const [meetings, users] = await Promise.all([
         query(`SELECT * FROM room_meetings WHERE lower(title) LIKE $1 OR lower(meeting_link) LIKE $1 ORDER BY created_at DESC LIMIT 20`, [term]),
-        query(`SELECT id,name,email FROM room_users WHERE lower(name) LIKE $1 OR lower(email) LIKE $1 ORDER BY name LIMIT 20`, [term]),
+        query(`SELECT id,name,email FROM room_users WHERE is_guest=false AND (lower(name) LIKE $1 OR lower(email) LIKE $1) ORDER BY name LIMIT 20`, [term]),
       ]);
       response.json({ meetings: meetings.rows.map(publicMeeting), users: users.rows });
     } catch (error) { next(error); }

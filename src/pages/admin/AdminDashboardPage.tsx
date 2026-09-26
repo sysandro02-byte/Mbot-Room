@@ -31,8 +31,10 @@ import { socket } from '../../lib/socket';
 import { authService } from '../../services/authService';
 import {
   AdminActivity,
+  AdminAiInsights,
   AdminDashboardPayload,
   AdminDashboardStat,
+  AdminGuestHistoryEntry,
   GuestAccessSlide,
   HomeSlide,
   LoginBranding,
@@ -122,9 +124,11 @@ const activityTones: Record<AdminActivity['type'], ActivityTone> = {
 };
 
 const periodOptions = [
+  { value: '1d', label: 'Aujourd’hui' },
   { value: '7d', label: '7 derniers jours' },
   { value: '30d', label: '30 derniers jours' },
-  { value: 'month', label: 'Mois en cours' },
+  { value: '90d', label: '90 derniers jours' },
+  { value: '365d', label: '12 derniers mois' },
 ];
 
 const formatNumber = (value: number) => new Intl.NumberFormat(getAppLocale()).format(value);
@@ -195,6 +199,12 @@ export default function AdminDashboardPage() {
   const [isSavingLoginBranding, setIsSavingLoginBranding] = useState(false);
   const [toast, setToast] = useState('');
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    const toggleSidebar = () => setSidebarOpen((open) => !open);
+    window.addEventListener('mboteroom-toggle-sidebar', toggleSidebar);
+    return () => window.removeEventListener('mboteroom-toggle-sidebar', toggleSidebar);
+  }, []);
 
   const loadDashboard = async () => {
     setIsLoading(true);
@@ -606,6 +616,11 @@ export default function AdminDashboardPage() {
             {(dashboard?.stats || []).map((stat) => <StatisticCard key={stat.id} stat={stat} />)}
           </section>
 
+          <section className="admin-insights-grid" aria-label="Analyse administrative">
+            <MeetingTotalsCard totals={dashboard?.meetingTotals || { day: 0, week: 0, month: 0, year: 0 }} />
+            <AiUsageReportCard dashboard={dashboard} />
+          </section>
+
           <section className="admin-main-grid">
             <LiveMeetingsCard
               meetings={liveMeetings}
@@ -616,6 +631,7 @@ export default function AdminDashboardPage() {
               onEnd={(meeting) => void endLiveMeeting(meeting)}
             />
             <RecentActivityCard activities={dashboard?.recentActivity || []} />
+            <GuestHistoryCard entries={dashboard?.guestHistory || []} total={dashboard?.guestAttendanceCount || 0} />
             <AdminControlCenter />
             <AdminBroadcastCenter />
             <AdminAdCampaignCenter />
@@ -676,6 +692,8 @@ function AdminSidebar({ userName, open, onClose }: { userName: string; open: boo
     { label: 'Tableau de bord', icon: Home, path: '/admin', active: true },
     { label: 'Réglages généraux', icon: Settings, path: '/admin#admin-controls' },
     { label: 'Utilisateurs', icon: UsersRound, path: '/admin#admin-users' },
+    { label: 'Historique invités', icon: Activity, path: '/admin#admin-guest-history' },
+    { label: 'Rapport IA', icon: FileText, path: '/admin#admin-ai-report' },
     { label: 'Signalements', icon: Flag, path: '/admin#admin-reports' },
     { label: 'Conditions d’utilisation', icon: FileText, path: '/admin#admin-legal-terms' },
     { label: 'Administrateurs', icon: ShieldCheck, path: '/admin#admin-admin-invites' },
@@ -686,7 +704,7 @@ function AdminSidebar({ userName, open, onClose }: { userName: string; open: boo
     { label: 'Réunions', icon: CalendarDays, path: '/app/meetings' },
     { label: 'Enregistrements', icon: CirclePlay, path: '/app/recordings' },
     { label: 'Messages', icon: MessageCircle, path: '/app/messages' },
-    { label: 'Notifications', icon: Bell, path: '/app/notifications' },
+    { label: 'Notifications', icon: Bell, path: '/admin#admin-notifications' },
     { label: 'Calendrier', icon: CalendarDays, path: '/app/calendar' },
     { label: 'Tableau blanc', icon: BarChart3, path: '/app/whiteboard' },
     { label: 'Paramètres', icon: Settings, path: '/app/settings' },
@@ -1020,10 +1038,9 @@ function UsageStatisticsCard({ usage }: { usage: Array<{ label: string; meetings
 }
 
 function UserDistributionCard({ distribution }: { distribution: { active: number; guests: number; inactive: number; banned: number } }) {
-  const total = distribution.active + distribution.guests + distribution.inactive + distribution.banned;
+  const total = distribution.active + distribution.inactive + distribution.banned;
   const rows = [
     ['Utilisateurs actifs', distribution.active, '#16a365'],
-    ['Invités', distribution.guests, '#007e83'],
     ['Inactifs', distribution.inactive, '#ff9f2f'],
     ['Bannis', distribution.banned, '#ef5350'],
   ] as const;
@@ -1031,7 +1048,7 @@ function UserDistributionCard({ distribution }: { distribution: { active: number
     <section className="admin-distribution-card">
       <h2>Répartition des utilisateurs</h2>
       <div className="admin-distribution-content">
-        <div className="admin-donut" style={{ '--active': `${total ? (distribution.active / total) * 100 : 0}%`, '--guests': `${total ? (distribution.guests / total) * 100 : 0}%` } as CSSProperties}>
+        <div className="admin-donut" style={{ '--active': `${total ? (distribution.active / total) * 100 : 0}%`, '--guests': '0%' } as CSSProperties}>
           <strong>{formatNumber(total)}</strong><span>Total</span>
         </div>
         <div className="admin-distribution-legend">
@@ -1042,6 +1059,125 @@ function UserDistributionCard({ distribution }: { distribution: { active: number
   );
 }
 
+function MeetingTotalsCard({ totals }: { totals: { day: number; week: number; month: number; year: number } }) {
+  const rows = [
+    ['Aujourd’hui', totals.day],
+    ['Cette semaine', totals.week],
+    ['Ce mois', totals.month],
+    ['Cette année', totals.year],
+  ] as const;
+  return (
+    <section className="admin-meeting-totals-card admin-card">
+      <header>
+        <div><h2>Réunions par période</h2><p>Comptage réel des réunions créées, hors réunions annulées.</p></div>
+        <CalendarDays size={22} aria-hidden="true" />
+      </header>
+      <div className="admin-meeting-totals-grid">
+        {rows.map(([label, value]) => <article key={label}><span>{label}</span><strong>{formatNumber(value)}</strong></article>)}
+      </div>
+    </section>
+  );
+}
+
+function GuestHistoryCard({ entries, total }: { entries: AdminGuestHistoryEntry[]; total: number }) {
+  return (
+    <section className="admin-guest-history-card admin-card" id="admin-guest-history">
+      <header>
+        <div>
+          <h2>Historique des accès invités</h2>
+          <p>Les invités sont suivis comme participations temporaires et ne sont pas comptés comme comptes utilisateurs.</p>
+        </div>
+        <span>{formatNumber(total)} accès</span>
+      </header>
+      <div className="admin-guest-history-list">
+        {entries.length ? entries.map((entry) => (
+          <article key={entry.id}>
+            <span className="admin-guest-history-avatar">{getInitials(entry.name || 'Invité')}</span>
+            <div>
+              <strong>{entry.name || 'Invité'}</strong>
+              <small>{entry.meetingTitle || (entry.meetingId ? `Réunion #${entry.meetingId}` : 'Réunion non renseignée')}</small>
+            </div>
+            <time>{formatRelativeTime(entry.createdAt)}</time>
+          </article>
+        )) : <p className="admin-empty">Aucun accès invité enregistré.</p>}
+      </div>
+    </section>
+  );
+}
+
+function AiUsageReportCard({ dashboard }: { dashboard: AdminDashboardPayload | null }) {
+  const [insights, setInsights] = useState<AdminAiInsights | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [reportError, setReportError] = useState('');
+
+  const generateReport = async () => {
+    setLoading(true);
+    setReportError('');
+    try {
+      setInsights(await adminDashboardService.getAiInsights());
+    } catch (cause) {
+      setReportError(cause instanceof Error ? cause.message : 'Rapport IA indisponible.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const exportReport = () => {
+    if (!insights) return;
+    const totals = dashboard?.meetingTotals || { day: 0, week: 0, month: 0, year: 0 };
+    const generatedAt = new Intl.DateTimeFormat(getAppLocale(), { dateStyle: 'full', timeStyle: 'short' }).format(new Date());
+    const report = [
+      '# Rapport général MBotéRoom',
+      '',
+      `Généré le ${generatedAt}`,
+      '',
+      '## Réunions',
+      `- Aujourd’hui : ${totals.day}`,
+      `- Cette semaine : ${totals.week}`,
+      `- Ce mois : ${totals.month}`,
+      `- Cette année : ${totals.year}`,
+      '',
+      '## Comptes utilisateurs',
+      `- Comptes analysés : ${JSON.stringify(insights.metrics.users)}`,
+      `- Accès invités historiques : ${dashboard?.guestAttendanceCount || 0}`,
+      '',
+      '## Utilisation et exploitation',
+      `- Réunions : ${JSON.stringify(insights.metrics.meetings)}`,
+      `- Signalements : ${JSON.stringify(insights.metrics.reports)}`,
+      `- Notifications : ${JSON.stringify(insights.metrics.notifications)}`,
+      '',
+      '## Analyse Luna IA',
+      insights.summary,
+      '',
+      `Moteur : ${insights.provider}${insights.model ? ` / ${insights.model}` : ''}`,
+    ].join('\n');
+    const blob = new Blob([report], { type: 'text/markdown;charset=utf-8' });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = `rapport-mboteroom-${new Date().toISOString().slice(0, 10)}.md`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(href), 1000);
+  };
+
+  return (
+    <section className="admin-ai-report-card admin-card" id="admin-ai-report">
+      <header>
+        <div><h2>Rapport général par Luna IA</h2><p>Analyse agrégée de l’utilisation de MBotéRoom, sans traiter les invités comme des comptes.</p></div>
+        <Activity size={23} aria-hidden="true" />
+      </header>
+      {insights ? <div className="admin-ai-report-summary"><p>{insights.summary}</p><small>Source : {insights.provider}{insights.model ? ` · ${insights.model}` : ''}</small></div>
+        : <p className="admin-ai-report-placeholder">Générez une synthèse générale des comptes, réunions, notifications et signalements.</p>}
+      {reportError ? <p className="admin-inline-error" role="alert">{reportError}</p> : null}
+      <div className="admin-ai-report-actions">
+        <button type="button" onClick={() => void generateReport()} disabled={loading}>{loading ? 'Analyse en cours…' : insights ? 'Actualiser le rapport' : 'Générer le rapport IA'}</button>
+        <button type="button" onClick={exportReport} disabled={!insights}><FileText size={17} aria-hidden="true" /> Exporter le rapport</button>
+      </div>
+    </section>
+  );
+}
 function CountriesCard({ countries }: { countries: Array<{ id: string; name: string; flag: string; count: number; percentage: number }> }) {
   return (
     <section className="admin-countries-card">

@@ -120,6 +120,22 @@ export type AdminUserDistribution = {
   banned: number;
 };
 
+export type AdminGuestHistoryEntry = {
+  id: number;
+  name: string;
+  meetingId: number | null;
+  meetingTitle: string;
+  status: string;
+  createdAt: string;
+};
+
+export type AdminMeetingTotals = {
+  day: number;
+  week: number;
+  month: number;
+  year: number;
+};
+
 export type AdminCountryStat = {
   id: string;
   name: string;
@@ -134,6 +150,9 @@ export type AdminDashboardPayload = {
   recentActivity: AdminActivity[];
   usage: AdminUsagePoint[];
   distribution: AdminUserDistribution;
+  guestAttendanceCount: number;
+  guestHistory: AdminGuestHistoryEntry[];
+  meetingTotals: AdminMeetingTotals;
   countries: AdminCountryStat[];
   permissions: string[];
 };

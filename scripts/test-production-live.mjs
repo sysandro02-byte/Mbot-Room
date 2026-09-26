@@ -562,6 +562,12 @@ try {
   if (meeting?.id && host?.token) {
     await api(`/api/meetings/${meeting.id}`, { method: 'DELETE' }, host.token).catch(() => undefined);
   }
+  if (host?.token) {
+    await api('/api/auth/test-account-cleanup', {
+      method: 'DELETE',
+      body: JSON.stringify({ guestUserId: guest?.user?.id || null }),
+    }, host.token).catch(() => undefined);
+  }
 
   console.log('PRODUCTION_SMOKE_CLEANUP', JSON.stringify({
     meetingId: meeting?.id || null,
