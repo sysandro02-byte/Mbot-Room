@@ -167,16 +167,52 @@ registerTranscriptionRoutes(app, io);
 registerLegalAndReportRoutes(app, io);
 registerRealtime(io);
 
-const androidApkSourceUrl = String(
-  process.env.MBOTEROOM_ANDROID_APK_SOURCE_URL
-    || 'https://github.com/sysandro02-byte/Mbot-Room/releases/download/android-latest/MBoteRoom-Android.apk',
-).trim();
+const androidReleaseBaseUrl = String(
+  process.env.MBOTEROOM_ANDROID_RELEASE_BASE_URL
+    || 'https://jyaqdzkkxvrxxrseqyhy.supabase.co/storage/v1/object/public/mboteroom-releases',
+).replace(/\\\/+$/, '');
 
-app.get('/api/public/android/download', rateLimit(60, 60_000), (_request, response) => {
+app.get('/api/public/android/download', rateLimit(60, 60_000), async (_request, response) => {
   response.setHeader('Cache-Control', 'no-store, max-age=0');
   response.setHeader('Pragma', 'no-cache');
-  response.setHeader('Content-Disposition', 'attachment; filename="MBoteRoom-Android.apk"');
-  response.redirect(302, androidApkSourceUrl);
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12_000);
+    let manifestResponse: globalThis.Response;
+    try {
+      manifestResponse = await fetch(
+        `${androidReleaseBaseUrl}/android/latest.json?v=${Date.now()}`,
+        {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+          signal: controller.signal,
+        },
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!manifestResponse.ok) throw new Error(`Manifest Android indisponible (${manifestResponse.status}).`);
+    const manifest = await manifestResponse.json().catch(() => null);
+    const sha = String(manifest?.sha || '').toLowerCase();
+    const apkPath = String(manifest?.apk?.path || '');
+    const expectedPath = /^[a-f0-9]{40}$/.test(sha)
+      ? `android/builds/${sha}/MBoteRoom-Android.apk`
+      : '';
+    if (!expectedPath || apkPath !== expectedPath) {
+      throw new Error('Manifest Android invalide.');
+    }
+
+    const target = `${androidReleaseBaseUrl}/${apkPath}?download=MBoteRoom-Android.apk&v=${sha}`;
+    response.setHeader('Content-Disposition', 'attachment; filename="MBoteRoom-Android.apk"');
+    response.redirect(302, target);
+  } catch (error) {
+    console.error('[android download]', error);
+    response.status(503).json({
+      error: 'Le téléchargement MBotéRoom Android est momentanément indisponible.',
+      code: 'ANDROID_RELEASE_UNAVAILABLE',
+    });
+  }
 });
 
 app.use('/api', (_request, response) => {
