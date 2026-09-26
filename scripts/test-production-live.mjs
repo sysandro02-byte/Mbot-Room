@@ -422,6 +422,71 @@ try {
   assert.equal(guestChat.response.status, 403, JSON.stringify(guestChat.data));
   assert.equal(guestChat.data.code, 'GUEST_CHAT_DISABLED');
 
+  const guestControlDisabled = async (label) => guestRoom.page.locator('button.room-v2-control').filter({ hasText: label }).first().isDisabled();
+  assert.equal(await guestControlDisabled('Partager'), true, 'Guest screen share must be disabled before promotion');
+  assert.equal(await guestControlDisabled('Main'), true, 'Guest hand raise must be disabled before promotion');
+  assert.equal(await guestControlDisabled('Enregistrer'), true, 'Guest recording must be disabled before promotion');
+
+  const promoteGuest = await api(`/api/meetings/${meeting.id}/participants/${guest.user.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role: 'cohost' }),
+  }, host.token);
+  assert.equal(promoteGuest.response.status, 200, JSON.stringify(promoteGuest.data));
+  assert.equal(promoteGuest.data.role, 'cohost');
+
+  await guestRoom.page.waitForFunction(() => {
+    const labels = ['Partager', 'Main', 'Enregistrer'];
+    const controls = [...document.querySelectorAll('button.room-v2-control')];
+    return labels.every((label) => controls.some((button) => button.textContent?.includes(label) && !button.disabled));
+  }, undefined, { timeout: 15_000 });
+
+  const elevatedGuestChat = await api(`/api/meetings/${meeting.id}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ text: 'Message co-hôte invité: les droits élevés sont actifs.' }),
+  }, guest.token);
+  assert.equal(elevatedGuestChat.response.status, 201, JSON.stringify(elevatedGuestChat.data));
+
+  const elevatedGuestLuna = await api('/api/ai/luna', {
+    method: 'POST',
+    body: JSON.stringify({
+      meetingId: Number(meeting.id),
+      prompt: 'Réponds uniquement: droits co-hôte actifs.',
+    }),
+  }, guest.token);
+  assert.equal(elevatedGuestLuna.response.status, 200, JSON.stringify(elevatedGuestLuna.data));
+
+  const guestHandControl = guestRoom.page.locator('button.room-v2-control').filter({ hasText: 'Main' }).first();
+  await guestHandControl.click();
+  await guestRoom.page.locator('button.room-v2-control').filter({ hasText: 'Baisser la main' }).first().waitFor({ state: 'visible', timeout: 10_000 });
+
+  await hostRoom.page.getByTestId('participants-view-button').click();
+  const hostGuestRow = hostRoom.page.locator('.room-v2-rail-participants article').filter({ hasText: guestName }).first();
+  await hostGuestRow.waitFor({ state: 'visible', timeout: 10_000 });
+  await hostGuestRow.locator('.room-v2-rail-hand').waitFor({ state: 'visible', timeout: 10_000 });
+
+  await guestRoom.page.locator('button.room-v2-control').filter({ hasText: 'Baisser la main' }).first().click();
+  await hostGuestRow.locator('.room-v2-rail-hand').waitFor({ state: 'hidden', timeout: 10_000 });
+
+  const demoteGuest = await api(`/api/meetings/${meeting.id}/participants/${guest.user.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role: 'participant' }),
+  }, host.token);
+  assert.equal(demoteGuest.response.status, 200, JSON.stringify(demoteGuest.data));
+  assert.equal(demoteGuest.data.role, 'participant');
+
+  await guestRoom.page.waitForFunction(() => {
+    const labels = ['Partager', 'Main', 'Enregistrer'];
+    const controls = [...document.querySelectorAll('button.room-v2-control')];
+    return labels.every((label) => controls.some((button) => button.textContent?.includes(label) && button.disabled));
+  }, undefined, { timeout: 15_000 });
+
+  const demotedGuestChat = await api(`/api/meetings/${meeting.id}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ text: 'Ce message doit être rebloqué après révocation.' }),
+  }, guest.token);
+  assert.equal(demotedGuestChat.response.status, 403, JSON.stringify(demotedGuestChat.data));
+  assert.equal(demotedGuestChat.data.code, 'GUEST_CHAT_DISABLED');
+
   const hostChat = await api(`/api/meetings/${meeting.id}/messages`, {
     method: 'POST',
     body: JSON.stringify({ text: 'Décision smoke: le test TURN et WebRTC de production est validé.' }),
@@ -447,12 +512,22 @@ try {
   assert.ok(Array.isArray(summary.data.decisions));
   assert.ok(Array.isArray(summary.data.actions));
 
-  const ended = await api(`/api/meetings/${meeting.id}/end`, {
-    method: 'POST',
-  }, host.token);
+  await guestRoom.page.locator('button.room-v2-leave').click();
+  const guestLeaveModal = guestRoom.page.locator('.room-v2-confirm-modal');
+  await guestLeaveModal.waitFor({ state: 'visible', timeout: 10_000 });
+  await guestLeaveModal.getByRole('button', { name: 'Quitter la réunion' }).click();
+  await guestRoom.page.waitForURL((url) => url.pathname === '/reunions', { timeout: 15_000 });
+
+  await hostRoom.page.locator('button.room-v2-control').filter({ hasText: 'Plus' }).first().click();
+  await hostRoom.page.getByTestId('end-meeting-for-all').click();
+  const hostEndModal = hostRoom.page.locator('.room-v2-confirm-modal');
+  await hostEndModal.waitFor({ state: 'visible', timeout: 10_000 });
+  await hostEndModal.getByRole('button', { name: 'Terminer pour tous' }).click();
+  await hostRoom.page.waitForURL((url) => /\/reunions\/[^/]+\/terminee$/.test(url.pathname), { timeout: 20_000 });
+
+  const ended = await api(`/api/meetings/${meeting.id}/ended`, {}, host.token);
   assert.equal(ended.response.status, 200, JSON.stringify(ended.data));
-  assert.equal(ended.data.success, true);
-  assert.equal(ended.data.meeting?.status, 'ended');
+  assert.equal(ended.data.status, 'ended');
 
   assert.deepEqual(hostRoom.browserErrors, [], `Host browser errors: ${hostRoom.browserErrors.join('\n')}`);
   assert.deepEqual(guestRoom.browserErrors, [], `Guest browser errors: ${guestRoom.browserErrors.join('\n')}`);
@@ -473,6 +548,11 @@ try {
     pushConfigured: true,
     pwaVerified: true,
     meetingEnded: true,
+    leaveButtonVerified: true,
+    endForAllButtonVerified: true,
+    raisedHandBroadcastVerified: true,
+    guestModeratorPromotionVerified: true,
+    guestModeratorRevocationVerified: true,
   }));
 } finally {
   await guestRoom?.context?.close().catch(() => undefined);
