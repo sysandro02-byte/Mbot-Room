@@ -172,5 +172,35 @@ export const runProductMigrations = async () => {
       responded_at timestamptz,
       PRIMARY KEY(live_id,user_id)
     );
+
+    ALTER TABLE room_live_sessions ADD COLUMN IF NOT EXISTS gift_count integer NOT NULL DEFAULT 0;
+
+    CREATE TABLE IF NOT EXISTS room_live_assets (
+      id uuid PRIMARY KEY,
+      owner_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      mime_type text NOT NULL,
+      size_bytes integer NOT NULL,
+      content bytea NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS room_live_assets_owner_idx ON room_live_assets(owner_id,created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS room_live_gifts (
+      id uuid PRIMARY KEY,
+      live_id uuid NOT NULL REFERENCES room_live_sessions(id) ON DELETE CASCADE,
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      gift_type text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS room_live_gifts_live_idx ON room_live_gifts(live_id,created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS room_live_invitations (
+      live_id uuid NOT NULL REFERENCES room_live_sessions(id) ON DELETE CASCADE,
+      email text NOT NULL,
+      invited_by integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      invited_user_id integer REFERENCES room_users(id) ON DELETE SET NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY(live_id,email)
+    );
   `);
 };
