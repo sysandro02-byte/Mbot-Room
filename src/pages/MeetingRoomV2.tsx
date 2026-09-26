@@ -2660,9 +2660,18 @@ export default function MeetingRoomV2() {
         ><Captions/></Control>
         <Control active={handRaised} disabled={!guestRaiseHandAllowed} title={!guestRaiseHandAllowed ? 'Lever la main non autorisé pour les invités' : undefined} label={handRaised ? 'Baisser la main' : 'Main'} onClick={() => {
           const raised = !handRaised;
-          setHandRaised(raised);
-          setRaisedHands((current) => { const next = new Set(current); if (raised) next.add(Number(currentUser?.id || 0)); else next.delete(Number(currentUser?.id || 0)); return next; });
-          socket.emit('meeting:hand-raised',{meetingId:meeting.id,raised});
+          if (!socket.connected) {
+            setNotice('Connexion temps réel indisponible. Réessayez dans un instant.');
+            return;
+          }
+          socket.timeout(5000).emit('meeting:hand-raised',{meetingId:meeting.id,raised},(error:any,response:any)=>{
+            if (error || response?.ok === false) {
+              setNotice(response?.error || 'Impossible de mettre à jour la main levée.');
+              socket.emit('meeting:hands-request',{meetingId:meeting.id});
+              return;
+            }
+            setHandRaised(raised);
+          });
         }}><Hand/></Control>
         <div className="room-v2-reaction-wrap">
           <Control active={reactionPanelOpen} disabled={!canUseReactions} title={!canUseReactions ? 'Réactions désactivées par l’hôte' : undefined} label="Réactions" testId="reaction-button" onClick={() => setReactionPanelOpen((current) => !current)}>😊</Control>
