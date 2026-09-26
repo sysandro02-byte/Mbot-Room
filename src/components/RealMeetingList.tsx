@@ -172,6 +172,7 @@ export default function RealMeetingList(){
       setForm(defaultForm(preferences,user?.personalMeetingId||''));
       setShowCreate(true);
       if(searchParams.get('intent')==='screen-share')setNotice('Créez la réunion, puis utilisez « Partager l’écran » une fois dans la salle.');
+      if(searchParams.get('intent')==='admin')setNotice('Réunion administrateur : invitez vos partenaires, clients ou membres de l’équipe LoukaTech par e-mail, puis partagez le lien si nécessaire.');
       setSearchParams({}, { replace:true });
       return;
     }
