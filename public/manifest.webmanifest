@@ -1,7 +1,7 @@
 {
   "name": "MBotéRoom",
   "short_name": "MBotéRoom",
-  "description": "MBotéRoom, créée par LoukaTech : réunions sécurisées, collaboration en temps réel et assistant Luna IA.",
+  "description": "MBotéRoom, créée par LoukaTech : réunions sécurisées, Lives, collaboration en temps réel et assistant Luna IA.",
   "id": "/app",
   "start_url": "/app?source=pwa",
   "scope": "/",
@@ -35,6 +35,19 @@
       "short_name": "Réunion",
       "description": "Créer ou démarrer une réunion MBotéRoom",
       "url": "/app/meetings",
+      "icons": [
+        {
+          "src": "/icons/mboteroom-install.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Live MBotéRoom",
+      "short_name": "Live",
+      "description": "Découvrir ou lancer un Live MBotéRoom",
+      "url": "/app/live",
       "icons": [
         {
           "src": "/icons/mboteroom-install.svg",
