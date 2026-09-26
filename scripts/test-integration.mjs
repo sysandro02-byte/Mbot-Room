@@ -938,6 +938,9 @@ try {
   const liveFeed = await jsonRequest('/api/live/feed?category=business', { headers: authHeaders(participant.token) });
   assert.equal(liveFeed.response.status, 200, JSON.stringify(liveFeed.data));
   assert.ok(liveFeed.data.some((item) => item.id === liveCreate.data.id && item.status === 'live'));
+  const trendingLiveFeed = await jsonRequest('/api/live/feed?mode=trending', { headers: authHeaders(participant.token) });
+  assert.equal(trendingLiveFeed.response.status, 200, JSON.stringify(trendingLiveFeed.data));
+  assert.ok(trendingLiveFeed.data.some((item) => item.id === liveCreate.data.id), 'Trending feed must include active Live sessions');
 
   const liveHostSocket = await socketConnect(host.token);
   const liveParticipantSocket = await socketConnect(participant.token);
@@ -1051,6 +1054,42 @@ try {
   assert.equal(rejoinedLive.response.status, 200, JSON.stringify(rejoinedLive.data));
   assert.equal(rejoinedLive.data.role, 'cohost');
 
+  const secondParticipationRequest = await jsonRequest(`/api/live/${liveCreate.data.id}/participation-requests`, {
+    method: 'POST',
+    headers: authHeaders(outsider.token),
+    body: JSON.stringify({}),
+  });
+  assert.equal(secondParticipationRequest.response.status, 201, JSON.stringify(secondParticipationRequest.data));
+  const secondParticipationAccept = await jsonRequest(`/api/live/${liveCreate.data.id}/participation-requests/${outsider.user.id}`, {
+    method: 'PATCH',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ status: 'accepted' }),
+  });
+  assert.equal(secondParticipationAccept.response.status, 200, JSON.stringify(secondParticipationAccept.data));
+  const secondCohostJoin = await jsonRequest(`/api/live/${liveCreate.data.id}/join`, {
+    method: 'POST',
+    headers: authHeaders(outsider.token),
+    body: JSON.stringify({}),
+  });
+  assert.equal(secondCohostJoin.response.status, 200, JSON.stringify(secondCohostJoin.data));
+  assert.equal(secondCohostJoin.data.role, 'cohost');
+  const firstCohostStillActive = await jsonRequest(`/api/live/${liveCreate.data.id}/join`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({}),
+  });
+  assert.equal(firstCohostStillActive.response.status, 200, JSON.stringify(firstCohostStillActive.data));
+  assert.equal(firstCohostStillActive.data.role, 'cohost', 'Accepting a second cohost must not revoke the first');
+
+  const firstCohostMedia = await jsonRequest(`/api/meetings/${liveCreate.data.meetingId}/media-session`, { headers: authHeaders(participant.token) });
+  assert.equal(firstCohostMedia.response.status, 200, JSON.stringify(firstCohostMedia.data));
+  assert.ok(firstCohostMedia.data.permissions?.canPublishSources?.includes('camera'));
+  assert.ok(firstCohostMedia.data.permissions?.canPublishSources?.includes('microphone'));
+  const secondCohostMedia = await jsonRequest(`/api/meetings/${liveCreate.data.meetingId}/media-session`, { headers: authHeaders(outsider.token) });
+  assert.equal(secondCohostMedia.response.status, 200, JSON.stringify(secondCohostMedia.data));
+  assert.ok(secondCohostMedia.data.permissions?.canPublishSources?.includes('camera'));
+  assert.ok(secondCohostMedia.data.permissions?.canPublishSources?.includes('microphone'));
+
   const liveDisableChat = await jsonRequest(`/api/live/${liveCreate.data.id}/settings`, {
     method: 'PATCH',
     headers: authHeaders(host.token),
@@ -1097,6 +1136,21 @@ try {
   assert.ok(privateLiveInviteToken);
   const privateAllowed = await jsonRequest(`/api/live/${privateLive.data.id}?invite=${encodeURIComponent(privateLiveInviteToken)}`, { headers: authHeaders(participant.token) });
   assert.equal(privateAllowed.response.status, 200, JSON.stringify(privateAllowed.data));
+  assert.equal(privateAllowed.data.canShare, false, 'Invited viewers must not be able to redistribute a private Live link');
+  const privateViewerShare = await jsonRequest(`/api/live/${privateLive.data.id}/share`, {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ inviteToken: privateLiveInviteToken }),
+  });
+  assert.equal(privateViewerShare.response.status, 403, JSON.stringify(privateViewerShare.data));
+  assert.equal(privateViewerShare.data.code, 'LIVE_PRIVATE_SHARE_DENIED');
+  const privateHostShare = await jsonRequest(`/api/live/${privateLive.data.id}/share`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({}),
+  });
+  assert.equal(privateHostShare.response.status, 200, JSON.stringify(privateHostShare.data));
+  assert.ok(new URL(privateHostShare.data.url, 'https://mboteroom.test').searchParams.get('invite'));
   const privateEnd = await jsonRequest(`/api/live/${privateLive.data.id}/end`, {
     method: 'POST',
     headers: authHeaders(host.token),
