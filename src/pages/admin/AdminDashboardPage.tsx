@@ -171,6 +171,21 @@ export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const currentUser = authService.getCurrentUser();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (!sidebarOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSidebarOpen(false);
+    };
+    const isCompact = window.matchMedia('(max-width: 1024px)').matches;
+    const previousOverflow = document.body.style.overflow;
+    if (isCompact) document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      if (isCompact) document.body.style.overflow = previousOverflow;
+    };
+  }, [sidebarOpen]);
   const [period, setPeriod] = useState('30d');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -520,7 +535,14 @@ export default function AdminDashboardPage() {
 
       <section className="admin-dashboard-workspace">
         <header className="admin-topbar">
-          <button className="admin-mobile-menu" type="button" aria-label="Ouvrir le menu" onClick={() => setSidebarOpen(true)}>
+          <button
+            className="admin-mobile-menu"
+            type="button"
+            aria-label={sidebarOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+            aria-expanded={sidebarOpen}
+            aria-controls="admin-navigation"
+            onClick={() => setSidebarOpen((open) => !open)}
+          >
             <Menu size={23} aria-hidden="true" />
           </button>
           <Link className="admin-topbar-brand" to="/admin" aria-label="Accueil administration MBotéRoom">
@@ -711,7 +733,7 @@ function AdminSidebar({ userName, open, onClose }: { userName: string; open: boo
     { label: 'Aide', icon: CircleHelp, path: '/aide' },
   ];
   return (
-    <aside className={`admin-sidebar ${open ? 'is-open' : ''}`}>
+    <aside id="admin-navigation" className={`admin-sidebar ${open ? 'is-open' : ''}`}>
       <button className="admin-sidebar-close" type="button" aria-label="Fermer le menu" onClick={onClose}><X size={20} /></button>
       <Link className="admin-brand" to="/admin">
         <span><img src="/icons/mboteroom-symbol.png" alt="" /></span>
