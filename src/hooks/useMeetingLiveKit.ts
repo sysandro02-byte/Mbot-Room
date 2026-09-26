@@ -20,6 +20,7 @@ type UseMeetingLiveKitOptions = {
   localStream: MediaStream | null;
   media: MeetingMediaState;
   enabled?: boolean;
+  sessionKey?: string | number;
   onNotice?: (message: string) => void;
   onFailure?: (message: string) => void;
 };
@@ -53,6 +54,7 @@ export function useMeetingLiveKit({
   localStream,
   media,
   enabled = false,
+  sessionKey = 0,
   onNotice,
   onFailure,
 }: UseMeetingLiveKitOptions) {
@@ -277,7 +279,7 @@ export function useMeetingLiveKit({
       setRemoteParticipants([]);
       setActiveSpeakerSocketId(null);
     };
-  }, [breakoutRoomId, enabled, meetingId, onFailure, onNotice, rebuildRemoteParticipants]);
+  }, [breakoutRoomId, enabled, meetingId, sessionKey, onFailure, onNotice, rebuildRemoteParticipants]);
 
   useEffect(() => {
     if (status !== 'connected') return;
