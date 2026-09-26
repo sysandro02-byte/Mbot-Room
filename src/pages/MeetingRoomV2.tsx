@@ -1158,7 +1158,7 @@ export default function MeetingRoomV2() {
       socket.off('meeting:banned', onBanned);
       socket.off('meeting:moved-to-lobby', onMoved);
     };
-  }, [currentUser?.id, isModerator, location.state, meeting?.id, navigate, refreshBreakouts, refreshLobby, refreshParticipants]);
+  }, [currentUser?.id, guestMode, isModerator, location.state, meeting?.id, navigate, refreshBreakouts, refreshLobby, refreshParticipants]);
 
   const requestMissingMediaTrack = useCallback(async (kind: 'audio' | 'video') => {
     if (!navigator.mediaDevices?.getUserMedia) return false;
