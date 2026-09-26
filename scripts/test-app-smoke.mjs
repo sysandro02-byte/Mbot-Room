@@ -415,6 +415,7 @@ try {
   await page.getByRole('heading', { name: 'Live', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
   assert.equal(await page.locator('.live-feed-hero > button').filter({ hasText: 'Créer un live' }).count(), 1, 'Live feed must expose one primary creation action in its header');
   assert.equal(await page.getByPlaceholder('Rechercher un live, un créateur, un sujet…').count(), 1, 'Live feed must expose search');
+  assert.equal(await page.getByRole('button', { name: 'Tendance', exact: true }).count(), 1, 'Live feed must expose trending discovery');
   assert.equal(await page.locator('.app-shell-bottom-nav a[href="/app/live"]').count(), 1, 'Mobile navigation must expose Live');
 
   await page.goto('/app/live/new', { waitUntil: 'domcontentloaded', timeout: 20_000 });
