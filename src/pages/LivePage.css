@@ -41,3 +41,43 @@
 }
 @media(max-width:430px){.live-host-controls{grid-template-columns:repeat(2,1fr)}.live-feed-hero p{font-size:12px}.live-feed-categories{margin-right:-12px}.live-room-topbar .live-badge{display:none}}
 @media(prefers-reduced-motion:reduce){.live-feed-card{transition:none}.spin{animation:none}}
+
+
+.live-cover-upload{
+  position:absolute;
+  left:12px;
+  right:12px;
+  bottom:12px;
+  min-height:44px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:0 13px;
+  border:1px solid rgba(255,255,255,.5);
+  border-radius:11px;
+  background:rgba(255,255,255,.94);
+  color:#1f5067;
+  font-size:12px;
+  font-weight:850;
+  cursor:pointer;
+  box-shadow:0 8px 24px rgba(5,28,42,.12);
+}
+.live-cover-upload svg{width:18px}
+.live-cover-upload input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important}
+.live-cover-editor:has(>img){min-height:250px}
+.live-invite-panel{margin-top:12px;padding:12px;border:1px solid #dfe7eb;border-radius:16px;background:#fff}
+.live-invite-panel>header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.live-invite-panel>header>div{display:flex;align-items:center;gap:9px}
+.live-invite-panel>header>div>svg{width:20px;color:#078f8c}
+.live-invite-panel strong,.live-invite-panel small{display:block}
+.live-invite-panel small{margin-top:2px;color:#82939f}
+.live-invite-panel>header>button{display:grid;width:32px;height:32px;place-items:center;border:0;border-radius:9px;background:#f1f6f8;color:#60788b}
+.live-invite-panel form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:10px}
+.live-invite-panel input{min-width:0;padding:10px 11px;border:1px solid #d9e4e9;border-radius:10px;outline:0}
+.live-invite-panel form button{min-height:40px;display:flex;align-items:center;gap:6px;padding:0 12px;border:0;border-radius:10px;background:#0a9995;color:#fff;font-weight:850}
+.live-invite-panel form button svg{width:16px}
+@media(max-width:560px){
+  .live-invite-panel form{grid-template-columns:1fr}
+  .live-invite-panel form button{justify-content:center}
+}
