@@ -100,5 +100,77 @@ export const runProductMigrations = async () => {
     ALTER TABLE room_captions ADD COLUMN IF NOT EXISTS language text NOT NULL DEFAULT '';
     CREATE INDEX IF NOT EXISTS room_captions_meeting_created_idx ON room_captions(meeting_id, created_at);
     CREATE INDEX IF NOT EXISTS room_captions_user_idx ON room_captions(user_id);
+
+    CREATE TABLE IF NOT EXISTS room_live_sessions (
+      id uuid PRIMARY KEY,
+      meeting_id integer NOT NULL UNIQUE REFERENCES room_meetings(id) ON DELETE CASCADE,
+      host_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      title text NOT NULL,
+      description text NOT NULL DEFAULT '',
+      category text NOT NULL DEFAULT 'other',
+      visibility text NOT NULL DEFAULT 'public',
+      cover_url text NOT NULL DEFAULT '',
+      status text NOT NULL DEFAULT 'scheduled',
+      scheduled_for timestamptz NOT NULL,
+      started_at timestamptz,
+      ended_at timestamptz,
+      chat_enabled boolean NOT NULL DEFAULT true,
+      cohosts_enabled boolean NOT NULL DEFAULT true,
+      recording_enabled boolean NOT NULL DEFAULT false,
+      moderation_enabled boolean NOT NULL DEFAULT true,
+      viewer_count integer NOT NULL DEFAULT 0,
+      peak_viewer_count integer NOT NULL DEFAULT 0,
+      like_count integer NOT NULL DEFAULT 0,
+      share_count integer NOT NULL DEFAULT 0,
+      share_token text NOT NULL UNIQUE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS room_live_sessions_feed_idx ON room_live_sessions(status,visibility,scheduled_for DESC);
+    CREATE INDEX IF NOT EXISTS room_live_sessions_host_idx ON room_live_sessions(host_id,created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS room_live_viewers (
+      live_id uuid NOT NULL REFERENCES room_live_sessions(id) ON DELETE CASCADE,
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      joined_at timestamptz NOT NULL DEFAULT now(),
+      last_seen_at timestamptz NOT NULL DEFAULT now(),
+      left_at timestamptz,
+      PRIMARY KEY(live_id,user_id)
+    );
+    CREATE INDEX IF NOT EXISTS room_live_viewers_presence_idx ON room_live_viewers(live_id,left_at,last_seen_at DESC);
+
+    CREATE TABLE IF NOT EXISTS room_live_comments (
+      id uuid PRIMARY KEY,
+      live_id uuid NOT NULL REFERENCES room_live_sessions(id) ON DELETE CASCADE,
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      text text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      deleted_at timestamptz
+    );
+    CREATE INDEX IF NOT EXISTS room_live_comments_live_idx ON room_live_comments(live_id,created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS room_live_likes (
+      live_id uuid NOT NULL REFERENCES room_live_sessions(id) ON DELETE CASCADE,
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY(live_id,user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS room_live_follows (
+      creator_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      follower_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY(creator_id,follower_id)
+    );
+    CREATE INDEX IF NOT EXISTS room_live_follows_follower_idx ON room_live_follows(follower_id,created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS room_live_participation_requests (
+      live_id uuid NOT NULL REFERENCES room_live_sessions(id) ON DELETE CASCADE,
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      status text NOT NULL DEFAULT 'pending',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      responded_at timestamptz,
+      PRIMARY KEY(live_id,user_id)
+    );
   `);
 };
