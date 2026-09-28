@@ -2187,3 +2187,5 @@ html[data-native-app="android"] .android-download-card{
   }
   .login-page{padding-top:0!important}
 }
+
+@media(max-width:900px){.android-welcome-connect{background:linear-gradient(135deg,#087f87,#0b6677)!important}.android-action-icon{background:#087f87!important}.android-guest-action{background:#eef9f8!important}.android-guest-action .android-action-icon{background:#0b8f88!important}.android-apk-action{border-color:#bfe0df!important}.android-apk-action .android-action-icon{background:#ef6b61!important}.android-welcome-benefits svg,.android-welcome-shortcuts svg{color:#087f87!important}.android-welcome-shortcuts button:nth-child(1) svg,.android-welcome-shortcuts button:nth-child(4) svg{color:#ef6b61!important}.primary-login-button{background:linear-gradient(135deg,#087f87,#0b6677)!important}}
