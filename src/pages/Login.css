@@ -2174,3 +2174,16 @@ html[data-native-app="android"] .android-download-card{
   .auth-side.android-credentials-open .android-welcome{display:none!important}
   .auth-side.android-credentials-open .android-login-form-card{display:block!important}
 }
+
+
+/* Login page: no application header on Android. The welcome screen owns its branding. */
+@media(max-width:900px){
+  .login-page .app-header,
+  .login-page .main-header,
+  .login-page header.site-header,
+  .login-page header.app-header,
+  .login-page [class*="top-header"]:not(.login-card-header):not(.registration-modal-header){
+    display:none!important;
+  }
+  .login-page{padding-top:0!important}
+}
