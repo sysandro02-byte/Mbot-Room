@@ -856,7 +856,42 @@ export default function Login({ initialView = 'login' }: LoginProps) {
 
         <section className="auth-side">
           {initialView === 'login' && (
-            <section className="login-card" aria-labelledby="login-title">
+            <section className="android-welcome" aria-label="Bienvenue sur MBotéRoom">
+              <div className="android-welcome-top">
+                <img src={loginBranding.wordmarkUrl} alt="MBotéRoom" />
+                <select aria-label={copy.ariaLanguage} value={language} onChange={(event) => setLanguage(event.target.value as Language)}>
+                  {languageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </div>
+              <p className="android-welcome-tagline">Réunissez-vous sans limites</p>
+              <p className="android-welcome-maker">Application créée par LoukaTech</p>
+              <div className="android-welcome-visual">
+                <img src={loginBranding.illustrationUrl} alt="Réunion vidéo MBotéRoom" />
+              </div>
+              <div className="android-welcome-benefits">
+                <span><ShieldCheck size={21}/><b>Accès sécurisé</b><small>Vos réunions en toute sécurité</small></span>
+                <span><Smartphone size={21}/><b>Tous appareils</b><small>Android, iOS, Web</small></span>
+                <span><UsersRound size={21}/><b>Haute qualité</b><small>Audio et vidéo en HD</small></span>
+              </div>
+              <div className="android-welcome-actions">
+                <button className="android-welcome-connect" type="button" onClick={() => document.getElementById('login-email')?.focus()}><User size={25}/><span><b>MBoté Connect</b><small>Se connecter à mon compte</small></span><ChevronRight/></button>
+                <button type="button" onClick={() => { clearErrors(); setRegisterModalOpen(true); }}><span className="android-action-icon">+</span><span><b>Créer un compte</b><small>Rejoignez MBotéRoom gratuitement</small></span><ChevronRight/></button>
+                <div className="android-action-separator"><span/>ou<span/></div>
+                <button type="button" onClick={goToGuestJoin}><span className="android-action-icon"><UsersRound size={20}/></span><span><b>Rejoindre une réunion</b><small>Avec un ID ou un lien d’invitation</small></span><ChevronRight/></button>
+                <button className="android-guest-action" type="button" onClick={goToGuestJoin}><span className="android-action-icon"><User size={20}/></span><span><b>Continuer en tant qu’invité</b><small>Rejoindre sans créer de compte</small></span><ChevronRight/></button>
+                <a className="android-apk-action" href={ANDROID_APK_URL}><span className="android-action-icon"><Smartphone size={20}/></span><span><b>MBotéRoom pour Android</b><small>Télécharger l’APK</small></span><Download/></a>
+              </div>
+              <div className="android-welcome-shortcuts">
+                <button type="button"><Sparkles/><b>Premium</b><small>Fonctionnalités avancées</small></button>
+                <button type="button" onClick={() => navigate('/app/calendrier')}><CalendarDays/><b>Planifier</b><small>Programmer une réunion</small></button>
+                <button type="button" onClick={() => navigate('/rejoindre')}><Video/><b>Voir une démo</b><small>Découvrir MBotéRoom</small></button>
+                <button type="button" onClick={() => navigate('/aide')}><ShieldCheck/><b>Aide</b><small>Centre d’assistance</small></button>
+              </div>
+              <p className="android-welcome-footer">MBotéRoom application créée par LoukaTech</p>
+            </section>
+          )}
+          {initialView === 'login' && (
+            <section className="login-card android-login-form-card" aria-labelledby="login-title">
               <header className="login-card-header">
                 <span className="auth-card-kicker">Espace sécurisé MBotéRoom</span>
                 <h1 id="login-title">{copy.title}</h1>
