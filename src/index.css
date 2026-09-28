@@ -222,3 +222,70 @@ html[data-platform="android"][data-standalone="true"] body{background:#f4f6fb}
   .simple-info-page{padding:12px}
   .simple-info-page section{border-radius:var(--mb-radius)}
 }
+
+
+/* Android page-by-page visual pass. CSS-only: preserves real API/backend bindings. */
+@media(max-width:900px){
+  /* Auth: login / register / OTP */
+  .login-shell{display:block!important;min-height:100dvh!important}
+  .brand-panel{display:none!important}
+  .login-page{background:linear-gradient(180deg,#f7fbff 0,#fff 42%)!important}
+  .login-page form,.login-page [class*="form-card"],.login-page [class*="auth-card"]{border-radius:22px!important}
+  .login-page input{min-height:52px!important}
+  .login-page button{min-height:48px}
+
+  /* Profile */
+  .profile-pro-page{padding:12px!important;gap:12px!important}
+  .profile-pro-cover{border-radius:22px!important;background:linear-gradient(135deg,#0877f9,#0ba7f5)!important}
+  .profile-pro-side>section,.profile-pro-editor,.profile-pro-quick{border-color:var(--mb-line)!important;border-radius:18px!important;box-shadow:var(--mb-shadow)!important}
+  .profile-pro-save{background:linear-gradient(135deg,var(--mb-primary),var(--mb-primary-2))!important}
+
+  /* Join + preview */
+  .real-join-shell{padding:12px!important;background:var(--mb-bg)!important}
+  .real-join-stage{grid-template-columns:1fr!important;min-height:auto!important;gap:14px!important}
+  .real-join-intro,.real-join-art{display:none!important}
+  .real-join-card{max-width:560px;margin:auto;padding:20px!important;border-color:var(--mb-line)!important;border-radius:22px!important;box-shadow:var(--mb-shadow)!important}
+  .real-join-primary{background:linear-gradient(135deg,var(--mb-primary),var(--mb-primary-2))!important}
+  .real-join-shortcuts{grid-template-columns:1fr 1fr!important}
+
+  /* Waiting room + meeting */
+  [class*="waiting"] [class*="card"],[class*="waiting"] [class*="panel"]{border-radius:20px!important}
+  [class*="meeting"] button{min-height:44px}
+  [class*="meeting"] [class*="toolbar"],[class*="meeting"] [class*="controls"]{padding-bottom:max(10px,env(safe-area-inset-bottom))}
+  [class*="meeting"] [class*="panel"]{border-color:var(--mb-line)!important}
+
+  /* Home/dashboard */
+  [class*="dashboard"] [class*="card"]{border-radius:18px!important;border-color:var(--mb-line)!important;box-shadow:var(--mb-shadow)!important}
+  [class*="dashboard"] [class*="primary"]{background:linear-gradient(135deg,var(--mb-primary),var(--mb-primary-2))!important}
+
+  /* Messages */
+  [class*="messages"]{background:var(--mb-bg)}
+  [class*="messages"] [class*="conversation"],[class*="messages"] [class*="thread"]{border-color:var(--mb-line)!important}
+  [class*="messages"] textarea,[class*="messages"] input{background:#fff!important}
+
+  /* Live */
+  [class*="live"] [class*="card"]{border-radius:18px!important;border-color:var(--mb-line)!important}
+  [class*="live"] button[class*="primary"]{background:linear-gradient(135deg,var(--mb-primary),var(--mb-primary-2))!important}
+
+  /* Calendar */
+  .calendar-pro-page{padding:12px!important;background:var(--mb-bg)!important}
+  .calendar-google-card,.calendar-board,.calendar-create-card,.calendar-upcoming-card{border-color:var(--mb-line)!important;border-radius:18px!important;box-shadow:var(--mb-shadow)!important}
+  .calendar-event-detail-modal{border-radius:22px!important}
+
+  /* Luna + settings */
+  .real-feature-page{padding:12px!important;background:var(--mb-bg)!important}
+  .real-feature-hero{border-radius:20px!important;background:linear-gradient(135deg,#eef6ff,#f7fbff)!important;border-color:var(--mb-line)!important}
+  .real-feature-hero>span,.real-form button,.real-message-form button{background:linear-gradient(135deg,var(--mb-primary),var(--mb-primary-2))!important}
+  .real-card{border-color:var(--mb-line)!important;border-radius:18px!important;box-shadow:var(--mb-shadow)!important}
+
+  /* Admin */
+  [class*="admin-"]{--admin-mobile-primary:var(--mb-primary)}
+  [class*="admin-"][class*="page"],[class*="admin-"][class*="shell"]{background:var(--mb-bg)}
+  [class*="admin-"] [class*="card"],[class*="admin-"] [class*="panel"]{border-color:var(--mb-line)!important;border-radius:18px!important}
+  [class*="admin-"] button{min-height:44px}
+}
+@media(max-width:520px){
+  .real-join-shortcuts{grid-template-columns:1fr!important}
+  .profile-pro-editor{padding:14px!important}
+  [class*="meeting"] [class*="toolbar"] button,[class*="meeting"] [class*="controls"] button{min-width:44px}
+}
