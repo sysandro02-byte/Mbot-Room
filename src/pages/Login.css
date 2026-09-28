@@ -2130,3 +2130,37 @@ html[data-native-app="android"] .android-download-card{
   .login-card,.compact-auth-card{padding:14px!important;border-radius:20px!important}
   .login-card-header h1{font-size:29px!important}
 }
+
+
+/* Approved Android welcome composition */
+.android-welcome{display:none}
+@media(max-width:900px){
+ .android-welcome{display:block;width:100%;max-width:560px;margin:0 auto 14px;padding:18px 14px 14px;box-sizing:border-box;background:linear-gradient(180deg,#f8fbff,#fff);border:1px solid #e0eaf6;border-radius:0 0 26px 26px;box-shadow:0 12px 34px rgba(15,70,135,.08)}
+ .auth-side:has(.android-welcome):before{display:none!important}
+ .android-welcome-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+ .android-welcome-top img{width:180px;max-height:58px;object-fit:contain;object-position:left center}
+ .android-welcome-top select{width:auto!important;min-height:38px!important;padding:0 28px 0 10px!important;border:1px solid #e2eaf4!important;border-radius:999px!important;background:#fff!important;font-size:12px!important}
+ .android-welcome-tagline{margin:2px 0 0;text-align:center;font-size:18px;font-weight:800;color:#123766}
+ .android-welcome-maker{margin:2px 0 10px;text-align:center;font-size:12px;color:#6e82a0}
+ .android-welcome-visual{height:250px;overflow:hidden;border-radius:24px;background:linear-gradient(135deg,#eaf4ff,#f9fcff)}
+ .android-welcome-visual img{width:100%;height:100%;object-fit:cover;object-position:center}
+ .android-welcome-benefits{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:-24px 8px 12px;position:relative;padding:10px 6px;border-radius:17px;background:rgba(255,255,255,.94);box-shadow:0 9px 25px rgba(18,77,150,.14);backdrop-filter:blur(12px)}
+ .android-welcome-benefits span{display:grid;grid-template-columns:26px 1fr;grid-template-rows:auto auto;align-items:center;padding:4px 6px;border-right:1px solid #e5edf7}
+ .android-welcome-benefits span:last-child{border-right:0}.android-welcome-benefits svg{grid-row:1/3;color:#0877f9}
+ .android-welcome-benefits b{font-size:9px;color:#17365d}.android-welcome-benefits small{font-size:7px;color:#6f8098}
+ .android-welcome-actions{display:flex;flex-direction:column;gap:9px;padding:12px;border-radius:22px;background:#fff;box-shadow:0 8px 26px rgba(17,74,140,.09)}
+ .android-welcome-actions button,.android-welcome-actions a{display:grid;grid-template-columns:42px 1fr 24px;align-items:center;gap:10px;min-height:62px;padding:8px 12px;border:0;border-radius:16px;background:#f5f9ff;color:#12345e;text-align:left;text-decoration:none}
+ .android-welcome-actions button>span:nth-child(2),.android-welcome-actions a>span:nth-child(2){display:flex;flex-direction:column}
+ .android-welcome-actions b{font-size:14px}.android-welcome-actions small{margin-top:2px;font-size:10px;color:#6e8099}
+ .android-welcome-actions .android-welcome-connect{background:linear-gradient(135deg,#0877f9,#095ee8);color:#fff;box-shadow:0 9px 20px rgba(8,119,249,.2)}
+ .android-welcome-connect small{color:#e8f3ff!important}
+ .android-action-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:#0877f9;color:#fff;font-size:26px}
+ .android-guest-action{background:#eefaf3!important}.android-guest-action .android-action-icon{background:#16ad61}
+ .android-apk-action{border:1px solid #cfe0fb!important;background:#fff!important}.android-apk-action .android-action-icon{background:#19ad61}
+ .android-action-separator{display:flex;align-items:center;gap:10px;justify-content:center;font-size:11px;color:#7c8ca2}.android-action-separator span{height:1px;flex:1;background:#dfe8f3}
+ .android-welcome-shortcuts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+ .android-welcome-shortcuts button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:74px;padding:7px 3px;border:1px solid #e5edf7;border-radius:15px;background:#fff;color:#12365f}
+ .android-welcome-shortcuts svg{width:20px;color:#0877f9}.android-welcome-shortcuts b{font-size:9px}.android-welcome-shortcuts small{font-size:7px;color:#71829a;text-align:center}
+ .android-welcome-footer{text-align:center;font-size:9px;color:#58708f;margin:10px 0 0}
+ .android-login-form-card{margin-top:14px!important}
+}
