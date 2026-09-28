@@ -2080,3 +2080,53 @@ html[data-native-app="android"] .android-download-card{
   .google-config-progress span{animation:none;width:70%}
   .android-download-primary{animation:none!important}
 }
+
+
+/* 2026 Android redesign — auth experience */
+.mobile-auth-header{display:none}
+@media(max-width:900px){
+  .login-page{min-height:100dvh;background:#f7fbff!important}
+  .login-shell{display:block!important;min-height:auto!important}
+  .brand-panel{display:none!important}
+  .auth-side{width:100%!important;min-height:auto!important;padding:0 14px 32px!important;box-sizing:border-box;background:transparent!important}
+  .auth-side:before{content:"";display:block;height:86px;margin:0 -14px 12px;background:#fff url('/icons/mboteroom-wordmark.png') no-repeat 18px center;background-size:145px auto;border-bottom:1px solid #e5eef8}
+  .login-card,.compact-auth-card{width:100%!important;max-width:560px!important;margin:0 auto!important;padding:18px!important;box-sizing:border-box;border:1px solid #dce8f7!important;border-radius:24px!important;background:#fff!important;box-shadow:0 12px 34px rgba(15,70,135,.09)!important}
+  .login-card-header{padding:10px 4px 20px!important;text-align:left!important}
+  .login-card-header .auth-card-kicker{display:inline-flex!important;padding:7px 12px!important;border-radius:999px!important;background:#eaf9f7!important;color:#087e83!important;font-size:10px!important;font-weight:900!important;letter-spacing:.06em!important}
+  .login-card-header h1{margin:13px 0 6px!important;font-size:32px!important;line-height:1.08!important;color:#092d58!important}
+  .login-card-header p{margin:0!important;font-size:14px!important;line-height:1.5!important;color:#6c7f99!important}
+  .auth-security-badges{display:flex!important;gap:7px!important;overflow-x:auto!important;margin-top:14px!important;padding-bottom:3px!important;scrollbar-width:none}
+  .auth-security-badges::-webkit-scrollbar{display:none}
+  .auth-security-badges span{flex:0 0 auto!important;padding:7px 9px!important;border:1px solid #dce7f4!important;border-radius:999px!important;background:#fbfdff!important;color:#536b89!important;font-size:9px!important}
+  .login-form{gap:15px!important}
+  .form-group label{font-size:13px!important;font-weight:800!important;color:#16365d!important}
+  .input-shell{min-height:54px!important;border:1px solid #d7e2ef!important;border-radius:16px!important;background:#fff!important;box-shadow:none!important}
+  .input-shell:focus-within{border-color:#238cf5!important;box-shadow:0 0 0 4px rgba(35,140,245,.08)!important}
+  .input-shell input,.input-shell select{height:52px!important;font-size:14px!important;background:transparent!important}
+  .input-icon{color:#7186a4!important}
+  .form-options{align-items:center!important;gap:12px!important}
+  .remember-control,.auth-text-link{font-size:12px!important}
+  .auth-text-link{color:#0877f9!important;font-weight:800!important}
+  .primary-login-button{min-height:54px!important;border-radius:16px!important;background:linear-gradient(135deg,#0877f9,#0aa4ed)!important;box-shadow:0 10px 22px rgba(8,119,249,.20)!important;font-size:15px!important}
+  .auth-separator{margin:2px 0!important}
+  .external-login-row{display:block!important}
+  .google-login-button{width:100%!important;min-height:52px!important;border-radius:15px!important;border:1px solid #d9e5f2!important;background:#fff!important;color:#16365d!important}
+  .join-meeting-card{min-height:82px!important;border:1px solid #dce7f4!important;border-radius:18px!important;background:#f8fbff!important}
+  .join-meeting-icon{background:#e9f4ff!important;color:#0877f9!important}
+  .android-download-card{border:1px solid #dce7f4!important;border-radius:18px!important;background:linear-gradient(135deg,#f7fbff,#f1f9ff)!important}
+  .android-download-primary{background:#0877f9!important;border-radius:12px!important}
+  .android-download-share{border-radius:12px!important}
+  .create-account-copy{padding-top:4px!important;font-size:12px!important}
+  .create-account-copy button{color:#0877f9!important}
+  .auth-modal{width:min(92vw,520px)!important;border-radius:24px!important}
+  .registration-modal{max-height:90dvh!important}
+  .registration-modal-grid{grid-template-columns:1fr!important}
+  .otp-login-modal{text-align:center!important}
+  .otp-login-form input{height:58px!important;border-radius:16px!important;font-size:24px!important;letter-spacing:.35em!important;text-align:center!important}
+}
+@media(max-width:390px){
+  .auth-side{padding-left:10px!important;padding-right:10px!important}
+  .auth-side:before{margin-left:-10px;margin-right:-10px}
+  .login-card,.compact-auth-card{padding:14px!important;border-radius:20px!important}
+  .login-card-header h1{font-size:29px!important}
+}
