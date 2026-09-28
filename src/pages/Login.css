@@ -2164,3 +2164,13 @@ html[data-native-app="android"] .android-download-card{
  .android-welcome-footer{text-align:center;font-size:9px;color:#58708f;margin:10px 0 0}
  .android-login-form-card{margin-top:14px!important}
 }
+
+
+/* Android landing is the only visible login surface.
+   The credential form remains mounted for existing auth logic and opens only
+   when MBoté Connect is selected. */
+@media(max-width:900px){
+  .android-login-form-card{display:none!important}
+  .auth-side.android-credentials-open .android-welcome{display:none!important}
+  .auth-side.android-credentials-open .android-login-form-card{display:block!important}
+}
