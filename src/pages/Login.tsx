@@ -855,7 +855,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       <section className="login-shell" aria-label="Connexion MBotéRoom">
         <AuthBrandPanel copy={copy} language={language} branding={loginBranding} onLanguageChange={setLanguage} />
 
-        <section className={`auth-side${showAndroidCredentials ? ' android-credentials-open' : ''}`}>
+        <section className="auth-side">
           {initialView === 'login' && (
             <section className="android-welcome" aria-label="Bienvenue sur MBotéRoom">
               <div className="android-welcome-top">
@@ -888,8 +888,8 @@ export default function Login({ initialView = 'login' }: LoginProps) {
               <p className="android-welcome-footer">MBotéRoom application créée par LoukaTech</p>
             </section>
           )}
-          {initialView === 'login' && (
-            <section className="login-card android-login-form-card" aria-labelledby="login-title">
+          {showAndroidCredentials && (
+            <div className="android-login-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAndroidCredentials(false); }}><section className="login-card android-login-form-card android-login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="android-login-modal-close" type="button" aria-label="Fermer" onClick={() => setShowAndroidCredentials(false)}>×</button>
               <header className="login-card-header">
                 <span className="auth-card-kicker">Espace sécurisé MBotéRoom</span>
                 <h1 id="login-title">{copy.title}</h1>
@@ -1041,7 +1041,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                   </button>
                 </p>
               </form>
-            </section>
+            </section></div>
           )}
 
           {initialView === 'register' && (
