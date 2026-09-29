@@ -56,3 +56,19 @@
  .terms-modal-footer>div{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important;padding-bottom:2px!important}
  .terms-modal-footer button{min-height:46px!important;height:auto!important;padding:8px 10px!important;line-height:1.15!important;white-space:normal!important}
 }
+
+/* Hard reset for the nested legal dialog on phones. Parent sheet styles must not leak in. */
+@media(max-width:640px){
+ .terms-modal-backdrop{position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:0!important;z-index:10000!important;box-sizing:border-box!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:14px!important;overflow:hidden!important;background:rgba(4,25,39,.55)!important}
+ .terms-modal-backdrop>.terms-modal{position:relative!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;transform:none!important;width:calc(100vw - 28px)!important;max-width:620px!important;height:calc(100dvh - 44px)!important;max-height:760px!important;min-height:0!important;margin:0!important;padding:0!important;display:grid!important;grid-template-rows:auto minmax(0,1fr) auto!important;border:1px solid #dbe7eb!important;border-radius:20px!important;overflow:hidden!important;background:#fff!important;box-shadow:0 24px 70px rgba(6,35,54,.3)!important}
+ .terms-modal-backdrop>.terms-modal::before,.terms-modal-backdrop>.terms-modal::after{content:none!important;display:none!important}
+ .terms-modal>header{position:static!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;width:auto!important;min-height:68px!important;margin:0!important;padding:12px 14px!important;overflow:visible!important;background:#fbfdfd!important}
+ .terms-modal>header>div{display:flex!important;align-items:center!important;gap:9px!important;min-width:0!important;flex:1 1 auto!important}
+ .terms-modal>header>div>div{min-width:0!important}
+ .terms-modal h2{display:block!important;margin:0!important;padding:0!important;font-size:17px!important;line-height:1.2!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+ .terms-modal>header>button{position:static!important;inset:auto!important;transform:none!important;display:grid!important;place-items:center!important;flex:0 0 38px!important;width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;margin:0!important;padding:0!important;border:0!important;border-radius:50%!important;background:#eef4f5!important}
+ .terms-modal-body{min-height:0!important;height:auto!important;overflow-y:auto!important;margin:0!important;padding:14px 16px!important}
+ .terms-modal-footer{position:static!important;inset:auto!important;height:auto!important;min-height:0!important;margin:0!important;padding:10px 14px 14px!important;overflow:visible!important;background:#fbfdfd!important}
+ .terms-modal-footer>div{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important}
+ .terms-modal-footer button{display:flex!important;align-items:center!important;justify-content:center!important;min-height:44px!important;margin:0!important;padding:8px!important;overflow:visible!important}
+}
