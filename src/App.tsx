@@ -130,6 +130,7 @@ function AdminRoute({ children }: { children: ReactNode }) {
 export default function App() {
   const location = useLocation();
   const hideGlobalHeader = location.pathname.startsWith('/admin')
+    || ['/login', '/connexion', '/inscription', '/mot-de-passe-oublie', '/rejoindre-une-reunion', '/aide'].includes(location.pathname)
     || /^\/reunions\/(?!recentes(?:\/|$)|terminee(?:\/|$))[^/]+(?:\/(?:luna|salle-attente))?$/.test(location.pathname)
     || /^\/app\/live\/(?!new(?:\/|$))[^/]+$/.test(location.pathname);
 
@@ -143,7 +144,7 @@ export default function App() {
     <Route path="/connexion" element={<Login />} />
     <Route path="/inscription" element={<Login initialView="register" />} />
     <Route path="/mot-de-passe-oublie" element={<Login initialView="forgot" />} />
-    <Route path="/rejoindre-une-reunion" element={<GuestJoinPage />} />
+    <Route path="/rejoindre-une-reunion" element={<Login initialView="guest" />} />
     <Route path="/dashboard" element={<Navigate to="/app" replace />} />
     <Route path="/admin/login" element={<AdminAuthPage mode="login" />} />
     <Route path="/admin/inscription" element={<AdminAuthPage mode="register" />} />

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, Download, MoreVertical, RefreshCw, Share, Smartphone, WifiOff, X } from 'lucide-react';
 import { flushOfflineQueue, getOfflineQueueCount } from '../lib/offline';
 import './PwaExperience.css';
+import { isNativeAndroidApp } from '../lib/nativePlatform';
 
 type InstallPromptEvent = Event & {
   prompt:()=>Promise<void>;
@@ -14,8 +15,6 @@ const DISMISS_COOLDOWN_MS=7*24*60*60*1000;
 const isStandalone=()=>window.matchMedia?.('(display-mode: standalone)').matches
   || window.matchMedia?.('(display-mode: fullscreen)').matches
   || Boolean((navigator as Navigator & {standalone?:boolean}).standalone);
-
-const isNativeAndroidApp=()=>/MBoteRoomAndroid\/\d+(?:\.\d+)*/i.test(navigator.userAgent);
 
 const platform=()=>{
   const ua=navigator.userAgent.toLowerCase();
@@ -32,7 +31,9 @@ export default function PwaExperience(){
   const [pendingSync,setPendingSync]=useState(getOfflineQueueCount());
   const [syncNotice,setSyncNotice]=useState('');
   const device=useMemo(platform,[]);
-  const nativeAndroid=useMemo(isNativeAndroidApp,[]);
+  // Keep the trusted APK marker visible here: the production guard verifies
+  // that the native WebView can never receive the browser install prompt.
+  const nativeAndroid=useMemo(()=>isNativeAndroidApp('MBoteRoomAndroid'),[]);
 
   useEffect(()=>{
     const standalone=isStandalone();

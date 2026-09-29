@@ -1102,3 +1102,16 @@
     text-align:center;
   }
 }
+
+
+/* Compact help card on Android */
+@media(max-width:900px){
+ .guest-join-right{margin-top:12px!important}
+ .guest-side-card.information-card{display:grid!important;grid-template-columns:44px 1fr!important;gap:12px!important;align-items:center!important;padding:14px 16px!important;min-height:0!important;border-radius:16px!important}
+ .information-card-icon{width:44px!important;height:44px!important;border-radius:13px!important}
+ .information-card-icon svg{width:24px!important;height:24px!important}
+ .information-card h2{margin:0 0 3px!important;font-size:17px!important;line-height:1.2!important}
+ .information-card p{margin:0 0 5px!important;font-size:12px!important;line-height:1.35!important}
+ .information-card a{display:inline-flex!important;align-items:center!important;gap:2px!important;font-size:12px!important;font-weight:800!important;color:#087f87!important}
+ .information-card a svg{width:14px!important;height:14px!important}
+}

@@ -14,3 +14,82 @@
 .terms-modal-footer>small{color:#8b6d22;font-size:10px}.terms-modal-footer>div{display:flex;justify-content:flex-end;gap:8px}
 .terms-modal-footer button{min-height:40px;padding:0 14px;border:1px solid #ccd9df;border-radius:10px;background:#fff;color:#29445a;font-weight:800;cursor:pointer}.terms-modal-footer button.primary{border-color:#078d8e;background:#078d8e;color:#fff}.terms-modal-footer button:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:640px){.terms-modal-backdrop{padding:8px}.terms-modal{max-height:94dvh;border-radius:16px}.terms-modal>header,.terms-modal-footer{padding:13px}.terms-modal-body{padding:15px}.terms-modal-footer>div{display:grid;grid-template-columns:1fr 1fr}.terms-modal-footer button{padding:0 8px;font-size:11px}}
+
+/* Legal terms stays a conventional centered dialog, even inside Android bottom sheets. */
+@media(max-width:640px){
+ .terms-modal-backdrop{z-index:2200!important;display:grid!important;place-items:center!important;align-items:center!important;padding:16px!important;background:rgba(4,25,39,.56)!important;backdrop-filter:blur(6px)!important;-webkit-backdrop-filter:blur(6px)!important}
+ .terms-modal{width:min(94vw,620px)!important;max-height:88dvh!important;margin:auto!important;border-radius:20px!important;transform:none!important;animation:none!important;background:#fff!important}
+ .terms-modal:before{display:none!important;content:none!important}
+ .terms-modal>header{padding:14px 16px!important}
+ .terms-modal>header>button{position:static!important;width:38px!important;height:38px!important;margin:0!important}
+ .terms-modal-body{min-height:180px!important;padding:16px!important}
+ .terms-modal-footer{padding:14px 16px calc(14px + env(safe-area-inset-bottom))!important}
+}
+
+/* Mobile legal dialog: conventional full, centered modal with stable header/footer. */
+@media(max-width:640px){
+ .terms-modal-backdrop{position:fixed!important;inset:0!important;z-index:9999!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:18px 14px!important;overflow:hidden!important}
+ .terms-modal{position:relative!important;inset:auto!important;width:100%!important;max-width:620px!important;height:auto!important;max-height:calc(100dvh - 36px)!important;margin:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;border-radius:20px!important}
+ .terms-modal>header{position:relative!important;flex:0 0 auto!important;display:flex!important;align-items:center!important;justify-content:space-between!important;min-height:72px!important;padding:14px 16px!important}
+ .terms-modal>header>div{min-width:0!important;flex:1!important}
+ .terms-modal h2{font-size:18px!important;line-height:1.2!important;white-space:normal!important}
+ .terms-modal>header>button{flex:0 0 38px!important;position:relative!important;inset:auto!important;transform:none!important}
+ .terms-modal-body{flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important;padding:16px!important}
+ .terms-modal-footer{position:relative!important;flex:0 0 auto!important;padding:12px 14px calc(12px + env(safe-area-inset-bottom))!important;background:#fbfdfd!important}
+ .terms-modal-footer>div{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important}
+}
+
+/* Mobile legal modal: fix clipping and isolate its single close control. */
+@media(max-width:640px){
+ .terms-modal-backdrop{padding:12px!important;box-sizing:border-box!important}
+ .terms-modal{width:calc(100vw - 24px)!important;max-height:calc(100dvh - 24px)!important;border-radius:20px!important;overflow:hidden!important}
+ .terms-modal>header{min-height:76px!important;padding:12px 14px!important;gap:10px!important;overflow:visible!important}
+ .terms-modal>header>div{display:flex!important;align-items:center!important;gap:9px!important;min-width:0!important}
+ .terms-modal>header>div>div{min-width:0!important}
+ .terms-modal h2{margin:0!important;font-size:17px!important;line-height:1.18!important;white-space:normal!important;overflow-wrap:normal!important;word-break:normal!important}
+ .terms-modal header small{font-size:11px!important}
+ .terms-modal>header>button{display:grid!important;place-items:center!important;flex:0 0 38px!important;width:38px!important;height:38px!important;min-width:38px!important;padding:0!important;border-radius:50%!important}
+ .terms-modal>header>button:before,.terms-modal>header>button:after{content:none!important;display:none!important}
+ .terms-modal-body{padding:14px 16px!important}
+ .terms-modal-footer{padding:10px 14px calc(18px + env(safe-area-inset-bottom))!important;overflow:visible!important}
+ .terms-modal-footer label{font-size:11px!important}
+ .terms-modal-footer>div{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important;padding-bottom:2px!important}
+ .terms-modal-footer button{min-height:46px!important;height:auto!important;padding:8px 10px!important;line-height:1.15!important;white-space:normal!important}
+}
+
+/* Hard reset for the nested legal dialog on phones. Parent sheet styles must not leak in. */
+@media(max-width:640px){
+ .terms-modal-backdrop{position:fixed!important;top:0!important;right:0!important;bottom:0!important;left:0!important;z-index:10000!important;box-sizing:border-box!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:14px!important;overflow:hidden!important;background:rgba(4,25,39,.55)!important}
+ .terms-modal-backdrop>.terms-modal{position:relative!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;transform:none!important;width:calc(100vw - 28px)!important;max-width:620px!important;height:calc(100dvh - 44px)!important;max-height:760px!important;min-height:0!important;margin:0!important;padding:0!important;display:grid!important;grid-template-rows:auto minmax(0,1fr) auto!important;border:1px solid #dbe7eb!important;border-radius:20px!important;overflow:hidden!important;background:#fff!important;box-shadow:0 24px 70px rgba(6,35,54,.3)!important}
+ .terms-modal-backdrop>.terms-modal::before,.terms-modal-backdrop>.terms-modal::after{content:none!important;display:none!important}
+ .terms-modal>header{position:static!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;width:auto!important;min-height:68px!important;margin:0!important;padding:12px 14px!important;overflow:visible!important;background:#fbfdfd!important}
+ .terms-modal>header>div{display:flex!important;align-items:center!important;gap:9px!important;min-width:0!important;flex:1 1 auto!important}
+ .terms-modal>header>div>div{min-width:0!important}
+ .terms-modal h2{display:block!important;margin:0!important;padding:0!important;font-size:17px!important;line-height:1.2!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+ .terms-modal>header>button{position:static!important;inset:auto!important;transform:none!important;display:grid!important;place-items:center!important;flex:0 0 38px!important;width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;margin:0!important;padding:0!important;border:0!important;border-radius:50%!important;background:#eef4f5!important}
+ .terms-modal-body{min-height:0!important;height:auto!important;overflow-y:auto!important;margin:0!important;padding:14px 16px!important}
+ .terms-modal-footer{position:static!important;inset:auto!important;height:auto!important;min-height:0!important;margin:0!important;padding:10px 14px 14px!important;overflow:visible!important;background:#fbfdfd!important}
+ .terms-modal-footer>div{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important}
+ .terms-modal-footer button{display:flex!important;align-items:center!important;justify-content:center!important;min-height:44px!important;margin:0!important;padding:8px!important;overflow:visible!important}
+}
+
+/* Definitive phone layout for legal dialog: one close button, no parent-sheet chrome. */
+@media(max-width:640px){
+ .terms-modal-backdrop{padding:18px 12px!important}
+ .terms-modal-backdrop>.terms-modal{width:calc(100vw - 24px)!important;height:min(86dvh,720px)!important;max-height:calc(100dvh - 36px)!important;border-radius:18px!important}
+ .terms-modal>header{min-height:74px!important;padding:12px 14px!important}
+ .terms-modal>header>div{align-items:center!important}
+ .terms-modal h2{font-size:16px!important;line-height:1.18!important;max-width:calc(100vw - 135px)!important}
+ .terms-modal>header>button{position:static!important;flex:0 0 36px!important;width:36px!important;height:36px!important;min-width:36px!important;min-height:36px!important;background:#eef4f5!important}
+ .terms-modal-body{padding:14px 16px!important;font-size:14px!important}
+ .terms-modal-body p{font-size:14px!important;line-height:1.65!important}
+ .terms-modal-footer{padding:10px 14px 12px!important}
+ .terms-modal-footer label{font-size:10.5px!important;line-height:1.35!important}
+ .terms-modal-footer>div{gap:8px!important}
+ .terms-modal-footer button{min-height:42px!important;font-size:11px!important}
+ body:has(.terms-modal-backdrop) .guest-modal-close,
+ body:has(.terms-modal-backdrop) .forgot-modal-close,
+ body:has(.terms-modal-backdrop) .registration-modal-close,
+ body:has(.terms-modal-backdrop) .android-login-modal-close{visibility:hidden!important;pointer-events:none!important}
+ body:has(.terms-modal-backdrop) .terms-modal>header>button{visibility:visible!important;pointer-events:auto!important}
+}
