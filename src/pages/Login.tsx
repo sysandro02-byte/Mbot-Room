@@ -335,6 +335,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [meetingCode, setMeetingCode] = useState('');
   const [meetingPassword, setMeetingPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showAndroidCredentials, setShowAndroidCredentials] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isMboteLoading, setIsMboteLoading] = useState(false);
   const [apkShareMessage, setApkShareMessage] = useState('');
@@ -854,7 +855,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       <section className="login-shell" aria-label="Connexion MBotéRoom">
         <AuthBrandPanel copy={copy} language={language} branding={loginBranding} onLanguageChange={setLanguage} />
 
-        <section className="auth-side">
+        <section className={`auth-side${showAndroidCredentials ? ' android-credentials-open' : ''}`}>
           {initialView === 'login' && (
             <section className="android-welcome" aria-label="Bienvenue sur MBotéRoom">
               <div className="android-welcome-top">
@@ -873,7 +874,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                 <span><UsersRound size={21}/><b>Haute qualité</b><small>Audio et vidéo en HD</small></span>
               </div>
               <div className="android-welcome-actions">
-                <button className="android-welcome-connect" type="button" onClick={() => document.getElementById('login-email')?.focus()}><User size={25}/><span><b>Connexion</b><small>Se connecter à mon compte</small></span><ChevronRight/></button>
+                <button className="android-welcome-connect" type="button" onClick={() => setShowAndroidCredentials(true)}><User size={25}/><span><b>Connexion</b><small>Se connecter à mon compte</small></span><ChevronRight/></button>
                 <button type="button" onClick={() => { clearErrors(); setRegisterModalOpen(true); }}><span className="android-action-icon">+</span><span><b>Créer un compte</b><small>Rejoignez MBotéRoom gratuitement</small></span><ChevronRight/></button>
                 <button className="android-guest-action" type="button" onClick={goToGuestJoin}><span className="android-action-icon"><User size={20}/></span><span><b>Continuer en tant qu’invité</b><small>Rejoindre sans créer de compte</small></span><ChevronRight/></button>
                 <a className="android-apk-action" href={ANDROID_APK_URL}><span className="android-action-icon"><Smartphone size={20}/></span><span><b>MBotéRoom pour Android</b><small>Télécharger l’APK</small></span><Download/></a>
