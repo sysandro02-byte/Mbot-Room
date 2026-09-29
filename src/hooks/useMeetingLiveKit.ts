@@ -60,6 +60,8 @@ export function useMeetingLiveKit({
 }: UseMeetingLiveKitOptions) {
   const roomRef = useRef<LiveKitRoomLike | null>(null);
   const sdkRef = useRef<LiveKitSdk | null>(null);
+  const onNoticeRef = useRef(onNotice);
+  const onFailureRef = useRef(onFailure);
   const publishedTracksRef = useRef<Map<MediaStreamTrack, LiveKitTrackPublicationLike>>(new Map());
   const publishGenerationRef = useRef(0);
   const remoteStreamsRef = useRef<Map<string, MediaStream>>(new Map());
@@ -73,6 +75,14 @@ export function useMeetingLiveKit({
     connectedPeers: 0,
     totalPeers: 0,
   });
+
+  useEffect(() => {
+    onNoticeRef.current = onNotice;
+  }, [onNotice]);
+
+  useEffect(() => {
+    onFailureRef.current = onFailure;
+  }, [onFailure]);
 
   const rebuildRemoteParticipants = useCallback(() => {
     const room = roomRef.current;
@@ -203,12 +213,12 @@ export function useMeetingLiveKit({
           if (cancelled) return;
           setStatus('failed');
           setNetworkQuality({ level: 'offline', rttMs: null, packetLossPct: null, connectedPeers: 0, totalPeers: 0 });
-          onFailure?.('La connexion de la réunion a changé automatiquement pour rester active.');
+          onFailureRef.current?.('La connexion de la réunion a changé automatiquement pour rester active.');
         };
         const handleReconnecting = () => {
           if (!cancelled) {
             setNetworkQuality((current) => ({ ...current, level: 'poor' }));
-            onNotice?.('Reconnexion au serveur média SFU…');
+            onNoticeRef.current?.('Reconnexion au serveur média SFU…');
           }
         };
         const handleReconnected = () => {
@@ -276,7 +286,7 @@ export function useMeetingLiveKit({
         if (roomRef.current === room) roomRef.current = null;
         setStatus('failed');
         setNetworkQuality({ level: 'offline', rttMs: null, packetLossPct: null, connectedPeers: 0, totalPeers: 0 });
-        onFailure?.(message);
+        onFailureRef.current?.(message);
       }
     };
 
@@ -295,7 +305,7 @@ export function useMeetingLiveKit({
       setRemoteParticipants([]);
       setActiveSpeakerSocketId(null);
     };
-  }, [breakoutRoomId, enabled, meetingId, sessionKey, onFailure, onNotice, rebuildRemoteParticipants]);
+  }, [breakoutRoomId, enabled, meetingId, sessionKey, rebuildRemoteParticipants]);
 
   useEffect(() => {
     if (status !== 'connected') return;
@@ -341,9 +351,9 @@ export function useMeetingLiveKit({
     };
 
     void sync().catch(() => {
-      onNotice?.('Une piste locale n’a pas pu être publiée sur le SFU.');
+      onNoticeRef.current?.('Une piste locale n’a pas pu être publiée sur le SFU.');
     });
-  }, [localStream, media.audio, media.screen, media.video, onNotice, status]);
+  }, [localStream, media.audio, media.screen, media.video, status]);
 
   return {
     status,
