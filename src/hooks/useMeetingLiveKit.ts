@@ -235,12 +235,26 @@ export function useMeetingLiveKit({
         listen(sdk, 'Reconnecting', handleReconnecting);
         listen(sdk, 'Reconnected', handleReconnected);
 
-        await room.connect(session.serverUrl, session.participantToken, {
-          autoSubscribe: true,
-          maxRetries: 3,
-          websocketTimeout: 12_000,
-          peerConnectionTimeout: 15_000,
-        });
+        const connectDeadlineMs = 22_000;
+        let deadlineTimer = 0;
+        try {
+          await Promise.race([
+            room.connect(session.serverUrl, session.participantToken, {
+              autoSubscribe: true,
+              maxRetries: 1,
+              websocketTimeout: 10_000,
+              peerConnectionTimeout: 12_000,
+            }),
+            new Promise<void>((_resolve, reject) => {
+              deadlineTimer = window.setTimeout(
+                () => reject(new Error('Le serveur média met trop de temps à répondre.')),
+                connectDeadlineMs,
+              );
+            }),
+          ]);
+        } finally {
+          if (deadlineTimer) window.clearTimeout(deadlineTimer);
+        }
         if (cancelled) {
           await room.disconnect(false).catch(() => undefined);
           return;
@@ -257,10 +271,12 @@ export function useMeetingLiveKit({
         refresh();
       } catch (cause) {
         if (cancelled) return;
-        const message = cause instanceof Error ? cause.message : 'Connexion SFU impossible.';
+        const message = cause instanceof Error ? cause.message : 'Connexion au serveur média impossible.';
+        await room?.disconnect(false).catch(() => undefined);
+        if (roomRef.current === room) roomRef.current = null;
         setStatus('failed');
         setNetworkQuality({ level: 'offline', rttMs: null, packetLossPct: null, connectedPeers: 0, totalPeers: 0 });
-        onFailure?.(`${message} Retour au mode WebRTC direct.`);
+        onFailure?.(message);
       }
     };
 
