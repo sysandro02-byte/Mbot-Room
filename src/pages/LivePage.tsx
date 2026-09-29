@@ -206,6 +206,7 @@ export function LiveRoomPage(){
   const [duration,setDuration]=useState('');
   const [summary,setSummary]=useState<{bullets:string[];decisions:string[];actions:string[]}|null>(null);
   const recordingIdRef=useRef('');
+  const mediaRetryAttemptsRef=useRef(0);
   const localVideoRef=useRef<HTMLVideoElement|null>(null);
   const remoteVideoRef=useRef<HTMLVideoElement|null>(null);
   const publisher=joinRole==='host'||joinRole==='cohost';
@@ -221,6 +222,39 @@ export function LiveRoomPage(){
   });
 
   const hostRemote=useMemo(()=>liveKit.remoteParticipants.find((participant)=>String(participant.userId)===String(live?.hostId))||liveKit.remoteParticipants[0]||null,[liveKit.remoteParticipants,live?.hostId]);
+
+  useEffect(()=>{
+    if(liveKit.connected){
+      mediaRetryAttemptsRef.current=0;
+      return;
+    }
+    if(!joined||live?.status!=='live'||!liveKit.failed||mediaRetryAttemptsRef.current>=3)return;
+    const attempt=mediaRetryAttemptsRef.current+1;
+    const timer=window.setTimeout(()=>{
+      mediaRetryAttemptsRef.current=attempt;
+      setError('');
+      setNotice(`Reconnexion au serveur média (${attempt}/3)…`);
+      setMediaSessionKey((value)=>value+1);
+    },attempt===1?1200:2500);
+    return()=>window.clearTimeout(timer);
+  },[joined,live?.status,liveKit.connected,liveKit.failed]);
+
+  useEffect(()=>{
+    if(!joined||live?.status!=='live')return;
+    const retryAfterNetworkReturn=()=>{
+      if(!liveKit.failed)return;
+      mediaRetryAttemptsRef.current=0;
+      setError('');
+      setMediaSessionKey((value)=>value+1);
+    };
+    const onVisibility=()=>{if(document.visibilityState==='visible')retryAfterNetworkReturn();};
+    window.addEventListener('online',retryAfterNetworkReturn);
+    document.addEventListener('visibilitychange',onVisibility);
+    return()=>{
+      window.removeEventListener('online',retryAfterNetworkReturn);
+      document.removeEventListener('visibilitychange',onVisibility);
+    };
+  },[joined,live?.status,liveKit.failed]);
 
   useEffect(()=>{if(localVideoRef.current)localVideoRef.current.srcObject=localStream;},[localStream]);
   useEffect(()=>{if(remoteVideoRef.current)remoteVideoRef.current.srcObject=publisher?hostRemote?.stream||null:hostRemote?.stream||null;},[hostRemote?.stream,publisher]);
@@ -302,6 +336,12 @@ export function LiveRoomPage(){
 
   useEffect(()=>()=>{cameraStreamRef.current?.getTracks().forEach((track)=>track.stop());localStream?.getTracks().forEach((track)=>track.stop());},[]);
 
+  const retryMedia=()=>{
+    mediaRetryAttemptsRef.current=0;
+    setError('');
+    setNotice('Nouvelle tentative de connexion au serveur média…');
+    setMediaSessionKey((value)=>value+1);
+  };
   const startLive=async()=>{
     if(!live)return;setBusy('start');
     try{const updated=await liveService.start(live.id);setLive(updated);const joinedResult=await liveService.join(live.id,inviteToken);setJoinRole(joinedResult.role);setJoined(true);}
@@ -366,6 +406,11 @@ export function LiveRoomPage(){
   if(!live)return <AppShell title="Live"><main className="live-room-error"><Radio/><h1>Live indisponible</h1><p>{error}</p><button onClick={()=>navigate('/app/live')}>Retour aux Lives</button></main></AppShell>;
 
   const mainStream=publisher?localStream:hostRemote?.stream||null;
+  const mediaWaitLabel=liveKit.failed
+    ? 'Connexion média interrompue'
+    : liveKit.connected
+      ? (publisher?'Activation de la caméra…':'En attente de la vidéo de l’animateur…')
+      : 'Connexion au serveur média…';
 
   return <main className={publisher?'live-room-page host-mode':'live-room-page viewer-mode'}>
     <header className="live-room-topbar">
@@ -384,7 +429,9 @@ export function LiveRoomPage(){
     <>
       <section className="live-stage">
         <video ref={publisher?localVideoRef:remoteVideoRef} autoPlay playsInline muted={publisher} className="live-main-video"/>
-        {!mainStream?<div className="live-video-wait"><LoaderCircle className="spin"/><strong>{liveKit.connected?'Connexion vidéo…':'Connexion au serveur média…'}</strong></div>:null}
+        {!mainStream?<div className="live-video-wait">
+          {liveKit.failed?<><Radio/><strong>{mediaWaitLabel}</strong><span>MBotéRoom va réessayer automatiquement. Vous pouvez aussi relancer maintenant.</span><button type="button" onClick={retryMedia}>Réessayer</button></>:<><LoaderCircle className="spin"/><strong>{mediaWaitLabel}</strong></>}
+        </div>:null}
         <div className="live-stage-stats"><span><Eye/> {fmtCount(live.viewerCount)}</span><span><Heart/> {fmtCount(live.likeCount)}</span><span><Send/> {fmtCount(comments.length)}</span></div>
 
         {!publisher?<aside className="live-viewer-actions">
