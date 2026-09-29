@@ -2365,3 +2365,13 @@ html[data-native-app="android"] .android-download-card{
  .android-login-modal .auth-security-badges,.android-login-modal .join-meeting-card,.android-login-modal .android-download-card,.android-login-modal .create-account-copy{display:none!important}
  .android-login-modal .login-form{gap:16px!important}
 }
+
+/* Android bottom-sheet motion for authentication modals. */
+@media(max-width:900px){
+ .android-login-modal-backdrop{align-items:flex-end!important;padding:0!important;animation:mboteBackdropIn .22s ease-out both}
+ .android-login-modal.android-login-form-card{width:100%!important;max-width:none!important;max-height:88dvh!important;margin:0!important;border-radius:28px 28px 0 0!important;padding:24px 18px calc(24px + env(safe-area-inset-bottom))!important;animation:mboteSheetUp .34s cubic-bezier(.22,.8,.24,1) both}
+ .android-login-modal.android-login-form-card:before{content:'';display:block;width:44px;height:5px;border-radius:999px;background:#cbd7df;margin:0 auto 16px}
+ @keyframes mboteSheetUp{from{transform:translateY(100%);opacity:.75}to{transform:translateY(0);opacity:1}}
+ @keyframes mboteBackdropIn{from{background:rgba(8,27,52,0)}to{background:rgba(8,27,52,.48)}}
+ @media(prefers-reduced-motion:reduce){.android-login-modal-backdrop,.android-login-modal.android-login-form-card{animation:none!important}}
+}
