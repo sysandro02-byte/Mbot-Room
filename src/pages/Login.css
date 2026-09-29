@@ -2405,3 +2405,15 @@ html[data-native-app="android"] .android-download-card{
  .android-login-modal .auth-card-kicker{display:block!important;text-align:center!important;margin-left:auto!important;margin-right:auto!important}
  .android-login-modal .login-card-header h1,.android-login-modal .login-card-header p{text-align:center!important}
 }
+
+/* Match password recovery + registration with the Android connection bottom sheet. */
+@media(max-width:900px){
+ .forgot-modal-backdrop,.android-sheet-backdrop{position:fixed!important;inset:0!important;z-index:1000!important;background:rgba(0,0,0,.42)!important;display:flex!important;align-items:flex-end!important;justify-content:center!important;padding:0!important;animation:mboteBackdropIn .22s ease-out both!important}
+ .forgot-bottom-sheet,.android-bottom-sheet{position:relative!important;width:100%!important;max-width:none!important;max-height:92dvh!important;overflow:auto!important;margin:0!important;border:0!important;border-radius:30px 30px 0 0!important;background:#fff!important;padding:10px 22px calc(24px + env(safe-area-inset-bottom))!important;box-shadow:0 -10px 36px rgba(0,0,0,.12)!important;animation:mboteSheetUp .34s cubic-bezier(.22,.8,.24,1) both!important}
+ .forgot-bottom-sheet:before,.android-bottom-sheet:before{content:'';display:block;width:76px;height:6px;border-radius:999px;background:#858b91;margin:4px auto 18px}
+ .forgot-bottom-sheet .login-card-header,.android-bottom-sheet .registration-modal-header{text-align:center!important;background:#f5f6f8!important;border:0!important;border-radius:22px!important;padding:20px 42px!important;margin:0 0 16px!important}
+ .forgot-bottom-sheet .login-card-header h1,.android-bottom-sheet .registration-modal-header h2{font-size:30px!important;line-height:1.1!important;text-align:center!important}
+ .forgot-bottom-sheet .login-card-header p,.android-bottom-sheet .registration-modal-header p,.android-bottom-sheet .auth-card-kicker{text-align:center!important}
+ .android-bottom-sheet .registration-modal-close{right:18px!important;top:18px!important;width:40px!important;height:40px!important;border-radius:50%!important;background:#f1f3f6!important;z-index:3!important}
+ @media(prefers-reduced-motion:reduce){.forgot-modal-backdrop,.android-sheet-backdrop,.forgot-bottom-sheet,.android-bottom-sheet{animation:none!important}}
+}
