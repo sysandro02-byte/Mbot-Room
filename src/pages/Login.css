@@ -2277,3 +2277,24 @@ html[data-native-app="android"] .android-download-card{
  .android-welcome{width:calc(100% - 14px)!important;margin-top:7px!important;padding:15px 11px!important}
  .android-welcome-visual{height:205px!important}
 }
+
+
+/* Final mobile polish: balanced spacing, compact controls, no duplicate maker line. */
+@media(max-width:900px){
+ .android-welcome{padding:20px 16px 18px!important}
+ .android-welcome-maker{margin-bottom:15px!important}
+ .android-welcome-benefits{margin:-16px 9px 17px!important;padding:11px 7px!important}
+ .android-welcome-actions{gap:11px!important;padding:14px!important}
+ .android-welcome-actions button,.android-welcome-actions a{min-height:64px!important;padding:9px 12px!important}
+ .android-welcome-shortcuts{margin-top:14px!important;gap:8px!important}
+ .android-welcome-shortcuts button{min-height:78px!important;padding:8px 4px!important}
+ .android-welcome-footer{display:none!important}
+ .login-page .back-button,.login-page [class*="back-button"],.login-page [class*="back-home"],.login-page [class*="return-home"]{
+   max-width:100%!important;width:auto!important;min-width:0!important;min-height:42px!important;
+   padding:8px 12px!important;gap:6px!important;white-space:nowrap!important;overflow:hidden!important;
+   text-overflow:ellipsis!important;box-sizing:border-box!important
+ }
+ .login-page .back-button span,.login-page [class*="back-button"] span,.login-page [class*="back-home"] span,.login-page [class*="return-home"] span{
+   overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important
+ }
+}
