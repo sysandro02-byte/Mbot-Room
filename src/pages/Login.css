@@ -2426,3 +2426,5 @@ html[data-native-app="android"] .android-download-card{
  .android-bottom-sheet .registration-modal-header{background:#fff!important;box-shadow:none!important}
  .android-bottom-sheet .registration-modal-grid>*{background:#fff!important}
 }
+
+@media(max-width:900px){.android-bottom-sheet .registration-modal-header h2{white-space:nowrap!important;font-size:clamp(25px,8vw,30px)!important}}
