@@ -72,3 +72,24 @@
  .terms-modal-footer>div{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important}
  .terms-modal-footer button{display:flex!important;align-items:center!important;justify-content:center!important;min-height:44px!important;margin:0!important;padding:8px!important;overflow:visible!important}
 }
+
+/* Definitive phone layout for legal dialog: one close button, no parent-sheet chrome. */
+@media(max-width:640px){
+ .terms-modal-backdrop{padding:18px 12px!important}
+ .terms-modal-backdrop>.terms-modal{width:calc(100vw - 24px)!important;height:min(86dvh,720px)!important;max-height:calc(100dvh - 36px)!important;border-radius:18px!important}
+ .terms-modal>header{min-height:74px!important;padding:12px 14px!important}
+ .terms-modal>header>div{align-items:center!important}
+ .terms-modal h2{font-size:16px!important;line-height:1.18!important;max-width:calc(100vw - 135px)!important}
+ .terms-modal>header>button{position:static!important;flex:0 0 36px!important;width:36px!important;height:36px!important;min-width:36px!important;min-height:36px!important;background:#eef4f5!important}
+ .terms-modal-body{padding:14px 16px!important;font-size:14px!important}
+ .terms-modal-body p{font-size:14px!important;line-height:1.65!important}
+ .terms-modal-footer{padding:10px 14px 12px!important}
+ .terms-modal-footer label{font-size:10.5px!important;line-height:1.35!important}
+ .terms-modal-footer>div{gap:8px!important}
+ .terms-modal-footer button{min-height:42px!important;font-size:11px!important}
+ body:has(.terms-modal-backdrop) .guest-modal-close,
+ body:has(.terms-modal-backdrop) .forgot-modal-close,
+ body:has(.terms-modal-backdrop) .registration-modal-close,
+ body:has(.terms-modal-backdrop) .android-login-modal-close{visibility:hidden!important;pointer-events:none!important}
+ body:has(.terms-modal-backdrop) .terms-modal>header>button{visibility:visible!important;pointer-events:auto!important}
+}
