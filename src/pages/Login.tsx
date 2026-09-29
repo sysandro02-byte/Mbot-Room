@@ -967,7 +967,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                     <span aria-hidden="true" />
                     {copy.remember}
                   </label>
-                  <button className="auth-text-link" type="button" onClick={() => navigate('/mot-de-passe-oublie')}>
+                  <button className="auth-text-link" type="button" onClick={() => { setShowAndroidCredentials(false); navigate('/mot-de-passe-oublie'); }}>
                     {copy.forgot}
                   </button>
                 </div>
