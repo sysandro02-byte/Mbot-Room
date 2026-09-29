@@ -2348,3 +2348,10 @@ html[data-native-app="android"] .android-download-card{
  .android-welcome-benefits b{font-size:8px!important}.android-welcome-benefits small{font-size:6px!important}
  .android-welcome-shortcuts button{min-height:55px!important}
 }
+
+/* Restore comfortable Android spacing between welcome actions. */
+@media(max-width:900px){
+ .android-welcome-actions{gap:14px!important;padding:14px!important}
+ .android-welcome-actions button,.android-welcome-actions a{min-height:66px!important;margin:0!important}
+ .android-welcome-shortcuts{gap:10px!important;margin-top:14px!important}
+}
