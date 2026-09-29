@@ -38,3 +38,21 @@
  .terms-modal-footer{position:relative!important;flex:0 0 auto!important;padding:12px 14px calc(12px + env(safe-area-inset-bottom))!important;background:#fbfdfd!important}
  .terms-modal-footer>div{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important}
 }
+
+/* Mobile legal modal: fix clipping and isolate its single close control. */
+@media(max-width:640px){
+ .terms-modal-backdrop{padding:12px!important;box-sizing:border-box!important}
+ .terms-modal{width:calc(100vw - 24px)!important;max-height:calc(100dvh - 24px)!important;border-radius:20px!important;overflow:hidden!important}
+ .terms-modal>header{min-height:76px!important;padding:12px 14px!important;gap:10px!important;overflow:visible!important}
+ .terms-modal>header>div{display:flex!important;align-items:center!important;gap:9px!important;min-width:0!important}
+ .terms-modal>header>div>div{min-width:0!important}
+ .terms-modal h2{margin:0!important;font-size:17px!important;line-height:1.18!important;white-space:normal!important;overflow-wrap:normal!important;word-break:normal!important}
+ .terms-modal header small{font-size:11px!important}
+ .terms-modal>header>button{display:grid!important;place-items:center!important;flex:0 0 38px!important;width:38px!important;height:38px!important;min-width:38px!important;padding:0!important;border-radius:50%!important}
+ .terms-modal>header>button:before,.terms-modal>header>button:after{content:none!important;display:none!important}
+ .terms-modal-body{padding:14px 16px!important}
+ .terms-modal-footer{padding:10px 14px calc(18px + env(safe-area-inset-bottom))!important;overflow:visible!important}
+ .terms-modal-footer label{font-size:11px!important}
+ .terms-modal-footer>div{display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px!important;padding-bottom:2px!important}
+ .terms-modal-footer button{min-height:46px!important;height:auto!important;padding:8px 10px!important;line-height:1.15!important;white-space:normal!important}
+}
