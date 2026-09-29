@@ -2080,3 +2080,377 @@ html[data-native-app="android"] .android-download-card{
   .google-config-progress span{animation:none;width:70%}
   .android-download-primary{animation:none!important}
 }
+
+
+/* 2026 Android redesign — auth experience */
+.mobile-auth-header{display:none}
+@media(max-width:900px){
+  .login-page{min-height:100dvh;background:#f7fbff!important}
+  .login-shell{display:block!important;min-height:auto!important}
+  .brand-panel{display:none!important}
+  .auth-side{width:100%!important;min-height:auto!important;padding:0 14px 32px!important;box-sizing:border-box;background:transparent!important}
+  .auth-side:before{content:"";display:block;height:86px;margin:0 -14px 12px;background:#fff url('/icons/mboteroom-wordmark.png') no-repeat 18px center;background-size:145px auto;border-bottom:1px solid #e5eef8}
+  .login-card,.compact-auth-card{width:100%!important;max-width:560px!important;margin:0 auto!important;padding:18px!important;box-sizing:border-box;border:1px solid #dce8f7!important;border-radius:24px!important;background:#fff!important;box-shadow:0 12px 34px rgba(15,70,135,.09)!important}
+  .login-card-header{padding:10px 4px 20px!important;text-align:left!important}
+  .login-card-header .auth-card-kicker{display:inline-flex!important;padding:7px 12px!important;border-radius:999px!important;background:#eaf9f7!important;color:#087e83!important;font-size:10px!important;font-weight:900!important;letter-spacing:.06em!important}
+  .login-card-header h1{margin:13px 0 6px!important;font-size:32px!important;line-height:1.08!important;color:#092d58!important}
+  .login-card-header p{margin:0!important;font-size:14px!important;line-height:1.5!important;color:#6c7f99!important}
+  .auth-security-badges{display:flex!important;gap:7px!important;overflow-x:auto!important;margin-top:14px!important;padding-bottom:3px!important;scrollbar-width:none}
+  .auth-security-badges::-webkit-scrollbar{display:none}
+  .auth-security-badges span{flex:0 0 auto!important;padding:7px 9px!important;border:1px solid #dce7f4!important;border-radius:999px!important;background:#fbfdff!important;color:#536b89!important;font-size:9px!important}
+  .login-form{gap:15px!important}
+  .form-group label{font-size:13px!important;font-weight:800!important;color:#16365d!important}
+  .input-shell{min-height:54px!important;border:1px solid #d7e2ef!important;border-radius:16px!important;background:#fff!important;box-shadow:none!important}
+  .input-shell:focus-within{border-color:#238cf5!important;box-shadow:0 0 0 4px rgba(35,140,245,.08)!important}
+  .input-shell input,.input-shell select{height:52px!important;font-size:14px!important;background:transparent!important}
+  .input-icon{color:#7186a4!important}
+  .form-options{align-items:center!important;gap:12px!important}
+  .remember-control,.auth-text-link{font-size:12px!important}
+  .auth-text-link{color:#0877f9!important;font-weight:800!important}
+  .primary-login-button{min-height:54px!important;border-radius:16px!important;background:linear-gradient(135deg,#0877f9,#0aa4ed)!important;box-shadow:0 10px 22px rgba(8,119,249,.20)!important;font-size:15px!important}
+  .auth-separator{margin:2px 0!important}
+  .external-login-row{display:block!important}
+  .google-login-button{width:100%!important;min-height:52px!important;border-radius:15px!important;border:1px solid #d9e5f2!important;background:#fff!important;color:#16365d!important}
+  .join-meeting-card{min-height:82px!important;border:1px solid #dce7f4!important;border-radius:18px!important;background:#f8fbff!important}
+  .join-meeting-icon{background:#e9f4ff!important;color:#0877f9!important}
+  .android-download-card{border:1px solid #dce7f4!important;border-radius:18px!important;background:linear-gradient(135deg,#f7fbff,#f1f9ff)!important}
+  .android-download-primary{background:#0877f9!important;border-radius:12px!important}
+  .android-download-share{border-radius:12px!important}
+  .create-account-copy{padding-top:4px!important;font-size:12px!important}
+  .create-account-copy button{color:#0877f9!important}
+  .auth-modal{width:min(92vw,520px)!important;border-radius:24px!important}
+  .registration-modal{max-height:90dvh!important}
+  .registration-modal-grid{grid-template-columns:1fr!important}
+  .otp-login-modal{text-align:center!important}
+  .otp-login-form input{height:58px!important;border-radius:16px!important;font-size:24px!important;letter-spacing:.35em!important;text-align:center!important}
+}
+@media(max-width:390px){
+  .auth-side{padding-left:10px!important;padding-right:10px!important}
+  .auth-side:before{margin-left:-10px;margin-right:-10px}
+  .login-card,.compact-auth-card{padding:14px!important;border-radius:20px!important}
+  .login-card-header h1{font-size:29px!important}
+}
+
+
+/* Approved Android welcome composition */
+.android-welcome{display:none}
+@media(max-width:900px){
+ .android-welcome{display:block;width:100%;max-width:560px;margin:0 auto 14px;padding:18px 14px 14px;box-sizing:border-box;background:linear-gradient(180deg,#f8fbff,#fff);border:1px solid #e0eaf6;border-radius:0 0 26px 26px;box-shadow:0 12px 34px rgba(15,70,135,.08)}
+ .auth-side:has(.android-welcome):before{display:none!important}
+ .android-welcome-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+ .android-welcome-top img{width:180px;max-height:58px;object-fit:contain;object-position:left center}
+ .android-welcome-top select{width:auto!important;min-height:38px!important;padding:0 28px 0 10px!important;border:1px solid #e2eaf4!important;border-radius:999px!important;background:#fff!important;font-size:12px!important}
+ .android-welcome-tagline{margin:2px 0 0;text-align:center;font-size:18px;font-weight:800;color:#123766}
+ .android-welcome-maker{margin:2px 0 10px;text-align:center;font-size:12px;color:#6e82a0}
+ .android-welcome-visual{height:250px;overflow:hidden;border-radius:24px;background:linear-gradient(135deg,#eaf4ff,#f9fcff)}
+ .android-welcome-visual img{width:100%;height:100%;object-fit:cover;object-position:center}
+ .android-welcome-benefits{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:-24px 8px 12px;position:relative;padding:10px 6px;border-radius:17px;background:rgba(255,255,255,.94);box-shadow:0 9px 25px rgba(18,77,150,.14);backdrop-filter:blur(12px)}
+ .android-welcome-benefits span{display:grid;grid-template-columns:26px 1fr;grid-template-rows:auto auto;align-items:center;padding:4px 6px;border-right:1px solid #e5edf7}
+ .android-welcome-benefits span:last-child{border-right:0}.android-welcome-benefits svg{grid-row:1/3;color:#0877f9}
+ .android-welcome-benefits b{font-size:9px;color:#17365d}.android-welcome-benefits small{font-size:7px;color:#6f8098}
+ .android-welcome-actions{display:flex;flex-direction:column;gap:9px;padding:12px;border-radius:22px;background:#fff;box-shadow:0 8px 26px rgba(17,74,140,.09)}
+ .android-welcome-actions button,.android-welcome-actions a{display:grid;grid-template-columns:42px 1fr 24px;align-items:center;gap:10px;min-height:62px;padding:8px 12px;border:0;border-radius:16px;background:#f5f9ff;color:#12345e;text-align:left;text-decoration:none}
+ .android-welcome-actions button>span:nth-child(2),.android-welcome-actions a>span:nth-child(2){display:flex;flex-direction:column}
+ .android-welcome-actions b{font-size:14px}.android-welcome-actions small{margin-top:2px;font-size:10px;color:#6e8099}
+ .android-welcome-actions .android-welcome-connect{background:linear-gradient(135deg,#0877f9,#095ee8);color:#fff;box-shadow:0 9px 20px rgba(8,119,249,.2)}
+ .android-welcome-connect small{color:#e8f3ff!important}
+ .android-action-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:11px;background:#0877f9;color:#fff;font-size:26px}
+ .android-guest-action{background:#eefaf3!important}.android-guest-action .android-action-icon{background:#16ad61}
+ .android-apk-action{border:1px solid #cfe0fb!important;background:#fff!important}.android-apk-action .android-action-icon{background:#19ad61}
+ .android-action-separator{display:flex;align-items:center;gap:10px;justify-content:center;font-size:11px;color:#7c8ca2}.android-action-separator span{height:1px;flex:1;background:#dfe8f3}
+ .android-welcome-shortcuts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+ .android-welcome-shortcuts button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:74px;padding:7px 3px;border:1px solid #e5edf7;border-radius:15px;background:#fff;color:#12365f}
+ .android-welcome-shortcuts svg{width:20px;color:#0877f9}.android-welcome-shortcuts b{font-size:9px}.android-welcome-shortcuts small{font-size:7px;color:#71829a;text-align:center}
+ .android-welcome-footer{text-align:center;font-size:9px;color:#58708f;margin:10px 0 0}
+ .android-login-form-card{margin-top:14px!important}
+}
+
+
+/* Android landing is the only visible login surface.
+   The credential form remains mounted for existing auth logic and opens only
+   when MBoté Connect is selected. */
+@media(max-width:900px){
+  .android-login-form-card{display:none!important}
+  .auth-side.android-credentials-open .android-welcome{display:none!important}
+  .auth-side.android-credentials-open .android-login-form-card{display:block!important}
+}
+
+
+/* Login page: no application header on Android. The welcome screen owns its branding. */
+@media(max-width:900px){
+  .login-page .app-header,
+  .login-page .main-header,
+  .login-page header.site-header,
+  .login-page header.app-header,
+  .login-page [class*="top-header"]:not(.login-card-header):not(.registration-modal-header){
+    display:none!important;
+  }
+  .login-page{padding-top:0!important}
+}
+
+@media(max-width:900px){.android-welcome-connect{background:linear-gradient(135deg,#087f87,#0b6677)!important}.android-action-icon{background:#087f87!important}.android-guest-action{background:#eef9f8!important}.android-guest-action .android-action-icon{background:#0b8f88!important}.android-apk-action{border-color:#bfe0df!important}.android-apk-action .android-action-icon{background:#ef6b61!important}.android-welcome-benefits svg,.android-welcome-shortcuts svg{color:#087f87!important}.android-welcome-shortcuts button:nth-child(1) svg,.android-welcome-shortcuts button:nth-child(4) svg{color:#ef6b61!important}.primary-login-button{background:linear-gradient(135deg,#087f87,#0b6677)!important}}
+
+/* Compact Android landing: keep the complete welcome experience inside the initial viewport. */
+@media(max-width:900px){
+ .auth-side{padding:0 8px 12px!important}
+ .android-welcome{padding:8px 10px 9px!important;margin:0 auto!important;border-radius:0 0 20px 20px!important}
+ .android-welcome-top img{width:145px!important;max-height:42px!important}
+ .android-welcome-top select{min-height:34px!important;font-size:11px!important}
+ .android-welcome-tagline{font-size:16px!important;line-height:1.15!important;margin:0!important}
+ .android-welcome-maker{font-size:10px!important;margin:1px 0 5px!important}
+ .android-welcome-visual{height:145px!important;border-radius:18px!important}
+ .android-welcome-benefits{margin:-17px 5px 6px!important;padding:6px 3px!important;border-radius:13px!important}
+ .android-welcome-benefits span{padding:2px 3px!important;grid-template-columns:21px 1fr!important}
+ .android-welcome-benefits svg{width:17px!important;height:17px!important}
+ .android-welcome-benefits b{font-size:8px!important}.android-welcome-benefits small{font-size:6px!important}
+ .android-welcome-actions{gap:5px!important;padding:7px!important;border-radius:16px!important}
+ .android-welcome-actions button,.android-welcome-actions a{min-height:48px!important;padding:5px 9px!important;border-radius:12px!important;grid-template-columns:34px 1fr 18px!important;gap:7px!important}
+ .android-action-icon{width:31px!important;height:31px!important;border-radius:9px!important;font-size:20px!important}
+ .android-welcome-actions b{font-size:12px!important}.android-welcome-actions small{font-size:8px!important;margin-top:0!important}
+ .android-action-separator{font-size:9px!important;gap:7px!important}
+ .android-welcome-shortcuts{gap:4px!important;margin-top:6px!important}
+ .android-welcome-shortcuts button{min-height:57px!important;padding:4px 2px!important;border-radius:11px!important}
+ .android-welcome-shortcuts svg{width:17px!important;height:17px!important}.android-welcome-shortcuts b{font-size:8px!important}.android-welcome-shortcuts small{font-size:6px!important}
+ .android-welcome-footer{font-size:7px!important;margin:5px 0 0!important}
+}
+@media(max-width:390px){
+ .android-welcome-visual{height:125px!important}
+ .android-welcome-actions button,.android-welcome-actions a{min-height:45px!important}
+ .android-welcome-shortcuts button{min-height:52px!important}
+}
+
+
+/* Android welcome: use more of the viewport vertically and keep the final actions visible. */
+@media(max-width:900px){
+  .auth-side{padding-bottom:max(8px,env(safe-area-inset-bottom))!important}
+  .android-welcome{
+    min-height:calc(100dvh - env(safe-area-inset-top));
+    margin-bottom:0!important;
+    padding-bottom:max(20px,calc(10px + env(safe-area-inset-bottom)))!important;
+    border-radius:0 0 18px 18px!important;
+  }
+  .android-welcome-visual{height:clamp(230px,34dvh,320px)!important}
+  .android-welcome-footer{margin-bottom:0!important;padding-bottom:4px}
+}
+
+
+/* Android welcome breathing room: clearer visual hierarchy and touch spacing. */
+@media(max-width:900px){
+ .android-welcome{padding:22px 18px 20px!important}
+ .android-welcome-top{margin-bottom:10px!important}
+ .android-welcome-tagline{margin:10px 0 4px!important;line-height:1.22!important}
+ .android-welcome-maker{margin:0 0 18px!important;line-height:1.45!important}
+ .android-welcome-visual{margin-bottom:0!important}
+ .android-welcome-benefits{gap:8px!important;margin:-18px 10px 20px!important;padding:13px 8px!important}
+ .android-welcome-benefits span{padding:6px 8px!important}
+ .android-welcome-actions{gap:13px!important;padding:16px!important}
+ .android-welcome-actions button,.android-welcome-actions a{min-height:70px!important;padding:11px 14px!important}
+ .android-action-separator{margin:3px 0!important}
+ .android-welcome-shortcuts{gap:9px!important;margin-top:16px!important}
+ .android-welcome-shortcuts button{min-height:86px!important;padding:10px 5px!important}
+ .android-welcome-footer{margin:16px 0 4px!important;line-height:1.4!important}
+}
+@media(max-width:390px){
+ .android-welcome{padding:18px 12px 18px!important}
+ .android-welcome-actions{padding:13px!important;gap:11px!important}
+ .android-welcome-actions button,.android-welcome-actions a{min-height:66px!important}
+ .android-welcome-shortcuts{gap:6px!important}
+}
+
+
+/* Final Android viewport balance: more outer breathing room, slightly tighter content. */
+@media(max-width:900px){
+ .android-welcome{width:calc(100% - 20px)!important;margin:10px auto 18px!important;padding:18px 16px 16px!important;border-radius:24px!important}
+ .android-welcome-top{margin-bottom:7px!important}
+ .android-welcome-tagline{margin:7px 0 3px!important;font-size:17px!important}
+ .android-welcome-maker{margin:0 0 13px!important}
+ .android-welcome-visual{height:220px!important;border-radius:20px!important}
+ .android-welcome-benefits{margin:-16px 8px 15px!important;padding:10px 6px!important;gap:5px!important}
+ .android-welcome-benefits span{padding:4px 6px!important}
+ .android-welcome-actions{gap:9px!important;padding:12px!important}
+ .android-welcome-actions button,.android-welcome-actions a{min-height:62px!important;padding:8px 12px!important}
+ .android-welcome-shortcuts{gap:7px!important;margin-top:12px!important}
+ .android-welcome-shortcuts button{min-height:76px!important;padding:7px 4px!important}
+ .android-welcome-footer{display:none!important}
+}
+@media(max-width:390px){
+ .android-welcome{width:calc(100% - 14px)!important;margin-top:7px!important;padding:15px 11px!important}
+ .android-welcome-visual{height:205px!important}
+}
+
+
+/* Final mobile polish: balanced spacing, compact controls, no duplicate maker line. */
+@media(max-width:900px){
+ .android-welcome{padding:20px 16px 18px!important}
+ .android-welcome-maker{margin-bottom:15px!important}
+ .android-welcome-benefits{margin:-16px 9px 17px!important;padding:11px 7px!important}
+ .android-welcome-actions{gap:11px!important;padding:14px!important}
+ .android-welcome-actions button,.android-welcome-actions a{min-height:64px!important;padding:9px 12px!important}
+ .android-welcome-shortcuts{margin-top:14px!important;gap:8px!important}
+ .android-welcome-shortcuts button{min-height:78px!important;padding:8px 4px!important}
+ .android-welcome-footer{display:none!important}
+ .login-page .back-button,.login-page [class*="back-button"],.login-page [class*="back-home"],.login-page [class*="return-home"]{
+   max-width:100%!important;width:auto!important;min-width:0!important;min-height:42px!important;
+   padding:8px 12px!important;gap:6px!important;white-space:nowrap!important;overflow:hidden!important;
+   text-overflow:ellipsis!important;box-sizing:border-box!important
+ }
+ .login-page .back-button span,.login-page [class*="back-button"] span,.login-page [class*="back-home"] span,.login-page [class*="return-home"] span{
+   overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important
+ }
+}
+
+
+@media(max-width:900px){
+ .android-welcome{margin:12px auto 24px!important;padding:20px 16px 18px!important}
+ .android-welcome-actions{gap:11px!important;padding:14px!important}
+ .android-welcome-actions button,.android-welcome-actions a{min-height:66px!important}
+ .android-welcome-shortcuts{margin-top:14px!important}
+ .android-welcome-shortcuts button{min-height:80px!important}
+ .android-welcome-footer{display:none!important}
+}
+
+
+/* Guest join Android: compact one-screen layout, no redundant submit button. */
+@media(max-width:900px){
+  .auth-side > .compact-auth-card .primary-login-button{display:none!important}
+  .auth-side > .compact-auth-card{padding:14px!important}
+  .auth-side > .compact-auth-card .login-card-header{padding:4px 2px 10px!important}
+  .auth-side > .compact-auth-card .login-card-header h1{font-size:27px!important;margin:5px 0!important}
+  .auth-side > .compact-auth-card .login-card-header p{font-size:12px!important;line-height:1.35!important}
+  .auth-side > .compact-auth-card .login-form{gap:9px!important}
+  .auth-side > .compact-auth-card .form-group{gap:4px!important}
+  .auth-side > .compact-auth-card .form-group label{font-size:12px!important}
+  .auth-side > .compact-auth-card .input-shell{min-height:46px!important}
+  .auth-side > .compact-auth-card .input-shell input,
+  .auth-side > .compact-auth-card .input-shell select{height:44px!important;font-size:13px!important}
+  .auth-side > .compact-auth-card .terms-consent{margin:2px 0!important;padding:8px!important}
+  .auth-side > .compact-auth-card .create-account-copy{margin:2px 0!important}
+}
+
+@media(max-width:900px){
+ .android-welcome{min-height:100dvh;padding:10px 12px 8px!important;border-radius:0!important;box-shadow:none!important}
+ .android-welcome-top img{width:145px!important;max-height:44px!important}
+ .android-welcome-top select{min-height:34px!important}
+ .android-welcome-tagline{font-size:16px!important;margin-top:0!important}
+ .android-welcome-maker{font-size:10px!important;margin-bottom:6px!important}
+ .android-welcome-visual{height:clamp(155px,25dvh,215px)!important;border-radius:18px!important}
+ .android-welcome-benefits{margin:-18px 6px 7px!important;padding:7px 4px!important}
+ .android-welcome-actions{gap:6px!important;padding:8px!important;border-radius:17px!important}
+ .android-welcome-actions button,.android-welcome-actions a{min-height:52px!important;padding:6px 9px!important;border-radius:13px!important}
+ .android-action-icon{width:34px!important;height:34px!important}
+ .android-welcome-actions b{font-size:12px!important}.android-welcome-actions small{font-size:9px!important}
+ .android-welcome-shortcuts{margin-top:6px!important;gap:4px!important}
+ .android-welcome-shortcuts button{min-height:60px!important;padding:4px 2px!important;border-radius:12px!important}
+ .android-welcome-footer{margin:5px 0 0!important}
+}
+@media(max-width:390px){
+ .android-welcome-visual{height:150px!important}
+ .android-welcome-benefits b{font-size:8px!important}.android-welcome-benefits small{font-size:6px!important}
+ .android-welcome-shortcuts button{min-height:55px!important}
+}
+
+/* Restore comfortable Android spacing between welcome actions. */
+@media(max-width:900px){
+ .android-welcome-actions{gap:14px!important;padding:14px!important}
+ .android-welcome-actions button,.android-welcome-actions a{min-height:66px!important;margin:0!important}
+ .android-welcome-shortcuts{gap:10px!important;margin-top:14px!important}
+}
+
+/* Android connection dialog: show only authentication essentials. */
+@media(max-width:900px){
+ .android-login-modal-backdrop{position:fixed;inset:0;z-index:1000;background:rgba(8,27,52,.48);display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto}
+ .android-login-modal.android-login-form-card{display:block!important;position:relative;width:min(100%,520px);max-height:calc(100dvh - 36px);overflow:auto;margin:auto;border-radius:26px!important;padding:22px 18px!important;background:#fff!important;box-shadow:0 24px 70px rgba(8,27,52,.25)!important}
+ .android-login-modal-close{position:absolute!important;right:14px;top:12px;width:38px!important;height:38px!important;min-height:38px!important;border:0!important;border-radius:50%!important;background:#eef5f7!important;font-size:28px!important;line-height:1!important;z-index:2}
+ .android-login-modal .login-card-header{padding-right:38px!important}
+ .android-login-modal .auth-security-badges,.android-login-modal .join-meeting-card,.android-login-modal .android-download-card,.android-login-modal .create-account-copy{display:none!important}
+ .android-login-modal .login-form{gap:16px!important}
+}
+
+/* Android bottom-sheet motion for authentication modals. */
+@media(max-width:900px){
+ .android-login-modal-backdrop{align-items:flex-end!important;padding:0!important;animation:mboteBackdropIn .22s ease-out both}
+ .android-login-modal.android-login-form-card{width:100%!important;max-width:none!important;max-height:88dvh!important;margin:0!important;border-radius:28px 28px 0 0!important;padding:24px 18px calc(24px + env(safe-area-inset-bottom))!important;animation:mboteSheetUp .34s cubic-bezier(.22,.8,.24,1) both}
+ .android-login-modal.android-login-form-card:before{content:'';display:block;width:44px;height:5px;border-radius:999px;background:#cbd7df;margin:0 auto 16px}
+ @keyframes mboteSheetUp{from{transform:translateY(100%);opacity:.75}to{transform:translateY(0);opacity:1}}
+ @keyframes mboteBackdropIn{from{background:rgba(8,27,52,0)}to{background:rgba(8,27,52,.48)}}
+ @media(prefers-reduced-motion:reduce){.android-login-modal-backdrop,.android-login-modal.android-login-form-card{animation:none!important}}
+}
+
+/* Android native-style bottom sheet inspired by the supplied reference. */
+@media(max-width:900px){
+ .android-login-modal-backdrop{background:rgba(0,0,0,.42)!important;backdrop-filter:none!important}
+ .android-login-modal.android-login-form-card{max-height:92dvh!important;border:0!important;border-radius:30px 30px 0 0!important;background:#fff!important;padding:10px 22px calc(24px + env(safe-area-inset-bottom))!important;box-shadow:0 -10px 36px rgba(0,0,0,.12)!important}
+ .android-login-modal.android-login-form-card:before{width:76px!important;height:6px!important;margin:4px auto 18px!important;background:#858b91!important;border-radius:999px!important}
+ .android-login-modal-close{right:18px!important;top:18px!important;width:40px!important;height:40px!important;background:#f1f3f6!important;color:#17202a!important;font-size:26px!important}
+ .android-login-modal .login-card-header{background:#f5f6f8!important;border:0!important;border-radius:22px!important;padding:20px!important;margin:0 0 16px!important}
+ .android-login-modal .login-card-header h1{font-size:30px!important;line-height:1.1!important;margin:8px 0!important}
+ .android-login-modal .auth-card-kicker{background:transparent!important;padding:0!important}
+ .android-login-modal .login-form{gap:14px!important}
+ .android-login-modal .form-field{background:#f5f6f8!important;border-radius:20px!important;padding:12px 14px!important}
+ .android-login-modal .primary-login-button,.android-login-modal .google-login-button{border-radius:20px!important;min-height:58px!important}
+}
+
+/* Fine-tune Android login sheet controls. */
+@media(max-width:900px){
+ .android-login-modal .form-options{display:grid!important;grid-template-columns:auto 1fr!important;align-items:center!important;column-gap:14px!important;row-gap:6px!important}
+ .android-login-modal .remember-control{grid-column:1!important;grid-row:1!important;margin:0!important;white-space:nowrap!important}
+ .android-login-modal .auth-text-link{grid-column:2!important;grid-row:1!important;justify-self:end!important;margin:0!important;white-space:nowrap!important}
+ .android-login-modal .external-login-row{display:flex!important;justify-content:center!important;width:100%!important}
+ .android-login-modal .google-login-button.mbote-auth-button{width:auto!important;min-width:220px!important;max-width:270px!important;min-height:50px!important;padding:9px 16px!important;margin:0 auto!important;border-radius:17px!important}
+ .android-login-modal .google-login-button.mbote-auth-button .external-login-arrow{margin-left:auto!important}
+}
+
+@media(max-width:900px){
+ .android-login-modal .login-card-header{text-align:center!important;padding-left:42px!important;padding-right:42px!important}
+ .android-login-modal .auth-card-kicker{display:block!important;text-align:center!important;margin-left:auto!important;margin-right:auto!important}
+ .android-login-modal .login-card-header h1,.android-login-modal .login-card-header p{text-align:center!important}
+}
+
+/* Match password recovery + registration with the Android connection bottom sheet. */
+@media(max-width:900px){
+ .forgot-modal-backdrop,.android-sheet-backdrop{position:fixed!important;inset:0!important;z-index:1000!important;background:rgba(0,0,0,.42)!important;display:flex!important;align-items:flex-end!important;justify-content:center!important;padding:0!important;animation:mboteBackdropIn .22s ease-out both!important}
+ .forgot-bottom-sheet,.android-bottom-sheet{position:relative!important;width:100%!important;max-width:none!important;max-height:92dvh!important;overflow:auto!important;margin:0!important;border:0!important;border-radius:30px 30px 0 0!important;background:#fff!important;padding:10px 22px calc(24px + env(safe-area-inset-bottom))!important;box-shadow:0 -10px 36px rgba(0,0,0,.12)!important;animation:mboteSheetUp .34s cubic-bezier(.22,.8,.24,1) both!important}
+ .forgot-bottom-sheet:before,.android-bottom-sheet:before{content:'';display:block;width:76px;height:6px;border-radius:999px;background:#858b91;margin:4px auto 18px}
+ .forgot-bottom-sheet .login-card-header,.android-bottom-sheet .registration-modal-header{text-align:center!important;background:#f5f6f8!important;border:0!important;border-radius:22px!important;padding:20px 42px!important;margin:0 0 16px!important}
+ .forgot-bottom-sheet .login-card-header h1,.android-bottom-sheet .registration-modal-header h2{font-size:30px!important;line-height:1.1!important;text-align:center!important}
+ .forgot-bottom-sheet .login-card-header p,.android-bottom-sheet .registration-modal-header p,.android-bottom-sheet .auth-card-kicker{text-align:center!important}
+ .android-bottom-sheet .registration-modal-close{right:18px!important;top:18px!important;width:40px!important;height:40px!important;border-radius:50%!important;background:#f1f3f6!important;z-index:3!important}
+ @media(prefers-reduced-motion:reduce){.forgot-modal-backdrop,.android-sheet-backdrop,.forgot-bottom-sheet,.android-bottom-sheet{animation:none!important}}
+}
+
+/* Final Android sheet polish: blurred backdrop + clean registration surface. */
+@media(max-width:900px){
+ .android-login-modal-backdrop,.auth-modal-backdrop,.forgot-modal-backdrop,.android-sheet-backdrop{backdrop-filter:blur(7px)!important;-webkit-backdrop-filter:blur(7px)!important;background:rgba(8,20,32,.36)!important}
+ .forgot-modal-close{display:flex!important;align-items:center!important;justify-content:center!important}
+ .android-bottom-sheet,.android-bottom-sheet .registration-modal-form,.android-bottom-sheet .registration-modal-grid{background:#fff!important}
+ .android-bottom-sheet .registration-modal-header{background:#fff!important;box-shadow:none!important}
+ .android-bottom-sheet .registration-modal-grid>*{background:#fff!important}
+}
+
+@media(max-width:900px){.android-bottom-sheet .registration-modal-header h2{white-space:nowrap!important;font-size:clamp(25px,8vw,30px)!important}}
+
+/* Guest join uses the same Android sheet language as account creation. */
+@media(max-width:900px){
+ .guest-modal-backdrop{position:fixed!important;inset:0!important;z-index:1000!important;background:rgba(8,20,32,.36)!important;backdrop-filter:blur(7px)!important;-webkit-backdrop-filter:blur(7px)!important;display:flex!important;align-items:flex-end!important;justify-content:center!important;padding:0!important;animation:mboteBackdropIn .22s ease-out both!important}
+ .guest-bottom-sheet{position:relative!important;width:100%!important;max-width:none!important;max-height:92dvh!important;overflow:auto!important;margin:0!important;border:0!important;border-radius:30px 30px 0 0!important;background:#fff!important;padding:10px 22px calc(24px + env(safe-area-inset-bottom))!important;box-shadow:0 -10px 36px rgba(0,0,0,.12)!important;animation:mboteSheetUp .34s cubic-bezier(.22,.8,.24,1) both!important}
+ .guest-bottom-sheet:before{content:'';display:block;width:76px;height:6px;border-radius:999px;background:#858b91;margin:4px auto 18px}
+ .guest-bottom-sheet>.compact-auth-card{width:100%!important;max-width:none!important;margin:0!important;border:0!important;box-shadow:none!important;background:#fff!important;padding:0!important}
+ .guest-bottom-sheet .login-card-header{text-align:center!important;background:#fff!important;border:0!important;box-shadow:none!important;padding:20px 42px!important;margin:0 0 16px!important}
+ .guest-bottom-sheet .login-card-header h1,.guest-bottom-sheet .login-card-header p{text-align:center!important}
+ .guest-modal-close{display:flex!important;align-items:center!important;justify-content:center!important;right:18px!important;top:18px!important;z-index:4!important}
+ @media(prefers-reduced-motion:reduce){.guest-modal-backdrop,.guest-bottom-sheet{animation:none!important}}
+}
+
+
+/* Android welcome maker credit: directly below the four shortcut buttons. */
+@media(max-width:900px){
+  .android-welcome-footer{
+    display:block!important;
+    margin:7px 0 0!important;
+    padding:0!important;
+    text-align:center!important;
+    font-size:9px!important;
+    line-height:1.25!important;
+    color:#58708f!important;
+  }
+}

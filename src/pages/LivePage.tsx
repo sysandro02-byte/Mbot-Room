@@ -49,6 +49,14 @@ export function LiveFeedPage(){
     finally{setLoading(false);}
   };
   useEffect(()=>{const timer=window.setTimeout(()=>void load(),q?300:0);return()=>window.clearTimeout(timer);},[q,category]);
+  useEffect(()=>{
+    const onStatus=(payload:{liveId:string;status:string})=>setItems((current)=>payload.status==='ended'
+      ?current.filter((item)=>item.id!==payload.liveId)
+      :current.map((item)=>item.id===payload.liveId?{...item,status:payload.status as LiveSession['status']}:item));
+    if(!socket.connected)socket.connect();
+    socket.on('live:status',onStatus);
+    return()=>{socket.off('live:status',onStatus);};
+  },[]);
 
   return <AppShell title="Live">
     <main className="live-feed-page">

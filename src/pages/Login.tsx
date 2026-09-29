@@ -335,6 +335,8 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [meetingCode, setMeetingCode] = useState('');
   const [meetingPassword, setMeetingPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showAndroidCredentials, setShowAndroidCredentials] = useState(false);
+  const [showGuestSheet, setShowGuestSheet] = useState(initialView === 'guest');
   const [isLoading, setIsLoading] = useState(false);
   const [isMboteLoading, setIsMboteLoading] = useState(false);
   const [apkShareMessage, setApkShareMessage] = useState('');
@@ -735,7 +737,10 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     }
   };
 
-  const goToGuestJoin = () => navigate('/rejoindre-une-reunion');
+  const goToGuestJoin = () => {
+    clearErrors();
+    setShowGuestSheet(true);
+  };
 
   const handleGuestKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -856,7 +861,38 @@ export default function Login({ initialView = 'login' }: LoginProps) {
 
         <section className="auth-side">
           {initialView === 'login' && (
-            <section className="login-card" aria-labelledby="login-title">
+            <section className="android-welcome" aria-label="Bienvenue sur MBotéRoom">
+              <div className="android-welcome-top">
+                <img src={loginBranding.wordmarkUrl} alt="MBotéRoom" />
+                <select aria-label={copy.ariaLanguage} value={language} onChange={(event) => setLanguage(event.target.value as Language)}>
+                  {languageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </div>
+              <p className="android-welcome-tagline">Réunissez-vous sans limites</p>
+              <div className="android-welcome-visual">
+                <img src={loginBranding.illustrationUrl} alt="Réunion vidéo MBotéRoom" />
+              </div>
+              <div className="android-welcome-benefits">
+                <span><ShieldCheck size={21}/><b>Accès sécurisé</b><small>Vos réunions en toute sécurité</small></span>
+                <span><Smartphone size={21}/><b>Tous appareils</b><small>Android, iOS, Web</small></span>
+                <span><UsersRound size={21}/><b>Haute qualité</b><small>Audio et vidéo en HD</small></span>
+              </div>
+              <div className="android-welcome-actions">
+                <button className="android-welcome-connect" type="button" onClick={() => setShowAndroidCredentials(true)}><User size={25}/><span><b>Connexion</b><small>Se connecter à mon compte</small></span><ChevronRight/></button>
+                <button type="button" onClick={() => { clearErrors(); setRegisterModalOpen(true); }}><span className="android-action-icon">+</span><span><b>Créer un compte</b><small>Rejoignez MBotéRoom gratuitement</small></span><ChevronRight/></button>
+                <button className="android-guest-action" type="button" onClick={goToGuestJoin}><span className="android-action-icon"><User size={20}/></span><span><b>Continuer en tant qu’invité</b><small>Rejoindre sans créer de compte</small></span><ChevronRight/></button>
+              </div>
+              <div className="android-welcome-shortcuts">
+                <button type="button"><Sparkles/><b>Premium</b><small>Fonctionnalités avancées</small></button>
+                <button type="button" onClick={() => navigate('/app/calendrier')}><CalendarDays/><b>Planifier</b><small>Programmer une réunion</small></button>
+                <button type="button" onClick={() => navigate('/rejoindre')}><Video/><b>Voir une démo</b><small>Découvrir MBotéRoom</small></button>
+                <button type="button" onClick={() => navigate('/aide')}><ShieldCheck/><b>Aide</b><small>Centre d’assistance</small></button>
+              </div>
+              <p className="android-welcome-footer">MBotéRoom application créée par LoukaTech</p>
+            </section>
+          )}
+          {showAndroidCredentials && (
+            <div className="android-login-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAndroidCredentials(false); }}><section className="login-card android-login-form-card android-login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="android-login-modal-close" type="button" aria-label="Fermer" onClick={() => setShowAndroidCredentials(false)}>×</button>
               <header className="login-card-header">
                 <span className="auth-card-kicker">Espace sécurisé MBotéRoom</span>
                 <h1 id="login-title">{copy.title}</h1>
@@ -934,7 +970,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                     <span aria-hidden="true" />
                     {copy.remember}
                   </label>
-                  <button className="auth-text-link" type="button" onClick={() => navigate('/mot-de-passe-oublie')}>
+                  <button className="auth-text-link" type="button" onClick={() => { setShowAndroidCredentials(false); navigate('/mot-de-passe-oublie'); }}>
                     {copy.forgot}
                   </button>
                 </div>
@@ -1008,7 +1044,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                   </button>
                 </p>
               </form>
-            </section>
+            </section></div>
           )}
 
           {initialView === 'register' && (
@@ -1027,7 +1063,10 @@ export default function Login({ initialView = 'login' }: LoginProps) {
             </CompactAuthCard>
           )}
 
-          {initialView === 'guest' && (
+          {showGuestSheet && (
+            <div className="android-login-modal-backdrop guest-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) navigate('/login'); }}>
+            <section className="login-card compact-auth-card android-login-modal guest-bottom-sheet" role="dialog" aria-modal="true" aria-label="Rejoindre une réunion comme invité">
+              <button className="android-login-modal-close guest-modal-close" type="button" aria-label="Fermer" onClick={() => { setShowGuestSheet(false); if (initialView === 'guest') navigate('/login'); }}>×</button>
             <CompactAuthCard
               title="Rejoindre une réunion"
               subtitle="Entrez les informations fournies par l'hôte."
@@ -1049,10 +1088,12 @@ export default function Login({ initialView = 'login' }: LoginProps) {
               </FormField>
               <TermsConsent accepted={termsAccepted} version={termsVersion} onAccepted={(accepted,version)=>{setTermsAccepted(accepted);setTermsVersion(version);setFormError('');}} />
             </CompactAuthCard>
+            </section></div>
           )}
 
           {initialView === 'forgot' && (
-            <section className="login-card compact-auth-card" aria-labelledby="forgot-title">
+            <div className="android-login-modal-backdrop forgot-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) navigate('/connexion'); }}><section className="login-card compact-auth-card android-login-modal forgot-bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="forgot-title">
+              <button className="android-login-modal-close forgot-modal-close" type="button" aria-label="Fermer" onClick={() => navigate('/connexion')}>×</button>
               <header className="login-card-header">
                 <h1 id="forgot-title">{resetToken ? 'Nouveau mot de passe' : 'Mot de passe oublié'}</h1>
                 <p>{resetToken ? 'Choisissez un nouveau mot de passe sécurisé pour votre compte.' : 'Entrez votre adresse e-mail pour recevoir un lien de réinitialisation.'}</p>
@@ -1125,7 +1166,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                 )}
                 <AuthFooterAction label="Vous connaissez votre mot de passe ?" action="Se connecter" onClick={() => navigate('/connexion')} />
               </form>
-            </section>
+            </section></div>
           )}
         </section>
       </section>
@@ -1136,13 +1177,13 @@ export default function Login({ initialView = 'login' }: LoginProps) {
 
       {isRegisterModalOpen && !registrationSuccess && (
         <div
-          className="auth-modal-backdrop registration-modal-backdrop"
+          className="auth-modal-backdrop registration-modal-backdrop android-sheet-backdrop"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setRegisterModalOpen(false);
           }}
         >
-          <section className="auth-modal registration-modal" role="dialog" aria-modal="true" aria-labelledby="registration-modal-title">
+          <section className="auth-modal registration-modal android-bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="registration-modal-title">
             <button className="registration-modal-close" type="button" aria-label="Fermer la création de compte" onClick={() => setRegisterModalOpen(false)}>×</button>
             <header className="registration-modal-header">
               <span className="auth-card-kicker">Nouveau compte MBotéRoom</span>

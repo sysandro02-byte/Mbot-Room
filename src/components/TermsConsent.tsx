@@ -69,7 +69,7 @@ export default function TermsConsent({accepted,version,onAccepted,compact=false,
     </div>
 
     {open?<div className="terms-modal-backdrop" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)setOpen(false);}}>
-      <section className="terms-modal" role="dialog" aria-modal="true" aria-labelledby="terms-modal-title">
+      <section className="terms-modal" role="dialog" aria-modal="true" aria-labelledby="terms-modal-title" onMouseDown={(event)=>event.stopPropagation()}>
         <header><div><FileText size={22}/><div><h2 id="terms-modal-title">{document?.title||'Conditions d’utilisation'}</h2><small>{document?.version?'Version '+document.version:'Chargement…'}</small></div></div><button type="button" aria-label="Fermer" onClick={()=>setOpen(false)}><X size={19}/></button></header>
         <div className="terms-modal-body" ref={scrollRef} onScroll={onScroll}>
           {loading?<AppLoader label="Chargement des conditions…" compact />:document?.body.split(/\n{2,}/).map((paragraph,index)=><p key={index}>{paragraph}</p>)}

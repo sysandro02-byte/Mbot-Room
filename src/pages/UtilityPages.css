@@ -10,3 +10,13 @@
 .utility-notification-copy small{display:flex;gap:5px;align-items:center;color:#64748b;font-size:11px}
 .utility-notification-row>b{font-size:10px;color:#1d4ed8;background:#dbeafe;border-radius:999px;padding:4px 7px}
 @media(max-width:600px){.utility-notification-row{grid-template-columns:auto 1fr}.utility-notification-row>b{display:none}}
+
+
+@media(max-width:900px){
+  .utility-page{padding:20px 16px 36px!important}
+  .utility-page-head{display:grid!important;grid-template-columns:1fr!important;gap:16px!important;align-items:start!important}
+  .utility-page-head>button{width:max-content!important;max-width:100%!important;min-height:44px!important;padding:10px 14px!important;white-space:nowrap!important;border-radius:14px!important}
+  .utility-page-head>div{min-width:0!important}
+  .utility-page-head h1{font-size:28px!important;line-height:1.08!important;margin:0 0 8px!important}
+  .utility-page-head p{font-size:15px!important;line-height:1.5!important;margin:0!important}
+}

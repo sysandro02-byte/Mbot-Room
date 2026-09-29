@@ -101,6 +101,24 @@ const respondWithSession = (
 
 const createAvatar = (name: string) =>
   `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'MBoté')}&background=3156eb&color=fff&bold=true`;
+const normalizePhoneNumber = (value: unknown) => String(value || '').replace(/\D/g, '').slice(0, 40);
+
+const assertPhoneAvailable = async (phoneNumber: string, userId?: number) => {
+  const normalized = normalizePhoneNumber(phoneNumber);
+  if (!normalized) return;
+  const duplicate = await query(
+    `SELECT 1 FROM room_users
+      WHERE NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '')=$1
+        AND ($2::integer IS NULL OR id<>$2)
+      LIMIT 1`,
+    [normalized, userId ?? null],
+  );
+  if (duplicate.rows[0]) {
+    const error = new Error('Un compte existe déjà avec ce numéro de téléphone.');
+    (error as Error & { code?: string }).code = 'PHONE_ALREADY_EXISTS';
+    throw error;
+  }
+};
 
 const safeRedirectPath = (value: unknown) => {
   const raw=String(value||'/app').trim();
@@ -368,6 +386,11 @@ export const registerAuthRoutes = (app: express.Express, io: Server) => {
       if (phoneNumber && !phoneNumber.startsWith(selectedCountry.dialCode)) {
         return sendApiError(response, 400, 'PHONE_COUNTRY_MISMATCH', 'L’indicatif du téléphone doit correspondre au pays sélectionné.');
       }
+      try { await assertPhoneAvailable(phoneNumber); }
+      catch (error: any) {
+        if (error?.code === 'PHONE_ALREADY_EXISTS') return sendApiError(response, 409, error.code, error.message);
+        throw error;
+      }
       const birthDate = normalizeText(request.body?.birthDate).slice(0, 10);
       if (birthDate && !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
         return sendApiError(response, 400, 'INVALID_BIRTH_DATE', 'La date de naissance est invalide.');
@@ -430,11 +453,17 @@ export const registerAuthRoutes = (app: express.Express, io: Server) => {
       if (duplicate.rows[0]) return sendApiError(response, 409, 'EMAIL_ALREADY_EXISTS', 'Un compte existe déjà avec cette adresse.');
       const passwordData = hashPassword(password);
       const username = normalizeText(request.body?.username || email.split('@')[0]).toLowerCase().slice(0, 80);
+      const phoneNumber = normalizeText(request.body?.phoneNumber).slice(0,40);
+      try { await assertPhoneAvailable(phoneNumber); }
+      catch (error: any) {
+        if (error?.code === 'PHONE_ALREADY_EXISTS') return sendApiError(response, 409, error.code, error.message);
+        throw error;
+      }
       const inserted = await query(
         `INSERT INTO room_users
           (name,username,email,avatar,password_hash,password_salt,is_guest,created_at,phone_number,organization,job_title,role,is_suspended)
          VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8,$9,$10,'admin',true) RETURNING *`,
-        [name, username, email, createAvatar(name), passwordData.hash, passwordData.salt, new Date().toISOString(), normalizeText(request.body?.phoneNumber).slice(0,40), normalizeText(request.body?.organization).slice(0,120), normalizeText(request.body?.jobTitle).slice(0,120)],
+        [name, username, email, createAvatar(name), passwordData.hash, passwordData.salt, new Date().toISOString(), phoneNumber, normalizeText(request.body?.organization).slice(0,120), normalizeText(request.body?.jobTitle).slice(0,120)],
       );
       const challenge = await issueLoginOtp(inserted.rows[0], true);
       if (!challenge) {
@@ -455,6 +484,9 @@ export const registerAuthRoutes = (app: express.Express, io: Server) => {
       const adminOnly = request.body?.adminOnly === true;
       if (adminOnly && user.role !== 'admin') {
         return sendApiError(response, 403, 'ADMIN_ACCESS_REQUIRED', 'Ce compte n’est pas autorisé à accéder au backoffice.');
+      }
+      if (!adminOnly && user.role === 'admin') {
+        return sendApiError(response, 403, 'ADMIN_LOGIN_REQUIRED', 'Utilisez l’espace administrateur pour vous connecter avec ce compte.');
       }
       const password = String(request.body?.password || '');
       if (!verifyPasswordHash(password, String(user.password_salt || ''), String(user.password_hash || ''))) {

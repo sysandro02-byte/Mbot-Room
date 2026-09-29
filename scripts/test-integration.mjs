@@ -698,6 +698,25 @@ try {
   });
   assert.equal(restoreOutsider.response.status, 200, JSON.stringify(restoreOutsider.data));
 
+  const directBeforeAcceptance = await jsonRequest('/api/conversations/direct', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ contactUserId: outsider.user.id }),
+  });
+  assert.equal(directBeforeAcceptance.response.status, 403, JSON.stringify(directBeforeAcceptance.data));
+  assert.equal(directBeforeAcceptance.data.code, 'CONTACT_REQUEST_REQUIRED');
+  const contactRequest = await jsonRequest('/api/contact-requests', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ contactUserId: outsider.user.id }),
+  });
+  assert.equal(contactRequest.response.status, 201, JSON.stringify(contactRequest.data));
+  const acceptedContactRequest = await jsonRequest('/api/contact-requests/'+encodeURIComponent(contactRequest.data.requestId), {
+    method: 'PATCH',
+    headers: authHeaders(outsider.token),
+    body: JSON.stringify({ status: 'accepted' }),
+  });
+  assert.equal(acceptedContactRequest.response.status, 200, JSON.stringify(acceptedContactRequest.data));
   const userToUserConversation = await jsonRequest('/api/conversations/direct', {
     method: 'POST',
     headers: authHeaders(participant.token),
@@ -731,6 +750,18 @@ try {
   assert.equal(idorThread.response.status, 403, 'A non-member must not read another direct conversation');
 
 
+  const adminContactRequest = await jsonRequest('/api/contact-requests', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ contactUserId: participant.user.id }),
+  });
+  assert.equal(adminContactRequest.response.status, 201, JSON.stringify(adminContactRequest.data));
+  const acceptedAdminContactRequest = await jsonRequest('/api/contact-requests/'+encodeURIComponent(adminContactRequest.data.requestId), {
+    method: 'PATCH',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({ status: 'accepted' }),
+  });
+  assert.equal(acceptedAdminContactRequest.response.status, 200, JSON.stringify(acceptedAdminContactRequest.data));
   const adminToUserConversation = await jsonRequest('/api/conversations/direct', {
     method: 'POST',
     headers: authHeaders(host.token),

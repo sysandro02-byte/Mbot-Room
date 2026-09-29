@@ -39,6 +39,17 @@ const parseDate = (value: unknown) => {
 };
 
 const directConversationKey=(left:number,right:number)=>[left,right].sort((a,b)=>a-b).join(':');
+const normalizePhoneNumber=(value:unknown)=>String(value||'').replace(/\D/g,'').slice(0,40);
+
+const areContacts=async(left:number,right:number)=>{
+  const result=await query(
+    `SELECT 1 FROM room_user_contacts
+      WHERE user_id=$1 AND contact_user_id=$2
+      LIMIT 1`,
+    [left,right],
+  );
+  return Boolean(result.rows[0]);
+};
 
 const getConversationAccess=async(conversationId:string,userId:number)=>{
   const result=await query(
@@ -328,6 +339,16 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
       const profileVisible=typeof request.body?.profileVisible==='boolean'?request.body.profileVisible:request.user!.profileVisible!==false;
       const personalMeetingId=String(request.body?.personalMeetingId??request.user!.personalMeetingId??'').replace(/\s+/g,'').trim();
       if(!name||!username)return sendApiError(response,400,'VALIDATION_ERROR','Nom et nom d’utilisateur requis.');
+      const normalizedPhone=normalizePhoneNumber(phoneNumber);
+      if(normalizedPhone){
+        const duplicatePhone=await query(
+          `SELECT 1 FROM room_users
+            WHERE NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '')=$1 AND id<>$2
+            LIMIT 1`,
+          [normalizedPhone,request.user!.id],
+        );
+        if(duplicatePhone.rows[0])return sendApiError(response,409,'PHONE_ALREADY_EXISTS','Un compte existe déjà avec ce numéro de téléphone.');
+      }
       if(personalMeetingId&&!/^\d{6,12}$/.test(personalMeetingId))return sendApiError(response,400,'PERSONAL_MEETING_ID_INVALID','L’ID personnel doit contenir entre 6 et 12 chiffres.');
       const duplicate=await query('SELECT 1 FROM room_users WHERE lower(username)=lower($1) AND id<>$2 LIMIT 1',[username,request.user!.id]);
       if(duplicate.rows[0])return sendApiError(response,409,'USERNAME_ALREADY_EXISTS','Ce nom d’utilisateur est déjà utilisé.');
@@ -600,10 +621,11 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
                 COALESCE((SELECT favorite FROM room_user_contacts c WHERE c.user_id=$1 AND c.contact_user_id=u.id LIMIT 1),false) AS favorite
            FROM room_users u
           WHERE u.id<>$1 AND u.is_guest=false AND COALESCE(u.is_suspended,false)=false AND COALESCE(u.account_status,'active')<>'banned'
-            AND (lower(u.name) LIKE $2 OR lower(u.email) LIKE $2 OR lower(u.username) LIKE $2)
+            AND (lower(u.name) LIKE $2 OR lower(u.email) LIKE $2 OR lower(u.username) LIKE $2
+              OR regexp_replace(COALESCE(u.phone_number,''), '[^0-9]', '', 'g') LIKE $4)
           ORDER BY CASE WHEN lower(u.name)=$3 THEN 0 ELSE 1 END,u.name ASC
           LIMIT 30`,
-        [request.user!.id,`%${search}%`,search],
+        [request.user!.id,`%${search}%`,search,`%${normalizePhoneNumber(search)}%`],
       );
       response.json(result.rows.map((row:any)=>({
         id:Number(row.id),name:String(row.name||row.email),username:String(row.username||''),email:String(row.email||''),
@@ -620,12 +642,63 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
       if(!target.rows[0]||Boolean(target.rows[0].is_guest)||contactUserId===request.user!.id){
         return sendApiError(response,404,'CONTACT_NOT_FOUND','Ce compte MBotéRoom est introuvable.');
       }
-      await query(
-        `INSERT INTO room_user_contacts (user_id,contact_user_id)
-         VALUES ($1,$2) ON CONFLICT (user_id,contact_user_id) DO NOTHING`,
-        [request.user!.id,contactUserId],
+      return sendApiError(response,410,'CONTACT_REQUEST_REQUIRED','Envoyez une demande de contact ; elle devra être acceptée avant de pouvoir discuter.');
+    }catch(error){next(error);}
+  });
+
+  app.get('/api/contact-requests', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+    try{
+      const result=await query(
+        `SELECT r.id,r.status,r.created_at,u.id AS user_id,u.name,u.username,u.email,u.avatar,u.organization,u.job_title,u.city
+           FROM room_contact_requests r
+           JOIN room_users u ON u.id=r.requester_user_id
+          WHERE r.recipient_user_id=$1 AND r.status='pending'
+          ORDER BY r.created_at DESC`,
+        [request.user!.id],
       );
-      response.status(201).json({success:true,contactUserId});
+      response.json(result.rows.map((row:any)=>({
+        id:String(row.id),status:String(row.status),createdAt:new Date(row.created_at).toISOString(),
+        user:{id:Number(row.user_id),name:String(row.name||row.email),username:String(row.username||''),email:String(row.email||''),avatar:String(row.avatar||''),organization:String(row.organization||''),jobTitle:String(row.job_title||''),city:String(row.city||'')},
+      })));
+    }catch(error){next(error);}
+  });
+
+  app.post('/api/contact-requests', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+    try{
+      const recipientUserId=Number(request.body?.contactUserId||0);
+      const target=await query("SELECT id,name,is_guest FROM room_users WHERE id=$1 AND COALESCE(is_suspended,false)=false AND COALESCE(account_status,'active')<>'banned' LIMIT 1",[recipientUserId]);
+      if(!target.rows[0]||Boolean(target.rows[0].is_guest)||recipientUserId===request.user!.id)return sendApiError(response,404,'CONTACT_NOT_FOUND','Ce compte MBotéRoom est introuvable.');
+      if(await areContacts(request.user!.id,recipientUserId))return response.json({success:true,status:'accepted',alreadyContact:true});
+      const reverse=await query(`SELECT id FROM room_contact_requests WHERE requester_user_id=$1 AND recipient_user_id=$2 AND status='pending' LIMIT 1`,[recipientUserId,request.user!.id]);
+      if(reverse.rows[0]){
+        await query(`UPDATE room_contact_requests SET status='accepted',responded_at=now() WHERE id=$1`,[reverse.rows[0].id]);
+        await query(`INSERT INTO room_user_contacts (user_id,contact_user_id) VALUES ($1,$2),($2,$1) ON CONFLICT (user_id,contact_user_id) DO NOTHING`,[request.user!.id,recipientUserId]);
+        return response.json({success:true,status:'accepted'});
+      }
+      const pending=await query(`SELECT id FROM room_contact_requests WHERE requester_user_id=$1 AND recipient_user_id=$2 AND status='pending' LIMIT 1`,[request.user!.id,recipientUserId]);
+      if(pending.rows[0])return response.json({success:true,status:'pending',requestId:String(pending.rows[0].id)});
+      const id=createId();
+      await query(`INSERT INTO room_contact_requests (id,requester_user_id,recipient_user_id) VALUES ($1,$2,$3)`,[id,request.user!.id,recipientUserId]);
+      const notification=await createNotificationAndPush(recipientUserId,{type:'CONTACT_REQUEST',title:'Nouvelle demande de contact',body:`${request.user!.name} souhaite vous ajouter à ses contacts.`,url:'/app/contacts',tag:`contact-request-${id}`,data:{requestId:id,requesterUserId:request.user!.id}});
+      io.to(`user:${recipientUserId}`).emit('contact:request',notification);
+      response.status(201).json({success:true,status:'pending',requestId:id});
+    }catch(error){next(error);}
+  });
+
+  app.patch('/api/contact-requests/:requestId', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
+    try{
+      const status=request.body?.status==='accepted'?'accepted':request.body?.status==='rejected'?'rejected':'';
+      if(!status)return sendApiError(response,400,'CONTACT_REQUEST_STATUS_INVALID','Choisissez d’accepter ou de refuser la demande.');
+      const result=await query(`UPDATE room_contact_requests SET status=$3,responded_at=now() WHERE id=$1 AND recipient_user_id=$2 AND status='pending' RETURNING requester_user_id`,[request.params.requestId,request.user!.id,status]);
+      const requestRow=result.rows[0];
+      if(!requestRow)return sendApiError(response,404,'CONTACT_REQUEST_NOT_FOUND','Cette demande de contact est introuvable ou a déjà été traitée.');
+      const requesterUserId=Number(requestRow.requester_user_id);
+      if(status==='accepted'){
+        await query(`INSERT INTO room_user_contacts (user_id,contact_user_id) VALUES ($1,$2),($2,$1) ON CONFLICT (user_id,contact_user_id) DO NOTHING`,[requesterUserId,request.user!.id]);
+        const notification=await createNotificationAndPush(requesterUserId,{type:'CONTACT_REQUEST_ACCEPTED',title:'Demande de contact acceptée',body:`${request.user!.name} est maintenant dans vos contacts.`,url:'/app/contacts',tag:`contact-accepted-${request.params.requestId}`,data:{contactUserId:request.user!.id}});
+        io.to(`user:${requesterUserId}`).emit('contact:accepted',notification);
+      }
+      response.json({success:true,status});
     }catch(error){next(error);}
   });
 
@@ -679,6 +752,9 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
       if(!target.rows[0]||Boolean(target.rows[0].is_guest)||targetUserId===request.user!.id){
         return sendApiError(response,404,'CONTACT_NOT_FOUND','Ce compte MBotéRoom est introuvable.');
       }
+      if(!(await areContacts(request.user!.id,targetUserId))){
+        return sendApiError(response,403,'CONTACT_REQUEST_REQUIRED','Cette personne doit accepter votre demande de contact avant de démarrer une discussion.');
+      }
       const key=directConversationKey(request.user!.id,targetUserId);
       const id=createId();
       const inserted=await query(
@@ -698,11 +774,6 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
           [conversation.id,userId],
         );
       }
-      await query(
-        `INSERT INTO room_user_contacts (user_id,contact_user_id) VALUES ($1,$2),($2,$1)
-         ON CONFLICT (user_id,contact_user_id) DO NOTHING`,
-        [request.user!.id,targetUserId],
-      );
       const member=await query(
         'SELECT c.*,m.pinned,m.archived,m.notifications_enabled,m.last_read_at FROM room_conversations c JOIN room_conversation_members m ON m.conversation_id=c.id WHERE c.id=$1 AND m.user_id=$2',
         [conversation.id,request.user!.id],
