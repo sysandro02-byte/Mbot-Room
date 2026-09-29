@@ -2218,3 +2218,17 @@ html[data-native-app="android"] .android-download-card{
  .android-welcome-actions button,.android-welcome-actions a{min-height:45px!important}
  .android-welcome-shortcuts button{min-height:52px!important}
 }
+
+
+/* Android welcome: use more of the viewport vertically and keep the final actions visible. */
+@media(max-width:900px){
+  .auth-side{padding-bottom:max(8px,env(safe-area-inset-bottom))!important}
+  .android-welcome{
+    min-height:calc(100dvh - env(safe-area-inset-top));
+    margin-bottom:0!important;
+    padding-bottom:max(20px,calc(10px + env(safe-area-inset-bottom)))!important;
+    border-radius:0 0 18px 18px!important;
+  }
+  .android-welcome-visual{height:clamp(230px,34dvh,320px)!important}
+  .android-welcome-footer{margin-bottom:0!important;padding-bottom:4px}
+}
