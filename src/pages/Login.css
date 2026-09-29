@@ -2298,3 +2298,13 @@ html[data-native-app="android"] .android-download-card{
    overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important
  }
 }
+
+
+@media(max-width:900px){
+ .android-welcome{margin:12px auto 24px!important;padding:20px 16px 18px!important}
+ .android-welcome-actions{gap:11px!important;padding:14px!important}
+ .android-welcome-actions button,.android-welcome-actions a{min-height:66px!important}
+ .android-welcome-shortcuts{margin-top:14px!important}
+ .android-welcome-shortcuts button{min-height:80px!important}
+ .android-welcome-footer{display:none!important}
+}
