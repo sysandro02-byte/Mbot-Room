@@ -1085,7 +1085,8 @@ export default function Login({ initialView = 'login' }: LoginProps) {
           )}
 
           {initialView === 'forgot' && (
-            <div className="android-login-modal-backdrop forgot-modal-backdrop" role="presentation"><section className="login-card compact-auth-card android-login-modal forgot-bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="forgot-title">
+            <div className="android-login-modal-backdrop forgot-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) navigate('/connexion'); }}><section className="login-card compact-auth-card android-login-modal forgot-bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="forgot-title">
+              <button className="android-login-modal-close forgot-modal-close" type="button" aria-label="Fermer" onClick={() => navigate('/connexion')}>×</button>
               <header className="login-card-header">
                 <h1 id="forgot-title">{resetToken ? 'Nouveau mot de passe' : 'Mot de passe oublié'}</h1>
                 <p>{resetToken ? 'Choisissez un nouveau mot de passe sécurisé pour votre compte.' : 'Entrez votre adresse e-mail pour recevoir un lien de réinitialisation.'}</p>
