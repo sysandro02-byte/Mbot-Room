@@ -1085,7 +1085,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
           )}
 
           {initialView === 'forgot' && (
-            <section className="login-card compact-auth-card" aria-labelledby="forgot-title">
+            <div className="android-login-modal-backdrop forgot-modal-backdrop" role="presentation"><section className="login-card compact-auth-card android-login-modal forgot-bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="forgot-title">
               <header className="login-card-header">
                 <h1 id="forgot-title">{resetToken ? 'Nouveau mot de passe' : 'Mot de passe oublié'}</h1>
                 <p>{resetToken ? 'Choisissez un nouveau mot de passe sécurisé pour votre compte.' : 'Entrez votre adresse e-mail pour recevoir un lien de réinitialisation.'}</p>
@@ -1158,7 +1158,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                 )}
                 <AuthFooterAction label="Vous connaissez votre mot de passe ?" action="Se connecter" onClick={() => navigate('/connexion')} />
               </form>
-            </section>
+            </section></div>
           )}
         </section>
       </section>
@@ -1169,13 +1169,13 @@ export default function Login({ initialView = 'login' }: LoginProps) {
 
       {isRegisterModalOpen && !registrationSuccess && (
         <div
-          className="auth-modal-backdrop registration-modal-backdrop"
+          className="auth-modal-backdrop registration-modal-backdrop android-sheet-backdrop"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setRegisterModalOpen(false);
           }}
         >
-          <section className="auth-modal registration-modal" role="dialog" aria-modal="true" aria-labelledby="registration-modal-title">
+          <section className="auth-modal registration-modal android-bottom-sheet" role="dialog" aria-modal="true" aria-labelledby="registration-modal-title">
             <button className="registration-modal-close" type="button" aria-label="Fermer la création de compte" onClick={() => setRegisterModalOpen(false)}>×</button>
             <header className="registration-modal-header">
               <span className="auth-card-kicker">Nouveau compte MBotéRoom</span>
