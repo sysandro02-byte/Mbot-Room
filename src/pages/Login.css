@@ -2440,3 +2440,17 @@ html[data-native-app="android"] .android-download-card{
  .guest-modal-close{display:flex!important;align-items:center!important;justify-content:center!important;right:18px!important;top:18px!important;z-index:4!important}
  @media(prefers-reduced-motion:reduce){.guest-modal-backdrop,.guest-bottom-sheet{animation:none!important}}
 }
+
+
+/* Android welcome maker credit: directly below the four shortcut buttons. */
+@media(max-width:900px){
+  .android-welcome-footer{
+    display:block!important;
+    margin:7px 0 0!important;
+    padding:0!important;
+    text-align:center!important;
+    font-size:9px!important;
+    line-height:1.25!important;
+    color:#58708f!important;
+  }
+}
