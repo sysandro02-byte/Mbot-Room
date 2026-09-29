@@ -2417,3 +2417,12 @@ html[data-native-app="android"] .android-download-card{
  .android-bottom-sheet .registration-modal-close{right:18px!important;top:18px!important;width:40px!important;height:40px!important;border-radius:50%!important;background:#f1f3f6!important;z-index:3!important}
  @media(prefers-reduced-motion:reduce){.forgot-modal-backdrop,.android-sheet-backdrop,.forgot-bottom-sheet,.android-bottom-sheet{animation:none!important}}
 }
+
+/* Final Android sheet polish: blurred backdrop + clean registration surface. */
+@media(max-width:900px){
+ .android-login-modal-backdrop,.auth-modal-backdrop,.forgot-modal-backdrop,.android-sheet-backdrop{backdrop-filter:blur(7px)!important;-webkit-backdrop-filter:blur(7px)!important;background:rgba(8,20,32,.36)!important}
+ .forgot-modal-close{display:flex!important;align-items:center!important;justify-content:center!important}
+ .android-bottom-sheet,.android-bottom-sheet .registration-modal-form,.android-bottom-sheet .registration-modal-grid{background:#fff!important}
+ .android-bottom-sheet .registration-modal-header{background:#fff!important;box-shadow:none!important}
+ .android-bottom-sheet .registration-modal-grid>*{background:#fff!important}
+}
