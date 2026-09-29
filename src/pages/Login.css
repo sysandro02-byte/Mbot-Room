@@ -2232,3 +2232,27 @@ html[data-native-app="android"] .android-download-card{
   .android-welcome-visual{height:clamp(230px,34dvh,320px)!important}
   .android-welcome-footer{margin-bottom:0!important;padding-bottom:4px}
 }
+
+
+/* Android welcome breathing room: clearer visual hierarchy and touch spacing. */
+@media(max-width:900px){
+ .android-welcome{padding:22px 18px 20px!important}
+ .android-welcome-top{margin-bottom:10px!important}
+ .android-welcome-tagline{margin:10px 0 4px!important;line-height:1.22!important}
+ .android-welcome-maker{margin:0 0 18px!important;line-height:1.45!important}
+ .android-welcome-visual{margin-bottom:0!important}
+ .android-welcome-benefits{gap:8px!important;margin:-18px 10px 20px!important;padding:13px 8px!important}
+ .android-welcome-benefits span{padding:6px 8px!important}
+ .android-welcome-actions{gap:13px!important;padding:16px!important}
+ .android-welcome-actions button,.android-welcome-actions a{min-height:70px!important;padding:11px 14px!important}
+ .android-action-separator{margin:3px 0!important}
+ .android-welcome-shortcuts{gap:9px!important;margin-top:16px!important}
+ .android-welcome-shortcuts button{min-height:86px!important;padding:10px 5px!important}
+ .android-welcome-footer{margin:16px 0 4px!important;line-height:1.4!important}
+}
+@media(max-width:390px){
+ .android-welcome{padding:18px 12px 18px!important}
+ .android-welcome-actions{padding:13px!important;gap:11px!important}
+ .android-welcome-actions button,.android-welcome-actions a{min-height:66px!important}
+ .android-welcome-shortcuts{gap:6px!important}
+}
