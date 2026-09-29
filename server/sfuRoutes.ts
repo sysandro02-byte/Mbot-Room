@@ -68,8 +68,17 @@ const configuredMode = () => {
   return mode === 'livekit' || mode === 'mesh' ? mode : 'auto';
 };
 
+const normalizeLiveKitServerUrl = (value: string) => {
+  const raw = String(value || '').trim().replace(/\/+$/, '');
+  if (!raw) return '';
+  if (/^https:\/\//i.test(raw)) return `wss://${raw.slice('https://'.length)}`;
+  if (/^http:\/\//i.test(raw)) return `ws://${raw.slice('http://'.length)}`;
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) return `wss://${raw}`;
+  return raw;
+};
+
 const liveKitConfig = () => ({
-  serverUrl: String(process.env.LIVEKIT_URL || '').trim().replace(/\/+$/, ''),
+  serverUrl: normalizeLiveKitServerUrl(process.env.LIVEKIT_URL || ''),
   apiKey: String(process.env.LIVEKIT_API_KEY || '').trim(),
   apiSecret: String(process.env.LIVEKIT_API_SECRET || '').trim(),
 });
