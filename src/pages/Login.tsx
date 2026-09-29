@@ -336,6 +336,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [meetingPassword, setMeetingPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showAndroidCredentials, setShowAndroidCredentials] = useState(false);
+  const [showGuestSheet, setShowGuestSheet] = useState(initialView === 'guest');
   const [isLoading, setIsLoading] = useState(false);
   const [isMboteLoading, setIsMboteLoading] = useState(false);
   const [apkShareMessage, setApkShareMessage] = useState('');
@@ -736,7 +737,10 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     }
   };
 
-  const goToGuestJoin = () => navigate('/rejoindre-une-reunion');
+  const goToGuestJoin = () => {
+    clearErrors();
+    setShowGuestSheet(true);
+  };
 
   const handleGuestKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -1060,10 +1064,10 @@ export default function Login({ initialView = 'login' }: LoginProps) {
             </CompactAuthCard>
           )}
 
-          {initialView === 'guest' && (
+          {showGuestSheet && (
             <div className="android-login-modal-backdrop guest-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) navigate('/login'); }}>
             <section className="login-card compact-auth-card android-login-modal guest-bottom-sheet" role="dialog" aria-modal="true" aria-label="Rejoindre une réunion comme invité">
-              <button className="android-login-modal-close guest-modal-close" type="button" aria-label="Fermer" onClick={() => navigate('/login')}>×</button>
+              <button className="android-login-modal-close guest-modal-close" type="button" aria-label="Fermer" onClick={() => { setShowGuestSheet(false); if (initialView === 'guest') navigate('/login'); }}>×</button>
             <CompactAuthCard
               title="Rejoindre une réunion"
               subtitle="Entrez les informations fournies par l'hôte."
