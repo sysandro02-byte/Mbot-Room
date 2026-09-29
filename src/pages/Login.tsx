@@ -864,7 +864,6 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                 </select>
               </div>
               <p className="android-welcome-tagline">Réunissez-vous sans limites</p>
-              <p className="android-welcome-maker">Application créée par LoukaTech</p>
               <div className="android-welcome-visual">
                 <img src={loginBranding.illustrationUrl} alt="Réunion vidéo MBotéRoom" />
               </div>
