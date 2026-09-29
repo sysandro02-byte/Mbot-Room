@@ -2399,3 +2399,9 @@ html[data-native-app="android"] .android-download-card{
  .android-login-modal .google-login-button.mbote-auth-button{width:auto!important;min-width:220px!important;max-width:270px!important;min-height:50px!important;padding:9px 16px!important;margin:0 auto!important;border-radius:17px!important}
  .android-login-modal .google-login-button.mbote-auth-button .external-login-arrow{margin-left:auto!important}
 }
+
+@media(max-width:900px){
+ .android-login-modal .login-card-header{text-align:center!important;padding-left:42px!important;padding-right:42px!important}
+ .android-login-modal .auth-card-kicker{display:block!important;text-align:center!important;margin-left:auto!important;margin-right:auto!important}
+ .android-login-modal .login-card-header h1,.android-login-modal .login-card-header p{text-align:center!important}
+}
