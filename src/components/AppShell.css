@@ -170,7 +170,11 @@
 
 /* GlobalHeader replaces the legacy AppShell header on every route. */
 .app-shell-header{display:none!important}
-.app-shell,.app-shell-workspace{min-height:calc(100dvh - 64px)}
-@media(max-width:500px){.app-shell,.app-shell-workspace{min-height:calc(100dvh - 58px)}}
+.app-shell{min-height:calc(100dvh - 64px)}
+.app-shell-workspace{min-height:0}
+@media(max-width:500px){
+  .app-shell{min-height:calc(100dvh - 58px)}
+  .app-shell-workspace{min-height:0}
+}
 
 .app-shell-profile-static{grid-template-columns:40px minmax(0,1fr)}
