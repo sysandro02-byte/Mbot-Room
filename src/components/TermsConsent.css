@@ -14,3 +14,14 @@
 .terms-modal-footer>small{color:#8b6d22;font-size:10px}.terms-modal-footer>div{display:flex;justify-content:flex-end;gap:8px}
 .terms-modal-footer button{min-height:40px;padding:0 14px;border:1px solid #ccd9df;border-radius:10px;background:#fff;color:#29445a;font-weight:800;cursor:pointer}.terms-modal-footer button.primary{border-color:#078d8e;background:#078d8e;color:#fff}.terms-modal-footer button:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:640px){.terms-modal-backdrop{padding:8px}.terms-modal{max-height:94dvh;border-radius:16px}.terms-modal>header,.terms-modal-footer{padding:13px}.terms-modal-body{padding:15px}.terms-modal-footer>div{display:grid;grid-template-columns:1fr 1fr}.terms-modal-footer button{padding:0 8px;font-size:11px}}
+
+/* Legal terms stays a conventional centered dialog, even inside Android bottom sheets. */
+@media(max-width:640px){
+ .terms-modal-backdrop{z-index:2200!important;display:grid!important;place-items:center!important;align-items:center!important;padding:16px!important;background:rgba(4,25,39,.56)!important;backdrop-filter:blur(6px)!important;-webkit-backdrop-filter:blur(6px)!important}
+ .terms-modal{width:min(94vw,620px)!important;max-height:88dvh!important;margin:auto!important;border-radius:20px!important;transform:none!important;animation:none!important;background:#fff!important}
+ .terms-modal:before{display:none!important;content:none!important}
+ .terms-modal>header{padding:14px 16px!important}
+ .terms-modal>header>button{position:static!important;width:38px!important;height:38px!important;margin:0!important}
+ .terms-modal-body{min-height:180px!important;padding:16px!important}
+ .terms-modal-footer{padding:14px 16px calc(14px + env(safe-area-inset-bottom))!important}
+}
