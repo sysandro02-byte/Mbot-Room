@@ -2389,3 +2389,13 @@ html[data-native-app="android"] .android-download-card{
  .android-login-modal .form-field{background:#f5f6f8!important;border-radius:20px!important;padding:12px 14px!important}
  .android-login-modal .primary-login-button,.android-login-modal .google-login-button{border-radius:20px!important;min-height:58px!important}
 }
+
+/* Fine-tune Android login sheet controls. */
+@media(max-width:900px){
+ .android-login-modal .form-options{display:grid!important;grid-template-columns:auto 1fr!important;align-items:center!important;column-gap:14px!important;row-gap:6px!important}
+ .android-login-modal .remember-control{grid-column:1!important;grid-row:1!important;margin:0!important;white-space:nowrap!important}
+ .android-login-modal .auth-text-link{grid-column:2!important;grid-row:1!important;justify-self:end!important;margin:0!important;white-space:nowrap!important}
+ .android-login-modal .external-login-row{display:flex!important;justify-content:center!important;width:100%!important}
+ .android-login-modal .google-login-button.mbote-auth-button{width:auto!important;min-width:220px!important;max-width:270px!important;min-height:50px!important;padding:9px 16px!important;margin:0 auto!important;border-radius:17px!important}
+ .android-login-modal .google-login-button.mbote-auth-button .external-login-arrow{margin-left:auto!important}
+}
