@@ -199,6 +199,7 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
         type:'LIVE_STARTED',title:`${row.host_name} est en direct`,body:row.title,url:liveUrl(row.id),tag:`live-${row.id}`,data:{liveId:row.id},
       }).then((notification)=>io.to(`user:${item.follower_id}`).emit('notification:new',notification)).catch(()=>undefined)));
       io.to(`live:${row.id}`).emit('live:status',{liveId:row.id,status:'live',startedAt:now});
+      io.emit('live:status',{liveId:row.id,status:'live',startedAt:now});
       response.json(mapLive({...updated.rows[0],host_name:row.host_name,host_avatar:row.host_avatar,is_host:true}));
     }catch(error){next(error);}
   });
@@ -212,6 +213,7 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
       await query(`UPDATE room_live_sessions SET status='ended',ended_at=$2,viewer_count=0,updated_at=now() WHERE id=$1`,[row.id,now]);
       await query(`UPDATE room_meetings SET status='ended',is_active=false,ended_at=$2::timestamptz,updated_at=now() WHERE id=$1`,[row.meeting_id,now]);
       io.to(`live:${row.id}`).emit('live:status',{liveId:row.id,status:'ended',endedAt:now});
+      io.emit('live:status',{liveId:row.id,status:'ended',endedAt:now});
       response.json({success:true,status:'ended'});
     }catch(error){next(error);}
   });

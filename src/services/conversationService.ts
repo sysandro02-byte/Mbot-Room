@@ -21,6 +21,13 @@ export type DirectoryContact={
   sharedGroup:boolean;
 };
 
+export type ContactRequest={
+  id:string;
+  status:'pending'|'accepted'|'rejected';
+  createdAt:string;
+  user:DirectoryContact;
+};
+
 export type ConversationFile={
   id:string;
   name:string;
@@ -80,9 +87,17 @@ export const conversationService={
     return readJson<DirectoryContact[]>(await apiFetch(apiUrl('/api/contacts/search?q='+encodeURIComponent(q)),{headers:getAuthHeaders(),cache:'no-store'}));
   },
 
-  async saveContact(contactUserId:number){
-    return readJson<{success:boolean;contactUserId:number}>(await apiFetch(apiUrl('/api/contacts/'+contactUserId),{
-      method:'POST',headers:getAuthHeaders(),body:'{}',
+  async requestContact(contactUserId:number){
+    return readJson<{success:boolean;status:'pending'|'accepted';requestId?:string;alreadyContact?:boolean}>(await apiFetch(apiUrl('/api/contact-requests'),{
+      method:'POST',headers:getAuthHeaders(),body:JSON.stringify({contactUserId}),
+    }));
+  },
+  async getContactRequests(){
+    return readJson<ContactRequest[]>(await apiFetch(apiUrl('/api/contact-requests'),{headers:getAuthHeaders(),cache:'no-store'}));
+  },
+  async respondToContactRequest(requestId:string,status:'accepted'|'rejected'){
+    return readJson<{success:boolean;status:'accepted'|'rejected'}>(await apiFetch(apiUrl('/api/contact-requests/'+encodeURIComponent(requestId)),{
+      method:'PATCH',headers:getAuthHeaders(),body:JSON.stringify({status}),
     }));
   },
 

@@ -17,7 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { conversationService, type DirectoryContact } from '../services/conversationService';
+import { conversationService, type ContactRequest, type DirectoryContact } from '../services/conversationService';
 import { meetingService, type Meeting } from '../services/meetingService';
 import { workspaceService, type WorkGroup } from '../services/workspaceService';
 import { showAppMessage } from '../lib/appMessage';
@@ -32,6 +32,7 @@ const localDateValue=(date=new Date(Date.now()+3600_000))=>new Date(date.getTime
 export default function ContactsPage(){
   const navigate=useNavigate();
   const [contacts,setContacts]=useState<DirectoryContact[]>([]);
+  const [incomingRequests,setIncomingRequests]=useState<ContactRequest[]>([]);
   const [groups,setGroups]=useState<WorkGroup[]>([]);
   const [meetings,setMeetings]=useState<Meeting[]>([]);
   const [selectedId,setSelectedId]=useState<number|null>(null);
@@ -51,14 +52,16 @@ export default function ContactsPage(){
     setLoading(true);
     setError('');
     try{
-      const [contactRows,groupRows,meetingRows]=await Promise.all([
+      const [contactRows,groupRows,meetingRows,requestRows]=await Promise.all([
         conversationService.getContacts(),
         workspaceService.getWorkGroups().catch(()=>[]),
         meetingService.getMeetings().catch(()=>[]),
+        conversationService.getContactRequests().catch(()=>[]),
       ]);
       setContacts(contactRows);
       setGroups(groupRows);
       setMeetings(meetingRows);
+      setIncomingRequests(requestRows);
       setSelectedId((current)=>current&&contactRows.some((contact)=>contact.id===current)?current:(contactRows[0]?.id||null));
     }catch(cause){
       setError(cause instanceof Error?cause.message:'Impossible de charger vos contacts.');
@@ -128,19 +131,25 @@ export default function ContactsPage(){
 
   const saveContact=async(contact:DirectoryContact)=>{
     try{
-      await conversationService.saveContact(contact.id);
-      setContacts((current)=>{
-        const exists=current.some((item)=>item.id===contact.id);
-        if(exists)return current.map((item)=>item.id===contact.id?{...item,saved:true}:item);
-        return [...current,{...contact,saved:true}].sort((a,b)=>a.name.localeCompare(b.name));
-      });
-      setSelectedId(contact.id);
-      setAddOpen(false);
-      setDirectorySearch('');
-      showAppMessage('Contact ajouté à MBotéRoom.',{tone:'success'});
+      const result=await conversationService.requestContact(contact.id);
+      if(result.status==='accepted'){
+        await load();
+        showAppMessage('Vous êtes maintenant contacts sur MBotéRoom.',{tone:'success'});
+      }else showAppMessage('Demande de contact envoyée. Vous pourrez discuter après son acceptation.',{tone:'success'});
     }catch(cause){
-      showAppMessage(cause instanceof Error?cause.message:'Impossible d’ajouter ce contact.',{tone:'error'});
+      showAppMessage(cause instanceof Error?cause.message:'Impossible d’envoyer la demande.',{tone:'error'});
     }
+  };
+
+  const respondToRequest=async(request:ContactRequest,status:'accepted'|'rejected')=>{
+    try{
+      await conversationService.respondToContactRequest(request.id,status);
+      setIncomingRequests((current)=>current.filter((item)=>item.id!==request.id));
+      if(status==='accepted'){
+        await load();
+        showAppMessage(`${request.user.name} a été ajouté à vos contacts.`,{tone:'success'});
+      }
+    }catch(cause){showAppMessage(cause instanceof Error?cause.message:'Impossible de traiter cette demande.',{tone:'error'});}
   };
 
   const startConversation=async(contact:DirectoryContact)=>{
@@ -246,6 +255,8 @@ export default function ContactsPage(){
 
     {error?<div className="contacts-pro-error">{error}</div>:null}
 
+    {incomingRequests.length?<section className="contacts-pro-empty" style={{marginBottom:18}}><UsersRound size={28}/><strong>Demandes de contact</strong>{incomingRequests.map((request)=><p key={request.id}><b>{request.user.name}</b> souhaite vous ajouter. <button onClick={()=>void respondToRequest(request,'accepted')}>Accepter</button> <button onClick={()=>void respondToRequest(request,'rejected')}>Refuser</button></p>)}</section>:null}
+
     <div className="contacts-pro-layout">
       <aside className="contacts-pro-filters">
         <div className="contacts-pro-filter-title">Filtres</div>
@@ -336,10 +347,10 @@ export default function ContactsPage(){
 
     {addOpen?<div className="contacts-pro-modal" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)setAddOpen(false);}}>
       <section role="dialog" aria-modal="true">
-        <header><div><h2>Ajouter un contact MBotéRoom</h2><p>Recherchez uniquement un compte MBotéRoom enregistré.</p></div><button onClick={()=>setAddOpen(false)}><X/></button></header>
-        <label className="contacts-pro-directory-search"><Search size={17}/><input autoFocus value={directorySearch} onChange={(event)=>setDirectorySearch(event.target.value)} placeholder="Nom, e-mail ou identifiant MBotéRoom"/></label>
+        <header><div><h2>Ajouter un contact MBotéRoom</h2><p>Recherchez un compte par nom, e-mail ou numéro, puis envoyez une demande.</p></div><button onClick={()=>setAddOpen(false)}><X/></button></header>
+        <label className="contacts-pro-directory-search"><Search size={17}/><input autoFocus value={directorySearch} onChange={(event)=>setDirectorySearch(event.target.value)} placeholder="Nom, e-mail ou numéro de téléphone"/></label>
         <div className="contacts-pro-directory-results">
-          {directoryBusy?<p>Recherche…</p>:directoryResults.map((contact)=><article key={contact.id}><span>{contact.avatar?<img src={contact.avatar} alt=""/>:initials(contact.name)}</span><div><strong>{contact.name}</strong><small>{contact.email}</small></div><button disabled={contact.saved} onClick={()=>void saveContact(contact)}>{contact.saved?'Déjà ajouté':'Ajouter'}</button></article>)}
+          {directoryBusy?<p>Recherche…</p>:directoryResults.map((contact)=><article key={contact.id}><span>{contact.avatar?<img src={contact.avatar} alt=""/>:initials(contact.name)}</span><div><strong>{contact.name}</strong><small>{contact.email}</small></div><button disabled={contact.saved} onClick={()=>void saveContact(contact)}>{contact.saved?'Déjà ami':'Envoyer la demande'}</button></article>)}
           {!directoryBusy&&directorySearch.trim().length>=2&&!directoryResults.length?<p>Aucun compte MBotéRoom correspondant.</p>:null}
           {directorySearch.trim().length<2?<p>Saisissez au moins 2 caractères.</p>:null}
         </div>

@@ -275,6 +275,25 @@ export const runExtraMigrations = async () => {
     );
     CREATE INDEX IF NOT EXISTS room_user_contacts_contact_idx ON room_user_contacts(contact_user_id);
 
+    CREATE TABLE IF NOT EXISTS room_contact_requests (
+      id uuid PRIMARY KEY,
+      requester_user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      recipient_user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','rejected','cancelled')),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      responded_at timestamptz,
+      CHECK (requester_user_id <> recipient_user_id)
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS room_contact_requests_pending_pair_unique
+      ON room_contact_requests(requester_user_id,recipient_user_id)
+      WHERE status='pending';
+    CREATE INDEX IF NOT EXISTS room_contact_requests_recipient_idx
+      ON room_contact_requests(recipient_user_id,status,created_at DESC);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS room_users_phone_number_unique
+      ON room_users (regexp_replace(phone_number, '[^0-9]', '', 'g'))
+      WHERE NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '') IS NOT NULL;
+
     CREATE TABLE IF NOT EXISTS room_conversations (
       id uuid PRIMARY KEY,
       kind text NOT NULL CHECK (kind IN ('direct','work_group')),

@@ -128,8 +128,11 @@ export default function ProfilePage(){
     setPhotoBusy(true);
     try{
       const avatar=await compressAvatar(file);
-      update({avatar});
-      showAppMessage('Photo prête. Enregistrez les modifications pour la conserver.',{tone:'success'});
+      const saved=await appDataService.updateProfile({avatar});
+      setProfile(saved.user);
+      await authService.refreshCurrentUser();
+      window.dispatchEvent(new CustomEvent('mbote-room-auth-changed'));
+      showAppMessage('Photo de profil mise à jour.',{tone:'success'});
     }catch(cause){showAppMessage(cause instanceof Error?cause.message:'Photo invalide.',{tone:'error'});}
     finally{setPhotoBusy(false);}
   };
