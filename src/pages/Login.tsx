@@ -1061,6 +1061,9 @@ export default function Login({ initialView = 'login' }: LoginProps) {
           )}
 
           {initialView === 'guest' && (
+            <div className="android-login-modal-backdrop guest-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) navigate('/login'); }}>
+            <section className="login-card compact-auth-card android-login-modal guest-bottom-sheet" role="dialog" aria-modal="true" aria-label="Rejoindre une réunion comme invité">
+              <button className="android-login-modal-close guest-modal-close" type="button" aria-label="Fermer" onClick={() => navigate('/login')}>×</button>
             <CompactAuthCard
               title="Rejoindre une réunion"
               subtitle="Entrez les informations fournies par l'hôte."
@@ -1082,6 +1085,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
               </FormField>
               <TermsConsent accepted={termsAccepted} version={termsVersion} onAccepted={(accepted,version)=>{setTermsAccepted(accepted);setTermsVersion(version);setFormError('');}} />
             </CompactAuthCard>
+            </section></div>
           )}
 
           {initialView === 'forgot' && (
