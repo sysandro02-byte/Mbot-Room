@@ -63,54 +63,79 @@ declare global {
   }
 }
 
-const LIVEKIT_UMD_URL = 'https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js';
+const LIVEKIT_UMD_URLS = [
+  'https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.min.js',
+  'https://unpkg.com/livekit-client@2.22.3/dist/livekit-client.umd.min.js',
+] as const;
 const LIVEKIT_SCRIPT_ID = 'mboteroom-livekit-client';
 
 let sdkPromise: Promise<LiveKitSdk> | null = null;
+
+const loadLiveKitScript = (url: string, sourceIndex: number): Promise<LiveKitSdk> => new Promise((resolve, reject) => {
+  const previous = document.getElementById(LIVEKIT_SCRIPT_ID);
+  previous?.remove();
+
+  const script = document.createElement('script');
+  script.id = LIVEKIT_SCRIPT_ID;
+  script.src = url;
+  script.async = true;
+  script.crossOrigin = 'anonymous';
+  script.referrerPolicy = 'no-referrer';
+  script.dataset.version = '2.22.3';
+  script.dataset.sourceIndex = String(sourceIndex);
+
+  let settled = false;
+  const cleanup = () => {
+    window.clearTimeout(timer);
+    script.removeEventListener('load', handleLoad);
+    script.removeEventListener('error', handleError);
+  };
+  const succeed = () => {
+    if (settled) return;
+    if (!window.LivekitClient) {
+      fail(new Error('Le SDK LiveKit a été chargé sans exposer son client.'));
+      return;
+    }
+    settled = true;
+    cleanup();
+    resolve(window.LivekitClient);
+  };
+  const fail = (error: Error) => {
+    if (settled) return;
+    settled = true;
+    cleanup();
+    script.remove();
+    reject(error);
+  };
+  const handleLoad = () => succeed();
+  const handleError = () => fail(new Error('Le SDK LiveKit n’a pas pu être chargé depuis ce serveur.'));
+  const timer = window.setTimeout(
+    () => fail(new Error('Le chargement du SDK LiveKit a dépassé le délai prévu.')),
+    10_000,
+  );
+
+  script.addEventListener('load', handleLoad, { once: true });
+  script.addEventListener('error', handleError, { once: true });
+  document.head.appendChild(script);
+});
 
 export const loadLiveKitClient = (): Promise<LiveKitSdk> => {
   if (window.LivekitClient) return Promise.resolve(window.LivekitClient);
   if (sdkPromise) return sdkPromise;
 
-  sdkPromise = new Promise<LiveKitSdk>((resolve, reject) => {
-    let settled = false;
-    const finish = () => {
-      if (settled) return;
-      if (!window.LivekitClient) {
-        settled = true;
-        reject(new Error('Le SDK LiveKit n’a pas pu être chargé.'));
-        return;
+  sdkPromise = (async () => {
+    let lastError: Error | null = null;
+    for (let index = 0; index < LIVEKIT_UMD_URLS.length; index += 1) {
+      try {
+        return await loadLiveKitScript(LIVEKIT_UMD_URLS[index], index);
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Chargement LiveKit impossible.');
       }
-      settled = true;
-      resolve(window.LivekitClient);
-    };
-
-    const fail = () => {
-      if (settled) return;
-      settled = true;
-      sdkPromise = null;
-      reject(new Error('La connexion vidéo avancée est momentanément indisponible.'));
-    };
-
-    let script = document.getElementById(LIVEKIT_SCRIPT_ID) as HTMLScriptElement | null;
-    if (!script) {
-      script = document.createElement('script');
-      script.id = LIVEKIT_SCRIPT_ID;
-      script.src = LIVEKIT_UMD_URL;
-      script.async = true;
-      script.crossOrigin = 'anonymous';
-      script.referrerPolicy = 'no-referrer';
-      script.dataset.version = '2.22.3';
-      document.head.appendChild(script);
     }
-
-    script.addEventListener('load', finish, { once: true });
-    script.addEventListener('error', fail, { once: true });
-
-    window.setTimeout(() => {
-      if (window.LivekitClient) finish();
-      else fail();
-    }, 12_000);
+    throw lastError || new Error('La connexion vidéo avancée est momentanément indisponible.');
+  })().catch((error) => {
+    sdkPromise = null;
+    throw error;
   });
 
   return sdkPromise;
