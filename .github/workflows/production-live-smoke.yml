@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'scripts/test-production-live.mjs'
+      - 'scripts/test-production-broadcast-live.mjs'
       - 'scripts/wait-for-ci-gate.mjs'
       - '.github/workflows/production-live-smoke.yml'
       - 'server-v2.ts'
@@ -50,3 +51,8 @@ jobs:
           MBOTE_ROOM_FRONTEND_URL: https://mbote-room.vercel.app
           MBOTE_ROOM_BACKEND_URL: https://mbote-room-api.onrender.com
         run: node scripts/test-production-live.mjs
+      - name: Run broadcast Live production smoke
+        env:
+          MBOTE_ROOM_FRONTEND_URL: https://mbote-room.vercel.app
+          MBOTE_ROOM_BACKEND_URL: https://mbote-room-api.onrender.com
+        run: node scripts/test-production-broadcast-live.mjs
