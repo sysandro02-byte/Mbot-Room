@@ -6,6 +6,7 @@ import './index.css';
 import './styles/ui-unified.css';
 import './styles/brand.css';
 import './styles/responsive-hardening.css';
+import './styles/android-native.css';
 import { registerPwa } from './lib/pwa';
 import { initOfflineMode } from './lib/offline';
 import { isChunkLoadError } from './lib/lazyWithRetry';

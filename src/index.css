@@ -188,6 +188,9 @@ html[data-platform="ios"][data-standalone="true"] body{padding-top:0}
 html[data-platform="android"][data-standalone="true"] body{background:#f4f6fb}
 
 
+/* Retired viewport-only Android pass. Kept inert for an easy rollback; the
+   active APK design is scoped in styles/android-native.css by native identity. */
+@media not all {
 /* MBotéRoom Android light design system — visual layer only.
    Existing routes, event handlers, API services and backend contracts stay untouched. */
 :root{
@@ -288,4 +291,5 @@ html[data-platform="android"][data-standalone="true"] body{background:#f4f6fb}
   .real-join-shortcuts{grid-template-columns:1fr!important}
   .profile-pro-editor{padding:14px!important}
   [class*="meeting"] [class*="toolbar"] button,[class*="meeting"] [class*="controls"] button{min-width:44px}
+}
 }

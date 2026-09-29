@@ -14,6 +14,8 @@ import { NextMeetingCard, RecentMeetings } from './components/HomeMeetings';
 import { HomeFeatureBanner, HomeFooter, HomeQuickAccess, LunaAssistantCard } from './components/HomeExtras';
 import { PremiumModal, StorageDataModal } from './components/HomeDashboardModals';
 import './RealDashboardPage.css';
+import AndroidHome from './components/AndroidHome';
+import { isNativeAndroidApp } from '../../lib/nativePlatform';
 
 const readCachedJson = async <T,>(path: string): Promise<T | null> => {
   const response = await readCachedApiResponse(apiUrl(path));
@@ -225,6 +227,19 @@ export default function RealDashboardPage() {
     }
     navigate('/app/meetings');
   };
+
+  if (isNativeAndroidApp()) return <AndroidHome
+    firstName={firstName}
+    meetings={upcoming}
+    loading={loading}
+    unreadNotifications={unreadNotifications}
+    onCreate={() => navigate('/app/meetings?new=1')}
+    onPlan={() => navigate('/app/meetings?new=1&mode=schedule')}
+    onOpen={(meeting) => void openMeeting(meeting)}
+    onAll={() => navigate('/app/meetings')}
+    onNotifications={() => navigate('/app/notifications')}
+    onLive={() => navigate('/app/live')}
+  />;
 
   return <main className="real-dashboard" aria-busy={loading}>
     {loading ? <div className="home-data-progress" aria-hidden="true"><span/></div> : null}
