@@ -2355,3 +2355,13 @@ html[data-native-app="android"] .android-download-card{
  .android-welcome-actions button,.android-welcome-actions a{min-height:66px!important;margin:0!important}
  .android-welcome-shortcuts{gap:10px!important;margin-top:14px!important}
 }
+
+/* Android connection dialog: show only authentication essentials. */
+@media(max-width:900px){
+ .android-login-modal-backdrop{position:fixed;inset:0;z-index:1000;background:rgba(8,27,52,.48);display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto}
+ .android-login-modal.android-login-form-card{display:block!important;position:relative;width:min(100%,520px);max-height:calc(100dvh - 36px);overflow:auto;margin:auto;border-radius:26px!important;padding:22px 18px!important;background:#fff!important;box-shadow:0 24px 70px rgba(8,27,52,.25)!important}
+ .android-login-modal-close{position:absolute!important;right:14px;top:12px;width:38px!important;height:38px!important;min-height:38px!important;border:0!important;border-radius:50%!important;background:#eef5f7!important;font-size:28px!important;line-height:1!important;z-index:2}
+ .android-login-modal .login-card-header{padding-right:38px!important}
+ .android-login-modal .auth-security-badges,.android-login-modal .join-meeting-card,.android-login-modal .android-download-card,.android-login-modal .create-account-copy{display:none!important}
+ .android-login-modal .login-form{gap:16px!important}
+}
