@@ -178,3 +178,28 @@
 }
 
 .app-shell-profile-static{grid-template-columns:40px minmax(0,1fr)}
+
+/* Android visual refresh: a light, quiet surface that keeps the same navigation. */
+@media(max-width:1024px){
+  .app-shell{background:#f7f9fb;color:#16263a}
+  .app-shell-content{padding:16px 14px calc(104px + env(safe-area-inset-bottom))}
+  .app-shell-bottom-nav{left:10px;right:10px;bottom:10px;border:1px solid #e3e9ef;border-radius:22px;background:rgba(255,255,255,.96);box-shadow:0 12px 32px rgba(21,42,65,.12)}
+  .app-shell-bottom-nav a{color:#7d8c9c}
+  .app-shell-bottom-nav a.is-active{color:#126f79}
+  .app-shell-bottom-nav a.is-active>span{background:#e4f5f4}
+  .app-shell-bottom-nav a.is-primary>span{border-color:#f7f9fb;background:#147b84;box-shadow:0 10px 22px rgba(20,123,132,.26)}
+}
+@media(max-width:720px){
+  .app-shell-content{padding-left:12px;padding-right:12px}
+  .app-shell-sidebar{background:#fff;color:#193049;box-shadow:14px 0 36px rgba(15,34,52,.18)}
+  .app-shell-sidebar .app-shell-logo{border-bottom-color:#e8edf1;color:#163552}
+  .app-shell-sidebar .app-shell-logo small{color:#7890a3}
+  .app-shell-sidebar .app-shell-nav a{color:#4c6478}
+  .app-shell-sidebar .app-shell-nav a:hover,.app-shell-sidebar .app-shell-nav a:focus-visible{background:#f1f7f8}
+  .app-shell-sidebar .app-shell-nav a.is-active{background:#e3f4f3;color:#126f79;box-shadow:none}
+  .app-shell-sidebar .app-shell-nav a.is-active::after{color:#126f79}
+  .app-shell-sidebar-secondary{border-top-color:#e8edf1}
+  .app-shell-close{background:#eef4f6;color:#26455f}
+  .app-shell-profile{border-color:#e6edf1;background:#f8fafb}
+  .app-shell-profile strong{color:#1e3448}.app-shell-profile small{color:#7b8d9c}
+}

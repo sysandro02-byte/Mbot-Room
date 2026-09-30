@@ -29,6 +29,21 @@ const liveDuration=(startedAt:string|null)=>{
   return [h,m,s].map((value)=>String(value).padStart(2,'0')).join(':');
 };
 const absoluteUrl=(path:string)=>path.startsWith('http')?path:window.location.origin+path;
+type VideoQuality='auto'|'data-saver'|'standard'|'high';
+type NetworkInformationLike=EventTarget&{effectiveType?:string;saveData?:boolean;downlink?:number};
+const networkInformation=()=>((navigator as Navigator&{connection?:NetworkInformationLike;mozConnection?:NetworkInformationLike;webkitConnection?:NetworkInformationLike}).connection||(navigator as Navigator&{mozConnection?:NetworkInformationLike}).mozConnection||(navigator as Navigator&{webkitConnection?:NetworkInformationLike}).webkitConnection);
+const automaticQuality=():Exclude<VideoQuality,'auto'>=>{
+  const connection=networkInformation();
+  if(connection?.saveData||connection?.effectiveType==='slow-2g'||connection?.effectiveType==='2g'||(connection?.downlink||Infinity)<1.5)return 'data-saver';
+  if(connection?.effectiveType==='3g'||(connection?.downlink||Infinity)<4)return 'standard';
+  return 'high';
+};
+const videoConstraints=(quality:VideoQuality):MediaTrackConstraints=>{
+  const resolved=quality==='auto'?automaticQuality():quality;
+  const profiles={'data-saver':{width:640,height:360,frameRate:15},standard:{width:960,height:540,frameRate:24},high:{width:1280,height:720,frameRate:30}} as const;
+  const profile=profiles[resolved];
+  return {width:{ideal:profile.width,min:320},height:{ideal:profile.height,min:180},frameRate:{ideal:profile.frameRate,max:profile.frameRate},facingMode:{ideal:'user'}};
+};
 
 const validateCoverDimensions=(file:File)=>new Promise<void>((resolve,reject)=>{
   const image=new Image();
@@ -221,6 +236,8 @@ export function LiveRoomPage(){
   const cameraStreamRef=useRef<MediaStream|null>(null);
   const screenStreamRef=useRef<MediaStream|null>(null);
   const [media,setMedia]=useState({audio:true,video:true,screen:false});
+  const [videoQuality,setVideoQuality]=useState<VideoQuality>('auto');
+  const [networkQuality,setNetworkQuality]=useState<Exclude<VideoQuality,'auto'>>(()=>automaticQuality());
   const [commentText,setCommentText]=useState('');
   const [notice,setNotice]=useState('');
   const [error,setError]=useState('');
@@ -235,6 +252,7 @@ export function LiveRoomPage(){
   const localVideoRef=useRef<HTMLVideoElement|null>(null);
   const remoteVideoRef=useRef<HTMLVideoElement|null>(null);
   const publisher=joinRole==='host'||joinRole==='cohost';
+  const activeVideoQuality=videoQuality==='auto'?networkQuality:videoQuality;
 
   const liveKit=useMeetingLiveKit({
     meetingId:live?.meetingId||0,
@@ -280,6 +298,14 @@ export function LiveRoomPage(){
       document.removeEventListener('visibilitychange',onVisibility);
     };
   },[joined,live?.status,liveKit.failed]);
+
+  useEffect(()=>{
+    const connection=networkInformation();
+    if(!connection)return;
+    const update=()=>setNetworkQuality(automaticQuality());
+    connection.addEventListener('change',update);
+    return()=>connection.removeEventListener('change',update);
+  },[]);
 
   useEffect(()=>{
     if(!localVideoRef.current)return;
@@ -352,15 +378,17 @@ export function LiveRoomPage(){
       cameraStreamRef.current?.getTracks().forEach((track)=>track.stop());cameraStreamRef.current=null;setLocalStream(null);return;
     }
     let cancelled=false;
+    let captured:MediaStream|null=null;
     void navigator.mediaDevices.getUserMedia({
       audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},
-      video:{width:{ideal:1280,min:640},height:{ideal:720,min:360},frameRate:{ideal:30,max:30},facingMode:{ideal:'user'}},
+      video:videoConstraints(videoQuality),
     }).then((stream)=>{
       if(cancelled){stream.getTracks().forEach((track)=>track.stop());return;}
+      captured=stream;
       cameraStreamRef.current=stream;setLocalStream(stream);setMedia({audio:true,video:true,screen:false});
     }).catch(()=>setError('Autorisez la caméra et le microphone pour diffuser.'));
-    return()=>{cancelled=true;};
-  },[publisher,live?.status]);
+    return()=>{cancelled=true;captured?.getTracks().forEach((track)=>track.stop());};
+  },[publisher,live?.status,videoQuality,networkQuality]);
 
   useEffect(()=>{
     if(!live?.startedAt||live.status!=='live')return;
@@ -514,6 +542,7 @@ export function LiveRoomPage(){
           <button className={media.audio?'active':''} onClick={toggleMic}>{media.audio?<Mic/>:<MicOff/>}<span>Micro<small>{media.audio?'Activé':'Muet'}</small></span></button>
           <button className={media.video?'active':''} onClick={toggleCamera}>{media.video?<Video/>:<VideoOff/>}<span>Caméra<small>{media.video?'Activée':'Coupée'}</small></span></button>
           <button className={media.screen?'active':''} onClick={()=>void shareScreen()}><Camera/><span>Partager<small>l’écran</small></span></button>
+          <label className="live-quality-control"><Video/><span>Qualité<small>{videoQuality==='auto'?`Auto · ${activeVideoQuality==='high'?'HD':activeVideoQuality==='standard'?'standard':'éco'}`:videoQuality==='high'?'HD 720p':videoQuality==='standard'?'Standard':'Éco'}</small></span><select aria-label="Qualité vidéo du Live" value={videoQuality} disabled={media.screen} onChange={(event)=>setVideoQuality(event.target.value as VideoQuality)}><option value="auto">Automatique</option><option value="data-saver">Économie</option><option value="standard">Standard</option><option value="high">HD</option></select></label>
           <button onClick={()=>{setInviteOpen((value)=>!value);void liveService.getParticipationRequests(live.id).then(setRequests);}}><UserPlus/><span>Inviter<small>un invité</small></span></button>
           <button className={!live.chatEnabled?'active danger':''} onClick={()=>void toggleChat()}><Send/><span>Chat<small>{live.chatEnabled?'Actif':'Muet'}</small></span></button>
           <button className="danger" disabled={busy==='end'} onClick={()=>void endLive()}><X/><span>Terminer<small>le Live</small></span></button>

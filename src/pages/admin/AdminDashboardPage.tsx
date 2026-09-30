@@ -1,5 +1,5 @@
 import { CSSProperties, FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getAppLocale } from '../../lib/appLanguage';
 import {
   Activity,
@@ -170,15 +170,14 @@ const buildPolylinePoints = (values: number[], width: number, height: number) =>
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const currentUser = authService.getCurrentUser();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeSection, setActiveSection] = useState(() => window.location.hash.slice(1) || 'dashboard');
 
   useEffect(() => {
-    const syncSection = () => setActiveSection(window.location.hash.slice(1) || 'dashboard');
-    window.addEventListener('hashchange', syncSection);
-    return () => window.removeEventListener('hashchange', syncSection);
-  }, []);
+    setActiveSection(location.hash.slice(1) || 'dashboard');
+  }, [location.hash]);
 
   useEffect(() => {
     if (!sidebarOpen) return undefined;
