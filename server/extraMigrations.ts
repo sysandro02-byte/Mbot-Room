@@ -299,48 +299,6 @@ export const runExtraMigrations = async () => {
       PRIMARY KEY (user_id, normalized_phone)
     );
 
-    WITH ranked_phones AS (
-      SELECT id,
-             phone_number,
-             regexp_replace(phone_number, '[^0-9]', '', 'g') AS normalized_phone,
-             first_value(id) OVER (
-               PARTITION BY regexp_replace(phone_number, '[^0-9]', '', 'g')
-               ORDER BY CASE WHEN role='admin' THEN 0 ELSE 1 END, created_at, id
-             ) AS kept_user_id,
-             row_number() OVER (
-               PARTITION BY regexp_replace(phone_number, '[^0-9]', '', 'g')
-               ORDER BY CASE WHEN role='admin' THEN 0 ELSE 1 END, created_at, id
-             ) AS duplicate_rank
-        FROM room_users
-       WHERE is_guest=false
-         AND NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '') IS NOT NULL
-    )
-    INSERT INTO room_phone_number_conflicts (user_id,normalized_phone,original_phone,kept_user_id)
-    SELECT id,normalized_phone,phone_number,kept_user_id
-      FROM ranked_phones
-     WHERE duplicate_rank > 1
-    ON CONFLICT (user_id,normalized_phone) DO NOTHING;
-
-    WITH ranked_phones AS (
-      SELECT id,
-             row_number() OVER (
-               PARTITION BY regexp_replace(phone_number, '[^0-9]', '', 'g')
-               ORDER BY CASE WHEN role='admin' THEN 0 ELSE 1 END, created_at, id
-             ) AS duplicate_rank
-        FROM room_users
-       WHERE is_guest=false
-         AND NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '') IS NOT NULL
-    )
-    UPDATE room_users AS users
-       SET phone_number=''
-      FROM ranked_phones
-     WHERE users.id=ranked_phones.id AND ranked_phones.duplicate_rank > 1;
-
-    CREATE UNIQUE INDEX IF NOT EXISTS room_users_phone_number_unique
-      ON room_users (regexp_replace(phone_number, '[^0-9]', '', 'g'))
-      WHERE is_guest=false
-        AND NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '') IS NOT NULL;
-
     CREATE TABLE IF NOT EXISTS room_conversations (
       id uuid PRIMARY KEY,
       kind text NOT NULL CHECK (kind IN ('direct','work_group')),
@@ -446,5 +404,37 @@ export const runExtraMigrations = async () => {
     );
     CREATE INDEX IF NOT EXISTS room_meeting_feedback_meeting_idx
       ON room_meeting_feedback(meeting_id, created_at DESC);
+  `);
+
+  const accountPhones = await query(`
+    SELECT id,phone_number,role,created_at
+      FROM room_users
+     WHERE is_guest=false
+       AND NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '') IS NOT NULL
+     ORDER BY CASE WHEN role='admin' THEN 0 ELSE 1 END, created_at, id
+  `);
+  const keptUserByPhone = new Map<string,number>();
+  for (const row of accountPhones.rows) {
+    const normalizedPhone = String(row.phone_number || '').replace(/\D/g,'');
+    if (!normalizedPhone) continue;
+    const keptUserId = keptUserByPhone.get(normalizedPhone);
+    if (!keptUserId) {
+      keptUserByPhone.set(normalizedPhone,Number(row.id));
+      continue;
+    }
+    await query(
+      `INSERT INTO room_phone_number_conflicts (user_id,normalized_phone,original_phone,kept_user_id)
+       VALUES ($1,$2,$3,$4)
+       ON CONFLICT (user_id,normalized_phone) DO NOTHING`,
+      [Number(row.id),normalizedPhone,String(row.phone_number || ''),keptUserId],
+    );
+    await query('UPDATE room_users SET phone_number=\'\' WHERE id=$1',[Number(row.id)]);
+  }
+
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS room_users_phone_number_unique
+      ON room_users (regexp_replace(phone_number, '[^0-9]', '', 'g'))
+      WHERE is_guest=false
+        AND NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '') IS NOT NULL
   `);
 };
