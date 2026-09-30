@@ -474,6 +474,7 @@ try {
       email: 'host.integration@mbote.test',
       password: 'Password2026!',
       rememberMe: true,
+      adminOnly: true,
     }),
   });
   assert.equal(browserLogin.response.status, 200, JSON.stringify(browserLogin.data));
