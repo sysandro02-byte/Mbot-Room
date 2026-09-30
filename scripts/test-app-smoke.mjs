@@ -329,10 +329,13 @@ try {
   const page = await context.newPage();
   const pageErrors = [];
   const serverErrors = [];
+  let expectedLunaConsoleErrorUntil = 0;
   page.on('pageerror', (error) => pageErrors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error') {
       const value = message.text();
+      if (value === 'Failed to load resource: the server responded with a status of 503 (Service Unavailable)'
+        && Date.now() < expectedLunaConsoleErrorUntil) return;
       if (!/favicon|ResizeObserver/i.test(value)) pageErrors.push(value);
     }
   });
@@ -340,6 +343,7 @@ try {
     const expectedUnavailableLuna = response.url().endsWith('/api/admin/ai/compose')
       && response.request().method() === 'POST'
       && response.status() === 503;
+    if (expectedUnavailableLuna) expectedLunaConsoleErrorUntil = Date.now() + 1_000;
     if (response.url().startsWith(baseUrl) && response.status() >= 500 && !expectedUnavailableLuna) {
       serverErrors.push(`${response.status()} ${response.request().method()} ${response.url()}`);
     }
