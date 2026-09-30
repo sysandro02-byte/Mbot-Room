@@ -74,6 +74,7 @@ export default function AdminControlCenter({ section = 'admin-controls' }: { sec
   const [error,setError]=useState('');
   const [editing,setEditing]=useState<AdminManagedUser|null>(null);
   const [revokeTarget,setRevokeTarget]=useState<AdminManagedUser|null>(null);
+  const [deleteTarget,setDeleteTarget]=useState<AdminManagedUser|null>(null);
   const [draft,setDraft]=useState({
     name:'',phoneNumber:'',organization:'',jobTitle:'',country:'',city:'',
     accountStatus:'active' as AdminManagedUser['accountStatus'],
@@ -189,6 +190,18 @@ export default function AdminControlCenter({ section = 'admin-controls' }: { sec
       setReports(rows=>rows.map(item=>item.id===next.id?{...item,...next}:item));
       setMessage('État du signalement mis à jour.');
     }catch(cause){setError(cause instanceof Error?cause.message:'Mise à jour du signalement impossible.');}
+    finally{setBusy(false);}
+  };
+
+  const deleteUser=async(user:AdminManagedUser)=>{
+    if(String(user.id)===String(current?.id)){setError('Vous ne pouvez pas supprimer votre propre compte administrateur.');return;}
+    setBusy(true);setError('');setMessage('');
+    try{
+      await adminDashboardService.deleteUser(user.id);
+      setUsers(list=>list.filter(item=>item.id!==user.id));
+      setDeleteTarget(null);
+      setMessage(`Le compte de ${user.name} a été supprimé.`);
+    }catch(cause){setError(cause instanceof Error?cause.message:'Suppression du compte impossible.');}
     finally{setBusy(false);}
   };
 
@@ -332,6 +345,7 @@ export default function AdminControlCenter({ section = 'admin-controls' }: { sec
               {user.accountStatus==='active'?<button type="button" onClick={()=>void setAccountStatus(user,'quarantined')} disabled={busy||String(user.id)===String(current?.id)}><ShieldAlert size={15}/> Quarantaine</button>:<button type="button" className="is-restore" onClick={()=>void setAccountStatus(user,'active')} disabled={busy||String(user.id)===String(current?.id)}><CheckCircle2 size={15}/> Activer</button>}
               {user.accountStatus!=='banned'?<button type="button" className="is-danger" onClick={()=>void setAccountStatus(user,'banned')} disabled={busy||String(user.id)===String(current?.id)}><Ban size={15}/> Bannir</button>:null}
               <button type="button" onClick={()=>setRevokeTarget(user)} disabled={busy||String(user.id)===String(current?.id)} title="Fermer toutes les sessions de ce compte"><LogOut size={15}/> Déconnecter</button>
+              <button type="button" className="is-danger" onClick={()=>setDeleteTarget(user)} disabled={busy||String(user.id)===String(current?.id)} title="Supprimer définitivement ce compte"><Trash2 size={15}/> Supprimer</button>
             </div></td>
           </tr>)}</tbody></table>
       </div>
@@ -353,6 +367,15 @@ export default function AdminControlCenter({ section = 'admin-controls' }: { sec
         <fieldset className="admin-feature-restrictions"><legend>Fonctionnalités bloquées pour ce compte</legend>{restrictionOptions.map(option=><label key={option.id}><input type="checkbox" checked={draft.featureRestrictions.includes(option.id)} onChange={event=>setDraft(value=>({...value,featureRestrictions:event.target.checked?[...value.featureRestrictions,option.id]:value.featureRestrictions.filter(item=>item!==option.id)}))}/><span>{option.label}</span></label>)}</fieldset>
         <div className="admin-edit-actions"><button type="button" onClick={()=>setEditing(null)}>Annuler</button><button type="submit" className="primary" disabled={busy}><Save size={16}/> Enregistrer</button></div>
       </form>
+    </div>}
+
+    {deleteTarget&&<div className="admin-edit-backdrop" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)setDeleteTarget(null);}}>
+      <section className="admin-revoke-confirm" role="dialog" aria-modal="true" aria-labelledby="admin-delete-user-title">
+        <span><Trash2 size={25}/></span>
+        <h2 id="admin-delete-user-title">Supprimer définitivement cet utilisateur ?</h2>
+        <p>Le compte <strong>{deleteTarget.name}</strong> ({deleteTarget.email}) sera supprimé. Cette action est irréversible.</p>
+        <div><button type="button" onClick={()=>setDeleteTarget(null)} disabled={busy}>Annuler</button><button type="button" className="is-danger" onClick={()=>void deleteUser(deleteTarget)} disabled={busy}><Trash2 size={16}/>{busy?'Suppression…':'Supprimer définitivement'}</button></div>
+      </section>
     </div>}
 
     {revokeTarget&&<div className="admin-edit-backdrop" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)setRevokeTarget(null);}}>
