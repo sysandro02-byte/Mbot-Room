@@ -309,6 +309,13 @@ export const adminDashboardService = {
     return readJson<AdminManagedUser>(response);
   },
 
+  async deleteUser(userId: number): Promise<void> {
+    const response = await apiFetch(apiUrl(`/api/admin/users/${userId}`), {
+      method: 'DELETE', headers: getAuthHeaders(),
+    });
+    await readJson<{ success: boolean }>(response);
+  },
+
   async revokeUserSessions(userId: number): Promise<void> {
     const response = await apiFetch(apiUrl(`/api/admin/users/${userId}/revoke-sessions`), {
       method: 'POST', headers: getAuthHeaders(),
