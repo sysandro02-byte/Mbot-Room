@@ -376,9 +376,6 @@ try {
       assert.equal(await page.locator('.admin-mobile-menu').count(), 1, 'Admin must render one menu trigger');
       assert.equal(await page.locator('.admin-topbar [aria-label="Notifications administrateur"]').count(), 1, 'Admin must render one notification trigger');
       assert.equal(await page.getByRole('link', { name: 'Réunion', exact: true }).count(), 1, 'Admin menu must expose one direct meeting creation entry');
-      const aiGenerateButton = page.getByRole('button', { name: 'Générer le message avec IA' });
-      await aiGenerateButton.waitFor({ state: 'visible', timeout: 10_000 });
-      assert.equal(await aiGenerateButton.count(), 1, 'Admin must expose one AI message generation action');
 
       const adminMenu = page.locator('.admin-mobile-menu');
       await adminMenu.evaluate((element) => element.click());
@@ -388,12 +385,27 @@ try {
       await page.waitForFunction(() => !document.querySelector('.admin-sidebar')?.classList.contains('is-open'));
       assert.equal(await page.locator('.admin-sidebar-overlay').count(), 0, 'Closing the admin menu must remove the overlay');
 
+      await page.getByRole('link', { name: 'Communications', exact: true }).click();
+      await page.waitForFunction(() => window.location.hash === '#admin-broadcasts');
+      await page.getByRole('heading', { name: 'Communication & audience', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
+
+      const aiIntent = page.getByLabel('Instruction pour Luna IA');
+      await aiIntent.fill('Informer les utilisateurs de la maintenance planifiée ce soir.');
+      const aiGenerateButton = page.getByRole('button', { name: 'Générer le message avec IA' });
+      await aiGenerateButton.waitFor({ state: 'visible', timeout: 10_000 });
+      assert.equal(await aiGenerateButton.count(), 1, 'Communications must expose one AI message generation action');
+      const aiResponse = page.waitForResponse((response) => response.url().endsWith('/api/admin/ai/compose') && response.request().method() === 'POST');
+      await aiGenerateButton.click();
+      assert.equal((await aiResponse).status(), 503, 'The test environment must report the intentionally unconfigured Luna provider');
+      await page.getByRole('status').filter({ hasText: 'Luna IA est momentanément indisponible.' }).waitFor({ state: 'visible', timeout: 10_000 });
+
       await page.reload({ waitUntil: 'domcontentloaded', timeout: 20_000 });
       await page.waitForFunction(() => !document.querySelector('.route-loading'), undefined, { timeout: 15_000 });
       assert.ok(!page.url().includes('/login'), 'Admin session must survive a page reload');
       await page.locator('.admin-topbar').waitFor({ state: 'visible', timeout: 10_000 });
       assert.equal(await page.locator('.global-app-header').count(), 0, 'Reloaded admin must still render only its dedicated header');
       assert.equal(await page.locator('.admin-topbar [aria-label="Notifications administrateur"]').count(), 1, 'Reloaded admin must keep one notification trigger');
+      await page.getByRole('heading', { name: 'Communication & audience', exact: true }).waitFor({ state: 'visible', timeout: 10_000 });
     } else {
       const globalHeader = page.locator('.global-app-header');
       await globalHeader.waitFor({ state: 'visible', timeout: 10_000 });
