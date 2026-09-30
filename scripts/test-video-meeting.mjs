@@ -435,6 +435,8 @@ try {
   const loginContext = await browser.newContext({ locale: 'fr-FR' });
   const loginPage = await loginContext.newPage();
   await loginPage.goto(`${baseUrl}/login`, { waitUntil: 'domcontentloaded' });
+  await loginPage.locator('.android-welcome-connect').click();
+  await loginPage.locator('.android-login-modal').waitFor({ state: 'visible', timeout: 10_000 });
   await loginPage.locator('#login-email').fill('host.video@mbote.test');
   await loginPage.locator('#login-password').fill('Password2026!');
   const mailCountBeforeLogin = mailRelayRequests.length;
