@@ -130,7 +130,7 @@ function AdminRoute({ children }: { children: ReactNode }) {
 export default function App() {
   const location = useLocation();
   const hideGlobalHeader = location.pathname.startsWith('/admin')
-    || ['/login', '/connexion', '/inscription', '/mot-de-passe-oublie', '/rejoindre-une-reunion', '/aide'].includes(location.pathname)
+    || ['/login', '/connexion', '/inscription', '/mot-de-passe-oublie', '/rejoindre-une-reunion'].includes(location.pathname)
     || /^\/reunions\/(?!recentes(?:\/|$)|terminee(?:\/|$))[^/]+(?:\/(?:luna|salle-attente))?$/.test(location.pathname)
     || /^\/app\/live\/(?!new(?:\/|$))[^/]+$/.test(location.pathname);
 
