@@ -47,8 +47,10 @@ public class MainActivity extends Activity {
     private static final String LOCAL_APP_HOST = WebViewAssetLoader.DEFAULT_DOMAIN;
     private static final String LOCAL_APP_URL = "https://" + LOCAL_APP_HOST + "/index.html";
     private static final int REQUEST_SCREEN_CAPTURE = 2002;
-    private static final long FRAME_INTERVAL_MS = 125L;
-    private static final int MAX_CAPTURE_EDGE = 960;
+    // The bridge sends compressed stills to the WebView canvas. 15 fps at 1280 px
+    // keeps text legible while avoiding the memory and bandwidth spikes of 30 fps.
+    private static final long FRAME_INTERVAL_MS = 67L;
+    private static final int MAX_CAPTURE_EDGE = 1280;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private WebView webView;
@@ -315,7 +317,7 @@ public class MainActivity extends Activity {
             croppedBitmap = Bitmap.createBitmap(paddedBitmap, 0, 0, image.getWidth(), image.getHeight());
 
             ByteArrayOutputStream output = new ByteArrayOutputStream();
-            croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 66, output);
+            croppedBitmap.compress(Bitmap.CompressFormat.JPEG, 78, output);
             String base64 = Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP);
             String dataUrl = "data:image/jpeg;base64," + base64;
             int width = image.getWidth();

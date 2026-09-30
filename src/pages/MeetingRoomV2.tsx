@@ -154,7 +154,7 @@ const requestAndroidDisplayCapture = async (): Promise<MediaStream> => {
       if (disposed || settled) return;
       canvas.width = Math.max(2, Math.floor(Number(width) || canvas.width));
       canvas.height = Math.max(2, Math.floor(Number(height) || canvas.height));
-      const stream = canvas.captureStream(10);
+      const stream = canvas.captureStream(15);
       if (!stream.getVideoTracks()[0]) {
         fail('Le flux de partage Android n’a pas pu être créé.', 'NotSupportedError');
         return;
@@ -187,7 +187,7 @@ const requestAndroidDisplayCapture = async (): Promise<MediaStream> => {
   });
 };
 
-const requestDisplayCapture = async () => {
+export const requestDisplayCapture = async () => {
   if (window.MBoteRoomAndroid?.requestScreenCapture) {
     return requestAndroidDisplayCapture();
   }

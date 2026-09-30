@@ -30,6 +30,19 @@ const liveDuration=(startedAt:string|null)=>{
 };
 const absoluteUrl=(path:string)=>path.startsWith('http')?path:window.location.origin+path;
 
+const validateCoverDimensions=(file:File)=>new Promise<void>((resolve,reject)=>{
+  const image=new Image();
+  const objectUrl=URL.createObjectURL(file);
+  const cleanup=()=>URL.revokeObjectURL(objectUrl);
+  image.onload=()=>{
+    const valid=image.naturalWidth>=1280&&image.naturalHeight>=720;
+    cleanup();
+    valid?resolve():reject(new Error('Choisissez une image d’au moins 1280 × 720 px pour une couverture nette.'));
+  };
+  image.onerror=()=>{cleanup();reject(new Error('Cette image ne peut pas être lue.'));};
+  image.src=objectUrl;
+});
+
 function Avatar({name,src,className=''}:{name:string;src?:string;className?:string}){
   return <span className={`live-avatar ${className}`}>{src?<img src={src} alt=""/>:initials(name)}</span>;
 }
@@ -85,7 +98,7 @@ export function LiveFeedPage(){
       <section className="live-feed-grid">
         {items.map((item)=><article key={item.id} className="live-feed-card" onClick={()=>navigate('/app/live/'+item.id)}>
           <div className="live-feed-cover">
-            {item.coverUrl?<img src={liveMediaUrl(item.coverUrl)} alt=""/>:<div className="live-cover-fallback"><Avatar name={item.hostName} src={item.hostAvatar}/><Radio/></div>}
+            {item.coverUrl?<img src={liveMediaUrl(item.coverUrl)} alt="" loading="lazy" decoding="async"/>:<div className="live-cover-fallback"><Avatar name={item.hostName} src={item.hostAvatar}/><Radio/></div>}
             <span className={item.status==='live'?'live-badge':'live-badge scheduled'}>{item.status==='live'?'EN DIRECT':'PROGRAMMÉ'}</span>
             {item.status==='live'?<span className="live-viewers"><Eye/> {fmtCount(item.viewerCount)}</span>:<span className="live-scheduled-date"><CalendarDays/> {item.scheduledFor?new Intl.DateTimeFormat('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(item.scheduledFor)):''}</span>}
           </div>
@@ -124,6 +137,7 @@ export function LiveCreatePage(){
     if(!file)return;
     setBusy('cover');setError('');
     try{
+      await validateCoverDimensions(file);
       const uploaded=await liveService.uploadCover(file);
       setCoverUrl(uploaded.url);
     }catch(cause){setError(cause instanceof Error?cause.message:'Téléversement de la couverture impossible.');}
@@ -152,7 +166,7 @@ export function LiveCreatePage(){
       <header className="live-create-header"><button onClick={()=>navigate('/app/live')}><ChevronLeft/></button><h1>Créer un live</h1></header>
       <section className="live-create-card">
         <div className="live-cover-editor">
-          {coverUrl?<img src={liveMediaUrl(coverUrl)} alt="Couverture du Live"/>:<div><Camera/><strong>Ajouter une couverture du live</strong><small>JPG, PNG ou WebP · 5 Mo maximum · stockée sur le serveur MBotéRoom.</small></div>}
+          {coverUrl?<img src={liveMediaUrl(coverUrl)} alt="Couverture du Live" decoding="async"/>:<div><Camera/><strong>Ajouter une couverture du live</strong><small>JPG, PNG ou WebP · au moins 1280 × 720 px · 5 Mo maximum.</small></div>}
           <label className="live-cover-upload">
             {busy==='cover'?<LoaderCircle className="spin"/>:<Camera/>}
             <span>{busy==='cover'?'Téléversement…':coverUrl?'Changer la couverture':'Choisir une couverture'}</span>
@@ -205,6 +219,7 @@ export function LiveRoomPage(){
   const [joined,setJoined]=useState(false);
   const [localStream,setLocalStream]=useState<MediaStream|null>(null);
   const cameraStreamRef=useRef<MediaStream|null>(null);
+  const screenStreamRef=useRef<MediaStream|null>(null);
   const [media,setMedia]=useState({audio:true,video:true,screen:false});
   const [commentText,setCommentText]=useState('');
   const [notice,setNotice]=useState('');
@@ -213,6 +228,8 @@ export function LiveRoomPage(){
   const [mediaSessionKey,setMediaSessionKey]=useState(0);
   const [duration,setDuration]=useState('');
   const [summary,setSummary]=useState<{bullets:string[];decisions:string[];actions:string[]}|null>(null);
+  const [hostPanel,setHostPanel]=useState<'public'|'comments'|'moderation'>('comments');
+  const [moreOpen,setMoreOpen]=useState(false);
   const recordingIdRef=useRef('');
   const mediaRetryAttemptsRef=useRef(0);
   const localVideoRef=useRef<HTMLVideoElement|null>(null);
@@ -264,8 +281,16 @@ export function LiveRoomPage(){
     };
   },[joined,live?.status,liveKit.failed]);
 
-  useEffect(()=>{if(localVideoRef.current)localVideoRef.current.srcObject=localStream;},[localStream]);
-  useEffect(()=>{if(remoteVideoRef.current)remoteVideoRef.current.srcObject=publisher?hostRemote?.stream||null:hostRemote?.stream||null;},[hostRemote?.stream,publisher]);
+  useEffect(()=>{
+    if(!localVideoRef.current)return;
+    localVideoRef.current.srcObject=localStream;
+    void localVideoRef.current.play().catch(()=>undefined);
+  },[localStream]);
+  useEffect(()=>{
+    if(!remoteVideoRef.current)return;
+    remoteVideoRef.current.srcObject=hostRemote?.stream||null;
+    void remoteVideoRef.current.play().catch(()=>undefined);
+  },[hostRemote?.stream]);
 
   useEffect(()=>{
     let active=true;
@@ -322,9 +347,15 @@ export function LiveRoomPage(){
   },[joined,live?.isHost,liveId]);
 
   useEffect(()=>{
-    if(!publisher||live?.status!=='live'){cameraStreamRef.current?.getTracks().forEach((track)=>track.stop());cameraStreamRef.current=null;setLocalStream(null);return;}
+    if(!publisher||live?.status!=='live'){
+      screenStreamRef.current?.getTracks().forEach((track)=>track.stop());screenStreamRef.current=null;
+      cameraStreamRef.current?.getTracks().forEach((track)=>track.stop());cameraStreamRef.current=null;setLocalStream(null);return;
+    }
     let cancelled=false;
-    void navigator.mediaDevices.getUserMedia({audio:true,video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'}}).then((stream)=>{
+    void navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},
+      video:{width:{ideal:1280,min:640},height:{ideal:720,min:360},frameRate:{ideal:30,max:30},facingMode:{ideal:'user'}},
+    }).then((stream)=>{
       if(cancelled){stream.getTracks().forEach((track)=>track.stop());return;}
       cameraStreamRef.current=stream;setLocalStream(stream);setMedia({audio:true,video:true,screen:false});
     }).catch(()=>setError('Autorisez la caméra et le microphone pour diffuser.'));
@@ -342,7 +373,10 @@ export function LiveRoomPage(){
     void collaborationService.startServerRecording(live.meetingId,{layout:'speaker'}).then((recording)=>{recordingIdRef.current=recording.id;setNotice('Enregistrement du Live activé.');}).catch(()=>setNotice('Le Live continue, mais l’enregistrement serveur n’a pas pu démarrer.'));
   },[joined,live?.isHost,live?.recordingEnabled,live?.meetingId,liveKit.connected]);
 
-  useEffect(()=>()=>{cameraStreamRef.current?.getTracks().forEach((track)=>track.stop());localStream?.getTracks().forEach((track)=>track.stop());},[]);
+  useEffect(()=>()=>{
+    screenStreamRef.current?.getTracks().forEach((track)=>track.stop());
+    cameraStreamRef.current?.getTracks().forEach((track)=>track.stop());
+  },[]);
 
   const retryMedia=()=>{
     mediaRetryAttemptsRef.current=0;
@@ -364,28 +398,49 @@ export function LiveRoomPage(){
     }catch(cause){setError(cause instanceof Error?cause.message:'Impossible de terminer le Live.');}
     finally{setBusy('');}
   };
-  const toggleMic=()=>{localStream?.getAudioTracks().forEach((track)=>{track.enabled=!media.audio;});setMedia((current)=>({...current,audio:!current.audio}));};
-  const toggleCamera=()=>{localStream?.getVideoTracks().forEach((track)=>{track.enabled=!media.video;});setMedia((current)=>({...current,video:!current.video}));};
+  const toggleMic=()=>{
+    if(!localStream?.getAudioTracks().length){setNotice('Le microphone n’est pas encore disponible.');return;}
+    localStream.getAudioTracks().forEach((track)=>{track.enabled=!media.audio;});setMedia((current)=>({...current,audio:!current.audio}));
+  };
+  const toggleCamera=()=>{
+    if(!localStream?.getVideoTracks().length){setNotice('La caméra n’est pas encore disponible.');return;}
+    localStream.getVideoTracks().forEach((track)=>{track.enabled=!media.video;});setMedia((current)=>({...current,video:!current.video}));
+  };
   const shareScreen=async()=>{
-    if(media.screen){const camera=cameraStreamRef.current;if(camera)setLocalStream(camera);setMedia((current)=>({...current,screen:false}));return;}
+    if(media.screen){
+      screenStreamRef.current?.getTracks().forEach((track)=>track.stop());screenStreamRef.current=null;
+      const camera=cameraStreamRef.current;if(camera)setLocalStream(camera);setMedia((current)=>({...current,screen:false}));return;
+    }
     try{
-      const display=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});
+      const {requestDisplayCapture}=await import('./MeetingRoomV2');
+      const display=await requestDisplayCapture();
       const mic=cameraStreamRef.current?.getAudioTracks()[0];if(mic&&!display.getAudioTracks().length)display.addTrack(mic);
-      display.getVideoTracks()[0]?.addEventListener('ended',()=>{if(cameraStreamRef.current)setLocalStream(cameraStreamRef.current);setMedia((current)=>({...current,screen:false}));},{once:true});
+      screenStreamRef.current=display;
+      display.getVideoTracks()[0]?.addEventListener('ended',()=>{
+        screenStreamRef.current?.getTracks().forEach((track)=>track.stop());screenStreamRef.current=null;
+        if(cameraStreamRef.current)setLocalStream(cameraStreamRef.current);setMedia((current)=>({...current,screen:false}));
+      },{once:true});
       setLocalStream(display);setMedia((current)=>({...current,screen:true,video:true}));
-    }catch{}
+    }catch(cause){
+      if(cause instanceof DOMException&&cause.name==='NotAllowedError')setNotice('Le partage d’écran a été refusé.');
+      else setNotice('Le partage d’écran a été annulé ou n’est pas disponible.');
+    }
   };
   const sendComment=async(event:FormEvent)=>{
     event.preventDefault();if(!commentText.trim()||!live)return;
     try{await liveService.comment(live.id,commentText.trim(),inviteToken);setCommentText('');}catch(cause){setNotice(cause instanceof Error?cause.message:'Commentaire impossible.');}
   };
-  const like=async()=>{if(!live)return;const result=await liveService.toggleLike(live.id,inviteToken);setLive({...live,isLiked:result.liked,likeCount:result.likeCount});};
+  const like=async()=>{if(!live)return;try{const result=await liveService.toggleLike(live.id,inviteToken);setLive((current)=>current?{...current,isLiked:result.liked,likeCount:result.likeCount}:current);}catch(cause){setNotice(cause instanceof Error?cause.message:'Réaction impossible.');}};
   const share=async()=>{
-    if(!live)return;const result=await liveService.share(live.id,inviteToken);const url=absoluteUrl(result.url);
-    setLive({...live,shareCount:result.shareCount});
-    try{if(navigator.share)await navigator.share({title:live.title,text:'Rejoignez ce Live MBotéRoom',url});else{await navigator.clipboard.writeText(url);setNotice('Lien du Live copié.');}}catch{}
+    if(!live)return;
+    try{
+      const result=await liveService.share(live.id,inviteToken);const url=absoluteUrl(result.url);
+      setLive((current)=>current?{...current,shareCount:result.shareCount}:current);
+      if(navigator.share)await navigator.share({title:live.title,text:'Rejoignez ce Live MBotéRoom',url});
+      else{await navigator.clipboard.writeText(url);setNotice('Lien du Live copié.');}
+    }catch(cause){if(!(cause instanceof DOMException&&cause.name==='AbortError'))setNotice(cause instanceof Error?cause.message:'Partage impossible.');}
   };
-  const follow=async()=>{if(!live)return;const result=await liveService.toggleFollow(live.id);setLive({...live,isFollowing:result.following});};
+  const follow=async()=>{if(!live)return;try{const result=await liveService.toggleFollow(live.id);setLive((current)=>current?{...current,isFollowing:result.following}:current);}catch(cause){setNotice(cause instanceof Error?cause.message:'Abonnement impossible.');}};
   const sendGift=async()=>{
     if(!live)return;
     try{
@@ -406,9 +461,10 @@ export function LiveRoomPage(){
     finally{setBusy('');}
   };
   const requestParticipation=async()=>{if(!live)return;try{await liveService.requestParticipation(live.id,inviteToken);setNotice('Demande envoyée à l’animateur.');}catch(cause){setNotice(cause instanceof Error?cause.message:'Demande impossible.');}};
-  const toggleChat=async()=>{if(!live)return;const updated=await liveService.updateSettings(live.id,{chatEnabled:!live.chatEnabled});setLive(updated);};
+  const toggleChat=async()=>{if(!live)return;try{const updated=await liveService.updateSettings(live.id,{chatEnabled:!live.chatEnabled});setLive(updated);setNotice(updated.chatEnabled?'Chat activé.':'Chat mis en sourdine.');}catch(cause){setNotice(cause instanceof Error?cause.message:'Mise à jour du chat impossible.');}};
   const generateSummary=async()=>{if(!live)return;setBusy('summary');try{setSummary(await collaborationService.generateSummary(live.meetingId));}catch(cause){setNotice(cause instanceof Error?cause.message:'Résumé Luna indisponible.');}finally{setBusy('');}};
-  const respond=async(request:LiveParticipationRequest,status:'accepted'|'rejected')=>{if(!live)return;await liveService.respondParticipation(live.id,request.userId,status);setRequests((current)=>current.map((item)=>item.userId===request.userId?{...item,status}:item));};
+  const respond=async(request:LiveParticipationRequest,status:'accepted'|'rejected')=>{if(!live)return;try{await liveService.respondParticipation(live.id,request.userId,status);setRequests((current)=>current.map((item)=>item.userId===request.userId?{...item,status}:item));}catch(cause){setNotice(cause instanceof Error?cause.message:'Réponse impossible.');}};
+  const deleteComment=async(commentId:string)=>{if(!live)return;try{await liveService.deleteComment(live.id,commentId);setComments((current)=>current.filter((comment)=>comment.id!==commentId));setNotice('Commentaire supprimé.');}catch(cause){setNotice(cause instanceof Error?cause.message:'Suppression impossible.');}};
 
   if(!live&&!error)return <AppShell title="Live"><AppLoader label="Connexion au Live…"/></AppShell>;
   if(!live)return <AppShell title="Live"><main className="live-room-error"><Radio/><h1>Live indisponible</h1><p>{error}</p><button onClick={()=>navigate('/app/live')}>Retour aux Lives</button></main></AppShell>;
@@ -426,7 +482,7 @@ export function LiveRoomPage(){
       <div className="live-room-host"><Avatar name={live.hostName} src={live.hostAvatar}/><span><strong>{live.hostName}</strong><small>{duration||liveCategoryLabel(live.category)}</small></span></div>
       {live.status==='live'?<span className="live-badge">EN DIRECT</span>:<span className="live-badge scheduled">{live.status==='scheduled'?'PROGRAMMÉ':'TERMINÉ'}</span>}
       {!live.isHost?<button className={live.isFollowing?'live-follow following':'live-follow'} onClick={()=>void follow()}>{live.isFollowing?'Suivi':'Suivre'}</button>:null}
-      <button><MoreVertical/></button>
+      <div className="live-more-wrap"><button type="button" aria-label="Plus d’actions" aria-expanded={moreOpen} onClick={()=>setMoreOpen((value)=>!value)}><MoreVertical/></button>{moreOpen?<div className="live-more-menu"><button type="button" onClick={()=>{setMoreOpen(false);void share();}}><Share2/> Partager le Live</button><button type="button" onClick={()=>{setMoreOpen(false);void navigator.clipboard.writeText(window.location.href).then(()=>setNotice('Lien du Live copié.')).catch(()=>setNotice('Copie du lien impossible.'));}}><Send/> Copier le lien</button></div>:null}</div>
     </header>
 
     {notice?<div className="live-toast" onClick={()=>setNotice('')}>{notice}</div>:null}
@@ -470,7 +526,7 @@ export function LiveRoomPage(){
 
         {requests.some((request)=>request.status==='pending')?<section className="live-requests"><h2>Demandes de participation</h2>{requests.filter((request)=>request.status==='pending').map((request)=><article key={request.userId}><Avatar name={request.name} src={request.avatar}/><strong>{request.name}</strong><button onClick={()=>void respond(request,'accepted')}>Accepter</button><button className="danger" onClick={()=>void respond(request,'rejected')}>Refuser</button></article>)}</section>:null}
 
-        <section className="live-host-comments"><header><button className="active">Public</button><button>Commentaires <b>{comments.length}</b></button><button>Modération</button></header>{comments.slice(-20).reverse().map((comment)=><article key={comment.id}><Avatar name={comment.name} src={comment.avatar}/><div><strong>{comment.name}</strong><p>{comment.text}</p></div>{live.moderationEnabled?<button onClick={()=>void liveService.deleteComment(live.id,comment.id)}><X/></button>:null}</article>)}</section>
+        <section className="live-host-comments"><header><button type="button" className={hostPanel==='public'?'active':''} onClick={()=>setHostPanel('public')}>Public</button><button type="button" className={hostPanel==='comments'?'active':''} onClick={()=>setHostPanel('comments')}>Commentaires <b>{comments.length}</b></button><button type="button" className={hostPanel==='moderation'?'active':''} onClick={()=>setHostPanel('moderation')}>Modération</button></header>{hostPanel==='public'?<div className="live-panel-note"><strong>Vue publique</strong><span>Les spectateurs voient actuellement le direct, les réactions et les {live.chatEnabled?'commentaires.':'commentaires sont désactivés.'}</span></div>:comments.slice(-20).reverse().map((comment)=><article key={comment.id}><Avatar name={comment.name} src={comment.avatar}/><div><strong>{comment.name}</strong><p>{comment.text}</p></div>{hostPanel==='moderation'&&live.moderationEnabled?<button type="button" aria-label="Supprimer ce commentaire" onClick={()=>void deleteComment(comment.id)}><X/></button>:null}</article>)}{hostPanel==='moderation'&&!live.moderationEnabled?<div className="live-panel-note"><strong>Mode modération désactivé</strong><span>Activez-le lors de la création du Live pour gérer les commentaires ici.</span></div>:null}</section>
 
         <section className="live-luna-card"><header><div><Sparkles/><span><strong>Résumé Luna IA</strong><small>Analyse du direct et points importants</small></span></div><button disabled={busy==='summary'} onClick={()=>void generateSummary()}>{busy==='summary'?<LoaderCircle className="spin"/>:<Sparkles/>} Générer</button></header>{summary?<ul>{summary.bullets.slice(0,5).map((item)=><li key={item}>{item}</li>)}</ul>:<p>Luna peut générer les points clés, décisions et actions du Live.</p>}</section>
         <button className="live-end-button" disabled={busy==='end'} onClick={()=>void endLive()}><Square/> Terminer le live</button>
