@@ -49,7 +49,9 @@ const restrictionOptions=[
 
 const emptyTerms:AdminLegalDocument={key:'terms',title:'Conditions d’utilisation MBotéRoom',body:'',version:'',updatedAt:''};
 
-export default function AdminControlCenter(){
+type AdminControlSection = 'admin-controls'|'admin-users'|'admin-reports'|'admin-legal-terms'|'admin-admin-invites';
+
+export default function AdminControlCenter({ section = 'admin-controls' }: { section?: AdminControlSection }){
   const current=authService.getCurrentUser();
   const [settings,setSettings]=useState<AdminPlatformSettings>(emptySettings);
   const [users,setUsers]=useState<AdminManagedUser[]>([]);
@@ -236,7 +238,7 @@ export default function AdminControlCenter(){
   };
 
   return <>
-    <section className="admin-control-card" id="admin-controls">
+    {section==='admin-controls'&&<section className="admin-control-card" id="admin-controls">
       <header><div><span className="admin-control-icon"><Settings2 size={20}/></span><div><h2>Réglages généraux</h2><p>Activez ou bloquez les fonctions principales pour tous les utilisateurs.</p></div></div><button type="button" onClick={()=>void load()} disabled={busy}><RefreshCw size={16}/> Actualiser</button></header>
       {error&&<div className="admin-control-error" role="alert">{error}</div>}
       {message&&<div className="admin-control-message" role="status">{message}</div>}
@@ -260,18 +262,18 @@ export default function AdminControlCenter(){
         </article>)}
       </div>
       <div className="admin-control-note"><ShieldCheck size={17}/><span>Ces réglages sont appliqués côté interface, API, temps réel et médias : masquer un bouton ne suffit pas à contourner la restriction.</span></div>
-    </section>
+    </section>}
 
-    <section className="admin-legal-card" id="admin-legal-terms">
+    {section==='admin-legal-terms'&&<section className="admin-legal-card" id="admin-legal-terms">
       <header><div><span className="admin-control-icon"><FileText size={20}/></span><div><h2>Conditions d’utilisation</h2><p>Texte obligatoire affiché à l’inscription et aux invités. Chaque publication crée une nouvelle version.</p></div></div><strong>{terms.version?'Version '+terms.version:'Non publiée'}</strong></header>
       <form className="admin-legal-form" onSubmit={saveTerms}>
         <label>Titre<input value={termsDraft.title} onChange={event=>setTermsDraft(value=>({...value,title:event.target.value}))} maxLength={180} required/></label>
         <label>Texte<textarea value={termsDraft.body} onChange={event=>setTermsDraft(value=>({...value,body:event.target.value}))} rows={12} maxLength={30000} required/></label>
         <div><small>{termsDraft.body.length}/30000 caractères</small><button disabled={termsBusy||termsDraft.body.trim().length<80}><Save size={16}/>{termsBusy?'Publication…':'Publier la nouvelle version'}</button></div>
       </form>
-    </section>
+    </section>}
 
-    <section className="admin-reports-card" id="admin-reports">
+    {section==='admin-reports'&&<section className="admin-reports-card" id="admin-reports">
       <header><div><span className="admin-control-icon"><Flag size={20}/></span><div><h2>Signalements</h2><p>Bugs et réunions signalés par les utilisateurs. Le support et les administrateurs reçoivent aussi un e-mail ou une notification.</p></div></div><strong>{reports.filter(report=>report.status==='open').length} ouvert(s)</strong></header>
       <div className="admin-reports-list">
         {reports.length?reports.map(report=><article key={report.id}>
@@ -284,9 +286,9 @@ export default function AdminControlCenter(){
           </select>
         </article>):<p className="admin-control-empty">Aucun signalement.</p>}
       </div>
-    </section>
+    </section>}
 
-    <section className="admin-admin-invites-card" id="admin-admin-invites">
+    {section==='admin-admin-invites'&&<section className="admin-admin-invites-card" id="admin-admin-invites">
       <header><div><span className="admin-control-icon"><MailPlus size={20}/></span><div><h2>Administrateurs</h2><p>Créez un lien sécurisé pour autoriser un nouveau compte administrateur.</p></div></div><strong>{users.filter(user=>user.role==='admin'&&!user.isSuspended).length} admin(s) actif(s)</strong></header>
       <form className="admin-admin-invite-form" onSubmit={createAdminInvite}>
         <label><span>Adresse e-mail du nouvel administrateur</span><input type="email" value={adminInviteEmail} onChange={event=>setAdminInviteEmail(event.target.value)} placeholder="admin@exemple.com" required/></label>
@@ -305,9 +307,9 @@ export default function AdminControlCenter(){
         }):<p className="admin-control-empty">Aucune invitation administrateur récente.</p>}
       </div>
       <div className="admin-control-note"><ShieldCheck size={17}/><span>Un nouvel administrateur ne peut plus s’auto-promouvoir simplement parce qu’un autre compte admin existe. Il doit utiliser ce lien d’invitation et confirmer son adresse avec le code OTP.</span></div>
-    </section>
+    </section>}
 
-    <section className="admin-users-card" id="admin-users">
+    {section==='admin-users'&&<section className="admin-users-card" id="admin-users">
       <header><div><span className="admin-control-icon"><UsersRound size={20}/></span><div><h2>Utilisateurs</h2><p>Filtrez les comptes par pays, ville, âge, entreprise et état, puis appliquez des restrictions.</p></div></div><strong>{filtered.length} / {users.length} compte(s)</strong></header>
       <div className="admin-user-filters">
         <label className="admin-users-search"><Search size={17}/><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Nom, e-mail, entreprise…"/></label>
@@ -334,7 +336,7 @@ export default function AdminControlCenter(){
           </tr>)}</tbody></table>
       </div>
       {!filtered.length&&<p className="admin-control-empty">Aucun compte ne correspond aux filtres.</p>}
-    </section>
+    </section>}
 
     {editing&&<div className="admin-edit-backdrop" onMouseDown={()=>setEditing(null)}>
       <form className="admin-edit-user admin-edit-user-wide" onSubmit={saveUser} onMouseDown={event=>event.stopPropagation()}>
