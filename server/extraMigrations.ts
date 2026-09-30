@@ -290,9 +290,56 @@ export const runExtraMigrations = async () => {
     CREATE INDEX IF NOT EXISTS room_contact_requests_recipient_idx
       ON room_contact_requests(recipient_user_id,status,created_at DESC);
 
+    CREATE TABLE IF NOT EXISTS room_phone_number_conflicts (
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      normalized_phone text NOT NULL,
+      original_phone text NOT NULL,
+      kept_user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      detected_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (user_id, normalized_phone)
+    );
+
+    WITH ranked_phones AS (
+      SELECT id,
+             phone_number,
+             regexp_replace(phone_number, '[^0-9]', '', 'g') AS normalized_phone,
+             first_value(id) OVER (
+               PARTITION BY regexp_replace(phone_number, '[^0-9]', '', 'g')
+               ORDER BY CASE WHEN role='admin' THEN 0 ELSE 1 END, created_at, id
+             ) AS kept_user_id,
+             row_number() OVER (
+               PARTITION BY regexp_replace(phone_number, '[^0-9]', '', 'g')
+               ORDER BY CASE WHEN role='admin' THEN 0 ELSE 1 END, created_at, id
+             ) AS duplicate_rank
+        FROM room_users
+       WHERE is_guest=false
+         AND NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '') IS NOT NULL
+    )
+    INSERT INTO room_phone_number_conflicts (user_id,normalized_phone,original_phone,kept_user_id)
+    SELECT id,normalized_phone,phone_number,kept_user_id
+      FROM ranked_phones
+     WHERE duplicate_rank > 1
+    ON CONFLICT (user_id,normalized_phone) DO NOTHING;
+
+    WITH ranked_phones AS (
+      SELECT id,
+             row_number() OVER (
+               PARTITION BY regexp_replace(phone_number, '[^0-9]', '', 'g')
+               ORDER BY CASE WHEN role='admin' THEN 0 ELSE 1 END, created_at, id
+             ) AS duplicate_rank
+        FROM room_users
+       WHERE is_guest=false
+         AND NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '') IS NOT NULL
+    )
+    UPDATE room_users AS users
+       SET phone_number=''
+      FROM ranked_phones
+     WHERE users.id=ranked_phones.id AND ranked_phones.duplicate_rank > 1;
+
     CREATE UNIQUE INDEX IF NOT EXISTS room_users_phone_number_unique
       ON room_users (regexp_replace(phone_number, '[^0-9]', '', 'g'))
-      WHERE NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '') IS NOT NULL;
+      WHERE is_guest=false
+        AND NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '') IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS room_conversations (
       id uuid PRIMARY KEY,

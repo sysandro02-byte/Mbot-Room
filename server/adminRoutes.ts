@@ -716,6 +716,20 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
       const organization = normalizeText(request.body?.organization ?? row.organization).slice(0,120);
       const jobTitle = normalizeText(request.body?.jobTitle ?? row.job_title).slice(0,120);
       const phoneNumber = normalizeText(request.body?.phoneNumber ?? row.phone_number).slice(0,40);
+      const normalizedPhoneNumber = phoneNumber.replace(/\D/g,'').slice(0,40);
+      if (normalizedPhoneNumber) {
+        const duplicatePhone = await query(
+          `SELECT 1 FROM room_users
+            WHERE is_guest=false
+              AND NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '')=$1
+              AND id<>$2
+            LIMIT 1`,
+          [normalizedPhoneNumber,userId],
+        );
+        if (duplicatePhone.rows[0]) {
+          return sendApiError(response,409,'PHONE_ALREADY_EXISTS','Un compte existe déjà avec ce numéro de téléphone.');
+        }
+      }
       const country = normalizeText(request.body?.country ?? row.country).slice(0,120);
       const city = normalizeText(request.body?.city ?? row.city).slice(0,120);
       const updated = await query(

@@ -108,7 +108,8 @@ const assertPhoneAvailable = async (phoneNumber: string, userId?: number) => {
   if (!normalized) return;
   const duplicate = await query(
     `SELECT 1 FROM room_users
-      WHERE NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '')=$1
+      WHERE is_guest=false
+        AND NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '')=$1
         AND ($2::integer IS NULL OR id<>$2)
       LIMIT 1`,
     [normalized, userId ?? null],

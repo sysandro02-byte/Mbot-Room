@@ -343,7 +343,8 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
       if(normalizedPhone){
         const duplicatePhone=await query(
           `SELECT 1 FROM room_users
-            WHERE NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '')=$1 AND id<>$2
+            WHERE is_guest=false
+              AND NULLIF(regexp_replace(phone_number, '[^0-9]', '', 'g'), '')=$1 AND id<>$2
             LIMIT 1`,
           [normalizedPhone,request.user!.id],
         );
