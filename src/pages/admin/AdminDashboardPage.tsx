@@ -172,6 +172,13 @@ export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const currentUser = authService.getCurrentUser();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState(() => window.location.hash.slice(1) || 'dashboard');
+
+  useEffect(() => {
+    const syncSection = () => setActiveSection(window.location.hash.slice(1) || 'dashboard');
+    window.addEventListener('hashchange', syncSection);
+    return () => window.removeEventListener('hashchange', syncSection);
+  }, []);
 
   useEffect(() => {
     if (!sidebarOpen) return undefined;
@@ -531,7 +538,7 @@ export default function AdminDashboardPage() {
 
   return (
     <main className="admin-dashboard-page">
-      <AdminSidebar userName={currentUser?.name || currentUser?.email || 'Administrateur'} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <AdminSidebar userName={currentUser?.name || currentUser?.email || 'Administrateur'} open={sidebarOpen} activeSection={activeSection} onClose={() => setSidebarOpen(false)} />
       {sidebarOpen && <button className="admin-sidebar-overlay" type="button" aria-label="Fermer le menu" onClick={() => setSidebarOpen(false)} />}
 
       <section className="admin-dashboard-workspace">
@@ -595,19 +602,19 @@ export default function AdminDashboardPage() {
         <div className="admin-dashboard-content">
           <header className="admin-dashboard-heading">
             <div>
-              <h1>Tableau de bord</h1>
-              <p>Vue d’ensemble de la plateforme MBotéRoom</p>
+              <h1>{{dashboard:'Tableau de bord','admin-controls':'Réglages généraux','admin-users':'Utilisateurs','admin-guest-history':'Historique invités','admin-ai-report':'Rapport IA','admin-reports':'Signalements','admin-legal-terms':'Conditions d’utilisation','admin-admin-invites':'Administrateurs','admin-broadcasts':'Communications','admin-ads':'Publicités','admin-home-slides':'Slider accueil','admin-login-branding':'Page de connexion','admin-guest-slides':'Accueil des invités','admin-tips':'Conseils d’accueil','admin-notifications':'Notifications'} as Record<string,string>)[activeSection] || 'Administration'}</h1>
+              <p>{activeSection==='dashboard' ? 'Vue d’ensemble de la plateforme MBotéRoom' : 'Espace de gestion administrateur MBotéRoom'}</p>
             </div>
-            <label className="admin-period-selector">
+            {activeSection==='dashboard'&&<label className="admin-period-selector">
               <CalendarDays size={18} aria-hidden="true" />
               <select value={period} onChange={(event) => setPeriod(event.target.value)} aria-label="Période d’analyse">
                 {periodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
               <ChevronDown size={16} aria-hidden="true" />
-            </label>
+            </label>}
           </header>
 
-          <section className="admin-mobile-quick-actions" aria-label="Actions rapides administrateur">
+          {activeSection==='dashboard'&&<section className="admin-mobile-quick-actions" aria-label="Actions rapides administrateur">
             <button
               className="admin-mobile-notification-card"
               type="button"
@@ -630,35 +637,42 @@ export default function AdminDashboardPage() {
               <Plus size={22} aria-hidden="true" />
               Nouvelle réunion
             </button>
-          </section>
+          </section>}
 
           {isLoading && <AppLoader label="Chargement des statistiques…" compact />}
           {error && dashboard && <p className="admin-inline-error" role="alert">{error}</p>}
 
-          <section className="admin-stat-grid" aria-label="Indicateurs principaux">
+          {activeSection==='dashboard'&&<section className="admin-stat-grid" aria-label="Indicateurs principaux">
             {(dashboard?.stats || []).map((stat) => <StatisticCard key={stat.id} stat={stat} />)}
-          </section>
+          </section>}
 
-          <section className="admin-insights-grid" aria-label="Analyse administrative">
+          {activeSection==='dashboard'&&<section className="admin-insights-grid" aria-label="Analyse administrative">
             <MeetingTotalsCard totals={dashboard?.meetingTotals || { day: 0, week: 0, month: 0, year: 0 }} />
             <AiUsageReportCard dashboard={dashboard} />
-          </section>
+          </section>}
 
           <section className="admin-main-grid">
-            <LiveMeetingsCard
-              meetings={liveMeetings}
-              activeMenu={activeMeetingMenu}
-              onToggleMenu={(meetingId) => setActiveMeetingMenu((current) => (current === meetingId ? null : meetingId))}
-              onJoin={(meeting) => void joinAsAdmin(meeting)}
-              onCopyId={(meeting) => void copyMeetingId(meeting)}
-              onEnd={(meeting) => void endLiveMeeting(meeting)}
-            />
-            <RecentActivityCard activities={dashboard?.recentActivity || []} />
-            <GuestHistoryCard entries={dashboard?.guestHistory || []} total={dashboard?.guestAttendanceCount || 0} />
-            <AdminControlCenter />
-            <AdminBroadcastCenter />
-            <AdminAdCampaignCenter />
-            <HomeSlidesCard
+            {activeSection==='dashboard'&&<>
+              <LiveMeetingsCard
+                meetings={liveMeetings}
+                activeMenu={activeMeetingMenu}
+                onToggleMenu={(meetingId) => setActiveMeetingMenu((current) => (current === meetingId ? null : meetingId))}
+                onJoin={(meeting) => void joinAsAdmin(meeting)}
+                onCopyId={(meeting) => void copyMeetingId(meeting)}
+                onEnd={(meeting) => void endLiveMeeting(meeting)}
+              />
+              <RecentActivityCard activities={dashboard?.recentActivity || []} />
+              <UsageStatisticsCard usage={dashboard?.usage || []} />
+              <UserDistributionCard distribution={dashboard?.distribution || { active: 0, guests: 0, inactive: 0, banned: 0 }} />
+              <CountriesCard countries={dashboard?.countries || []} />
+            </>}
+            {activeSection==='admin-notifications'&&<RecentActivityCard activities={dashboard?.recentActivity || []} />}
+            {activeSection==='admin-guest-history'&&<GuestHistoryCard entries={dashboard?.guestHistory || []} total={dashboard?.guestAttendanceCount || 0} />}
+            {activeSection==='admin-ai-report'&&<AiUsageReportCard dashboard={dashboard} />}
+            {(['admin-controls','admin-users','admin-reports','admin-legal-terms','admin-admin-invites'] as const).includes(activeSection as any)&&<AdminControlCenter section={activeSection as any} />}
+            {activeSection==='admin-broadcasts'&&<AdminBroadcastCenter />}
+            {activeSection==='admin-ads'&&<AdminAdCampaignCenter />}
+            {activeSection==='admin-home-slides'&&<HomeSlidesCard
               slides={homeSlides}
               selectedSlot={selectedHomeSlot}
               draft={homeSlideDraft}
@@ -666,16 +680,16 @@ export default function AdminDashboardPage() {
               onSelect={selectHomeSlide}
               onDraftChange={setHomeSlideDraft}
               onSubmit={saveHomeSlide}
-            />
-            <LoginBrandingCard
+            />}
+            {activeSection==='admin-login-branding'&&<LoginBrandingCard
               draft={loginBrandingDraft}
               saving={isSavingLoginBranding}
               onDraftChange={setLoginBrandingDraft}
               onSubmit={saveLoginBranding}
               onReset={() => setLoginBrandingDraft(defaultLoginBrandingDraft)}
-            />
-            <GuestAccessSlidesCard slides={guestSlides} draft={guestDraft} editingId={editingGuestSlideId} onDraftChange={setGuestDraft} onEdit={(slide) => { setEditingGuestSlideId(slide.id); setGuestDraft({ title: slide.title, body: slide.body, imageUrl: slide.imageUrl, isActive: slide.isActive }); }} onCancel={() => { setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); }} onSubmit={async (event) => { event.preventDefault(); try { await adminDashboardService.saveGuestAccessSlide(guestDraft, editingGuestSlideId || undefined); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\u00e8s invit\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); setToast('Slide enregistre.'); } catch (saveError) { setToast(saveError instanceof Error ? saveError.message : 'Enregistrement impossible.'); } }} onDelete={async (id) => { try { await adminDashboardService.deleteGuestAccessSlide(id); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setToast('Slide supprime.'); } catch (deleteError) { setToast(deleteError instanceof Error ? deleteError.message : 'Suppression impossible.'); } }} />
-            <DashboardTipsCard
+            />}
+            {activeSection==='admin-guest-slides'&&<GuestAccessSlidesCard slides={guestSlides} draft={guestDraft} editingId={editingGuestSlideId} onDraftChange={setGuestDraft} onEdit={(slide) => { setEditingGuestSlideId(slide.id); setGuestDraft({ title: slide.title, body: slide.body, imageUrl: slide.imageUrl, isActive: slide.isActive }); }} onCancel={() => { setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\\u00e8s invit\\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); }} onSubmit={async (event) => { event.preventDefault(); try { await adminDashboardService.saveGuestAccessSlide(guestDraft, editingGuestSlideId || undefined); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setEditingGuestSlideId(null); setGuestDraft({ title: 'Acc\\u00e8s invit\\u00e9', body: '', imageUrl: '/meeting-black-team.svg', isActive: true }); setToast('Slide enregistre.'); } catch (saveError) { setToast(saveError instanceof Error ? saveError.message : 'Enregistrement impossible.'); } }} onDelete={async (id) => { try { await adminDashboardService.deleteGuestAccessSlide(id); setGuestSlides(await adminDashboardService.getGuestAccessSlides()); setToast('Slide supprime.'); } catch (deleteError) { setToast(deleteError instanceof Error ? deleteError.message : 'Suppression impossible.'); } }} />}
+            {activeSection==='admin-tips'&&<DashboardTipsCard
               tips={dashboardTips}
               draft={tipDraft}
               editingTipId={editingTipId}
@@ -686,10 +700,7 @@ export default function AdminDashboardPage() {
               onToggle={(tip) => void toggleDashboardTip(tip)}
               onDelete={(tipId) => void deleteDashboardTip(tipId)}
               onCancel={resetTipDraft}
-            />
-            <UsageStatisticsCard usage={dashboard?.usage || []} />
-            <UserDistributionCard distribution={dashboard?.distribution || { active: 0, guests: 0, inactive: 0, banned: 0 }} />
-            <CountriesCard countries={dashboard?.countries || []} />
+            />}
           </section>
         </div>
 
@@ -703,7 +714,7 @@ export default function AdminDashboardPage() {
   );
 }
 
-function AdminSidebar({ userName, open, onClose }: { userName: string; open: boolean; onClose: () => void }) {
+function AdminSidebar({ userName, open, activeSection, onClose }: { userName: string; open: boolean; activeSection: string; onClose: () => void }) {
   const menuItems: Array<{
     label: string;
     icon: typeof Home;
@@ -712,7 +723,7 @@ function AdminSidebar({ userName, open, onClose }: { userName: string; open: boo
     live?: boolean;
     count?: number;
   }> = [
-    { label: 'Tableau de bord', icon: Home, path: '/admin', active: true },
+    { label: 'Tableau de bord', icon: Home, path: '/admin' },
     { label: 'Réglages généraux', icon: Settings, path: '/admin#admin-controls' },
     { label: 'Utilisateurs', icon: UsersRound, path: '/admin#admin-users' },
     { label: 'Historique invités', icon: Activity, path: '/admin#admin-guest-history' },
@@ -720,6 +731,8 @@ function AdminSidebar({ userName, open, onClose }: { userName: string; open: boo
     { label: 'Signalements', icon: Flag, path: '/admin#admin-reports' },
     { label: 'Conditions d’utilisation', icon: FileText, path: '/admin#admin-legal-terms' },
     { label: 'Administrateurs', icon: ShieldCheck, path: '/admin#admin-admin-invites' },
+    { label: 'Communications', icon: MessageCircle, path: '/admin#admin-broadcasts' },
+    { label: 'Publicités', icon: ImageIcon, path: '/admin#admin-ads' },
     { label: 'Slider accueil', icon: CirclePlay, path: '/admin#admin-home-slides' },
     { label: 'Page de connexion', icon: ImageIcon, path: '/admin#admin-login-branding' },
     { label: 'Accueil des invités', icon: Video, path: '/admin#admin-guest-slides' },
@@ -745,7 +758,7 @@ function AdminSidebar({ userName, open, onClose }: { userName: string; open: boo
         {menuItems.map((item) => {
           const Icon = item.icon;
           return (
-            <Link className={item.active ? 'is-active' : ''} to={item.path} key={item.label} onClick={() => { onClose(); if (item.path.startsWith('/admin#')) requestAnimationFrame(() => document.getElementById(item.path.split('#')[1])?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>
+            <Link className={(item.path==='/admin' ? activeSection==='dashboard' : item.path.startsWith('/admin#') && item.path.slice(item.path.indexOf('#')+1)===activeSection) ? 'is-active' : ''} to={item.path} key={item.label} onClick={() => { onClose(); if (item.path.startsWith('/admin#')) requestAnimationFrame(() => document.getElementById(item.path.split('#')[1])?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>
               <Icon size={20} aria-hidden="true" />
               <span>{item.label}</span>
               {item.live && <b className="admin-live-badge">LIVE</b>}
