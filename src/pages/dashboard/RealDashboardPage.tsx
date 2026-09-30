@@ -228,17 +228,47 @@ export default function RealDashboardPage() {
     navigate('/app/meetings');
   };
 
+  const startInstantMeeting = async () => {
+    const created = await meetingService.scheduleMeeting({
+        title: 'Réunion instantanée',
+        description: 'Réunion créée depuis l’accueil MBotéRoom.',
+        startTime: new Date().toISOString(),
+        duration: 60,
+        settings: {
+          waitingRoom: false,
+          joinBeforeHost: true,
+          participantAudio: true,
+          participantVideo: true,
+          screenShare: true,
+          chat: true,
+          reactions: true,
+          linkSharing: true,
+          externalAccess: true,
+          encryption: true,
+        },
+    });
+    const started = await meetingService.startMeetingAndNotify(created.id);
+    const meeting = started.meeting || { ...created, is_active: true, status: 'live' as const };
+    navigate(`/reunions/${meeting.meeting_link}`, { state: { meeting } });
+  };
+
   if (isNativeAndroidApp()) return <AndroidHome
     firstName={firstName}
     meetings={upcoming}
+    recentMeetings={recent}
+    slides={homeSlides}
     loading={loading}
     unreadNotifications={unreadNotifications}
     onCreate={() => navigate('/app/meetings?new=1')}
-    onPlan={() => navigate('/app/meetings?new=1&mode=schedule')}
+    onJoin={() => navigate('/join')}
+    onInstant={startInstantMeeting}
     onOpen={(meeting) => void openMeeting(meeting)}
     onAll={() => navigate('/app/meetings')}
     onNotifications={() => navigate('/app/notifications')}
+    onGroups={() => navigate('/app/groups')}
+    onPremium={() => setPremiumOpen(true)}
     onLive={() => navigate('/app/live')}
+    onSlideAction={(path) => navigate(path)}
   />;
 
   return <main className="real-dashboard" aria-busy={loading}>
