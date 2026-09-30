@@ -337,7 +337,10 @@ try {
     }
   });
   page.on('response', (response) => {
-    if (response.url().startsWith(baseUrl) && response.status() >= 500) {
+    const expectedUnavailableLuna = response.url().endsWith('/api/admin/ai/compose')
+      && response.request().method() === 'POST'
+      && response.status() === 503;
+    if (response.url().startsWith(baseUrl) && response.status() >= 500 && !expectedUnavailableLuna) {
       serverErrors.push(`${response.status()} ${response.request().method()} ${response.url()}`);
     }
   });
