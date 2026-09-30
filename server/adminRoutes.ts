@@ -760,6 +760,24 @@ export const registerAdminRoutes = (app: express.Express, io: Server) => {
     } catch (error) { next(error); }
   });
 
+  app.delete('/api/admin/users/:userId', ...adminApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const userId = Number(request.params.userId);
+      if (!Number.isSafeInteger(userId) || userId <= 0) return sendApiError(response,400,'USER_INVALID','Utilisateur invalide.');
+      if (userId === request.user!.id) return sendApiError(response,400,'ADMIN_SELF_DELETE_FORBIDDEN','Vous ne pouvez pas supprimer votre propre compte administrateur.');
+      const existing = await query('SELECT id,name,email,role,is_guest FROM room_users WHERE id=$1 LIMIT 1',[userId]);
+      const target = existing.rows[0];
+      if (!target || target.is_guest) return sendApiError(response,404,'USER_NOT_FOUND','Utilisateur introuvable.');
+      await query('DELETE FROM room_sessions WHERE user_id=$1',[userId]);
+      await query('DELETE FROM room_login_otps WHERE user_id=$1',[userId]).catch(()=>undefined);
+      const deleted = await query('DELETE FROM room_users WHERE id=$1 RETURNING id',[userId]);
+      if (!deleted.rows[0]) return sendApiError(response,404,'USER_NOT_FOUND','Utilisateur introuvable.');
+      io.in(`user:${userId}`).disconnectSockets(true);
+      io.to('admins').emit('admin:user-deleted',{userId});
+      response.json({success:true});
+    } catch (error) { next(error); }
+  });
+
   app.post('/api/admin/users/:userId/revoke-sessions', ...adminApi, async (request: AuthedRequest, response, next) => {
     try {
       const userId = Number(request.params.userId);
