@@ -602,7 +602,7 @@ export default function AdminDashboardPage() {
         <div className="admin-dashboard-content">
           <header className="admin-dashboard-heading">
             <div>
-              <h1>{{dashboard:'Tableau de bord','admin-controls':'Réglages généraux','admin-users':'Utilisateurs','admin-guest-history':'Historique invités','admin-ai-report':'Rapport IA','admin-reports':'Signalements','admin-legal-terms':'Conditions d’utilisation','admin-admin-invites':'Administrateurs','admin-broadcasts':'Communications','admin-ads':'Publicités','admin-home-slides':'Slider accueil','admin-login-branding':'Page de connexion','admin-guest-slides':'Accueil des invités','admin-tips':'Conseils d’accueil','admin-notifications':'Notifications'} as Record<string,string>)[activeSection] || 'Administration'}</h1>
+              <h1>{({dashboard:'Tableau de bord','admin-controls':'Réglages généraux','admin-users':'Utilisateurs','admin-guest-history':'Historique invités','admin-ai-report':'Rapport IA','admin-reports':'Signalements','admin-legal-terms':'Conditions d’utilisation','admin-admin-invites':'Administrateurs','admin-broadcasts':'Communications','admin-ads':'Publicités','admin-home-slides':'Slider accueil','admin-login-branding':'Page de connexion','admin-guest-slides':'Accueil des invités','admin-tips':'Conseils d’accueil','admin-notifications':'Notifications'} as Record<string,string>)[activeSection] || 'Administration'}</h1>
               <p>{activeSection==='dashboard' ? 'Vue d’ensemble de la plateforme MBotéRoom' : 'Espace de gestion administrateur MBotéRoom'}</p>
             </div>
             {activeSection==='dashboard'&&<label className="admin-period-selector">
