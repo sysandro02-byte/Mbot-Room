@@ -329,6 +329,7 @@ try {
   const page = await context.newPage();
   const pageErrors = [];
   const serverErrors = [];
+  const networkErrors = [];
   let expectedLunaConsoleErrorUntil = 0;
   page.on('pageerror', (error) => pageErrors.push(error.message));
   page.on('console', (message) => {
@@ -336,8 +337,15 @@ try {
       const value = message.text();
       if (value === 'Failed to load resource: the server responded with a status of 503 (Service Unavailable)'
         && Date.now() < expectedLunaConsoleErrorUntil) return;
+      if (/Failed to load resource: net::ERR_CONNECTION_CLOSED/i.test(value)) return;
       if (!/favicon|ResizeObserver/i.test(value)) pageErrors.push(value);
     }
+  });
+  page.on('requestfailed', (request) => {
+    if (!request.url().startsWith(baseUrl)) return;
+    const reason = request.failure()?.errorText || 'request_failed';
+    if (/net::ERR_ABORTED/i.test(reason)) return;
+    networkErrors.push(`${reason} ${request.method()} ${request.url()}`);
   });
   page.on('response', (response) => {
     const expectedUnavailableLuna = response.url().endsWith('/api/admin/ai/compose')
@@ -515,6 +523,7 @@ try {
   assert.match(adminMeetingNotice, /partenaires|clients|LoukaTech/i, 'Admin meeting creation must explain its partner/client/team use case');
 
   assert.deepEqual(serverErrors, [], `Server 5xx responses detected:\n${serverErrors.join('\n')}`);
+  assert.deepEqual(networkErrors, [], `Local network errors detected:\n${networkErrors.join('\n')}`);
   assert.deepEqual(pageErrors, [], `Browser errors detected:\n${pageErrors.join('\n')}`);
 
   const finalMe = await page.evaluate(async () => {
