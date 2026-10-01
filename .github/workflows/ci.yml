@@ -16,7 +16,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16-alpine
@@ -47,6 +47,11 @@ jobs:
         run: npm ci
       - name: Dependency audit
         run: npm audit
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
       - name: Install browsers for device and video checks
         run: npx playwright install --with-deps chromium webkit
       - name: Typecheck
