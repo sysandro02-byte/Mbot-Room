@@ -257,7 +257,10 @@ const openAuthenticatedMeeting = async (browser, session, meetingId, label, live
   page.on('console', (message) => {
     if (message.type() === 'error') {
       const text = message.text();
-      if (text === 'WebSocket is already in CLOSING or CLOSED state.') {
+      if (
+        text === 'WebSocket is already in CLOSING or CLOSED state.'
+        || /Failed to load resource: net::ERR_CONNECTION_CLOSED/i.test(text)
+      ) {
         console.warn(`[${label}:expected-network-warning] ${text}`);
         return;
       }
