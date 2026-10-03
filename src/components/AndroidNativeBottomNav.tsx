@@ -20,8 +20,8 @@ export default function AndroidNativeBottomNav() {
     || location.pathname.startsWith('/mot-de-passe-oublie')
     || location.pathname.startsWith('/rejoindre-une-reunion')
     || location.pathname.startsWith('/join')
-    || /^\\/reunions\\/[^/]+(?:\\/salle-attente|\\/terminee|\\/luna)?$/.test(location.pathname)
-    || /^\\/app\\/live\\/[^/]+$/.test(location.pathname);
+    || /^\/reunions\/[^/]+(?:\/salle-attente|\/terminee|\/luna)?$/.test(location.pathname)
+    || /^\/app\/live\/[^/]+$/.test(location.pathname);
   if (hidden) return null;
 
   // Match the Android mockup: five primary destinations, with Live and Profile
