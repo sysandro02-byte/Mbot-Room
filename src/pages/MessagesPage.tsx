@@ -1,6 +1,7 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Archive,
+  ArrowLeft,
   Bell,
   BellOff,
   CalendarDays,
@@ -31,6 +32,7 @@ import {
 import { meetingService } from '../services/meetingService';
 import { workspaceService, type WorkGroup } from '../services/workspaceService';
 import { socket } from '../lib/socket';
+import { isNativeAndroidApp } from '../lib/nativePlatform';
 import { showAppMessage } from '../lib/appMessage';
 import './MessagesPage.css';
 import AppLoader from '../components/AppLoader';
@@ -116,7 +118,7 @@ export default function MessagesPage(){
           setSelectedId(conversation.id);
           setParams({conversation:conversation.id},{replace:true});
         }else{
-          setSelectedId(rows.find((item)=>!item.archived)?.id||rows[0]?.id||null);
+          setSelectedId(isNativeAndroidApp()?null:(rows.find((item)=>!item.archived)?.id||rows[0]?.id||null));
         }
       }catch(cause){
         if(!cancelled)setError(cause instanceof Error?cause.message:'Chargement impossible.');
@@ -378,6 +380,7 @@ export default function MessagesPage(){
       <main className="messages-pro-chat">
         {selected?<>
           <header className="messages-pro-chat-head">
+            {isNativeAndroidApp()?<button type="button" className="messages-pro-chat-back" onClick={()=>{setSelectedId(null);const next=new URLSearchParams(params);next.delete('conversation');setParams(next,{replace:true});}} aria-label="Retour aux conversations"><ArrowLeft size={20}/></button>:null}
             <span className="messages-pro-chat-avatar">{selected.avatar?<img src={selected.avatar} alt=""/>:selected.kind==='work_group'?<UsersRound/>:initials(selected.title)}</span>
             <div><h2>{selected.title}{selected.pinned?<Star size={15} fill="currentColor"/>:null}</h2><p>{selected.kind==='work_group'?`${selected.participants.length} participants`:selected.participants.find((participant)=>participant.id!==currentUserId)?.online?'En ligne':'Compte MBotéRoom'}</p></div>
             <div className="messages-pro-chat-actions">
