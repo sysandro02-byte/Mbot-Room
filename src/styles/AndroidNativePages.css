@@ -103,3 +103,5 @@ body.mboteroom-native-android .android-native-bottom-nav button.is-active{color:
   body.mboteroom-native-android .real-feature-page{padding:8px!important}
   body.mboteroom-native-android .real-join-card{padding:13px!important}
 }
+
+/* APK visual overrides remain scoped to the trusted Android app marker. */
