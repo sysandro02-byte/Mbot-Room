@@ -90,5 +90,5 @@ html[data-native-app="android"] .messages-native-chat .messages-pro-layout{displ
 html[data-native-app="android"] .messages-native-chat .messages-pro-list,html[data-native-app="android"] .messages-native-chat .messages-pro-detail{display:none!important}
 html[data-native-app="android"] .messages-native-chat .messages-pro-chat{display:grid!important;width:100%!important;min-height:calc(100dvh - 150px)!important}
 html[data-native-app="android"] .messages-native-chat .messages-pro-chat-head{grid-template-columns:36px 40px minmax(0,1fr) auto!important}
-html[data-native-app="android"] .messages-pro-chat-back{display:grid!important;width:36px!important;height:40px!important;min-height:40px!important;place-items:center!important;border:0!important;border-radius:12px!important;background:#e7f6f5!important;color:#078e98!important}
-html[data-native-app="android"] .messages-pro-chat:not(.messages-native-chat .messages-pro-chat) .messages-pro-chat-back{display:none!important}
+html[data-native-app="android"] .messages-pro-chat-back{display:none!important;width:36px!important;height:40px!important;min-height:40px!important;place-items:center!important;border:0!important;border-radius:12px!important;background:#e7f6f5!important;color:#078e98!important}
+html[data-native-app="android"] .messages-native-chat .messages-pro-chat-back{display:grid!important}
