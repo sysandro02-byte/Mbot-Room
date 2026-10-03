@@ -63,18 +63,27 @@ jobs:
         working-directory: android
         run: gradle --no-daemon :app:assembleDebug
 
-      - name: Verify bundled offline shell
+      - name: Verify APK signature and Android package
         run: |
           APK=android/app/build/outputs/apk/debug/app-debug.apk
-          test -s "$APK"
+          APKSIGNER="$(find "${ANDROID_HOME}/build-tools" -type f -name apksigner -print -quit)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          unzip -t "$APK"
+          mkdir -p output
+          cp "$APK" output/MBoteRoom-Android-test.apk
+
+      - name: Verify bundled offline shell
+        run: |
+          APK=output/MBoteRoom-Android-test.apk
           unzip -l "$APK" | grep -F "assets/index.html"
           unzip -l "$APK" | grep -E "assets/assets/.+\.js"
           unzip -l "$APK" | grep -F "assets/icons/"
 
-      - name: Upload debug APK
+      - name: Upload installable debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: mboteroom-android-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: mboteroom-android-test
+          path: output/MBoteRoom-Android-test.apk
           if-no-files-found: error
           retention-days: 7
