@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import { createServer } from 'node:http';
+import { Readable } from 'node:stream';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
@@ -206,11 +207,44 @@ app.get('/api/public/android/download', rateLimit(60, 60_000), async (_request, 
       throw new Error('Manifest Android invalide.');
     }
 
-    const target = `${androidReleaseBaseUrl}/${apkPath}?download=MBoteRoom-Android.apk&v=${sha}`;
+    const target = `${androidReleaseBaseUrl}/${apkPath}?v=${sha}`;
+    const apkController = new AbortController();
+    const apkTimeout = setTimeout(() => apkController.abort(), 120_000);
+    let apkResponse: globalThis.Response;
+    try {
+      apkResponse = await fetch(target, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+        signal: apkController.signal,
+      });
+    } finally {
+      clearTimeout(apkTimeout);
+    }
+
+    if (!apkResponse.ok || !apkResponse.body) {
+      throw new Error(`APK Android indisponible (${apkResponse.status}).`);
+    }
+
+    response.status(200);
+    response.setHeader('Content-Type', 'application/vnd.android.package-archive');
     response.setHeader('Content-Disposition', 'attachment; filename="MBoteRoom-Android.apk"');
-    response.redirect(302, target);
+    response.setHeader('X-MBoteRoom-Release-Commit', sha);
+    const contentLength = apkResponse.headers.get('content-length');
+    if (contentLength) response.setHeader('Content-Length', contentLength);
+
+    await new Promise<void>((resolve, reject) => {
+      const apkStream = Readable.fromWeb(apkResponse.body as any);
+      apkStream.once('error', reject);
+      response.once('error', reject);
+      response.once('finish', resolve);
+      apkStream.pipe(response);
+    });
   } catch (error) {
     console.error('[android download]', error);
+    if (response.headersSent) {
+      response.destroy(error instanceof Error ? error : undefined);
+      return;
+    }
     response.status(503).json({
       error: 'Le téléchargement MBotéRoom Android est momentanément indisponible.',
       code: 'ANDROID_RELEASE_UNAVAILABLE',
