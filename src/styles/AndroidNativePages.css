@@ -1,0 +1,114 @@
+/* Android APK-only presentation layer. Web keeps its existing desktop/PWA design. */
+body.mboteroom-native-android{
+  --android-navy:#063b63;
+  --android-navy-dark:#032f4f;
+  --android-teal:#08a6a6;
+  --android-bg:#f4f8fb;
+  --android-card:#fff;
+  --android-border:#e1e9ef;
+  --android-text:#102a43;
+  --android-muted:#6d7f91;
+  background:var(--android-bg);
+}
+body.mboteroom-native-android #root{min-height:100dvh;background:var(--android-bg)}
+body.mboteroom-native-android .global-header{display:none!important}
+body.mboteroom-native-android .app-shell{
+  min-height:100dvh!important;
+  width:100%!important;
+  max-width:none!important;
+  margin:0!important;
+  padding:0 0 calc(82px + env(safe-area-inset-bottom))!important;
+  background:var(--android-bg)!important;
+}
+body.mboteroom-native-android .app-shell>aside,
+body.mboteroom-native-android .app-sidebar,
+body.mboteroom-native-android .desktop-sidebar{display:none!important}
+body.mboteroom-native-android .app-shell-main,
+body.mboteroom-native-android .app-shell-content,
+body.mboteroom-native-android main{max-width:100%!important}
+body.mboteroom-native-android .app-shell-header{
+  position:sticky!important;top:0;z-index:80;
+  min-height:70px!important;box-sizing:border-box;
+  padding:calc(10px + env(safe-area-inset-top)) 18px 10px!important;
+  border:0!important;border-radius:0!important;
+  background:linear-gradient(135deg,var(--android-navy-dark),var(--android-navy))!important;
+  color:#fff!important;box-shadow:0 8px 24px rgba(3,47,79,.14)!important;
+}
+body.mboteroom-native-android .app-shell-header h1,
+body.mboteroom-native-android .app-shell-header h2,
+body.mboteroom-native-android .app-shell-header strong{color:#fff!important}
+body.mboteroom-native-android .app-shell-header button{color:#fff!important}
+body.mboteroom-native-android .app-shell-content{padding:14px!important}
+
+/* Shared cards and controls across Messages, Contacts, Calendar, Files, Profile, Settings, etc. */
+body.mboteroom-native-android .app-shell-content section,
+body.mboteroom-native-android .app-shell-content article,
+body.mboteroom-native-android .app-shell-content form{
+  max-width:100%;box-sizing:border-box;
+}
+body.mboteroom-native-android .app-shell-content input,
+body.mboteroom-native-android .app-shell-content select,
+body.mboteroom-native-android .app-shell-content textarea{
+  max-width:100%;min-height:46px;box-sizing:border-box;border-radius:13px;
+}
+body.mboteroom-native-android .app-shell-content button,
+body.mboteroom-native-android .app-shell-content a[role="button"]{
+  min-height:44px;touch-action:manipulation;
+}
+body.mboteroom-native-android .app-shell-content img,
+body.mboteroom-native-android .app-shell-content video{max-width:100%}
+
+/* Join + meeting lifecycle: clean full-width phone layout. */
+body.mboteroom-native-android .join-page,
+body.mboteroom-native-android .real-join-page,
+body.mboteroom-native-android .waiting-room-page,
+body.mboteroom-native-android .meeting-ended-page{
+  width:100%!important;max-width:720px!important;margin:0 auto!important;box-sizing:border-box!important;
+}
+body.mboteroom-native-android .join-card,
+body.mboteroom-native-android .waiting-room-card,
+body.mboteroom-native-android .meeting-ended-card{
+  border-radius:22px!important;border-color:var(--android-border)!important;
+  box-shadow:0 12px 34px rgba(6,59,99,.07)!important;
+}
+
+/* Meeting room remains immersive in APK. */
+body.mboteroom-native-android .meeting-room,
+body.mboteroom-native-android .meeting-room-v2,
+body.mboteroom-native-android .meeting-stage{
+  min-height:100dvh!important;max-width:none!important;border-radius:0!important;
+}
+
+/* Mobile bottom navigation shared by every authenticated Android page. */
+.android-native-bottom-nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:1600;
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:end;
+  min-height:64px;padding:7px 8px calc(7px + env(safe-area-inset-bottom));
+  border-top:1px solid #dbe5eb;background:rgba(255,255,255,.97);
+  box-shadow:0 -10px 30px rgba(6,59,99,.09);backdrop-filter:blur(14px);
+}
+.android-native-bottom-nav button{
+  min-width:0;min-height:50px;padding:4px 2px;border:0;border-radius:13px;background:transparent;
+  color:#748598;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  font-size:9px;font-weight:800;line-height:1;touch-action:manipulation;
+}
+.android-native-bottom-nav button svg{width:20px;height:20px}
+.android-native-bottom-nav button.is-active{color:var(--android-teal);background:#edf9f8}
+.android-native-bottom-nav button.is-join{
+  width:54px;height:54px;min-height:54px;justify-self:center;margin-top:-21px;border-radius:18px;
+  background:linear-gradient(135deg,#078f8d,#0bb2aa);color:#fff;
+  box-shadow:0 9px 24px rgba(8,166,166,.28);
+}
+.android-native-bottom-nav button.is-join span{color:#557186;position:absolute;transform:translateY(40px)}
+body.mboteroom-native-android:has(.meeting-room-v2) .android-native-bottom-nav,
+body.mboteroom-native-android:has(.meeting-room) .android-native-bottom-nav{display:none}
+
+/* Remove wide-screen-only spacing that produces empty zones in the APK. */
+@media(max-width:720px){
+  body.mboteroom-native-android .app-shell-content{padding:12px!important}
+  body.mboteroom-native-android .app-shell-content .page,
+  body.mboteroom-native-android .app-shell-content .page-content{padding-left:0!important;padding-right:0!important}
+  body.mboteroom-native-android table{display:block;max-width:100%;overflow-x:auto}
+  body.mboteroom-native-android .modal,
+  body.mboteroom-native-android [role="dialog"]{max-width:calc(100vw - 20px)!important}
+}
