@@ -33,7 +33,7 @@ const participantCount = (meeting: Meeting) => Array.isArray(meeting.settings?.p
   ? meeting.settings.participants.length
   : 0;
 
-export default function AndroidHome({ firstName, meetings, recentMeetings, slides, loading, unreadNotifications, onCreate, onJoin, onOpen, onAll, onNotifications, onGroups, onPremium, onLive, onCalendar, onMessages, onProfile, onSlideAction }: Props) {
+export default function AndroidHome({ firstName, meetings, recentMeetings, slides, loading, unreadNotifications, onCreate, onJoin, onOpen, onAll, onNotifications, onPremium, onCalendar, onMessages, onProfile, onSlideAction }: Props) {
   const liveMeeting = meetings.find((meeting) => getMeetingPhase(meeting) === 'live') || null;
   const hero = slides.find((slide) => slide.slot >= 1 && slide.slot <= 3 && slide.isActive !== false)
     || slides.find((slide) => slide.isActive !== false)
@@ -116,6 +116,5 @@ export default function AndroidHome({ firstName, meetings, recentMeetings, slide
       </button>)}
     </section> : null}
 
-    <span className="sr-only">{onGroups && onLive ? 'Fonctions de groupes et Live disponibles dans la navigation.' : ''}</span>
   </main>;
 }
