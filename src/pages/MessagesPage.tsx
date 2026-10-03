@@ -345,7 +345,7 @@ export default function MessagesPage(){
 
   const unreadTotal=conversations.reduce((sum,item)=>sum+item.unreadCount,0);
 
-  return <section className="messages-pro-page">
+  return <section className={`messages-pro-page${isNativeAndroidApp()?` messages-native-android${selectedId?' messages-native-chat':' messages-native-list'}`:''}`}>
     <header className="messages-pro-heading">
       <div className="messages-pro-heading-icon"><MessageCircle/></div>
       <div><h1>Messages</h1><p>Échangez avec vos contacts MBotéRoom et vos groupes de travail.</p></div>
