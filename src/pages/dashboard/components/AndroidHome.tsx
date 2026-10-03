@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Bell, CalendarDays, ChevronRight, Crown, MessageSquare, Radio, UsersRound, Video } from 'lucide-react';
+import { Bell, CalendarDays, ChevronRight, FolderOpen, MessageCircle, Search, UsersRound, Video } from 'lucide-react';
 import type { HomeSlide, Meeting } from '../../../services/meetingService';
 import { getMeetingPhase } from '../../../services/meetingService';
 import { getAppLocale } from '../../../lib/appLanguage';
@@ -7,6 +6,7 @@ import './AndroidHome.css';
 
 type Props = {
   firstName: string;
+  avatar?: string;
   meetings: Meeting[];
   recentMeetings: Meeting[];
   slides: HomeSlide[];
@@ -17,78 +17,139 @@ type Props = {
   onOpen: (meeting: Meeting) => void;
   onAll: () => void;
   onNotifications: () => void;
-  onGroups: () => void;
   onPremium: () => void;
-  onLive: () => void;
   onCalendar: () => void;
   onMessages: () => void;
+  onContacts: () => void;
+  onFiles: () => void;
   onProfile: () => void;
+  onSearch: () => void;
   onSlideAction: (path: string) => void;
 };
 
-const dateTime = (value: string) => new Intl.DateTimeFormat(getAppLocale(), {
-  weekday: 'short', hour: '2-digit', minute: '2-digit',
+const meetingTime = (value: string) => new Intl.DateTimeFormat(getAppLocale(), {
+  hour: '2-digit',
+  minute: '2-digit',
 }).format(new Date(value));
 
-const participantCount = (meeting: Meeting) => Array.isArray(meeting.settings?.participants)
-  ? meeting.settings.participants.length
-  : 0;
+const meetingDateLabel = (value: string) => {
+  const date = new Date(value);
+  const today = new Date();
+  if (date.toDateString() === today.toDateString()) return 'Aujourd’hui';
+  return new Intl.DateTimeFormat(getAppLocale(), { weekday: 'short', day: 'numeric', month: 'short' }).format(date);
+};
 
-export default function AndroidHome({ firstName, meetings, recentMeetings, slides, loading, unreadNotifications, onCreate, onJoin, onOpen, onAll, onNotifications, onGroups, onPremium, onLive, onCalendar, onMessages, onProfile, onSlideAction }: Props) {
-  const [actionError] = useState('');
-  const liveMeeting = meetings.find((meeting) => getMeetingPhase(meeting) === 'live') || null;
-  const banner = slides.find((slide) => slide.slot === 4 && slide.isActive !== false) || slides.find((slide) => slide.isActive !== false) || null;
-  const hero = slides.find((slide) => slide.slot >= 1 && slide.slot <= 3 && slide.isActive !== false) || banner;
-  const upcoming = meetings.slice(0, 2);
+export default function AndroidHome({
+  firstName,
+  avatar,
+  meetings,
+  slides,
+  loading,
+  unreadNotifications,
+  onCreate,
+  onJoin,
+  onOpen,
+  onAll,
+  onNotifications,
+  onPremium,
+  onCalendar,
+  onMessages,
+  onContacts,
+  onFiles,
+  onProfile,
+  onSearch,
+  onSlideAction,
+}: Props) {
+  const hero = slides.find((slide) => slide.slot >= 1 && slide.slot <= 3 && slide.isActive !== false)
+    || slides.find((slide) => slide.isActive !== false)
+    || null;
+  const nextMeeting = meetings[0] || null;
+  const isLive = Boolean(nextMeeting && getMeetingPhase(nextMeeting) === 'live');
 
   return <main className="android-home android-home-redesign" aria-busy={loading}>
-    <header className="android-home-redesign-header">
-      <div>
-        <div className="android-home-brandline"><span className="android-home-brandmark"><Video size={21}/></span><span className="android-home-wordmark">MBotéRoom</span></div>
-        <h1>Bonjour {firstName} 👋</h1>
-        <p>Prêt(e) à vous connecter aujourd’hui ?</p>
+    <header className="android-home-topbar">
+      <div className="android-home-brand">
+        <span>MBoté</span><strong>Room</strong>
+        <small>Réunions vidéo sécurisées</small>
       </div>
-      <div className="android-home-header-actions">
-        <button type="button" className="android-icon-button" onClick={onNotifications} aria-label="Notifications"><Bell size={20}/>{unreadNotifications ? <b>{unreadNotifications > 9 ? '9+' : unreadNotifications}</b> : null}</button>
-        <button type="button" className="android-profile-button" onClick={onProfile} aria-label="Mon profil">{firstName.slice(0, 1).toUpperCase()}</button>
+      <div className="android-home-top-actions">
+        <button type="button" className="android-home-avatar" onClick={onProfile} aria-label="Mon profil">
+          {avatar ? <img src={avatar} alt="" /> : <span>{firstName.slice(0, 1).toUpperCase()}</span>}
+        </button>
+        <button type="button" className="android-home-round" onClick={onSearch} aria-label="Recherche"><Search/></button>
+        <button type="button" className="android-home-round" onClick={onNotifications} aria-label="Notifications">
+          <Bell/>{unreadNotifications ? <b>{unreadNotifications > 9 ? '9+' : unreadNotifications}</b> : null}
+        </button>
       </div>
     </header>
 
-    <button type="button" className="android-hero-banner" onClick={() => hero?.actionPath && onSlideAction(hero.actionPath)}>
-      {hero?.imageUrl ? <img src={hero.imageUrl} alt=""/> : null}
-      <span className="android-hero-copy"><strong>{hero?.title || 'Des réunions plus proches de vos projets'}</strong><small>{hero?.body || 'Échangez, collaborez, progressez avec MBotéRoom.'}</small></span>
-      <span className="android-hero-dots" aria-hidden="true"><i/><i/><i/></span>
-    </button>
-
-    <section className="android-primary-actions" aria-label="Actions principales">
-      <button type="button" onClick={onCreate}><span><Video size={23}/></span><strong>Créer une réunion</strong><small>Démarrer maintenant</small></button>
-      <button type="button" onClick={onJoin}><span><span style={{fontSize:24,fontWeight:900}}>+</span></span><strong>Rejoindre une réunion</strong><small>Avec un ID ou un lien</small></button>
+    <section className="android-home-welcome">
+      <h1>Bonjour, {firstName}</h1>
+      <p>Ravi{firstName.toLowerCase().endsWith('a') ? 'e' : ''} de vous revoir !</p>
+      <small>Des idées plus proches, un monde plus ouvert.</small>
     </section>
-    {actionError ? <p className="android-home-action-error" role="alert">{actionError}</p> : null}
 
-    <nav className="android-quick-row" aria-label="Accès rapides">
-      <button type="button" onClick={onCalendar}><span><CalendarDays size={19}/></span>Planifier</button>
-      <button type="button" onClick={onLive}><span><Radio size={19}/></span>Live</button>
-      <button type="button" onClick={onGroups}><span><UsersRound size={19}/></span>Groupes</button>
-      <button type="button" onClick={onMessages}><span><MessageSquare size={19}/></span>Messages{unreadNotifications ? <b>{unreadNotifications > 9 ? '9+' : unreadNotifications}</b> : null}</button>
-    </nav>
+    <section className="android-home-main-actions">
+      <button type="button" className="android-home-start" onClick={onCreate}>
+        <span className="android-home-start-icon"><Video/></span>
+        <span className="android-home-action-copy"><strong>Démarrer une réunion</strong><small>Lancez une réunion vidéo en un clic</small></span>
+        <ChevronRight/>
+      </button>
+      <button type="button" className="android-home-join" onClick={onJoin}>
+        <span className="android-home-join-icon"><UsersRound/></span>
+        <span className="android-home-action-copy"><strong>Rejoindre avec un code</strong><small>Entrez un code de réunion pour nous rejoindre</small></span>
+        <ChevronRight/>
+      </button>
+    </section>
 
-    <section>
-      <div className="android-section-title"><h2>Prochaines réunions</h2><button type="button" onClick={onAll}>Voir tout ›</button></div>
-      <div className="android-meeting-list">
-        {upcoming.map((meeting) => {
-          const live = getMeetingPhase(meeting) === 'live';
-          return <article className="android-meeting-card" key={meeting.id}><span className="android-meeting-icon">{live ? <Radio size={20}/> : <CalendarDays size={20}/>}</span><div className="android-meeting-card-copy"><strong>{meeting.title}</strong><small>{live ? 'En direct maintenant' : `${dateTime(meeting.start_time)} · ${participantCount(meeting) || '—'} participant${participantCount(meeting) > 1 ? 's' : ''}`}</small></div><button type="button" className="android-meeting-card-action" onClick={() => onOpen(meeting)}>{live ? 'Reprendre' : 'Rejoindre'}</button></article>;
-        })}
-        {!loading && !upcoming.length ? <button type="button" className="android-meeting-card android-empty-card" onClick={onCreate}><span className="android-meeting-icon"><CalendarDays size={20}/></span><span className="android-meeting-card-copy"><strong>Aucune réunion prévue</strong><small>Planifiez votre prochaine réunion.</small></span></button> : null}
+    <button
+      type="button"
+      className="android-home-banner"
+      onClick={() => hero?.actionPath && onSlideAction(hero.actionPath)}
+      aria-label={hero?.title || 'Organisez vos échanges simplement'}
+    >
+      <span className="android-home-banner-copy">
+        <strong>{hero?.title || 'Organisez vos échanges simplement'}</strong>
+        <small>{hero?.body || 'Collaborez, partagez, avancez ensemble.'}</small>
+      </span>
+      <img src={hero?.imageUrl || '/images/mboteroom-home-banner.svg'} alt="" />
+    </button>
+    <div className="android-home-dots" aria-hidden="true"><i className="active"/><i/><i/></div>
+
+    <section className="android-home-section">
+      <div className="android-home-section-title">
+        <h2>Prochaine réunion</h2>
+        <button type="button" onClick={onAll}>Voir tout <ChevronRight/></button>
+      </div>
+      {nextMeeting ? <button type="button" className="android-home-next" onClick={() => onOpen(nextMeeting)}>
+        <span className="android-home-next-icon"><CalendarDays/></span>
+        <span className="android-home-next-copy">
+          <strong>{nextMeeting.title}</strong>
+          <span>{meetingDateLabel(nextMeeting.start_time)}, {meetingTime(nextMeeting.start_time)}</span>
+          <small><Video/> {isLive ? 'En direct' : 'En ligne'}</small>
+        </span>
+        <span className="android-home-next-arrow"><ChevronRight/></span>
+      </button> : <button type="button" className="android-home-next android-home-next-empty" onClick={onCreate}>
+        <span className="android-home-next-icon"><CalendarDays/></span>
+        <span className="android-home-next-copy"><strong>Aucune réunion programmée</strong><span>Créez votre prochaine réunion MBotéRoom.</span></span>
+        <span className="android-home-next-arrow"><ChevronRight/></span>
+      </button>}
+    </section>
+
+    <section className="android-home-section">
+      <h2>Accès rapide</h2>
+      <div className="android-home-quick">
+        <button type="button" onClick={onMessages}><span className="teal"><MessageCircle/></span><small>Messages</small></button>
+        <button type="button" onClick={onContacts}><span className="blue"><UsersRound/></span><small>Contacts</small></button>
+        <button type="button" onClick={onCalendar}><span className="indigo"><CalendarDays/></span><small>Calendrier</small></button>
+        <button type="button" onClick={onFiles}><span className="gold"><FolderOpen/></span><small>Fichiers</small></button>
       </div>
     </section>
 
-    {recentMeetings.length ? <section><div className="android-section-title"><h2>Réunions récentes</h2><button type="button" onClick={onAll}>Voir tout ›</button></div><div className="android-meeting-list">{recentMeetings.slice(0, 2).map((meeting) => <article className="android-meeting-card" key={meeting.id}><span className="android-meeting-icon"><Video size={19}/></span><div className="android-meeting-card-copy"><strong>{meeting.title}</strong><small>{dateTime(meeting.start_time)}</small></div><button type="button" className="android-meeting-card-action done" onClick={() => onOpen(meeting)}>Terminée</button></article>)}</div></section> : null}
-
-    <button type="button" className="android-premium-strip" onClick={onPremium}><span><Crown size={22}/></span><span><strong>Fonctionnalités Premium</strong><small>Débloquez plus de possibilités avec MBotéRoom Premium.</small></span><ChevronRight size={18}/></button>
-
-    {banner ? <button type="button" className="android-admin-banner" onClick={() => onSlideAction(banner.actionPath || '/fonctionnalites')}><div>{banner.imageUrl ? <img src={banner.imageUrl} alt=""/> : <Radio size={26}/>}</div><span><small>À la une</small><strong>{banner.title}</strong><em>{banner.body}</em></span><ChevronRight size={18}/></button> : null}
-    {liveMeeting ? <span className="sr-only">Une réunion est actuellement en direct.</span> : null}
+    <button type="button" className="android-home-premium" onClick={onPremium}>
+      <span className="android-home-premium-mark">♛</span>
+      <span><strong>Passez à MBotéRoom Premium</strong><small>Plus de fonctionnalités pour vos réunions</small></span>
+      <ChevronRight/>
+    </button>
   </main>;
 }

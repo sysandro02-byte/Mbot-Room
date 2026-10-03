@@ -9,6 +9,7 @@ import { authService } from '../services/authService';
 import { readCachedPreferences } from '../lib/userPreferences';
 import { Meeting, meetingService } from '../services/meetingService';
 import { showAppMessage } from '../lib/appMessage';
+import { isNativeAndroidApp } from '../lib/nativePlatform';
 import './RealJoinPage.css';
 
 type BarcodeDetectorInstance={detect:(source:CanvasImageSource)=>Promise<Array<{rawValue:string}>>};
@@ -20,6 +21,7 @@ export default function RealJoinPage(){
   const user=authService.getCurrentUser();
   const inputRef=useRef<HTMLInputElement|null>(null);
   const videoRef=useRef<HTMLVideoElement|null>(null);
+  const previewRef=useRef<HTMLVideoElement|null>(null);
   const [value,setValue]=useState(meetingLink||'');
   const [password,setPassword]=useState('');
   const [passwordVisible,setPasswordVisible]=useState(false);
@@ -30,6 +32,7 @@ export default function RealJoinPage(){
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState('');
   const [qrOpen,setQrOpen]=useState(false);
+  const [nativeJoinMode,setNativeJoinMode]=useState<'code'|'link'>('code');
   const isMeetingModerator=Boolean(meeting&&(Number(meeting.host_id)===Number(user?.id)||Number(meeting.co_host_id||0)===Number(user?.id)||user?.role==='admin'));
   const micAllowed=Boolean(meeting&&(isMeetingModerator||meeting.settings?.participantAudio!==false));
   const cameraAllowed=Boolean(meeting&&(isMeetingModerator||meeting.settings?.participantVideo!==false));
@@ -140,6 +143,21 @@ export default function RealJoinPage(){
     }
   };
 
+
+  useEffect(()=>{
+    if(!isNativeAndroidApp()||!meeting||!camera||!cameraAllowed)return;
+    let active=true;
+    let stream:MediaStream|null=null;
+    navigator.mediaDevices?.getUserMedia({video:{facingMode:'user'},audio:false})
+      .then((next)=>{
+        if(!active){next.getTracks().forEach((track)=>track.stop());return;}
+        stream=next;
+        if(previewRef.current){previewRef.current.srcObject=next;void previewRef.current.play().catch(()=>undefined);}
+      })
+      .catch(()=>undefined);
+    return ()=>{active=false;stream?.getTracks().forEach((track)=>track.stop());if(previewRef.current)previewRef.current.srcObject=null;};
+  },[camera,cameraAllowed,meeting]);
+
   const openQr=()=>{
     const Detector=(window as typeof window & {BarcodeDetector?:BarcodeDetectorConstructor}).BarcodeDetector;
     if(!Detector){
@@ -149,6 +167,74 @@ export default function RealJoinPage(){
     }
     setQrOpen(true);
   };
+
+  if(isNativeAndroidApp()){
+    return <main className={meeting?'android-join-page is-preview':'android-join-page'}>
+      <header className="android-join-header">
+        <button type="button" onClick={()=>meeting?setMeeting(null):navigate('/app')} aria-label="Retour"><ArrowLeft/></button>
+        <div><h1>{meeting?'Prévisualisation avant la réunion':'Rejoindre une réunion'}</h1><p>{meeting?'Vérifiez vos paramètres avant de rejoindre':'Entrez le code, le lien ou scannez le QR'}</p></div>
+      </header>
+
+      {!meeting?<>
+        <section className="android-join-hero">
+          <span><UsersRound/></span>
+          <div><strong>Rejoignez une réunion en quelques secondes</strong><small>Connectez-vous facilement avec vos collègues, amis ou partenaires.</small></div>
+          <img src="/images/mboteroom-home-hero.svg" alt=""/>
+        </section>
+
+        <section className="android-join-card">
+          <div className="android-join-tabs">
+            <button type="button" className={nativeJoinMode==='code'?'active':''} onClick={()=>setNativeJoinMode('code')}><span>#</span>Avec un code</button>
+            <button type="button" className={nativeJoinMode==='link'?'active':''} onClick={()=>setNativeJoinMode('link')}><Link2/>Avec un lien</button>
+            <button type="button" onClick={openQr}><QrCode/>Scanner un QR</button>
+          </div>
+          <form onSubmit={lookup}>
+            <label>{nativeJoinMode==='code'?'Code de réunion':'Lien de réunion'}
+              <div className="android-join-input">{nativeJoinMode==='code'?<span>#</span>:<Link2/>}<input ref={inputRef} value={value} onChange={(event)=>setValue(event.target.value)} placeholder={nativeJoinMode==='code'?'Ex : 123 456 789':'https://…'} required/>{value?<button type="button" onClick={()=>setValue('')} aria-label="Effacer"><X/></button>:null}</div>
+            </label>
+            <label className="android-join-password-label">Mot de passe (si demandé)
+              <div className="android-join-password"><LockKeyhole/><input type={passwordVisible?'text':'password'} value={password} onChange={(event)=>setPassword(event.target.value)} placeholder="Mot de passe facultatif"/><button type="button" onClick={()=>setPasswordVisible((current)=>!current)} aria-label={passwordVisible?'Masquer le mot de passe':'Afficher le mot de passe'}>{passwordVisible?<EyeOff/>:<Eye/>}</button></div>
+            </label>
+            {error?<div className="android-join-error">{error}</div>:null}
+            <button className="android-join-submit" disabled={loading}>{loading?'Vérification…':<>Rejoindre la réunion <ChevronRight/></>}</button>
+          </form>
+          <div className="android-join-divider"><span>ou</span></div>
+          <button type="button" className="android-join-link-paste" onClick={()=>void pasteInvitation()}><Link2/><span><strong>Rejoindre depuis un lien</strong><small>Collez le lien de la réunion que vous avez reçu</small></span><ChevronRight/></button>
+          <button type="button" className="android-join-qr-row" onClick={openQr}><QrCode/><span><strong>Scanner un code QR</strong><small>Scannez le QR code partagé par l’organisateur</small></span><ChevronRight/></button>
+          <button type="button" className="android-join-recent" onClick={()=>navigate('/app/meetings')}><Clock3/><span><strong>Réunions récentes</strong><small>Retrouvez rapidement vos réunions MBotéRoom</small></span><ChevronRight/></button>
+        </section>
+      </>:<>
+        <section className="android-preview-stage">
+          <div className="android-preview-video">
+            {camera&&cameraAllowed?<video ref={previewRef} autoPlay playsInline muted/>:<div className="android-preview-off"><VideoOff/><strong>Caméra désactivée</strong></div>}
+            <span className={camera&&cameraAllowed?'android-preview-state on':'android-preview-state'}>{camera&&cameraAllowed?<Video/>:<VideoOff/>}{camera&&cameraAllowed?'Caméra activée':'Caméra coupée'}</span>
+            <span className="android-preview-name">{user?.name||user?.email||'Vous'}</span>
+            <div className="android-preview-overlay-controls">
+              <button type="button" className={camera?'active':''} onClick={()=>setCamera((current)=>!current)} disabled={!cameraAllowed}>{camera?<Video/>:<VideoOff/>}<small>Caméra</small></button>
+              <button type="button" className={mic?'active':''} onClick={()=>setMic((current)=>!current)} disabled={!micAllowed}>{mic?<Mic/>:<MicOff/>}<small>Micro</small></button>
+            </div>
+          </div>
+          <section className="android-preview-settings">
+            <div><span><Video/></span><strong>Caméra</strong><small>{cameraAllowed?'Caméra intégrée (avant)':'Désactivée par l’hôte'}</small></div>
+            <div><span><Mic/></span><strong>Microphone</strong><small>{micAllowed?'Micro intégré':'Désactivé par l’hôte'}</small></div>
+            <div className="android-preview-backgrounds"><strong>Arrière-plan</strong><button type="button" className="active">Aucun</button><button type="button">Flou</button></div>
+            <div className="android-preview-test"><span>🎧</span><div><strong>Test audio et vidéo</strong><small>Vérifiez que tout fonctionne correctement</small></div></div>
+          </section>
+          {error?<div className="android-join-error">{error}</div>:null}
+          <button type="button" className="android-preview-submit" onClick={()=>void join()} disabled={loading||meeting.status==='ended'||meeting.status==='cancelled'}><Video/>{loading?'Connexion…':meeting.status==='ended'||meeting.status==='cancelled'?'Réunion terminée':'Rejoindre la réunion'}</button>
+          <button type="button" className="android-preview-change" onClick={()=>setMeeting(null)}>Changer de réunion</button>
+        </section>
+      </>}
+
+      {qrOpen?<div className="real-join-qr-modal" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)setQrOpen(false);}}>
+        <section role="dialog" aria-modal="true" aria-label="Scanner un QR code">
+          <header><div><QrCode/><span><strong>Scanner le QR de la réunion</strong><small>Placez le code dans le cadre.</small></span></div><button onClick={()=>setQrOpen(false)}><X/></button></header>
+          <div className="real-join-qr-camera"><video ref={videoRef} playsInline muted/><i/><b/></div>
+          <p>La caméra sert uniquement à lire le code QR. Elle est arrêtée dès que vous fermez cette fenêtre.</p>
+        </section>
+      </div>:null}
+    </main>;
+  }
 
   return <main className="real-join-shell">
     <section className="real-join-stage">
