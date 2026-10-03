@@ -208,13 +208,18 @@ const escapeEmailHtml = (value: unknown) => String(value ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 
+const emailLogoUrl = () => String(
+  process.env.MBOTE_ROOM_EMAIL_LOGO_URL
+  || `${String(process.env.MBOTE_ROOM_APP_URL || 'https://mboteroom.loukatech.com').replace(/\/+$/, '')}/icons/mboteroom-wordmark.png`
+).trim();
+
 const emailFrame = (title: string, subtitle: string, content: string, footer = 'Cet e-mail a été envoyé automatiquement par MBotéRoom.') => [
   '<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>',
   '<body style="margin:0;background:#f4f7fc;font-family:Inter,Arial,sans-serif;color:#17213c">',
   '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f7fc;padding:30px 12px"><tr><td align="center">',
   '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#fff;border:1px solid #e2e8f4;border-radius:24px;overflow:hidden;box-shadow:0 16px 48px rgba(22,34,69,.08)">',
   '<tr><td style="padding:28px 34px;background:linear-gradient(135deg,#13224d,#3156eb 62%,#6046f4);color:#fff">',
-  '<div style="font-size:25px;font-weight:850">MBoté<span style="color:#c0cbff">Room</span></div><div style="margin-top:6px;font-size:13px;opacity:.84">Réunions professionnelles, simples et sécurisées</div></td></tr>',
+  '<img src="'+escapeEmailHtml(emailLogoUrl())+'" width="210" alt="MBotéRoom" style="display:block;width:210px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none"><div style="margin-top:8px;font-size:13px;opacity:.84">Réunions professionnelles, simples et sécurisées</div></td></tr>',
   '<tr><td style="padding:34px"><h1 style="margin:0 0 10px;font-size:28px;line-height:1.2;color:#15203d">'+escapeEmailHtml(title)+'</h1>',
   '<p style="margin:0 0 25px;color:#68758f;font-size:16px;line-height:1.65">'+escapeEmailHtml(subtitle)+'</p>'+content+'</td></tr>',
   '<tr><td style="padding:19px 34px;border-top:1px solid #edf1f7;background:#fafcff;color:#7a879d;font-size:12px;line-height:1.6">'+escapeEmailHtml(footer)+'<br>MBotéRoom est une application créée par LoukaTech.<br>© LoukaTech · MBotéRoom</td></tr>',
