@@ -47,7 +47,7 @@ android {
         debug {
             // Keep the CI/test APK separate from the production app, so a
             // different signing certificate cannot block its installation.
-            applicationIdSuffix = ".debug"
+            applicationIdSuffix = ".debug.redesign"
         }
         release {
             isDebuggable = false
