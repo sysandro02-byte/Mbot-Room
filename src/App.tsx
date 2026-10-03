@@ -1,6 +1,6 @@
 import { ReactNode, Suspense, useEffect, useState } from 'react';
 import { X } from 'lucide-react';
-import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { authService } from './services/authService';
 import PwaExperience from './components/PwaExperience';
 import MobileSplash from './components/MobileSplash';
@@ -10,10 +10,12 @@ import UserPreferencesRuntime from './components/UserPreferencesRuntime';
 import { sanitizeInternalPath } from './lib/navigationSecurity';
 import { AppLanguageBridge } from './lib/appLanguage';
 import { lazyWithRetry } from './lib/lazyWithRetry';
+import { isNativeAndroidApp } from './lib/nativePlatform';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import AppLoader from './components/AppLoader';
 import GlobalHeader from './components/GlobalHeader';
 import UserAdModal from './components/UserAdModal';
+import AndroidNativeBottomNav from './components/AndroidNativeBottomNav';
 import RealMeetingList from './components/RealMeetingList';
 import AppShell from './components/AppShell';
 import RealJoinPage from './pages/RealJoinPage';
@@ -32,6 +34,7 @@ import ProfilePage from './pages/ProfilePage';
 import FilesPage from './pages/FilesPage';
 import WorkGroupsPage from './pages/WorkGroupsPage';
 import { LiveCreatePage, LiveFeedPage, LiveRoomPage } from './pages/LivePage';
+import './styles/AndroidNativePages.css';
 const GuestJoinPage = lazyWithRetry(() => import('./pages/GuestJoinPage'));
 const MeetingRoomV2 = lazyWithRetry(() => import('./pages/MeetingRoomV2'));
 const GuestWaitingRoomPage = lazyWithRetry(() => import('./pages/GuestWaitingRoomPage'));
@@ -52,7 +55,6 @@ function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: bo
         const user = await authService.refreshCurrentUser();
         if (active) setIsAuthenticated(Boolean(user));
       } catch {
-        // Keep a still-valid local session during temporary API or network outages.
         if (active) setIsAuthenticated(authService.isAuthenticated());
       } finally {
         if (active) setChecking(false);
@@ -84,7 +86,6 @@ function AccountBar() {
 }
 
 function AdminRoute({ children }: { children: ReactNode }) {
-  const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated());
   const [isAdmin, setIsAdmin] = useState(authService.isAdmin());
   const [checking, setChecking] = useState(() => !(authService.isAuthenticated() && authService.isAdmin()));
@@ -120,19 +121,23 @@ function AdminRoute({ children }: { children: ReactNode }) {
   }, []);
 
   if (checking) return <AppLoader label="Vérification de la session…" fullScreen />;
-  if (!isAuthenticated) {
-    return <Navigate to="/admin/login" replace />;
-  }
+  if (!isAuthenticated) return <Navigate to="/admin/login" replace />;
   if (!isAdmin) return <Navigate to="/app" replace />;
   return children;
 }
 
 export default function App() {
   const location = useLocation();
-  const hideGlobalHeader = location.pathname.startsWith('/admin')
+  const nativeAndroid = isNativeAndroidApp();
+  const hideGlobalHeader = nativeAndroid || location.pathname.startsWith('/admin')
     || ['/login', '/connexion', '/inscription', '/mot-de-passe-oublie', '/rejoindre-une-reunion'].includes(location.pathname)
     || /^\/reunions\/(?!recentes(?:\/|$)|terminee(?:\/|$))[^/]+(?:\/(?:luna|salle-attente))?$/.test(location.pathname)
     || /^\/app\/live\/(?!new(?:\/|$))[^/]+$/.test(location.pathname);
+
+  useEffect(() => {
+    document.body.classList.toggle('mboteroom-native-android', nativeAndroid);
+    return () => document.body.classList.remove('mboteroom-native-android');
+  }, [nativeAndroid]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => sessionStorage.removeItem('mboteroom-runtime-recovery'), 5000);
@@ -184,5 +189,5 @@ export default function App() {
     <Route path="/join" element={<ProtectedRoute><AppShell title="Rejoindre"><RealJoinPage /></AppShell></ProtectedRoute>} />
     <Route path="/join/:meetingLink" element={<ProtectedRoute><AppShell title="Rejoindre"><RealJoinPage /></AppShell></ProtectedRoute>} />
     <Route path="*" element={<Navigate to="/app" replace />} />
-  </Routes></Suspense></></AppErrorBoundary>;
+  </Routes></Suspense><AndroidNativeBottomNav/></></AppErrorBoundary>;
 }
