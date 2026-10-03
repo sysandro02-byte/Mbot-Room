@@ -42,16 +42,18 @@ export default function AndroidHome({ firstName, meetings, recentMeetings, slide
 
   return <main className="android-home android-home-redesign" aria-busy={loading}>
     <header className="android-home-redesign-header">
-      <div className="android-home-heading">
+      <div className="android-home-topline">
         <div className="android-home-brandline"><span className="android-home-wordmark">MBoté<span>Room</span></span><small>Réunions vidéo sécurisées</small></div>
+        <div className="android-home-header-actions">
+          <button type="button" className="android-profile-button" onClick={onProfile} aria-label="Mon profil">{firstName.slice(0, 1).toUpperCase()}</button>
+          <button type="button" className="android-icon-button" onClick={() => onSlideAction('/app/search')} aria-label="Rechercher"><Search size={22}/></button>
+          <button type="button" className="android-icon-button" onClick={onNotifications} aria-label="Notifications"><Bell size={22}/>{unreadNotifications ? <b>{unreadNotifications > 9 ? '9+' : unreadNotifications}</b> : null}</button>
+        </div>
+      </div>
+      <div className="android-home-greeting">
         <h1>Bonjour, {firstName}</h1>
         <p>Ravie de vous revoir !</p>
         <p className="android-home-tagline">Des idées plus proches, un monde plus ouvert.</p>
-      </div>
-      <div className="android-home-header-actions">
-        <button type="button" className="android-profile-button" onClick={onProfile} aria-label="Mon profil">{firstName.slice(0, 1).toUpperCase()}</button>
-        <button type="button" className="android-icon-button" onClick={() => onSlideAction('/app/search')} aria-label="Rechercher"><Search size={22}/></button>
-        <button type="button" className="android-icon-button" onClick={onNotifications} aria-label="Notifications"><Bell size={22}/>{unreadNotifications ? <b>{unreadNotifications > 9 ? '9+' : unreadNotifications}</b> : null}</button>
       </div>
     </header>
 
