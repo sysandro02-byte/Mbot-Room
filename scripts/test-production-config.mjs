@@ -10,6 +10,11 @@ if (!server.includes('runMigrations')) throw new Error('Server V2 must run datab
 if (!server.includes('registerRealtime')) throw new Error('Server V2 must register realtime');
 if (/Réunion de démonstration|Amina Louka|Darel Mbote|Sarah Tech/.test(server)) throw new Error('Demo seed data detected in production server');
 
+const authRoutes = fs.readFileSync(new URL('../server/authRoutes.ts', import.meta.url), 'utf8');
+if (!authRoutes.includes('mboteroom-wordmark.png') || !authRoutes.includes('alt="MBotéRoom"') || !authRoutes.includes('MBOTE_ROOM_EMAIL_LOGO_URL')) {
+  throw new Error('Transactional emails must include the public MBotéRoom logo with accessible fallback text');
+}
+
 const core = fs.readFileSync(new URL('../server/core.ts', import.meta.url), 'utf8');
 if (!core.includes('room_meeting_members') || !core.includes('room_messages') || !core.includes('room_polls')) {
   throw new Error('Zoom core persistence tables are incomplete');
