@@ -261,6 +261,12 @@ if (!server.includes("/api/public/android/download") || !vercelConfig.rewrites?.
 if (!server.includes('mboteroom-releases') || !server.includes('android/latest.json')) {
   throw new Error('Branded Android download route must resolve the latest Supabase Storage manifest');
 }
+if (!server.includes('Readable.fromWeb(apkResponse.body') || !server.includes("'application/vnd.android.package-archive'")) {
+  throw new Error('Branded Android download route must proxy APK bytes through the LoukaTech backend');
+}
+if (server.includes('response.redirect(302, target)')) {
+  throw new Error('Android downloads must not redirect users to the Supabase hostname');
+}
 if (server.includes('github.com/sysandro02-byte/Mbot-Room/releases/download')) {
   throw new Error('Production download route must not fall back to GitHub Releases');
 }
