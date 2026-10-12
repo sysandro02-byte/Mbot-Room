@@ -50,9 +50,11 @@ jobs:
         env:
           MBOTE_ROOM_FRONTEND_URL: https://mbote-room.vercel.app
           MBOTE_ROOM_BACKEND_URL: https://mbote-room-api.onrender.com
+          MBOTE_ROOM_SMOKE_APP_URL: https://mbote-room.vercel.app
         run: node scripts/test-production-live.mjs
       - name: Run broadcast Live production smoke
         env:
           MBOTE_ROOM_FRONTEND_URL: https://mbote-room.vercel.app
           MBOTE_ROOM_BACKEND_URL: https://mbote-room-api.onrender.com
+          MBOTE_ROOM_SMOKE_APP_URL: https://mbote-room.vercel.app
         run: node scripts/test-production-broadcast-live.mjs
