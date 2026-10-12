@@ -20,6 +20,12 @@ on:
       - 'render.yaml'
       - '.env.example'
   workflow_dispatch:
+    inputs:
+      require_turn_relay:
+        description: 'Exiger une paire ICE relay sélectionnée sur les deux navigateurs (échec sinon)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -51,6 +57,7 @@ jobs:
           MBOTE_ROOM_FRONTEND_URL: https://mbote-room.vercel.app
           MBOTE_ROOM_BACKEND_URL: https://mbote-room-api.onrender.com
           MBOTE_ROOM_SMOKE_APP_URL: https://mbote-room.vercel.app
+          MBOTE_ROOM_REQUIRE_TURN_RELAY: ${{ inputs.require_turn_relay && 'true' || 'false' }}
         run: node scripts/test-production-live.mjs
       - name: Run broadcast Live production smoke
         env:
