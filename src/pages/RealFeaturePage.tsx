@@ -154,7 +154,7 @@ export default function RealFeaturePage({kind}:Props){
       const result=await workspaceService.syncGoogleCalendar();
       const events=await appDataService.getCalendar();
       setCalendar(events);
-      showAppMessage(`Synchronisation terminée : ${result.imported} événement(s) Google récupéré(s), ${result.pushed} événement(s) MBotéRoom envoyé(s).`,{tone:'success',title:'Agenda synchronisé'});
+      showAppMessage(`Synchronisation terminée : ${result.imported} nouvel(aux) événement(s), ${result.updated} mis à jour, ${result.pushed} envoyé(s) vers Google.`,{tone:'success',title:'Agenda synchronisé'});
     }catch(cause){
       showAppMessage(cause instanceof Error?cause.message:'Synchronisation Google Calendar impossible.',{tone:'error'});
     }finally{setGoogleBusy(false);}
