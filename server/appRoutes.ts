@@ -9,6 +9,7 @@ import {
   getRawSessionTokenFromRequest,
   hashToken,
   hasDatabase,
+  hasMeetingAccess,
   publicMeeting,
   query,
   requireAccountFeature,
@@ -459,7 +460,16 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
       const startsAt=parseDate(request.body?.startsAt);const endsAt=parseDate(request.body?.endsAt);const title=String(request.body?.title||'').trim().slice(0,200);
       if(!title||!startsAt||!endsAt||endsAt<=startsAt)return sendApiError(response,400,'VALIDATION_ERROR','Titre et horaires valides requis.');
       const metadata=request.body?.metadata&&typeof request.body.metadata==='object'&&!Array.isArray(request.body.metadata)?request.body.metadata:{};
-      const id=createId();const result=await query(`INSERT INTO room_calendar_events (id,user_id,meeting_id,title,description,starts_at,ends_at,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb) RETURNING *`,[id,request.user!.id,request.body?.meetingId?Number(request.body.meetingId):null,title,String(request.body?.description||'').trim().slice(0,1000),startsAt.toISOString(),endsAt.toISOString(),JSON.stringify(metadata)]);
+      const rawMeetingId=request.body?.meetingId;
+      const meetingId=rawMeetingId===undefined||rawMeetingId===null||rawMeetingId===''?null:Number(rawMeetingId);
+      if(meetingId!==null){
+        if(!Number.isSafeInteger(meetingId)||meetingId<=0)return sendApiError(response,400,'VALIDATION_ERROR','Identifiant de réunion invalide.');
+        const exists=await query('SELECT id FROM room_meetings WHERE id=$1',[meetingId]);
+        if(!exists.rows[0]||!(await hasMeetingAccess(meetingId,request.user!))){
+          return sendApiError(response,403,'MEETING_ACCESS_DENIED','Vous ne pouvez pas lier cet événement à cette réunion.');
+        }
+      }
+      const id=createId();const result=await query(`INSERT INTO room_calendar_events (id,user_id,meeting_id,title,description,starts_at,ends_at,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb) RETURNING *`,[id,request.user!.id,meetingId,title,String(request.body?.description||'').trim().slice(0,1000),startsAt.toISOString(),endsAt.toISOString(),JSON.stringify(metadata)]);
       const synced=await syncCalendarEventToGoogle(request.user!.id,result.rows[0]);
       io.to(`user:${request.user!.id}`).emit('calendar:event-updated',synced);
       response.status(201).json(synced);
@@ -468,6 +478,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
   app.put('/api/calendar/events/:eventId', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
       const startsAt=parseDate(request.body?.startsAt);const endsAt=parseDate(request.body?.endsAt);if(!startsAt||!endsAt||endsAt<=startsAt)return sendApiError(response,400,'VALIDATION_ERROR','Horaires invalides.');
+      if(!String(request.body?.title||'').trim())return sendApiError(response,400,'VALIDATION_ERROR','Titre de l’événement requis.');
       const metadata=request.body?.metadata&&typeof request.body.metadata==='object'&&!Array.isArray(request.body.metadata)?request.body.metadata:{};
       const result=await query(`UPDATE room_calendar_events SET title=$3,description=$4,starts_at=$5,ends_at=$6,metadata=$7::jsonb,updated_at=now() WHERE id=$1 AND user_id=$2 RETURNING *`,[request.params.eventId,request.user!.id,String(request.body?.title||'').trim().slice(0,200),String(request.body?.description||'').trim().slice(0,1000),startsAt.toISOString(),endsAt.toISOString(),JSON.stringify(metadata)]);
       if(!result.rows[0])return sendApiError(response,404,'CALENDAR_EVENT_NOT_FOUND','Événement introuvable.');
