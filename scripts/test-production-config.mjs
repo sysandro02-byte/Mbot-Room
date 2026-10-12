@@ -103,8 +103,8 @@ const liveSmoke = fs.readFileSync(new URL('../scripts/test-production-live.mjs',
 if (!liveSmoke.includes('GITHUB_RUN_ATTEMPT') || !liveSmoke.includes('Date.now()')) {
   throw new Error('Live production smoke must generate a unique identity for every rerun attempt');
 }
-if (!liveSmoke.includes('MBOTE_ROOM_SMOKE_APP_URL') || !liveSmoke.includes("|| backendUrl")) {
-  throw new Error('Full production meeting smoke must target the exact Render frontend commit while Vercel is validated separately');
+if (!liveSmoke.includes('MBOTE_ROOM_SMOKE_APP_URL') || !liveSmoke.includes("|| frontendUrl")) {
+  throw new Error('Full production meeting smoke must exercise the real Vercel frontend, not Render-served static assets');
 }
 
 if (String(packageJson.scripts?.start || '').includes('wait-for-ci-gate.mjs')) {
