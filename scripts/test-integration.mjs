@@ -926,6 +926,17 @@ try {
     && item.metadata?.priority === 'high'
   ), 'Admin calendar event must persist in PostgreSQL with its metadata');
 
+  const emptyCalendarTitle = await jsonRequest('/api/calendar/events/' + adminCalendarCreate.data.id, {
+    method: 'PUT',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: '   ',
+      startsAt: adminCalendarStart.toISOString(),
+      endsAt: adminCalendarEnd.toISOString(),
+    }),
+  });
+  assert.equal(emptyCalendarTitle.response.status, 400, 'Calendar updates must reject empty titles');
+
   // Live: real persistence, cover storage, feed, realtime interactions and co-host promotion.
   const liveCoverBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlK8v8AAAAASUVORK5CYII=', 'base64');
   const liveCoverResponse = await fetch(`${baseUrl}/api/live/assets/cover`, {
@@ -1255,6 +1266,45 @@ try {
   assert.ok(meeting.meeting_link);
   assert.equal(meeting.settings?.passwordHash, undefined);
   assert.equal(meeting.settings?.passwordSalt, undefined);
+
+  // A user must not attach their private calendar entry to a meeting they cannot access.
+  const calendarLinkDenied = await jsonRequest('/api/calendar/events', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({
+      title: 'Liaison non autorisée',
+      startsAt: adminCalendarStart.toISOString(),
+      endsAt: adminCalendarEnd.toISOString(),
+      meetingId: meeting.id,
+    }),
+  });
+  assert.equal(calendarLinkDenied.response.status, 403, JSON.stringify(calendarLinkDenied.data));
+  assert.equal(calendarLinkDenied.data.code, 'MEETING_ACCESS_DENIED');
+
+  const calendarLinkInvalid = await jsonRequest('/api/calendar/events', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({
+      title: 'Liaison invalide',
+      startsAt: adminCalendarStart.toISOString(),
+      endsAt: adminCalendarEnd.toISOString(),
+      meetingId: 'not-a-number',
+    }),
+  });
+  assert.equal(calendarLinkInvalid.response.status, 400, JSON.stringify(calendarLinkInvalid.data));
+
+  const calendarLinkHost = await jsonRequest('/api/calendar/events', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: 'Liaison autorisée',
+      startsAt: adminCalendarStart.toISOString(),
+      endsAt: adminCalendarEnd.toISOString(),
+      meetingId: meeting.id,
+    }),
+  });
+  assert.equal(calendarLinkHost.response.status, 201, JSON.stringify(calendarLinkHost.data));
+
 
   const reportMailCount = mailRelayRequests.length;
   const report = await jsonRequest('/api/reports', {
