@@ -275,6 +275,7 @@ export const registerRecordingRoutes = (app: express.Express, io: Server) => {
 
   app.post('/api/recording-storage/authorize', ...protectedApi, async (request: AuthedRequest, response, next) => {
     try {
+      if (request.user!.isGuest) return sendApiError(response, 403, 'GUEST_RECORDING_DISABLED', 'Les enregistrements ne sont pas accessibles aux invités.');
       const action = String(request.body?.action || '');
       const bucket = recordingStorageBucket();
 
@@ -420,6 +421,7 @@ export const registerRecordingRoutes = (app: express.Express, io: Server) => {
 
   app.get('/api/meetings/:meetingId/recordings/:recordingId/status', ...protectedApi, async (request: AuthedRequest, response, next) => {
     try {
+      if (request.user!.isGuest) return sendApiError(response, 403, 'GUEST_RECORDING_DISABLED', 'Les enregistrements ne sont pas accessibles aux invités.');
       const meetingId = Number(request.params.meetingId);
       if (!(await hasMeetingAccess(meetingId, request.user!))) {
         return sendApiError(response, 403, 'MEETING_ACCESS_DENIED', 'Accès refusé.');
@@ -435,6 +437,7 @@ export const registerRecordingRoutes = (app: express.Express, io: Server) => {
 
   app.post('/api/meetings/:meetingId/recordings/:recordingId/stop', ...protectedApi, async (request: AuthedRequest, response, next) => {
     try {
+      if (request.user!.isGuest) return sendApiError(response, 403, 'GUEST_RECORDING_DISABLED', 'Les enregistrements ne sont pas accessibles aux invités.');
       const meetingId = Number(request.params.meetingId);
       if (!(await canModerate(meetingId, request.user!.id, request.user!.role))) {
         return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte ou le co-hôte peut arrêter l’enregistrement serveur.');
