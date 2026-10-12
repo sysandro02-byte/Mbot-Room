@@ -124,6 +124,24 @@ try {
   assert.ok(verified.data.token);
   assert.equal(verified.data.user?.role, 'admin');
 
+  const nativePushConfig = await jsonRequest('/api/push/native/config', { headers: authHeaders(verified.data.token) });
+  assert.equal(nativePushConfig.response.status, 200);
+  // CI contains no service-account secrets. Android FCM must fail closed.
+  assert.equal(nativePushConfig.data.configured, false);
+  const nativePushUnavailable = await jsonRequest('/api/push/native/subscribe', {
+    method: 'POST', headers: authHeaders(verified.data.token),
+    body: JSON.stringify({ token: 'A'.repeat(128) }),
+  });
+  assert.equal(nativePushUnavailable.response.status, 503);
+  assert.equal(nativePushUnavailable.data.code, 'FCM_NOT_CONFIGURED');
+  const invalidNativeStatus = await jsonRequest('/api/push/native/status', {
+    method: 'POST', headers: authHeaders(verified.data.token),
+    body: JSON.stringify({ token: 'bad token' }),
+  });
+  assert.equal(invalidNativeStatus.response.status, 400);
+  assert.equal(invalidNativeStatus.data.code, 'FCM_TOKEN_INVALID');
+
+
   const setCookie = verified.response.headers.get('set-cookie') || '';
   assert.match(setCookie, /mbote_room_session=/);
   assert.match(setCookie, /HttpOnly/i);
