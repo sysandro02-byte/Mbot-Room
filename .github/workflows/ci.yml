@@ -114,6 +114,8 @@ jobs:
         run: node scripts/test-google-calendar-pages.mjs
       - name: Secure attachment format validation
         run: node scripts/test-file-signatures.mjs
+      - name: Native Firebase Messaging OAuth and privacy regression
+        run: node scripts/test-native-fcm.mjs
       - name: Verify production smoke script syntax
         run: node --check scripts/test-production-live.mjs && node --check scripts/test-production-broadcast-live.mjs && node --check scripts/test-production-livekit-multi.mjs
       - name: Explicit Render test database fallback
