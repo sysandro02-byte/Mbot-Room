@@ -60,6 +60,8 @@ jobs:
         run: npm run build
       - name: Production smoke checks
         run: node scripts/test-production-config.mjs
+      - name: Preferences backup import/export validation
+        run: node scripts/test-preferences-backup.mjs
       - name: Explicit Render test database fallback
         run: node scripts/test-pglite-fallback.mjs
       - name: PostgreSQL and realtime integration
