@@ -12,6 +12,7 @@ import {
 } from './core.js';
 import { sendTransactionalEmail } from './emailDelivery.js';
 import { listGoogleCalendarEvents } from './googleCalendarPages.js';
+import { hasAllowedFileSignature } from './fileTypeValidation.js';
 
 const GOOGLE_AUTH_URL='https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL='https://oauth2.googleapis.com/token';
@@ -347,6 +348,7 @@ export const registerWorkspaceRoutes=(app:express.Express,io:Server)=>{
       const name=rawName||'fichier';
       const content=await readRawBody(request);
       if(!content.length)return sendApiError(response,400,'FILE_EMPTY','Le fichier est vide.');
+      if(!hasAllowedFileSignature(mime,content))return sendApiError(response,415,'FILE_SIGNATURE_INVALID','Le contenu du fichier ne correspond pas à son format PDF ou image annoncé.');
       const id=createId();
       const inserted=await query(
         'INSERT INTO room_files (id,owner_id,name,mime_type,size_bytes,content) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id,owner_id,name,mime_type,size_bytes,created_at',
@@ -389,6 +391,8 @@ export const registerWorkspaceRoutes=(app:express.Express,io:Server)=>{
       const file=result.rows[0];
       if(!file)return sendApiError(response,404,'FILE_NOT_FOUND','Fichier introuvable.');
       response.setHeader('Content-Type',file.mime_type);
+      response.setHeader('X-Content-Type-Options','nosniff');
+      response.setHeader('Referrer-Policy','no-referrer');
       response.setHeader('Content-Length',String(file.size_bytes));
       response.setHeader('Content-Disposition',`inline; filename*=UTF-8''${encodeURIComponent(file.name)}`);
       response.setHeader('Cache-Control','private, max-age=300');
