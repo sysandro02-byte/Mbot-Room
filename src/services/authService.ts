@@ -415,7 +415,7 @@ export const authService = {
     const legacyToken = this.getToken();
     // A device must stop receiving private pushes after an explicit logout.
     // Revoke only this Android token; do not disconnect other devices.
-    if (legacyToken && typeof window !== 'undefined' && /MBoteRoomAndroid\\/\\d/i.test(navigator.userAgent)) {
+    if (legacyToken && typeof window !== 'undefined' && /MBoteRoomAndroid\/\d/i.test(navigator.userAgent)) {
       try {
         const bridge=(window as Window & {MBoteRoomAndroid?:{getNativePushToken?:()=>string}}).MBoteRoomAndroid;
         const token=bridge?.getNativePushToken?.() || '';
