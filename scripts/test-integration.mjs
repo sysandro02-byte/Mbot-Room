@@ -1923,6 +1923,39 @@ try {
   assert.equal(Number(testedCampaign.clicks), 1);
   assert.equal(Number(testedCampaign.dismissals), 1);
 
+  // A guest in a real, running room must not obtain recording inventory or
+  // storage tickets, even though ordinary participants can view shared media.
+  const recordingGuest = await jsonRequest('/api/auth/guest-join', {
+    method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+    body: JSON.stringify({
+      name: 'Invité Audit Enregistrements',
+      meetingCode: restarted.data.meeting.meeting_link,
+      password: 'RoomPass2026!',
+      termsAccepted: true,
+      termsVersion: '2026-09-24',
+    }),
+  });
+  assert.equal(recordingGuest.response.status, 201, JSON.stringify(recordingGuest.data));
+  assert.ok(recordingGuest.data.token, 'Guest must have its own bearer session');
+  for (const path of [
+    '/api/recordings',
+    '/api/recordings/stats',
+    `/api/recordings/${recordingId}/access`,
+    `/api/meetings/${meeting.id}/recordings`,
+    `/api/meetings/${meeting.id}/recordings/${recordingId}/status`,
+  ]) {
+    const denied = await jsonRequest(path, { headers: authHeaders(recordingGuest.data.token) });
+    assert.equal(denied.response.status, 403, JSON.stringify({ path, result: denied.data }));
+    assert.equal(denied.data.code, 'GUEST_RECORDING_DISABLED');
+  }
+  const forbiddenDownloadTicket = await jsonRequest('/api/recording-storage/authorize', {
+    method: 'POST', headers: authHeaders(recordingGuest.data.token),
+    body: JSON.stringify({ action: 'download', recordingId }),
+  });
+  assert.equal(forbiddenDownloadTicket.response.status, 403);
+  assert.equal(forbiddenDownloadTicket.data.code, 'GUEST_RECORDING_DISABLED');
+
   // Controlled adversarial checks. These run only against the disposable CI database.
   const unauthenticatedAdmin = await jsonRequest('/api/admin/ads');
   assert.equal(unauthenticatedAdmin.response.status, 401, JSON.stringify(unauthenticatedAdmin.data));
