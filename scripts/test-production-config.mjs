@@ -251,6 +251,18 @@ if (loginSource.includes('github.com/sysandro02-byte/Mbot-Room/releases/download
   throw new Error('Public login UI must not expose the GitHub release URL');
 }
 const androidMainActivity = fs.readFileSync(new URL('../android/app/src/main/java/com/loukatech/mboteroom/MainActivity.java', import.meta.url), 'utf8');
+const nativeFirebase = fs.readFileSync(new URL('../android/app/src/main/java/com/loukatech/mboteroom/MBoteRoomFirebaseService.java', import.meta.url), 'utf8');
+const nativePushServer = fs.readFileSync(new URL('../server/nativePushService.ts', import.meta.url), 'utf8');
+const nativeBuild = fs.readFileSync(new URL('../android/app/build.gradle.kts', import.meta.url), 'utf8');
+const nativeManifest = fs.readFileSync(new URL('../android/app/src/main/AndroidManifest.xml', import.meta.url), 'utf8');
+if (!nativeBuild.includes('firebase-messaging:26.0.0') || !nativeBuild.includes('MBOTEROOM_FCM_PROJECT_ID')
+    || !nativeFirebase.includes('FirebaseMessagingService') || !nativeFirebase.includes('onNewToken')
+    || !nativeManifest.includes('com.google.firebase.MESSAGING_EVENT')
+    || !nativePushServer.includes('FCM_SERVICE_ACCOUNT_JSON')
+    || nativeBuild.includes('FCM_SERVICE_ACCOUNT_JSON')) {
+  throw new Error('Native FCM must use the Android SDK with independently configured server credentials');
+}
+
 if (!androidMainActivity.includes('WebViewAssetLoader') || !androidMainActivity.includes('LOCAL_APP_URL') || !androidMainActivity.includes('appassets.androidplatform.net') && !androidMainActivity.includes('WebViewAssetLoader.DEFAULT_DOMAIN')) {
   throw new Error('Android APK must load a bundled HTTPS app shell instead of depending on the remote website');
 }
