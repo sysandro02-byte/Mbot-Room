@@ -69,7 +69,7 @@ export const workspaceService={
   },
 
   async syncGoogleCalendar(){
-    return readJson<{success:boolean;imported:number;pushed:number;totalGoogle:number}>(await apiFetch(apiUrl('/api/calendar/google/sync'),{
+    return readJson<{success:boolean;imported:number;updated:number;pushed:number;totalGoogle:number}>(await apiFetch(apiUrl('/api/calendar/google/sync'),{
       method:'POST',
       headers:getAuthHeaders(),
       body:'{}',
