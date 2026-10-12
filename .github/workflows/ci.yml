@@ -53,7 +53,7 @@ jobs:
       - name: Check bundled APK assets
         run: |
           unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -F 'assets/index.html'
-          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -E 'assets/assets/.+\\.js'
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -F 'assets/assets/' | grep -F '.js'
       - name: Upload QA-only APK
         uses: actions/upload-artifact@v4
         with:
