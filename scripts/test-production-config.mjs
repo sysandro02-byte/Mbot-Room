@@ -254,6 +254,13 @@ const androidMainActivity = fs.readFileSync(new URL('../android/app/src/main/jav
 if (!androidMainActivity.includes('WebViewAssetLoader') || !androidMainActivity.includes('LOCAL_APP_URL') || !androidMainActivity.includes('appassets.androidplatform.net') && !androidMainActivity.includes('WebViewAssetLoader.DEFAULT_DOMAIN')) {
   throw new Error('Android APK must load a bundled HTTPS app shell instead of depending on the remote website');
 }
+if (!androidMainActivity.includes('onShowFileChooser(')
+    || !androidMainActivity.includes('REQUEST_FILE_CHOOSER')
+    || !androidMainActivity.includes('pendingFileChooser.onReceiveValue(')
+    || !androidMainActivity.includes('settings.setAllowFileAccess(false)')
+    || !androidMainActivity.includes('isTrustedAppPage()')) {
+  throw new Error('Android APK must support secure same-app document imports with a managed file chooser');
+}
 if (!androidWorkflow.includes('MBOTEROOM_ANDROID_BUILD') || !androidWorkflow.includes('android/app/src/main/assets') || !androidWorkflow.includes('Verify bundled offline shell')) {
   throw new Error('Android APK workflow must build and verify the bundled offline application shell');
 }
