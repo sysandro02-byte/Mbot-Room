@@ -1,4 +1,5 @@
 import { getEmailDeliveryStatus } from './emailDelivery.js';
+import { isNativePushConfigured } from './nativePushService.js';
 export type RuntimeReadiness = {
   database: {
     type: string;
@@ -19,6 +20,7 @@ export type RuntimeReadiness = {
     serverRecording: boolean;
     supabaseRecordingStorage: boolean;
     push: boolean;
+    nativePush: boolean;
   };
   testReady: boolean;
   productionReady: boolean;
@@ -53,6 +55,7 @@ export const getRuntimeReadiness = (databaseType: string): RuntimeReadiness => {
   const supabaseRecordingStorage = has(process.env.MBOTE_SUPABASE_RECORDING_SIGNER_URL)
     && has(process.env.MBOTE_SUPABASE_RECORDING_BUCKET);
   const push = has(process.env.WEB_PUSH_VAPID_PUBLIC_KEY) && has(process.env.WEB_PUSH_VAPID_PRIVATE_KEY);
+  const nativePush = isNativePushConfigured();
   const requireLivekit = String(process.env.MBOTE_ROOM_REQUIRE_LIVEKIT || '').trim().toLowerCase() === 'true';
   const requireServerRecording = String(process.env.MBOTE_ROOM_REQUIRE_SERVER_RECORDING || '').trim().toLowerCase() === 'true';
 
@@ -84,6 +87,7 @@ export const getRuntimeReadiness = (databaseType: string): RuntimeReadiness => {
       serverRecording,
       supabaseRecordingStorage,
       push,
+      nativePush,
     },
     testReady: persistentDatabase,
     productionReady: blockers.length === 0,
