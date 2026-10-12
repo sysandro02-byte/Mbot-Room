@@ -18,6 +18,7 @@ import {
   toPublicUser,
 } from './core.js';
 import { createNotificationAndPush, getPushStatus } from './pushService.js';
+import { isNativePushConfigured, validNativeToken } from './nativePushService.js';
 import { sendTransactionalEmail } from './emailDelivery.js';
 import { getPlatformSettings, isPlatformFeatureEnabled } from './platformSettings.js';
 import { deleteCalendarEventFromGoogle, syncCalendarEventToGoogle } from './workspaceRoutes.js';
@@ -497,6 +498,45 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
 
   app.get('/api/push/config', requireDatabase, authenticateToken, (_request:AuthedRequest,response)=>{
     response.json(getPushStatus());
+  });
+
+  // Native Android FCM is a separate opt-in from Web Push. No service-account secrets
+  // or device tokens are returned to the web frontend.
+  app.get('/api/push/native/config', requireDatabase, authenticateToken, (_request,response)=>{
+    response.setHeader('Cache-Control','no-store');
+    response.json({configured:isNativePushConfigured()});
+  });
+
+  app.post('/api/push/native/status', requireDatabase, authenticateToken, async(request:AuthedRequest,response,next)=>{
+    try {
+      const token=String(request.body?.token||'');
+      if(!validNativeToken(token))return sendApiError(response,400,'FCM_TOKEN_INVALID','Jeton Android invalide.');
+      const exists=await query('SELECT 1 FROM room_native_push_tokens WHERE user_id=$1 AND token=$2 LIMIT 1',[request.user!.id,token]);
+      response.json({configured:isNativePushConfigured(),subscribed:Boolean(exists.rows[0])});
+    }catch(error){next(error);}
+  });
+
+  app.post('/api/push/native/subscribe', requireDatabase, authenticateToken, async(request:AuthedRequest,response,next)=>{
+    try {
+      if(!isNativePushConfigured())return sendApiError(response,503,'FCM_NOT_CONFIGURED','Notifications Android natives non configurées.');
+      const token=String(request.body?.token||'');
+      if(!validNativeToken(token))return sendApiError(response,400,'FCM_TOKEN_INVALID','Jeton Android invalide.');
+      await query(
+        `INSERT INTO room_native_push_tokens (id,user_id,token) VALUES ($1,$2,$3)
+         ON CONFLICT (token) DO UPDATE SET user_id=excluded.user_id,updated_at=now()`,
+        [createId(),request.user!.id,token],
+      );
+      response.status(201).json({success:true});
+    }catch(error){next(error);}
+  });
+
+  app.post('/api/push/native/unsubscribe', requireDatabase, authenticateToken, async(request:AuthedRequest,response,next)=>{
+    try {
+      const token=String(request.body?.token||'');
+      if(!validNativeToken(token))return sendApiError(response,400,'FCM_TOKEN_INVALID','Jeton Android invalide.');
+      await query('DELETE FROM room_native_push_tokens WHERE user_id=$1 AND token=$2',[request.user!.id,token]);
+      response.json({success:true});
+    }catch(error){next(error);}
   });
 
   app.post('/api/push/subscribe', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
