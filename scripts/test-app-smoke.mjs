@@ -283,6 +283,29 @@ try {
   assert.equal(pdfUpload.status, 201, JSON.stringify(uploadedPdf));
   assert.equal(uploadedPdf.name, 'workspace-smoke.pdf');
 
+  // Browser MIME headers alone do not authorize HTML disguised as PDF.
+  const forgedUpload = await fetch(`${baseUrl}/api/files/upload`, {
+    method: 'POST',
+    headers: {
+      ...authHeaders(verified.data.token),
+      Origin: baseUrl,
+      'Content-Type': 'application/pdf',
+      'X-File-Name': encodeURIComponent('forged.pdf'),
+    },
+    body: Buffer.from('<html><script>not a PDF</script></html>'),
+  });
+  const forgedResult = await forgedUpload.json();
+  assert.equal(forgedUpload.status, 415, JSON.stringify(forgedResult));
+  assert.equal(forgedResult.code, 'FILE_SIGNATURE_INVALID');
+
+  const validDownload = await fetch(`${baseUrl}/api/files/${uploadedPdf.id}/content`, {
+    headers: authHeaders(verified.data.token),
+  });
+  assert.equal(validDownload.status, 200);
+  assert.equal(validDownload.headers.get('x-content-type-options'), 'nosniff');
+  assert.match(await validDownload.text(), /^%PDF-/);
+
+
   const attachCall = await jsonRequest(`/api/work-groups/${createGroup.data.id}/calls`, {
     method: 'POST',
     headers: authHeaders(verified.data.token),
