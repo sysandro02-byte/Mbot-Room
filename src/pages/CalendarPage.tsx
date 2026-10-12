@@ -224,7 +224,7 @@ export default function CalendarPage(){
     try{
       const result=await workspaceService.syncGoogleCalendar();
       await load();
-      showAppMessage('Synchronisation terminée : '+result.imported+' importé(s), '+result.pushed+' envoyé(s).',{tone:'success'});
+      showAppMessage('Synchronisation terminée : '+result.imported+' nouveau(x), '+result.updated+' mis à jour, '+result.pushed+' envoyé(s).',{tone:'success'});
     }catch(cause){
       showAppMessage(cause instanceof Error?cause.message:'Synchronisation Google Calendar impossible.',{tone:'error'});
     }finally{setGoogleBusy(false);}
