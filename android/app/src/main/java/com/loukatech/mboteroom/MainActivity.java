@@ -201,6 +201,16 @@ public class MainActivity extends Activity {
 
     private final class AndroidBridge {
         @JavascriptInterface
+        public boolean isNotificationPermissionGranted() {
+            android.app.NotificationManager manager =
+                    (android.app.NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            boolean enabled = manager != null && manager.areNotificationsEnabled();
+            return isTrustedAppPage() && enabled
+                    && (Build.VERSION.SDK_INT < 33
+                    || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED);
+        }
+
+        @JavascriptInterface
         public boolean isNativePushConfigured() {
             return isTrustedAppPage() && MBoteRoomFirebaseService.isConfigured();
         }
