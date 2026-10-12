@@ -99,6 +99,7 @@ public class MainActivity extends Activity {
         }
         settings.setUserAgentString(settings.getUserAgentString() + " MBoteRoomAndroid/0.3.0");
 
+        MBoteRoomFirebaseService.initialize(this);
         webView.addJavascriptInterface(new AndroidBridge(), "MBoteRoomAndroid");
 
         webView.setWebViewClient(new WebViewClient() {
@@ -199,6 +200,16 @@ public class MainActivity extends Activity {
     }
 
     private final class AndroidBridge {
+        @JavascriptInterface
+        public boolean isNativePushConfigured() {
+            return isTrustedAppPage() && MBoteRoomFirebaseService.isConfigured();
+        }
+
+        @JavascriptInterface
+        public String getNativePushToken() {
+            return isTrustedAppPage() ? MBoteRoomFirebaseService.getStoredToken(MainActivity.this) : "";
+        }
+
         @JavascriptInterface
         public boolean isScreenCaptureSupported() {
             return Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
