@@ -42,25 +42,41 @@ public final class MBoteRoomFirebaseService extends FirebaseMessagingService {
         }
     }
 
-    public static void initialize(Activity activity) {
-        createChannel(activity);
+    private static void initializeFirebaseApp(Context context) {
+        createChannel(context);
         if (!isConfigured()) return;
         try {
-            if (FirebaseApp.getApps(activity).isEmpty()) {
+            if (FirebaseApp.getApps(context).isEmpty()) {
                 FirebaseOptions options = new FirebaseOptions.Builder()
                         .setProjectId(BuildConfig.FCM_PROJECT_ID)
                         .setApplicationId(BuildConfig.FCM_APP_ID)
                         .setGcmSenderId(BuildConfig.FCM_SENDER_ID)
                         .setApiKey(BuildConfig.FCM_API_KEY)
                         .build();
-                FirebaseApp.initializeApp(activity, options);
+                FirebaseApp.initializeApp(context, options);
             }
+        } catch (RuntimeException ignored) {
+            // Invalid optional config must not break the APK.
+        }
+    }
+
+    public static void initialize(Activity activity) {
+        initializeFirebaseApp(activity);
+        if (!isConfigured()) return;
+        try {
             FirebaseMessaging.getInstance().getToken().addOnSuccessListener(token ->
                     activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                             .edit().putString(TOKEN, token).apply());
         } catch (RuntimeException ignored) {
-            // Missing/incomplete config must not prevent the APK from starting.
+            // Google Play services may not be installed on this device.
         }
+    }
+
+    @Override
+    public void onCreate() {
+        // FCM may start this service in a fresh process while the Activity/WebView is closed.
+        initializeFirebaseApp(this);
+        super.onCreate();
     }
 
     @Override
