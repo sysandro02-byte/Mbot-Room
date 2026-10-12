@@ -1211,7 +1211,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
   });
 
   app.get('/api/meetings/:meetingId/recordings', ...protectedApi, async (request:AuthedRequest,response,next)=>{
-    try{const meetingId=Number(request.params.meetingId);if(!(await hasMeetingAccess(meetingId,request.user!)))return sendApiError(response,403,'MEETING_ACCESS_DENIED','Accès refusé.');const result=await query('SELECT * FROM room_recordings WHERE meeting_id=$1 ORDER BY created_at DESC',[meetingId]);response.json(result.rows);}catch(error){next(error);}
+    try{
+      if(request.user!.isGuest)return sendApiError(response,403,'GUEST_RECORDING_DISABLED','Les enregistrements ne sont pas accessibles aux invités.');const meetingId=Number(request.params.meetingId);if(!(await hasMeetingAccess(meetingId,request.user!)))return sendApiError(response,403,'MEETING_ACCESS_DENIED','Accès refusé.');const result=await query('SELECT * FROM room_recordings WHERE meeting_id=$1 ORDER BY created_at DESC',[meetingId]);response.json(result.rows);}catch(error){next(error);}
   });
 
   app.post('/api/meetings/:meetingId/recordings', ...protectedApi, async (request:AuthedRequest,response,next)=>{
