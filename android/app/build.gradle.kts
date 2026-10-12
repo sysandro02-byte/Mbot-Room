@@ -34,11 +34,10 @@ android {
         targetSdk = 35
         versionCode = ciVersionCode
         versionName = ciVersionName
-        fun quoted(value: String) = "\\"" + value.replace("\\", "\\\\").replace("\\"", "\\\"") + "\\""
-        buildConfigField("String", "FCM_PROJECT_ID", quoted(firebaseProjectId))
-        buildConfigField("String", "FCM_SENDER_ID", quoted(firebaseSenderId))
-        buildConfigField("String", "FCM_APP_ID", quoted(firebaseAppId))
-        buildConfigField("String", "FCM_API_KEY", quoted(firebaseApiKey))
+        buildConfigField("String", "FCM_PROJECT_ID", "\"$firebaseProjectId\"")
+        buildConfigField("String", "FCM_SENDER_ID", "\"$firebaseSenderId\"")
+        buildConfigField("String", "FCM_APP_ID", "\"$firebaseAppId\"")
+        buildConfigField("String", "FCM_API_KEY", "\"$firebaseApiKey\"")
     }
 
     signingConfigs {
