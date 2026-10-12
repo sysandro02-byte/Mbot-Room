@@ -8,6 +8,7 @@ import {
 } from 'node:crypto';
 import { createId, query } from './core.js';
 import { sendTransactionalEmail } from './emailDelivery.js';
+import { sendNativePushToUsers } from './nativePushService.js';
 
 type PushSubscriptionRecord = {
   endpoint: string;
@@ -159,7 +160,7 @@ const sendSubscription = async (subscription: PushSubscriptionRecord, payload: P
   throw new Error(`Push endpoint rejected request (${response.status})${detail ? `: ${detail.slice(0, 180)}` : ''}`);
 };
 
-export const sendPushToUsers = async (userIds: number[], payload: PushPayload) => {
+const sendWebPushToUsers = async (userIds: number[], payload: PushPayload) => {
   const uniqueIds = [...new Set(userIds.filter((id) => Number.isInteger(id) && id > 0))];
   if (!uniqueIds.length || !getVapidConfig().configured) return { sent: 0, failed: 0, stale: 0 };
 
@@ -211,6 +212,20 @@ export const sendPushToUsers = async (userIds: number[], payload: PushPayload) =
     }
   }
   return { sent, failed, stale };
+};
+
+export const sendPushToUsers = async (userIds: number[], payload: PushPayload) => {
+  // Web and Android have separate delivery channels; one missing configuration
+  // must not disable the other. A failed provider is reported, not silently skipped.
+  const [web, native] = await Promise.allSettled([
+    sendWebPushToUsers(userIds, payload),
+    sendNativePushToUsers(userIds, payload),
+  ]);
+  if (web.status === 'rejected') console.warn('[MBotéRoom Web Push] batch failed');
+  if (native.status === 'rejected') console.warn('[MBotéRoom FCM] batch failed');
+  const w = web.status === 'fulfilled' ? web.value : { sent: 0, failed: 1, stale: 0 };
+  const n = native.status === 'fulfilled' ? native.value : { sent: 0, failed: 1, stale: 0 };
+  return { sent: w.sent + n.sent, failed: w.failed + n.failed, stale: w.stale + n.stale };
 };
 
 export const createNotificationAndPush = async (
