@@ -91,6 +91,8 @@ export function useMeetingCaptions({
       return undefined;
     }
     let cancelled = false;
+    // On breakout transitions, never show captions from the previously visited room.
+    setCaptions((current) => current.filter((caption) => captionMatchesRoom(caption, breakoutRoomId)));
     void transcriptionService.getStatus()
       .then((next) => {
         if (!cancelled) setStatus(next);
