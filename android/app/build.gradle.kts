@@ -1,6 +1,13 @@
 val ciVersionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1).coerceAtLeast(1)
 val ciVersionName = System.getenv("GITHUB_SHA")?.take(7)?.let { "0.2.$ciVersionCode+$it" } ?: "0.2.$ciVersionCode"
 
+// Firebase client identifiers are public project metadata, injected at APK build
+// time. The Firebase service-account JSON must NEVER be embedded in an APK.
+val firebaseProjectId = System.getenv("MBOTEROOM_FCM_PROJECT_ID").orEmpty()
+val firebaseSenderId = System.getenv("MBOTEROOM_FCM_SENDER_ID").orEmpty()
+val firebaseAppId = System.getenv("MBOTEROOM_FCM_APP_ID").orEmpty()
+val firebaseApiKey = System.getenv("MBOTEROOM_FCM_API_KEY").orEmpty()
+
 val releaseKeystorePath = System.getenv("MBOTEROOM_KEYSTORE_FILE")
 val releaseStorePassword = System.getenv("MBOTEROOM_KEYSTORE_PASSWORD")
 val releaseKeyAlias = System.getenv("MBOTEROOM_KEY_ALIAS")
@@ -19,6 +26,7 @@ plugins {
 android {
     namespace = "com.loukatech.mboteroom"
     compileSdk = 35
+    buildFeatures { buildConfig = true }
 
     defaultConfig {
         applicationId = "com.loukatech.mboteroom"
@@ -26,6 +34,11 @@ android {
         targetSdk = 35
         versionCode = ciVersionCode
         versionName = ciVersionName
+        fun quoted(value: String) = "\\"" + value.replace("\\", "\\\\").replace("\\"", "\\\"") + "\\""
+        buildConfigField("String", "FCM_PROJECT_ID", quoted(firebaseProjectId))
+        buildConfigField("String", "FCM_SENDER_ID", quoted(firebaseSenderId))
+        buildConfigField("String", "FCM_APP_ID", quoted(firebaseAppId))
+        buildConfigField("String", "FCM_API_KEY", quoted(firebaseApiKey))
     }
 
     signingConfigs {
@@ -67,4 +80,5 @@ android {
 
 dependencies {
     implementation("androidx.webkit:webkit:1.17.1")
+    implementation("com.google.firebase:firebase-messaging:26.0.0")
 }
