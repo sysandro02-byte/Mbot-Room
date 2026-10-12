@@ -62,6 +62,8 @@ jobs:
         run: node scripts/test-production-config.mjs
       - name: Preferences backup import/export validation
         run: node scripts/test-preferences-backup.mjs
+      - name: Verify production smoke script syntax
+        run: node --check scripts/test-production-live.mjs && node --check scripts/test-production-broadcast-live.mjs && node --check scripts/test-production-livekit-multi.mjs
       - name: Explicit Render test database fallback
         run: node scripts/test-pglite-fallback.mjs
       - name: PostgreSQL and realtime integration
