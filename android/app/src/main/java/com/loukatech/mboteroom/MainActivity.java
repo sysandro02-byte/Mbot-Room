@@ -32,6 +32,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.ValueCallback;
 
 import androidx.webkit.WebViewAssetLoader;
 
@@ -47,6 +48,7 @@ public class MainActivity extends Activity {
     private static final String LOCAL_APP_HOST = WebViewAssetLoader.DEFAULT_DOMAIN;
     private static final String LOCAL_APP_URL = "https://" + LOCAL_APP_HOST + "/index.html";
     private static final int REQUEST_SCREEN_CAPTURE = 2002;
+    private static final int REQUEST_FILE_CHOOSER = 2003;
     // The bridge sends compressed stills to the WebView canvas. 15 fps at 1280 px
     // keeps text legible while avoiding the memory and bandwidth spikes of 30 fps.
     private static final long FRAME_INTERVAL_MS = 67L;
@@ -54,6 +56,7 @@ public class MainActivity extends Activity {
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private WebView webView;
+    private ValueCallback<Uri[]> pendingFileChooser;
     private WebViewAssetLoader assetLoader;
     private MediaProjectionManager mediaProjectionManager;
     private MediaProjection mediaProjection;
@@ -88,7 +91,8 @@ public class MainActivity extends Activity {
         settings.setDomStorageEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setAllowFileAccess(false);
-        settings.setAllowContentAccess(false);
+        // A user-selected document uses a content:// URI. Keep unrestricted file:// access disabled.
+        settings.setAllowContentAccess(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             settings.setSafeBrowsingEnabled(true);
@@ -118,6 +122,28 @@ public class MainActivity extends Activity {
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback,
+                                             FileChooserParams params) {
+                if (!isTrustedAppPage()) {
+                    callback.onReceiveValue(null);
+                    return true;
+                }
+                // Always cancel an older request before opening a new Android picker.
+                if (pendingFileChooser != null) pendingFileChooser.onReceiveValue(null);
+                pendingFileChooser = callback;
+                try {
+                    Intent intent = params.createIntent();
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivityForResult(intent, REQUEST_FILE_CHOOSER);
+                } catch (Exception error) {
+                    pendingFileChooser = null;
+                    callback.onReceiveValue(null);
+                }
+                return true;
+            }
+
             @Override
             public void onPermissionRequest(PermissionRequest request) {
                 runOnUiThread(() -> {
@@ -210,6 +236,16 @@ public class MainActivity extends Activity {
     @SuppressWarnings("deprecation")
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_FILE_CHOOSER) {
+            if (pendingFileChooser != null) {
+                Uri[] result = isTrustedAppPage()
+                        ? WebChromeClient.FileChooserParams.parseResult(resultCode, data)
+                        : null;
+                pendingFileChooser.onReceiveValue(result);
+                pendingFileChooser = null;
+            }
+            return;
+        }
         if (requestCode != REQUEST_SCREEN_CAPTURE) return;
 
         if (resultCode != RESULT_OK || data == null) {
@@ -430,6 +466,10 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (pendingFileChooser != null) {
+            pendingFileChooser.onReceiveValue(null);
+            pendingFileChooser = null;
+        }
         releaseScreenCapture(true, false);
         if (webView != null) {
             webView.removeJavascriptInterface("MBoteRoomAndroid");
