@@ -40,8 +40,8 @@ export default function PushNotificationSettings({ compact = false }: { compact?
 
   const statusLabel=!state?.supported?'Non pris en charge'
     :!state?.configured?'Indisponibles'
-    :state.subscribed?'Activées'
-    :state.permission==='denied'?'Bloquées par le système':'Désactivées';
+    :state.permission==='denied'?'Bloquées par le système'
+    :state.subscribed?'Activées':'Désactivées';
 
   if (compact) {
     const toggleDisabled = loading || Boolean(action) || !state?.supported || !state?.configured;
