@@ -422,8 +422,19 @@ try {
 
   for (const [route, expectedText] of routes) {
     await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 20_000 });
-    await page.waitForFunction(() => !document.querySelector('.route-loading'), undefined, { timeout: 15_000 });
-    await page.waitForTimeout(250);
+    // React's route fallback uses .app-loader, not .route-loading.
+    // Waiting for the fallback to disappear avoids checking an unloaded lazy page.
+    await page.waitForFunction((expected) => {
+      const loadingRoute = [...document.querySelectorAll('.app-loader')].some(
+        (element) => (element.getAttribute('aria-label') || '').includes('Chargement de MBotéRoom')
+      );
+      return !document.querySelector('.route-loading')
+        && !loadingRoute
+        && Boolean(document.body?.innerText?.includes(expected));
+    }, expectedText, { timeout: 25_000 });
+    if (route === '/app/search') {
+      await page.getByRole('heading', { name: 'Recherche MBotéRoom', exact: true }).waitFor({ state: 'visible', timeout: 15_000 });
+    }
 
     assert.ok(!page.url().includes('/login'), `${route} unexpectedly redirected to login`);
     if (route === '/admin') {
