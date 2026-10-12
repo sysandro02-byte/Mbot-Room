@@ -38,6 +38,16 @@ const selectMimeType = () => {
 const captionMatchesRoom = (caption: MeetingCaption, breakoutRoomId: string | null) =>
   breakoutRoomId ? caption.breakoutRoomId === breakoutRoomId : !caption.breakoutRoomId;
 
+// A history response may complete after a Socket.IO update. Merging rather than
+// replacing keeps realtime captions from being lost to the slower request.
+const mergeCaptions = (current: MeetingCaption[], incoming: MeetingCaption[]) => {
+  const byId = new Map(current.map((caption) => [caption.id, caption]));
+  for (const caption of incoming) byId.set(caption.id, caption);
+  return [...byId.values()]
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id))
+    .slice(-4);
+};
+
 export function useMeetingCaptions({
   meetingId,
   enabled,
@@ -88,15 +98,23 @@ export function useMeetingCaptions({
       .catch(() => {
         if (!cancelled) setStatus({ configured: false, model: '', chunkSeconds: 10 });
       });
+    let refreshInFlight = false;
     const refreshCaptions = () => {
+      if (refreshInFlight || document.visibilityState === 'hidden') return;
+      refreshInFlight = true;
       void transcriptionService.getCaptions(meetingId)
         .then((items) => {
           if (cancelled) return;
-          setCaptions(items.filter((caption) => captionMatchesRoom(caption, breakoutRoomId)).slice(-4));
+          setCaptions((current) => mergeCaptions(current, items.filter((caption) => captionMatchesRoom(caption, breakoutRoomId))));
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => { refreshInFlight = false; });
     };
     refreshCaptions();
+    // Socket.IO can join its meeting room after the first caption was broadcast.
+    // Periodic, visibility-gated reconciliation is a bounded fallback, not the
+    // primary realtime path. It also catches missed events after mobile standby.
+    const interval = window.setInterval(refreshCaptions, 8_000);
 
     const onRealtimeJoined = (event: Event) => {
       const detail = (event as CustomEvent<{ meetingId?: number; breakoutRoomId?: string | null }>).detail;
@@ -108,11 +126,19 @@ export function useMeetingCaptions({
 
     const onCaption = (caption: MeetingCaption) => {
       if (Number(caption.meetingId) !== meetingId || !caption.text || !captionMatchesRoom(caption, breakoutRoomId)) return;
-      setCaptions((current) => [...current.filter((item) => item.id !== caption.id), caption].slice(-4));
+      setCaptions((current) => mergeCaptions(current, [caption]));
     };
     socket.on('meeting:caption', onCaption);
+    socket.on('connect', refreshCaptions);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshCaptions();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      socket.off('connect', refreshCaptions);
       window.removeEventListener('mbote-room-meeting-realtime-joined', onRealtimeJoined);
       socket.off('meeting:caption', onCaption);
     };
