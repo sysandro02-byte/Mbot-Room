@@ -965,6 +965,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
 
   app.get('/api/recordings', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
+      if(request.user!.isGuest)return sendApiError(response,403,'GUEST_RECORDING_DISABLED','Les enregistrements ne sont pas accessibles aux invités.');
       const result=await query(
         `SELECT r.*,m.title,m.description,m.start_time,m.host_name,
                 COALESCE((SELECT COUNT(*)::int FROM room_meeting_members mm WHERE mm.meeting_id=m.id AND mm.status='accepted'),0) AS participant_count,
@@ -986,6 +987,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
 
   app.get('/api/recordings/stats', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
+      if(request.user!.isGuest)return sendApiError(response,403,'GUEST_RECORDING_DISABLED','Les enregistrements ne sont pas accessibles aux invités.');
       const result=await query(
         `SELECT COUNT(*)::int AS count,
                 COALESCE(SUM(r.duration_seconds),0)::bigint AS duration_seconds,
@@ -1014,6 +1016,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
 
   app.patch('/api/recordings/:recordingId', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
+      if(request.user!.isGuest)return sendApiError(response,403,'GUEST_RECORDING_DISABLED','Les enregistrements ne sont pas accessibles aux invités.');
       const recording=await query(
         `SELECT r.id FROM room_recordings r
            JOIN room_meetings m ON m.id=r.meeting_id
@@ -1037,6 +1040,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
 
   app.delete('/api/recordings/:recordingId', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
+      if(request.user!.isGuest)return sendApiError(response,403,'GUEST_RECORDING_DISABLED','Les enregistrements ne sont pas accessibles aux invités.');
       const recording=await query(
         `SELECT r.id FROM room_recordings r
            JOIN room_meetings m ON m.id=r.meeting_id
@@ -1058,6 +1062,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
 
   app.get('/api/recordings/:recordingId/access', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
+      if(request.user!.isGuest)return sendApiError(response,403,'GUEST_RECORDING_DISABLED','Les enregistrements ne sont pas accessibles aux invités.');
       const result=await query(
         `SELECT r.storage_url,r.status,r.mime_type
            FROM room_recordings r
