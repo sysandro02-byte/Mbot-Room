@@ -78,7 +78,13 @@ export const sendNativePushToUsers = async (userIds: number[], payload: PushPayl
             body: privatePreview ? 'Vous avez une nouvelle activité.' : String(payload.body || '').slice(0, 500),
           },
           data: { path: safePath },
-          android: { priority: 'HIGH', notification: { channel_id: 'mboteroom_updates' } },
+          android: {
+            priority: 'HIGH',
+            notification: {
+              channel_id: pref.notificationSounds === false ? 'mboteroom_silent' : 'mboteroom_updates',
+              default_vibrate_timings: pref.vibration === true,
+            },
+          },
         },
       }),
       signal: AbortSignal.timeout(15_000),
@@ -86,7 +92,7 @@ export const sendNativePushToUsers = async (userIds: number[], payload: PushPayl
     if (response?.ok) { sent += 1; continue; }
     const error = await response?.json().catch(() => ({})) || {};
     const code = String(error?.error?.details?.find?.((item: any) => item?.errorCode)?.errorCode || '');
-    if (code === 'UNREGISTERED' || code === 'INVALID_ARGUMENT' && response?.status === 404) {
+    if (code === 'UNREGISTERED' || (code === 'INVALID_ARGUMENT' && response?.status === 400)) {
       stale += 1;
       await query('DELETE FROM room_native_push_tokens WHERE id=$1', [row.id]).catch(() => undefined);
     } else {
