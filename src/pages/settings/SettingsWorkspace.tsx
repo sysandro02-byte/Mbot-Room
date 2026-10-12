@@ -1,4 +1,4 @@
-import { Dispatch, ReactNode, SetStateAction, useEffect, useMemo, useState } from 'react';
+import { Dispatch, ReactNode, SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Accessibility,
@@ -48,6 +48,7 @@ import { authService } from '../../services/authService';
 import { appDataService, type ConnectedSession, type Preferences } from '../../services/appDataService';
 import './SettingsWorkspace.css';
 import AppLoader from '../../components/AppLoader';
+import { createPreferencesBackup, parsePreferencesBackup, PREFERENCES_BACKUP_MAX_BYTES } from '../../lib/preferencesBackup';
 
 type SettingsWorkspaceProps = {
   preferences: Preferences;
@@ -138,6 +139,8 @@ export default function SettingsWorkspace({
   const [storageUsage, setStorageUsage] = useState<number | null>(null);
   const [storageQuota, setStorageQuota] = useState<number | null>(null);
   const [storageBusy, setStorageBusy] = useState(false);
+  const [restoringBackup, setRestoringBackup] = useState(false);
+  const backupInputRef = useRef<HTMLInputElement>(null);
   const [connectionCopied, setConnectionCopied] = useState(false);
   const [securityView, setSecurityView] = useState<'security' | 'sessions' | null>(null);
   const [sessions, setSessions] = useState<ConnectedSession[]>([]);
@@ -206,14 +209,7 @@ export default function SettingsWorkspace({
   };
 
   const backupPreferences = () => {
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      application: 'MBotéRoom',
-      exportType: 'preferences-only',
-      note: 'Cet export ne contient ni messages, ni fichiers, ni réunions. Il ne restaure pas le compte.',
-      user: { id: user?.id, email: user?.email },
-      preferences,
-    };
+    const payload = createPreferencesBackup({ id: user?.id, email: user?.email }, preferences);
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -222,6 +218,27 @@ export default function SettingsWorkspace({
     anchor.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     onNotice('Préférences exportées. Messages, fichiers et réunions non inclus.');
+  };
+
+  const restorePreferencesBackup = async (file: File) => {
+    if (restoringBackup) return;
+    if (file.size > PREFERENCES_BACKUP_MAX_BYTES) {
+      onError('La sauvegarde dépasse 256 Ko.');
+      return;
+    }
+    setRestoringBackup(true);
+    try {
+      const restored = parsePreferencesBackup(await file.text(), { id: user?.id, email: user?.email });
+      if (!window.confirm('Restaurer les préférences de ce fichier ? Cela remplacera les réglages correspondants de votre compte.')) return;
+      const next = { ...preferences, ...restored };
+      const saved = await persistPreferences(next);
+      setPreferences(saved);
+      onNotice('Préférences restaurées avec succès.');
+    } catch (error) {
+      onError(error instanceof Error ? error.message : 'Impossible de restaurer les préférences.');
+    } finally {
+      setRestoringBackup(false);
+    }
   };
 
   const copyPcConnection = async () => {
@@ -351,7 +368,15 @@ export default function SettingsWorkspace({
         <SettingsCard id="storage-data" title="Stockage & données" subtitle="Gérez l’espace et la consommation" icon={<Database/>}>
           <SettingRow icon={<HardDrive/>} label="Utilisation du stockage" value={storageLabel}/>
           <SettingRow icon={<Trash2/>} label="Nettoyer le cache" description="Supprimer les fichiers temporaires MBotéRoom" onClick={() => void clearMboteCache()} disabled={storageBusy}/>
-          <SettingRow icon={<Save/>} label="Exporter mes préférences" description="Fichier JSON des réglages uniquement (sans messages, fichiers ni réunions)" onClick={backupPreferences}/>
+          <SettingRow icon={<Save/>} label="Exporter mes préférences" description="Télécharger un JSON des réglages uniquement (sans messages, fichiers ni réunions)" onClick={backupPreferences}/>
+          <SettingRow icon={<Archive/>} label="Restaurer mes préférences" description="Importer une sauvegarde JSON du même compte ; aucun message ni fichier importé" onClick={() => backupInputRef.current?.click()} disabled={restoringBackup}/>
+          <input ref={backupInputRef} type="file" accept=".json,application/json" aria-label="Choisir une sauvegarde de préférences"
+            style={{ display: 'none' }}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file) void restorePreferencesBackup(file);
+            }}/> 
           <SettingRow icon={<Gauge/>} label="Économie de données" description="Réduire l’usage réseau quand c’est possible">
             <Switch checked={preferences.dataSaver === true} label="Économie de données" disabled={savingKey==='dataSaver'} onChange={(value) => void update('dataSaver', { dataSaver: value })}/>
           </SettingRow>
