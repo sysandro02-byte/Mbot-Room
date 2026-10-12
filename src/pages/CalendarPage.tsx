@@ -11,6 +11,7 @@ import { getMeetingJoinUrl, meetingService, type Meeting } from '../services/mee
 import { workspaceService, type GoogleCalendarStatus } from '../services/workspaceService';
 import { readCachedPreferences } from '../lib/userPreferences';
 import { showAppMessage } from '../lib/appMessage';
+import { authService } from '../services/authService';
 import './CalendarPage.css';
 import AppLoader from '../components/AppLoader';
 
@@ -343,6 +344,19 @@ export default function CalendarPage(){
   };
 
   const meetingFor=(item:CalendarItem)=>item.meetingId?meetings.find((meeting)=>meeting.id===item.meetingId):undefined;
+  // UI rights mirror meetingRoutes: co-hosts may edit; only the creator can delete.
+  const canEditItem=(item:CalendarItem)=>{
+    if(!item.meetingId)return true;
+    const meeting=meetingFor(item);
+    const userId=Number(authService.getCurrentUser()?.id||0);
+    return Boolean(meeting&&userId&&(authService.isAdmin()||meeting.host_id===userId||meeting.co_host_id===userId||meeting.temporary_host_id===userId));
+  };
+  const canDeleteItem=(item:CalendarItem)=>{
+    if(!item.meetingId)return true;
+    const meeting=meetingFor(item);
+    const userId=Number(authService.getCurrentUser()?.id||0);
+    return Boolean(meeting&&userId&&meeting.host_id===userId);
+  };
 
   const openDetails=(item:CalendarItem)=>{setOpenMenuId(null);setDetailItem(item);};
 
@@ -379,6 +393,10 @@ export default function CalendarPage(){
   };
 
   const editItem=(item:CalendarItem)=>{
+    if(!canEditItem(item)){
+      showAppMessage('Seuls l’hôte et ses co-hôtes peuvent modifier cette réunion.',{tone:'warning'});
+      return;
+    }
     const meeting=meetingFor(item);
     const metadata=item.metadata||{};
     const metadataParticipants=Array.isArray(metadata.participants)?metadata.participants.map(String):[];
@@ -408,6 +426,10 @@ export default function CalendarPage(){
   };
 
   const deleteEvent=async(item:CalendarItem)=>{
+    if(!canDeleteItem(item)){
+      showAppMessage('Seul le créateur de la réunion peut la supprimer.',{tone:'warning'});
+      return;
+    }
     if(!window.confirm('Supprimer « '+item.title+' » ? Cette action est définitive.'))return;
     setOpenMenuId(null);setDeleteBusyId(item.id);
     try{
@@ -549,8 +571,8 @@ export default function CalendarPage(){
                     {meeting?<button role="menuitem" onClick={()=>void copyMeetingLink(item)}><Link2/> Copier le lien</button>:null}
                     {meeting?<button role="menuitem" onClick={()=>void inviteToMeeting(item)}><UserPlus/> Inviter des participants</button>:null}
                     <div/>
-                    <button role="menuitem" onClick={()=>editItem(item)}><Pencil/> Modifier</button>
-                    <button role="menuitem" className="danger" disabled={deleteBusyId===item.id} onClick={()=>void deleteEvent(item)}><Trash2/> {deleteBusyId===item.id?'Suppression…':'Supprimer'}</button>
+                    {canEditItem(item)?<button role="menuitem" onClick={()=>editItem(item)}><Pencil/> Modifier</button>:null}
+                    {canDeleteItem(item)?<button role="menuitem" className="danger" disabled={deleteBusyId===item.id} onClick={()=>void deleteEvent(item)}><Trash2/> {deleteBusyId===item.id?'Suppression…':'Supprimer'}</button>:null}
                   </div>:null}
                 </div>
               </article>;
@@ -570,7 +592,7 @@ export default function CalendarPage(){
             {detailItem.description?<p>{detailItem.description}</p>:null}
           </div>
           <footer>
-            <button className="secondary" onClick={()=>{setDetailItem(null);editItem(detailItem);}}><Pencil/> Modifier</button>
+            {canEditItem(detailItem)?<button className="secondary" onClick={()=>{setDetailItem(null);editItem(detailItem);}}><Pencil/> Modifier</button>:null}
             {meetingFor(detailItem)?<button className="secondary" onClick={()=>void copyMeetingLink(detailItem)}><Copy/> Copier le lien</button>:null}
             {meetingFor(detailItem)?<button className="primary" onClick={()=>joinItem(detailItem)}><Play/> Rejoindre</button>:null}
           </footer>
