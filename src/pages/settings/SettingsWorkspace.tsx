@@ -48,6 +48,7 @@ import { authService } from '../../services/authService';
 import { appDataService, type ConnectedSession, type Preferences } from '../../services/appDataService';
 import './SettingsWorkspace.css';
 import AppLoader from '../../components/AppLoader';
+import { isNativeAndroidApp } from '../../lib/nativePlatform';
 import { createPreferencesBackup, parsePreferencesBackup, PREFERENCES_BACKUP_MAX_BYTES } from '../../lib/preferencesBackup';
 
 type SettingsWorkspaceProps = {
@@ -243,7 +244,11 @@ export default function SettingsWorkspace({
 
   const copyPcConnection = async () => {
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/login`);
+      // Android renders local assets inside its WebView: its origin is not a shareable PC URL.
+      const webOrigin = isNativeAndroidApp() || !/^https?:$/.test(window.location.protocol)
+        ? 'https://mboteroom.loukatech.com'
+        : window.location.origin;
+      await navigator.clipboard.writeText(`${webOrigin}/login`);
       setConnectionCopied(true);
       window.setTimeout(() => setConnectionCopied(false), 2200);
       onNotice('Adresse de connexion copiée.');
