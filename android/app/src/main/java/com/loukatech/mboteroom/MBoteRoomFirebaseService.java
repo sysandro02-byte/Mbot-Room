@@ -18,6 +18,7 @@ import com.google.firebase.messaging.RemoteMessage;
 /** FCM delivery for the native APK, independent of WebView/Web Push lifecycle. */
 public final class MBoteRoomFirebaseService extends FirebaseMessagingService {
     public static final String CHANNEL_ID = "mboteroom_updates";
+    public static final String SILENT_CHANNEL_ID = "mboteroom_silent";
     private static final String PREFS = "mboteroom_fcm";
     private static final String TOKEN = "token";
 
@@ -38,7 +39,15 @@ public final class MBoteRoomFirebaseService extends FirebaseMessagingService {
                     CHANNEL_ID, "Alertes MBotéRoom", NotificationManager.IMPORTANCE_HIGH);
             channel.setDescription("Réunions, invitations et messages MBotéRoom");
             NotificationManager manager = context.getSystemService(NotificationManager.class);
-            if (manager != null) manager.createNotificationChannel(channel);
+            NotificationChannel quiet = new NotificationChannel(
+                    SILENT_CHANNEL_ID, "Alertes silencieuses MBotéRoom", NotificationManager.IMPORTANCE_LOW);
+            quiet.setDescription("Notifications sans son MBotéRoom");
+            quiet.setSound(null, null);
+            quiet.enableVibration(false);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+                manager.createNotificationChannel(quiet);
+            }
         }
     }
 
