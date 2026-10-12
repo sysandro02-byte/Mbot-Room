@@ -209,6 +209,8 @@ export default function SettingsWorkspace({
     const payload = {
       exportedAt: new Date().toISOString(),
       application: 'MBotéRoom',
+      exportType: 'preferences-only',
+      note: 'Cet export ne contient ni messages, ni fichiers, ni réunions. Il ne restaure pas le compte.',
       user: { id: user?.id, email: user?.email },
       preferences,
     };
@@ -219,7 +221,7 @@ export default function SettingsWorkspace({
     anchor.download = `mboteroom-preferences-${new Date().toISOString().slice(0, 10)}.json`;
     anchor.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    onNotice('Sauvegarde locale créée.');
+    onNotice('Préférences exportées. Messages, fichiers et réunions non inclus.');
   };
 
   const copyPcConnection = async () => {
@@ -338,10 +340,10 @@ export default function SettingsWorkspace({
           </SettingRow>
         </SettingsCard>
 
-        <SettingsCard title="Connexion PC" subtitle="Utilisez MBotéRoom sur votre ordinateur" icon={<MonitorCog/>}>
+        <SettingsCard title="Connexion sur ordinateur" subtitle="Ouvrez la page de connexion sur votre PC ; l’appairage QR n’est pas disponible" icon={<MonitorCog/>}>
           <div className="settings-pc-connect">
             <span><Laptop size={28}/></span>
-            <div><strong>Connecter un appareil</strong><p>Ouvrez MBotéRoom sur l’ordinateur, puis connectez-vous avec votre compte.</p></div>
+            <div><strong>Se connecter depuis un PC</strong><p>Copiez l’adresse, ouvrez-la sur votre ordinateur et connectez-vous normalement. Cette action ne transfère pas votre session.</p></div>
             <button type="button" onClick={() => void copyPcConnection()}>{connectionCopied ? 'Copié' : 'Copier l’adresse'}</button>
           </div>
         </SettingsCard>
@@ -349,14 +351,14 @@ export default function SettingsWorkspace({
         <SettingsCard id="storage-data" title="Stockage & données" subtitle="Gérez l’espace et la consommation" icon={<Database/>}>
           <SettingRow icon={<HardDrive/>} label="Utilisation du stockage" value={storageLabel}/>
           <SettingRow icon={<Trash2/>} label="Nettoyer le cache" description="Supprimer les fichiers temporaires MBotéRoom" onClick={() => void clearMboteCache()} disabled={storageBusy}/>
-          <SettingRow icon={<Save/>} label="Sauvegarde locale" description="Exporter vos préférences sur cet appareil" onClick={backupPreferences}/>
+          <SettingRow icon={<Save/>} label="Exporter mes préférences" description="Fichier JSON des réglages uniquement (sans messages, fichiers ni réunions)" onClick={backupPreferences}/>
           <SettingRow icon={<Gauge/>} label="Économie de données" description="Réduire l’usage réseau quand c’est possible">
             <Switch checked={preferences.dataSaver === true} label="Économie de données" disabled={savingKey==='dataSaver'} onChange={(value) => void update('dataSaver', { dataSaver: value })}/>
           </SettingRow>
         </SettingsCard>
 
-        <SettingsCard id="premium" title="Localiser mon appareil" subtitle="Retrouvez et sécurisez vos appareils" icon={<MapPin/>} badge="Premium">
-          <SettingRow icon={<MapPin/>} label="Retrouver mes appareils" description="Voir la dernière activité de vos sessions MBotéRoom" value="Premium" onClick={() => void loadSessions('sessions')}/>
+        <SettingsCard id="premium" title="Sécurité des appareils" subtitle="Consultez et fermez vos sessions ; aucune géolocalisation n’est effectuée" icon={<MapPin/>}>
+          <SettingRow icon={<Laptop/>} label="Consulter les sessions connectées" description="Afficher la dernière activité et déconnecter un appareil perdu" onClick={() => void loadSessions('sessions')}/>
         </SettingsCard>
       </div>
 
