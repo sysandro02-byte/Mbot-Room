@@ -30,7 +30,9 @@ const accessToken = async (): Promise<string> => {
     exp: now + 3600,
   });
   const content = header + '.' + claim;
-  const signature = createSign('RSA-SHA256').update(content).end().sign(credentials.private_key, 'base64url');
+  const privateKey = credentials.private_key;
+  if (!privateKey) throw new Error('FCM credentials missing a private key');
+  const signature = createSign('RSA-SHA256').update(content).end().sign(privateKey, 'base64url');
   const assertion = content + '.' + signature;
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
