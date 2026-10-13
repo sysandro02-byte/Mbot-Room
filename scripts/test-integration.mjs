@@ -1520,6 +1520,17 @@ try {
     && item.storage_url === 'https://storage.test/mboteroom-test.mp4'
   ));
 
+  const endedRecordingPreview = await jsonRequest(`/api/meetings/${meeting.id}/ended`, {
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(endedRecordingPreview.response.status, 200, JSON.stringify(endedRecordingPreview.data));
+  assert.equal(endedRecordingPreview.data.recording.available, true);
+  assert.equal(endedRecordingPreview.data.recording.id, recordingId);
+  assert.equal(endedRecordingPreview.data.recording.url, null,
+    'Meeting summary must never expose an internal or unsigned recording storage URL');
+  assert.ok(!JSON.stringify(endedRecordingPreview.data).includes('https://storage.test/mboteroom-test.mp4'),
+    'Raw storage URL must not leak through the ended meeting recap');
+
   const muteAll = await jsonRequest(`/api/meetings/${meeting.id}/participants/mute-all`, {
     method: 'POST',
     headers: authHeaders(host.token),
@@ -1955,6 +1966,51 @@ try {
   });
   assert.equal(forbiddenDownloadTicket.response.status, 403);
   assert.equal(forbiddenDownloadTicket.data.code, 'GUEST_RECORDING_DISABLED');
+
+  const guestRecapMeeting = await jsonRequest('/api/meetings', {
+    method: 'POST', headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: 'Réunion audit confidentialité invité',
+      startTime: new Date(Date.now() - 60_000).toISOString(),
+      duration: 30,
+      settings: { waitingRoom: false, joinBeforeHost: true, externalAccess: true },
+    }),
+  });
+  assert.equal(guestRecapMeeting.response.status, 201, JSON.stringify(guestRecapMeeting.data));
+  const guestRecapMeetingId = guestRecapMeeting.data.id;
+  const testRecording = await jsonRequest(`/api/meetings/${guestRecapMeetingId}/recordings`, {
+    method: 'POST', headers: authHeaders(host.token),
+    body: JSON.stringify({
+      storageUrl: 'https://media.example.test/private-guest-audit.mp4',
+      mimeType: 'video/mp4', sizeBytes: 4096, durationSeconds: 12,
+    }),
+  });
+  assert.equal(testRecording.response.status, 201, JSON.stringify(testRecording.data));
+  const recapGuest = await jsonRequest('/api/auth/guest-join', {
+    method: 'POST', headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+    body: JSON.stringify({
+      name: 'Invité sans accès aux données privées',
+      meetingCode: guestRecapMeeting.data.meeting_link,
+      termsAccepted: true, termsVersion: '2026-09-24',
+    }),
+  });
+  assert.equal(recapGuest.response.status, 201, JSON.stringify(recapGuest.data));
+  assert.equal(recapGuest.data.lobbyStatus, 'accepted');
+  const deniedGuestRecap = await jsonRequest(`/api/meetings/${guestRecapMeetingId}/ended`, {
+    headers: authHeaders(recapGuest.data.token),
+  });
+  assert.equal(deniedGuestRecap.response.status, 200, JSON.stringify(deniedGuestRecap.data));
+  assert.equal(deniedGuestRecap.data.recording.available, false);
+  assert.equal(deniedGuestRecap.data.recording.id, null);
+  assert.equal(deniedGuestRecap.data.recording.url, null);
+  assert.equal(deniedGuestRecap.data.permissions.canViewRecording, false);
+  assert.equal(deniedGuestRecap.data.permissions.canDownloadSummary, false);
+  assert.equal(deniedGuestRecap.data.permissions.canShareSummary, false);
+  assert.equal(deniedGuestRecap.data.permissions.canExportChat, false);
+  assert.equal(deniedGuestRecap.data.summary.lunaConfigured, false);
+  assert.deepEqual(deniedGuestRecap.data.summary.bullets, []);
+  assert.deepEqual(deniedGuestRecap.data.summary.sourceCounts, { chat: 0, captions: 0 });
+  assert.ok(!JSON.stringify(deniedGuestRecap.data).includes('private-guest-audit.mp4'));
 
   // Controlled adversarial checks. These run only against the disposable CI database.
   const unauthenticatedAdmin = await jsonRequest('/api/admin/ads');
