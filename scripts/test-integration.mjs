@@ -1499,6 +1499,13 @@ try {
   assert.equal(recordingStatus.data.provider_recording_id, 'EG_TEST_RECORDING_1');
   assert.equal(recordingStatus.data.status, 'active');
 
+  const activeRecordingAccess = await jsonRequest(`/api/recordings/${recordingId}/access`, {
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(activeRecordingAccess.response.status, 409, JSON.stringify(activeRecordingAccess.data));
+  assert.equal(activeRecordingAccess.data.code, 'RECORDING_NOT_READY',
+    'A recording still being captured must not expose a playback link');
+
   const stopRecording = await jsonRequest(`/api/meetings/${meeting.id}/recordings/${recordingId}/stop`, {
     method: 'POST',
     headers: authHeaders(host.token),
@@ -1508,6 +1515,12 @@ try {
   assert.equal(stopRecording.data.storage_url, 'https://storage.test/mboteroom-test.mp4');
   assert.equal(Number(stopRecording.data.size_bytes), 245760);
   assert.equal(Number(stopRecording.data.duration_seconds), 5);
+
+  const completedRecordingAccess = await jsonRequest(`/api/recordings/${recordingId}/access`, {
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(completedRecordingAccess.response.status, 200, JSON.stringify(completedRecordingAccess.data));
+  assert.equal(completedRecordingAccess.data.url, 'https://storage.test/mboteroom-test.mp4');
 
   const persistedRecordings = await jsonRequest(`/api/meetings/${meeting.id}/recordings`, {
     headers: authHeaders(host.token),
