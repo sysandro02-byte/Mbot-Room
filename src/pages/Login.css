@@ -2525,3 +2525,218 @@ html[data-native-app="android"] .android-download-card{
     display: none;
   }
 }
+
+
+/* MBotéRoom web landing — refreshed design, based on approved mockup.
+   Scoped to desktop so that the existing Android bottom sheets stay intact. */
+@media (min-width: 901px) {
+  .login-page {
+    --landing-navy: #082b58;
+    --landing-teal: #009793;
+    background: #f7fcff;
+  }
+  .login-shell {
+    display: grid;
+    grid-template-columns: minmax(390px, 47.75%) minmax(0, 1fr);
+    min-height: calc(100dvh - 42px);
+    background: #f7fcff;
+  }
+  .brand-panel {
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+    padding: clamp(35px, 4vw, 70px) clamp(32px, 5.3vw, 84px);
+    border-right: 1px solid #dcebf5;
+    background:
+      radial-gradient(ellipse at 86% 94%, rgba(103,224,213,.36), transparent 48%),
+      radial-gradient(ellipse at 63% 62%, rgba(157,207,255,.36), transparent 48%),
+      radial-gradient(ellipse at 10% 13%, rgba(222,233,255,.48), transparent 42%),
+      linear-gradient(160deg,#fff 5%,#f4fcff 53%,#dbf7f6 100%);
+  }
+  .brand-panel::before {
+    inset: auto auto -30% -28%;
+    width: 100%;
+    height: 74%;
+    border-radius: 50%;
+    transform: rotate(-28deg);
+    background: linear-gradient(140deg, rgba(171,211,255,.46),rgba(110,215,206,.2));
+    filter: none;
+  }
+  .brand-panel::after {
+    top: 14%;
+    right: -53%;
+    width: 95%;
+    height: 90%;
+    border-radius: 48%;
+    transform: rotate(28deg);
+    background: rgba(181,217,255,.34);
+  }
+  .brand-dots { top: 12%; right: 7%; opacity: .65; }
+  .mbote-logo.admin-entry { width: min(345px,69%); }
+  .language-selector { top: 30px; right: 6%; }
+  .brand-panel-copy {
+    position: relative;
+    z-index: 3;
+    margin-top: clamp(85px, 10vh, 165px);
+    max-width: 650px;
+  }
+  .brand-panel-copy h2 {
+    color: var(--landing-navy);
+    font-size: clamp(35px, 3.95vw, 64px);
+    font-weight: 850;
+    line-height: 1.09;
+    letter-spacing: -.04em;
+  }
+  .brand-panel-copy h2 span { display: block; }
+  .brand-panel-copy h2 span:last-child { color: var(--landing-teal); }
+  .brand-panel-copy p {
+    max-width: 475px;
+    margin-top: 32px;
+    color: #455f87;
+    font-size: clamp(15px, 1.37vw, 21px);
+    line-height: 1.65;
+  }
+  .brand-panel-copy p::before {
+    content: "";
+    display: block;
+    width: 62px;
+    height: 6px;
+    margin: 0 0 18px;
+    border-radius: 999px;
+    background: #8ddad9;
+  }
+  .meeting-illustration { display: none; }
+  .auth-showcase-badge {
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,.8);
+    background: rgba(255,255,255,.82);
+    box-shadow: 0 18px 42px rgba(30,71,111,.13);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .auth-showcase-badge svg {
+    box-sizing: content-box;
+    width: 22px;
+    height: 22px;
+    padding: 10px;
+    border-radius: 50%;
+  }
+  .auth-showcase-badge-team { right: 9%; bottom: 33%; }
+  .auth-showcase-badge-security { right: 4%; bottom: 21%; }
+  .auth-showcase-note {
+    right: 7%;
+    bottom: 7%;
+    color: #008d91;
+    font-size: 18px;
+    line-height: 1.25;
+  }
+  .auth-side {
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px clamp(24px, 4vw, 80px);
+    background:
+      radial-gradient(ellipse at 94% 14%,rgba(161,240,235,.25),transparent 42%),
+      linear-gradient(160deg,#fbfeff,#f2fbfe);
+  }
+  .android-welcome {
+    width: 100%;
+    max-width: 680px;
+    margin: 0 auto;
+    padding: clamp(26px, 3vw, 48px) clamp(25px, 2.4vw, 40px) 30px;
+    border: 0;
+    border-radius: 30px;
+    background: rgba(255,255,255,.97);
+    box-shadow: 0 24px 75px rgba(26,69,104,.11);
+  }
+  .android-welcome-tagline {
+    margin: 0 0 28px;
+    color: var(--landing-navy);
+    font-size: clamp(23px, 2.15vw, 34px);
+    font-weight: 850;
+    line-height: 1.2;
+    letter-spacing: -.025em;
+    text-align: center;
+  }
+  .android-welcome-actions { gap: 16px; }
+  .android-welcome-actions button {
+    display: grid;
+    grid-template-columns: 64px minmax(0,1fr) 25px;
+    align-items: center;
+    gap: 16px;
+    min-height: 103px;
+    padding: 18px 20px;
+    border: 1px solid #d6e4f4;
+    border-radius: 19px;
+    background: #fff;
+    color: var(--landing-navy);
+    text-align: left;
+    box-shadow: 0 2px 4px rgba(32,66,104,.02);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  }
+  .android-welcome-actions button:hover {
+    transform: translateY(-2px);
+    border-color: #8bcfdf;
+    box-shadow: 0 12px 24px rgba(28,80,122,.12);
+  }
+  .android-welcome-actions button:focus-visible {
+    outline: 3px solid #4ba6ed;
+    outline-offset: 3px;
+  }
+  .android-welcome-actions button > span:nth-child(2) {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+  }
+  .android-welcome-actions button b { font-size: clamp(15px, 1.18vw, 19px); }
+  .android-welcome-actions button small {
+    color: #667fa3;
+    font-size: clamp(12px, 1vw, 15px);
+    line-height: 1.4;
+  }
+  .android-welcome-actions button > svg:last-child { justify-self: end; }
+  .android-welcome-actions .android-welcome-connect {
+    border: 0;
+    background: linear-gradient(130deg,#089f9c 0%,#007680 100%);
+    color: #fff;
+    box-shadow: 0 10px 27px rgba(0,132,134,.19);
+  }
+  .android-welcome-actions .android-welcome-connect small { color: #e4ffff; }
+  .android-action-icon,
+  .android-guest-action .android-action-icon {
+    display: grid;
+    place-items: center;
+    width: 58px;
+    height: 58px;
+    flex: none;
+    border-radius: 50%;
+    background: #eef6ff;
+    color: var(--landing-navy);
+    font-size: 32px;
+    font-weight: 400;
+  }
+  .android-welcome-actions .android-guest-action { background: #fff !important; }
+  .android-welcome-footer {
+    margin: 38px 0 0;
+    color: #6b83a5;
+    font-size: 12px;
+    text-align: center;
+  }
+}
+@media (min-width: 901px) and (max-width: 1200px) {
+  .brand-panel { padding-left: 44px; padding-right: 36px; }
+  .brand-panel-copy { margin-top: 90px; }
+  .auth-side { padding: 32px 28px; }
+  .android-welcome { padding: 30px 24px 26px; }
+  .android-welcome-actions button { min-height: 82px; padding: 12px 16px; grid-template-columns: 46px minmax(0,1fr) 20px; gap: 12px; }
+  .android-action-icon,.android-guest-action .android-action-icon { width: 42px; height: 42px; }
+  .auth-showcase-badge-team { bottom: 38%; }
+  .auth-showcase-badge-security { bottom: 27%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .android-welcome-actions button { transition: none; }
+}
