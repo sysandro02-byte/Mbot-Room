@@ -1561,15 +1561,17 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       const [members,summaryResult,recordings,sourceCounts,feedbackResult]=await Promise.all([
         query(`SELECT m.user_id,m.role,u.name,u.avatar,u.is_guest FROM room_meeting_members m JOIN room_users u ON u.id=m.user_id WHERE m.meeting_id=$1 ORDER BY m.role,u.name`,[meeting.id]),
         query('SELECT * FROM room_meeting_summaries WHERE meeting_id=$1 LIMIT 1',[meeting.id]),
-        query('SELECT storage_url FROM room_recordings WHERE meeting_id=$1 ORDER BY created_at DESC LIMIT 1',[meeting.id]),
+        query("SELECT id,status FROM room_recordings WHERE meeting_id=$1 AND status IN ('ready','complete') ORDER BY created_at DESC LIMIT 1",[meeting.id]),
         getSummarySourceStats(meeting.id),
         query('SELECT rating,comment,created_at,updated_at FROM room_meeting_feedback WHERE meeting_id=$1 AND user_id=$2 LIMIT 1',[meeting.id,request.user!.id]),
       ]);
       const participated=members.rows.some((row)=>Number(row.user_id)===request.user!.id);
+      const canReadRecap=!request.user!.isGuest;
+      const availableRecording=canReadRecap&&Boolean(recordings.rows[0]);
       const summaryRow=summaryResult.rows[0];
       const feedbackRow=feedbackResult.rows[0];
       const feedbackSubmitted=Boolean(feedbackRow);
-      const summaryUnlocked=!participated||feedbackSubmitted;
+      const summaryUnlocked=canReadRecap&&(!participated||feedbackSubmitted);
       const lunaConfigured=Boolean(String(process.env.GROQ_API_KEY||'').trim());
       const processingStatus=summaryRow
         ? 'ready'
@@ -1596,9 +1598,9 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
           decisions:summaryUnlocked?(summaryRow?.decisions||[]):[],
           actions:summaryUnlocked?(summaryRow?.actions||[]):[],
           nextMeeting:summaryUnlocked?(summaryRow?.next_meeting||''):'',
-          processingStatus:summaryUnlocked?processingStatus:'pending',
-          sourceCounts,
-          lunaConfigured,
+          processingStatus:!canReadRecap?'unavailable':summaryUnlocked?processingStatus:'pending',
+          sourceCounts:canReadRecap?sourceCounts:{chat:0,captions:0},
+          lunaConfigured:canReadRecap&&lunaConfigured,
         },
         feedback:{
           submitted:feedbackSubmitted,
@@ -1606,8 +1608,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
           comment:feedbackRow?String(feedbackRow.comment||''):'',
         },
         nextActions:[],
-        recording:{available:Boolean(recordings.rows[0]),retentionDays:0,url:recordings.rows[0]?.storage_url||null},
-        permissions:{canDownloadSummary:true,canShareSummary:true,canViewRecording:Boolean(recordings.rows[0]),canExportChat:true,canRate:participated},
+        recording:{available:availableRecording,retentionDays:0,id:availableRecording?String(recordings.rows[0].id):null,url:null},
+        permissions:{canDownloadSummary:canReadRecap,canShareSummary:canReadRecap,canViewRecording:availableRecording,canExportChat:canReadRecap,canRate:participated},
         guestRestrictions:Boolean(request.user!.isGuest),
       });
     }catch(error){next(error);}
