@@ -2740,3 +2740,33 @@ html[data-native-app="android"] .android-download-card{
 @media (prefers-reduced-motion: reduce) {
   .android-welcome-actions button { transition: none; }
 }
+
+
+/* Keep the two-factor authentication prompt above every sign-in layer. */
+.login-page .auth-modal-backdrop:has(.otp-login-modal) {
+  z-index: 1300;
+}
+.login-page .otp-login-modal {
+  position: relative;
+  z-index: 1;
+}
+
+/* Centre MBoté Connect consistently on desktop and mobile. */
+.login-page .android-login-modal .external-login-row {
+  display: flex !important;
+  width: 100%;
+  justify-content: center !important;
+  align-items: center;
+}
+.login-page .android-login-modal .google-login-button.mbote-auth-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: min(100%, 260px) !important;
+  min-width: 0 !important;
+  margin-inline: auto !important;
+  gap: 10px;
+}
+.login-page .android-login-modal .google-login-button.mbote-auth-button .external-login-arrow {
+  margin-left: auto;
+}
