@@ -2465,3 +2465,6 @@ html[data-native-app="android"] .android-download-card{
     color:#58708f!important;
   }
 }
+
+/* Keep the OTP verification dialog above every preceding login bottom sheet. */
+.login-page .otp-login-backdrop { z-index: 1400 !important; }
