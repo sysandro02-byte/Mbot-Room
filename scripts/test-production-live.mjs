@@ -6,7 +6,7 @@ import { chromium } from '@playwright/test';
 // This suite targets the already deployed production services.
 const frontendUrl = String(process.env.MBOTE_ROOM_FRONTEND_URL || 'https://mbote-room.vercel.app').replace(/\/+$/, '');
 const backendUrl = String(process.env.MBOTE_ROOM_BACKEND_URL || 'https://mbote-room-api.onrender.com').replace(/\/+$/, '');
-const appUrl = String(process.env.MBOTE_ROOM_SMOKE_APP_URL || backendUrl).replace(/\/+$/, '');
+const appUrl = String(process.env.MBOTE_ROOM_SMOKE_APP_URL || frontendUrl).replace(/\/+$/, '');
 const runSuffix = [process.env.GITHUB_RUN_ID, process.env.GITHUB_RUN_ATTEMPT, Date.now()]
   .filter(Boolean)
   .join('-')
@@ -163,11 +163,13 @@ const openMeeting = async (browser, session, meetingId, label) => {
   await context.addInitScript(() => {
     window.__mboteSmokeIceCandidates = [];
     window.__mboteSmokePeerConnections = 0;
+    window.__mboteSmokeConnections = [];
     const NativePeerConnection = window.RTCPeerConnection;
     window.RTCPeerConnection = class SmokePeerConnection extends NativePeerConnection {
       constructor(configuration = {}) {
         super({ ...configuration, iceTransportPolicy: 'relay' });
         window.__mboteSmokePeerConnections += 1;
+        window.__mboteSmokeConnections.push(this);
         this.addEventListener('icecandidate', (event) => {
           const candidate = event.candidate?.candidate;
           if (candidate) window.__mboteSmokeIceCandidates.push(candidate);
@@ -430,16 +432,46 @@ try {
     ]);
   }
 
+  // A gathered ICE candidate is not proof of the nominated network path.
+  // Report the selected candidate pair without collecting or logging IP addresses.
+  const readIceStats = async (page) => page.evaluate(async () => {
+    const peerConnections = window.__mboteSmokeConnections || [];
+    const selectedPairs = [];
+    for (const pc of peerConnections) {
+      try {
+        const stats = await pc.getStats();
+        const transports = [...stats.values()].filter((value) => value.type === 'transport');
+        const ids = new Set(transports.map((value) => value.selectedCandidatePairId).filter(Boolean));
+        const pairs = [...stats.values()].filter((value) =>
+          value.type === 'candidate-pair' && (ids.has(value.id) || (value.nominated && value.state === 'succeeded'))
+        );
+        for (const pair of pairs) {
+          const local = stats.get(pair.localCandidateId);
+          const remote = stats.get(pair.remoteCandidateId);
+          selectedPairs.push({
+            state: pair.state,
+            nominated: Boolean(pair.nominated),
+            localType: local?.candidateType || 'unknown',
+            remoteType: remote?.candidateType || 'unknown',
+            protocol: local?.protocol || 'unknown',
+          });
+        }
+      } catch {
+        // The connection may have closed after the successful media check.
+      }
+    }
+    return {
+      peerConnections: window.__mboteSmokePeerConnections || 0,
+      relayCandidates: (window.__mboteSmokeIceCandidates || []).filter((value) => value.includes('typ relay')).length,
+      selectedPairs,
+      relaySelected: selectedPairs.some((pair) => pair.localType === 'relay'),
+    };
+  });
+
   const relayDiagnostics = {
     transport: mediaStatus.data.preferredMode,
-    host: await hostRoom.page.evaluate(() => ({
-      peerConnections: window.__mboteSmokePeerConnections || 0,
-      relayCandidates: (window.__mboteSmokeIceCandidates || []).filter((value) => /\btyp relay\b/.test(value)).length,
-    })),
-    guest: await guestRoom.page.evaluate(() => ({
-      peerConnections: window.__mboteSmokePeerConnections || 0,
-      relayCandidates: (window.__mboteSmokeIceCandidates || []).filter((value) => /\btyp relay\b/.test(value)).length,
-    })),
+    host: await readIceStats(hostRoom.page),
+    guest: await readIceStats(guestRoom.page),
   };
   console.log('PRODUCTION_MEDIA_DIAGNOSTICS', JSON.stringify(relayDiagnostics));
   assert.ok(relayDiagnostics.host.peerConnections > 0);
@@ -449,6 +481,12 @@ try {
     assert.ok(relayDiagnostics.guest.relayCandidates > 0);
   } else {
     assert.equal(mediaStatus.data.livekitReady, true);
+  }
+  // An opt-in strict run fails if a selected TURN relay pair cannot be proven.
+  // Physical Android Wi-Fi/4G/5G certification is a separate release gate.
+  if (process.env.MBOTE_ROOM_REQUIRE_TURN_RELAY === 'true') {
+    assert.ok(relayDiagnostics.host.relaySelected, 'TURN not proven: host has no selected relay ICE pair');
+    assert.ok(relayDiagnostics.guest.relaySelected, 'TURN not proven: guest has no selected relay ICE pair');
   }
 
   const guestChat = await api(`/api/meetings/${meeting.id}/messages`, {
@@ -525,7 +563,7 @@ try {
 
   const hostChat = await api(`/api/meetings/${meeting.id}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ text: 'Décision smoke: le test TURN et WebRTC de production est validé.' }),
+    body: JSON.stringify({ text: 'Smoke WebRTC effectué ; le relais TURN exige une certification spécifique.' }),
   }, host.token);
   assert.equal(hostChat.response.status, 201, JSON.stringify(hostChat.data));
 

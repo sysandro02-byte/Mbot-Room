@@ -926,6 +926,17 @@ try {
     && item.metadata?.priority === 'high'
   ), 'Admin calendar event must persist in PostgreSQL with its metadata');
 
+  const emptyCalendarTitle = await jsonRequest('/api/calendar/events/' + adminCalendarCreate.data.id, {
+    method: 'PUT',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: '   ',
+      startsAt: adminCalendarStart.toISOString(),
+      endsAt: adminCalendarEnd.toISOString(),
+    }),
+  });
+  assert.equal(emptyCalendarTitle.response.status, 400, 'Calendar updates must reject empty titles');
+
   // Live: real persistence, cover storage, feed, realtime interactions and co-host promotion.
   const liveCoverBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlK8v8AAAAASUVORK5CYII=', 'base64');
   const liveCoverResponse = await fetch(`${baseUrl}/api/live/assets/cover`, {
@@ -1256,6 +1267,45 @@ try {
   assert.equal(meeting.settings?.passwordHash, undefined);
   assert.equal(meeting.settings?.passwordSalt, undefined);
 
+  // A user must not attach their private calendar entry to a meeting they cannot access.
+  const calendarLinkDenied = await jsonRequest('/api/calendar/events', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({
+      title: 'Liaison non autorisée',
+      startsAt: adminCalendarStart.toISOString(),
+      endsAt: adminCalendarEnd.toISOString(),
+      meetingId: meeting.id,
+    }),
+  });
+  assert.equal(calendarLinkDenied.response.status, 403, JSON.stringify(calendarLinkDenied.data));
+  assert.equal(calendarLinkDenied.data.code, 'MEETING_ACCESS_DENIED');
+
+  const calendarLinkInvalid = await jsonRequest('/api/calendar/events', {
+    method: 'POST',
+    headers: authHeaders(participant.token),
+    body: JSON.stringify({
+      title: 'Liaison invalide',
+      startsAt: adminCalendarStart.toISOString(),
+      endsAt: adminCalendarEnd.toISOString(),
+      meetingId: 'not-a-number',
+    }),
+  });
+  assert.equal(calendarLinkInvalid.response.status, 400, JSON.stringify(calendarLinkInvalid.data));
+
+  const calendarLinkHost = await jsonRequest('/api/calendar/events', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: 'Liaison autorisée',
+      startsAt: adminCalendarStart.toISOString(),
+      endsAt: adminCalendarEnd.toISOString(),
+      meetingId: meeting.id,
+    }),
+  });
+  assert.equal(calendarLinkHost.response.status, 201, JSON.stringify(calendarLinkHost.data));
+
+
   const reportMailCount = mailRelayRequests.length;
   const report = await jsonRequest('/api/reports', {
     method: 'POST',
@@ -1449,6 +1499,13 @@ try {
   assert.equal(recordingStatus.data.provider_recording_id, 'EG_TEST_RECORDING_1');
   assert.equal(recordingStatus.data.status, 'active');
 
+  const activeRecordingAccess = await jsonRequest(`/api/recordings/${recordingId}/access`, {
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(activeRecordingAccess.response.status, 409, JSON.stringify(activeRecordingAccess.data));
+  assert.equal(activeRecordingAccess.data.code, 'RECORDING_NOT_READY',
+    'A recording still being captured must not expose a playback link');
+
   const stopRecording = await jsonRequest(`/api/meetings/${meeting.id}/recordings/${recordingId}/stop`, {
     method: 'POST',
     headers: authHeaders(host.token),
@@ -1458,6 +1515,12 @@ try {
   assert.equal(stopRecording.data.storage_url, 'https://storage.test/mboteroom-test.mp4');
   assert.equal(Number(stopRecording.data.size_bytes), 245760);
   assert.equal(Number(stopRecording.data.duration_seconds), 5);
+
+  const completedRecordingAccess = await jsonRequest(`/api/recordings/${recordingId}/access`, {
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(completedRecordingAccess.response.status, 200, JSON.stringify(completedRecordingAccess.data));
+  assert.equal(completedRecordingAccess.data.url, 'https://storage.test/mboteroom-test.mp4');
 
   const persistedRecordings = await jsonRequest(`/api/meetings/${meeting.id}/recordings`, {
     headers: authHeaders(host.token),
@@ -1469,6 +1532,17 @@ try {
     && item.status === 'complete'
     && item.storage_url === 'https://storage.test/mboteroom-test.mp4'
   ));
+
+  const endedRecordingPreview = await jsonRequest(`/api/meetings/${meeting.id}/ended`, {
+    headers: authHeaders(participant.token),
+  });
+  assert.equal(endedRecordingPreview.response.status, 200, JSON.stringify(endedRecordingPreview.data));
+  assert.equal(endedRecordingPreview.data.recording.available, true);
+  assert.equal(endedRecordingPreview.data.recording.id, recordingId);
+  assert.equal(endedRecordingPreview.data.recording.url, null,
+    'Meeting summary must never expose an internal or unsigned recording storage URL');
+  assert.ok(!JSON.stringify(endedRecordingPreview.data).includes('https://storage.test/mboteroom-test.mp4'),
+    'Raw storage URL must not leak through the ended meeting recap');
 
   const muteAll = await jsonRequest(`/api/meetings/${meeting.id}/participants/mute-all`, {
     method: 'POST',
@@ -1872,6 +1946,84 @@ try {
   assert.equal(Number(testedCampaign.uniqueViewers), 1);
   assert.equal(Number(testedCampaign.clicks), 1);
   assert.equal(Number(testedCampaign.dismissals), 1);
+
+  // A guest in a real, running room must not obtain recording inventory or
+  // storage tickets, even though ordinary participants can view shared media.
+  const recordingGuest = await jsonRequest('/api/auth/guest-join', {
+    method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+    body: JSON.stringify({
+      name: 'Invité Audit Enregistrements',
+      meetingCode: restarted.data.meeting.meeting_link,
+      password: 'RoomPass2026!',
+      termsAccepted: true,
+      termsVersion: '2026-09-24',
+    }),
+  });
+  assert.equal(recordingGuest.response.status, 201, JSON.stringify(recordingGuest.data));
+  assert.ok(recordingGuest.data.token, 'Guest must have its own bearer session');
+  for (const path of [
+    '/api/recordings',
+    '/api/recordings/stats',
+    `/api/recordings/${recordingId}/access`,
+    `/api/meetings/${meeting.id}/recordings`,
+    `/api/meetings/${meeting.id}/recordings/${recordingId}/status`,
+  ]) {
+    const denied = await jsonRequest(path, { headers: authHeaders(recordingGuest.data.token) });
+    assert.equal(denied.response.status, 403, JSON.stringify({ path, result: denied.data }));
+    assert.equal(denied.data.code, 'GUEST_RECORDING_DISABLED');
+  }
+  const forbiddenDownloadTicket = await jsonRequest('/api/recording-storage/authorize', {
+    method: 'POST', headers: authHeaders(recordingGuest.data.token),
+    body: JSON.stringify({ action: 'download', recordingId }),
+  });
+  assert.equal(forbiddenDownloadTicket.response.status, 403);
+  assert.equal(forbiddenDownloadTicket.data.code, 'GUEST_RECORDING_DISABLED');
+
+  const guestRecapMeeting = await jsonRequest('/api/meetings', {
+    method: 'POST', headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: 'Réunion audit confidentialité invité',
+      startTime: new Date(Date.now() - 60_000).toISOString(),
+      duration: 30,
+      settings: { waitingRoom: false, joinBeforeHost: true, externalAccess: true },
+    }),
+  });
+  assert.equal(guestRecapMeeting.response.status, 201, JSON.stringify(guestRecapMeeting.data));
+  const guestRecapMeetingId = guestRecapMeeting.data.id;
+  const testRecording = await jsonRequest(`/api/meetings/${guestRecapMeetingId}/recordings`, {
+    method: 'POST', headers: authHeaders(host.token),
+    body: JSON.stringify({
+      storageUrl: 'https://media.example.test/private-guest-audit.mp4',
+      mimeType: 'video/mp4', sizeBytes: 4096, durationSeconds: 12,
+    }),
+  });
+  assert.equal(testRecording.response.status, 201, JSON.stringify(testRecording.data));
+  const recapGuest = await jsonRequest('/api/auth/guest-join', {
+    method: 'POST', headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+    body: JSON.stringify({
+      name: 'Invité sans accès aux données privées',
+      meetingCode: guestRecapMeeting.data.meeting_link,
+      termsAccepted: true, termsVersion: '2026-09-24',
+    }),
+  });
+  assert.equal(recapGuest.response.status, 201, JSON.stringify(recapGuest.data));
+  assert.equal(recapGuest.data.lobbyStatus, 'accepted');
+  const deniedGuestRecap = await jsonRequest(`/api/meetings/${guestRecapMeetingId}/ended`, {
+    headers: authHeaders(recapGuest.data.token),
+  });
+  assert.equal(deniedGuestRecap.response.status, 200, JSON.stringify(deniedGuestRecap.data));
+  assert.equal(deniedGuestRecap.data.recording.available, false);
+  assert.equal(deniedGuestRecap.data.recording.id, null);
+  assert.equal(deniedGuestRecap.data.recording.url, null);
+  assert.equal(deniedGuestRecap.data.permissions.canViewRecording, false);
+  assert.equal(deniedGuestRecap.data.permissions.canDownloadSummary, false);
+  assert.equal(deniedGuestRecap.data.permissions.canShareSummary, false);
+  assert.equal(deniedGuestRecap.data.permissions.canExportChat, false);
+  assert.equal(deniedGuestRecap.data.summary.lunaConfigured, false);
+  assert.deepEqual(deniedGuestRecap.data.summary.bullets, []);
+  assert.deepEqual(deniedGuestRecap.data.summary.sourceCounts, { chat: 0, captions: 0 });
+  assert.ok(!JSON.stringify(deniedGuestRecap.data).includes('private-guest-audit.mp4'));
 
   // Controlled adversarial checks. These run only against the disposable CI database.
   const unauthenticatedAdmin = await jsonRequest('/api/admin/ads');

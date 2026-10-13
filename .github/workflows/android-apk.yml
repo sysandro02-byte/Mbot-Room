@@ -15,6 +15,11 @@ concurrency:
 
 jobs:
   build-apk:
+    env:
+      MBOTEROOM_FCM_PROJECT_ID: ${{ vars.MBOTEROOM_FCM_PROJECT_ID }}
+      MBOTEROOM_FCM_SENDER_ID: ${{ vars.MBOTEROOM_FCM_SENDER_ID }}
+      MBOTEROOM_FCM_APP_ID: ${{ vars.MBOTEROOM_FCM_APP_ID }}
+      MBOTEROOM_FCM_API_KEY: ${{ vars.MBOTEROOM_FCM_API_KEY }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

@@ -891,7 +891,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
               <p className="android-welcome-footer">MBotéRoom application créée par LoukaTech</p>
             </section>
           )}
-          {showAndroidCredentials && (
+          {showAndroidCredentials && !otpChallengeId && (
             <div className="android-login-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAndroidCredentials(false); }}><section className="login-card android-login-form-card android-login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="android-login-modal-close" type="button" aria-label="Fermer" onClick={() => setShowAndroidCredentials(false)}>×</button>
               <header className="login-card-header">
                 <span className="auth-card-kicker">Espace sécurisé MBotéRoom</span>
@@ -1227,7 +1227,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       )}
 
       {otpChallengeId && (
-        <div className="auth-modal-backdrop" role="presentation">
+        <div className="auth-modal-backdrop otp-login-backdrop" role="presentation">
           <section className="auth-modal otp-login-modal" role="dialog" aria-modal="true" aria-labelledby="otp-login-title">
             <span className="auth-modal-icon otp" aria-hidden="true"><KeyRound size={27}/></span>
             <h2 id="otp-login-title">Vérifiez votre connexion</h2>

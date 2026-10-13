@@ -9,6 +9,7 @@ import {
   getRawSessionTokenFromRequest,
   hashToken,
   hasDatabase,
+  hasMeetingAccess,
   publicMeeting,
   query,
   requireAccountFeature,
@@ -17,6 +18,7 @@ import {
   toPublicUser,
 } from './core.js';
 import { createNotificationAndPush, getPushStatus } from './pushService.js';
+import { isNativePushConfigured, validNativeToken } from './nativePushService.js';
 import { sendTransactionalEmail } from './emailDelivery.js';
 import { getPlatformSettings, isPlatformFeatureEnabled } from './platformSettings.js';
 import { deleteCalendarEventFromGoogle, syncCalendarEventToGoogle } from './workspaceRoutes.js';
@@ -459,7 +461,16 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
       const startsAt=parseDate(request.body?.startsAt);const endsAt=parseDate(request.body?.endsAt);const title=String(request.body?.title||'').trim().slice(0,200);
       if(!title||!startsAt||!endsAt||endsAt<=startsAt)return sendApiError(response,400,'VALIDATION_ERROR','Titre et horaires valides requis.');
       const metadata=request.body?.metadata&&typeof request.body.metadata==='object'&&!Array.isArray(request.body.metadata)?request.body.metadata:{};
-      const id=createId();const result=await query(`INSERT INTO room_calendar_events (id,user_id,meeting_id,title,description,starts_at,ends_at,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb) RETURNING *`,[id,request.user!.id,request.body?.meetingId?Number(request.body.meetingId):null,title,String(request.body?.description||'').trim().slice(0,1000),startsAt.toISOString(),endsAt.toISOString(),JSON.stringify(metadata)]);
+      const rawMeetingId=request.body?.meetingId;
+      const meetingId=rawMeetingId===undefined||rawMeetingId===null||rawMeetingId===''?null:Number(rawMeetingId);
+      if(meetingId!==null){
+        if(!Number.isSafeInteger(meetingId)||meetingId<=0)return sendApiError(response,400,'VALIDATION_ERROR','Identifiant de réunion invalide.');
+        const exists=await query('SELECT id FROM room_meetings WHERE id=$1',[meetingId]);
+        if(!exists.rows[0]||!(await hasMeetingAccess(meetingId,request.user!))){
+          return sendApiError(response,403,'MEETING_ACCESS_DENIED','Vous ne pouvez pas lier cet événement à cette réunion.');
+        }
+      }
+      const id=createId();const result=await query(`INSERT INTO room_calendar_events (id,user_id,meeting_id,title,description,starts_at,ends_at,metadata) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb) RETURNING *`,[id,request.user!.id,meetingId,title,String(request.body?.description||'').trim().slice(0,1000),startsAt.toISOString(),endsAt.toISOString(),JSON.stringify(metadata)]);
       const synced=await syncCalendarEventToGoogle(request.user!.id,result.rows[0]);
       io.to(`user:${request.user!.id}`).emit('calendar:event-updated',synced);
       response.status(201).json(synced);
@@ -468,6 +479,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
   app.put('/api/calendar/events/:eventId', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
       const startsAt=parseDate(request.body?.startsAt);const endsAt=parseDate(request.body?.endsAt);if(!startsAt||!endsAt||endsAt<=startsAt)return sendApiError(response,400,'VALIDATION_ERROR','Horaires invalides.');
+      if(!String(request.body?.title||'').trim())return sendApiError(response,400,'VALIDATION_ERROR','Titre de l’événement requis.');
       const metadata=request.body?.metadata&&typeof request.body.metadata==='object'&&!Array.isArray(request.body.metadata)?request.body.metadata:{};
       const result=await query(`UPDATE room_calendar_events SET title=$3,description=$4,starts_at=$5,ends_at=$6,metadata=$7::jsonb,updated_at=now() WHERE id=$1 AND user_id=$2 RETURNING *`,[request.params.eventId,request.user!.id,String(request.body?.title||'').trim().slice(0,200),String(request.body?.description||'').trim().slice(0,1000),startsAt.toISOString(),endsAt.toISOString(),JSON.stringify(metadata)]);
       if(!result.rows[0])return sendApiError(response,404,'CALENDAR_EVENT_NOT_FOUND','Événement introuvable.');
@@ -486,6 +498,45 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
 
   app.get('/api/push/config', requireDatabase, authenticateToken, (_request:AuthedRequest,response)=>{
     response.json(getPushStatus());
+  });
+
+  // Native Android FCM is a separate opt-in from Web Push. No service-account secrets
+  // or device tokens are returned to the web frontend.
+  app.get('/api/push/native/config', requireDatabase, authenticateToken, (_request,response)=>{
+    response.setHeader('Cache-Control','no-store');
+    response.json({configured:isNativePushConfigured()});
+  });
+
+  app.post('/api/push/native/status', requireDatabase, authenticateToken, async(request:AuthedRequest,response,next)=>{
+    try {
+      const token=String(request.body?.token||'');
+      if(!validNativeToken(token))return sendApiError(response,400,'FCM_TOKEN_INVALID','Jeton Android invalide.');
+      const exists=await query('SELECT 1 FROM room_native_push_tokens WHERE user_id=$1 AND token=$2 LIMIT 1',[request.user!.id,token]);
+      response.json({configured:isNativePushConfigured(),subscribed:Boolean(exists.rows[0])});
+    }catch(error){next(error);}
+  });
+
+  app.post('/api/push/native/subscribe', requireDatabase, authenticateToken, async(request:AuthedRequest,response,next)=>{
+    try {
+      if(!isNativePushConfigured())return sendApiError(response,503,'FCM_NOT_CONFIGURED','Notifications Android natives non configurées.');
+      const token=String(request.body?.token||'');
+      if(!validNativeToken(token))return sendApiError(response,400,'FCM_TOKEN_INVALID','Jeton Android invalide.');
+      await query(
+        `INSERT INTO room_native_push_tokens (id,user_id,token) VALUES ($1,$2,$3)
+         ON CONFLICT (token) DO UPDATE SET user_id=excluded.user_id,updated_at=now()`,
+        [createId(),request.user!.id,token],
+      );
+      response.status(201).json({success:true});
+    }catch(error){next(error);}
+  });
+
+  app.post('/api/push/native/unsubscribe', requireDatabase, authenticateToken, async(request:AuthedRequest,response,next)=>{
+    try {
+      const token=String(request.body?.token||'');
+      if(!validNativeToken(token))return sendApiError(response,400,'FCM_TOKEN_INVALID','Jeton Android invalide.');
+      await query('DELETE FROM room_native_push_tokens WHERE user_id=$1 AND token=$2',[request.user!.id,token]);
+      response.json({success:true});
+    }catch(error){next(error);}
   });
 
   app.post('/api/push/subscribe', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
@@ -914,6 +965,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
 
   app.get('/api/recordings', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
+      if(request.user!.isGuest)return sendApiError(response,403,'GUEST_RECORDING_DISABLED','Les enregistrements ne sont pas accessibles aux invités.');
       const result=await query(
         `SELECT r.*,m.title,m.description,m.start_time,m.host_name,
                 COALESCE((SELECT COUNT(*)::int FROM room_meeting_members mm WHERE mm.meeting_id=m.id AND mm.status='accepted'),0) AS participant_count,
@@ -935,6 +987,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
 
   app.get('/api/recordings/stats', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
+      if(request.user!.isGuest)return sendApiError(response,403,'GUEST_RECORDING_DISABLED','Les enregistrements ne sont pas accessibles aux invités.');
       const result=await query(
         `SELECT COUNT(*)::int AS count,
                 COALESCE(SUM(r.duration_seconds),0)::bigint AS duration_seconds,
@@ -963,6 +1016,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
 
   app.patch('/api/recordings/:recordingId', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
+      if(request.user!.isGuest)return sendApiError(response,403,'GUEST_RECORDING_DISABLED','Les enregistrements ne sont pas accessibles aux invités.');
       const recording=await query(
         `SELECT r.id FROM room_recordings r
            JOIN room_meetings m ON m.id=r.meeting_id
@@ -986,6 +1040,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
 
   app.delete('/api/recordings/:recordingId', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
+      if(request.user!.isGuest)return sendApiError(response,403,'GUEST_RECORDING_DISABLED','Les enregistrements ne sont pas accessibles aux invités.');
       const recording=await query(
         `SELECT r.id FROM room_recordings r
            JOIN room_meetings m ON m.id=r.meeting_id
@@ -1007,6 +1062,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
 
   app.get('/api/recordings/:recordingId/access', requireDatabase, authenticateToken, async (request:AuthedRequest,response,next)=>{
     try{
+      if(request.user!.isGuest)return sendApiError(response,403,'GUEST_RECORDING_DISABLED','Les enregistrements ne sont pas accessibles aux invités.');
       const result=await query(
         `SELECT r.storage_url,r.status,r.mime_type
            FROM room_recordings r
@@ -1018,6 +1074,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
       );
       const row=result.rows[0];
       if(!row)return sendApiError(response,404,'RECORDING_NOT_FOUND','Enregistrement introuvable.');
+      if(!['ready','complete'].includes(String(row.status||'')))return sendApiError(response,409,'RECORDING_NOT_READY','L’enregistrement est encore en cours de préparation.');
       const storageUrl=String(row.storage_url||'').trim();
       const marker=parseSupabaseRecordingMarker(storageUrl);
       if(marker){

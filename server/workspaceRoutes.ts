@@ -11,6 +11,8 @@ import {
   sendApiError,
 } from './core.js';
 import { sendTransactionalEmail } from './emailDelivery.js';
+import { listGoogleCalendarEvents } from './googleCalendarPages.js';
+import { hasAllowedFileSignature } from './fileTypeValidation.js';
 
 const GOOGLE_AUTH_URL='https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL='https://oauth2.googleapis.com/token';
@@ -135,11 +137,12 @@ export const deleteCalendarEventFromGoogle=async(userId:number,googleEventId:str
 const syncGoogleCalendar=async(userId:number)=>{
   const timeMin=new Date(Date.now()-30*86400_000).toISOString();
   const timeMax=new Date(Date.now()+365*86400_000).toISOString();
-  const list=await googleRequest(userId,`/calendars/primary/events?singleEvents=true&orderBy=startTime&maxResults=2500&timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`);
-  if(!list.ok)throw new Error('Impossible de lire Google Calendar.');
-  const payload=await list.json().catch(()=>({items:[]}));
-  const items=Array.isArray(payload?.items)?payload.items:[];
+  const items=await listGoogleCalendarEvents((path)=>googleRequest(userId,path),timeMin,timeMax);
+  // Existing IDs are read once: re-synchronizing must not count an update as an import.
+  const known=await query('SELECT google_event_id FROM room_calendar_events WHERE user_id=$1 AND google_event_id IS NOT NULL',[userId]);
+  const knownIds=new Set<string>(known.rows.map((row:any)=>String(row.google_event_id)));
   let imported=0;
+  let updated=0;
   for(const event of items){
     if(!event?.id||event.status==='cancelled')continue;
     const startRaw=event.start?.dateTime||event.start?.date;
@@ -150,12 +153,16 @@ const syncGoogleCalendar=async(userId:number)=>{
     if(Number.isNaN(startsAt.getTime())||Number.isNaN(endsAt.getTime()))continue;
     const mboteId=String(event.extendedProperties?.private?.mboteroomEventId||'');
     if(mboteId){
-      await query(
+      const linked=await query(
         `UPDATE room_calendar_events SET title=$3,description=$4,starts_at=$5,ends_at=$6,google_event_id=$7,updated_at=now()
-         WHERE id=$1 AND user_id=$2`,
+         WHERE id=$1 AND user_id=$2 RETURNING id`,
         [mboteId,userId,String(event.summary||'Événement Google').slice(0,200),String(event.description||'').slice(0,1000),startsAt.toISOString(),endsAt.toISOString(),String(event.id)],
       );
-      continue;
+      if(linked.rows[0]){
+        knownIds.add(String(event.id));
+        updated+=1;
+        continue;
+      }
     }
     const id=createId();
     const result=await query(
@@ -166,7 +173,10 @@ const syncGoogleCalendar=async(userId:number)=>{
        RETURNING id`,
       [id,userId,String(event.summary||'Événement Google').slice(0,200),String(event.description||'').slice(0,1000),startsAt.toISOString(),endsAt.toISOString(),String(event.id)],
     );
-    if(result.rows[0])imported+=1;
+    if(result.rows[0]){
+      if(knownIds.has(String(event.id)))updated+=1;
+      else{imported+=1;knownIds.add(String(event.id));}
+    }
   }
 
   const unsynced=await query(`SELECT * FROM room_calendar_events WHERE user_id=$1 AND source='mboteroom' AND google_event_id IS NULL ORDER BY starts_at ASC LIMIT 500`,[userId]);
@@ -175,7 +185,7 @@ const syncGoogleCalendar=async(userId:number)=>{
     const synced=await syncCalendarEventToGoogle(userId,row);
     if(synced?.google_event_id)pushed+=1;
   }
-  return{imported,pushed,totalGoogle:items.length};
+  return{imported,updated,pushed,totalGoogle:items.length};
 };
 
 const readRawBody=async(request:express.Request,maxBytes=MAX_FILE_BYTES)=>{
@@ -338,6 +348,7 @@ export const registerWorkspaceRoutes=(app:express.Express,io:Server)=>{
       const name=rawName||'fichier';
       const content=await readRawBody(request);
       if(!content.length)return sendApiError(response,400,'FILE_EMPTY','Le fichier est vide.');
+      if(!hasAllowedFileSignature(mime,content))return sendApiError(response,415,'FILE_SIGNATURE_INVALID','Le contenu du fichier ne correspond pas à son format PDF ou image annoncé.');
       const id=createId();
       const inserted=await query(
         'INSERT INTO room_files (id,owner_id,name,mime_type,size_bytes,content) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id,owner_id,name,mime_type,size_bytes,created_at',
@@ -380,6 +391,8 @@ export const registerWorkspaceRoutes=(app:express.Express,io:Server)=>{
       const file=result.rows[0];
       if(!file)return sendApiError(response,404,'FILE_NOT_FOUND','Fichier introuvable.');
       response.setHeader('Content-Type',file.mime_type);
+      response.setHeader('X-Content-Type-Options','nosniff');
+      response.setHeader('Referrer-Policy','no-referrer');
       response.setHeader('Content-Length',String(file.size_bytes));
       response.setHeader('Content-Disposition',`inline; filename*=UTF-8''${encodeURIComponent(file.name)}`);
       response.setHeader('Cache-Control','private, max-age=300');

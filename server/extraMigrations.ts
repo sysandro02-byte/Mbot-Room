@@ -2,6 +2,15 @@ import { query } from './core.js';
 
 export const runExtraMigrations = async () => {
   await query(`
+    CREATE TABLE IF NOT EXISTS room_native_push_tokens (
+      id uuid PRIMARY KEY,
+      user_id integer NOT NULL REFERENCES room_users(id) ON DELETE CASCADE,
+      token text NOT NULL UNIQUE,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS room_native_push_user_idx ON room_native_push_tokens(user_id);
+
     CREATE TABLE IF NOT EXISTS room_media_requests (
       id uuid PRIMARY KEY,
       meeting_id integer NOT NULL REFERENCES room_meetings(id) ON DELETE CASCADE,

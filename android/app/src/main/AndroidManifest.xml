@@ -17,6 +17,14 @@
         android:roundIcon="@drawable/mboteroom_logo"
         android:label="MBotéRoom"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="mboteroom_updates" />
+        <service
+            android:name=".MBoteRoomFirebaseService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
         <service
             android:name=".ScreenCaptureService"
             android:exported="false"

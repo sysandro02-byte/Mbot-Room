@@ -14,6 +14,54 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  android-wrapper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install web dependencies
+        run: npm ci
+      - name: Bundle Android offline application
+        env:
+          MBOTEROOM_ANDROID_BUILD: 'true'
+          VITE_API_URL: https://mbote-room-api.onrender.com
+          VITE_SOCKET_URL: https://mbote-room-api.onrender.com
+        run: |
+          npm run build:frontend
+          rm -rf android/app/src/main/assets
+          mkdir -p android/app/src/main/assets
+          cp -a dist/. android/app/src/main/assets/
+          test -s android/app/src/main/assets/index.html
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Build QA APK without release signing secrets
+        working-directory: android
+        run: gradle --no-daemon :app:assembleDebug
+      - name: Check bundled APK assets
+        run: |
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -F 'assets/index.html'
+          unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -F 'assets/assets/' | grep -F '.js'
+      - name: Upload QA-only APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mboteroom-android-qa-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -60,6 +108,16 @@ jobs:
         run: npm run build
       - name: Production smoke checks
         run: node scripts/test-production-config.mjs
+      - name: Preferences backup import/export validation
+        run: node scripts/test-preferences-backup.mjs
+      - name: Google Calendar pagination and idempotence checks
+        run: node scripts/test-google-calendar-pages.mjs
+      - name: Secure attachment format validation
+        run: node scripts/test-file-signatures.mjs
+      - name: Native Firebase Messaging OAuth and privacy regression
+        run: node scripts/test-native-fcm.mjs
+      - name: Verify production smoke script syntax
+        run: node --check scripts/test-production-live.mjs && node --check scripts/test-production-broadcast-live.mjs && node --check scripts/test-production-livekit-multi.mjs
       - name: Explicit Render test database fallback
         run: node scripts/test-pglite-fallback.mjs
       - name: PostgreSQL and realtime integration

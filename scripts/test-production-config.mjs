@@ -103,8 +103,8 @@ const liveSmoke = fs.readFileSync(new URL('../scripts/test-production-live.mjs',
 if (!liveSmoke.includes('GITHUB_RUN_ATTEMPT') || !liveSmoke.includes('Date.now()')) {
   throw new Error('Live production smoke must generate a unique identity for every rerun attempt');
 }
-if (!liveSmoke.includes('MBOTE_ROOM_SMOKE_APP_URL') || !liveSmoke.includes("|| backendUrl")) {
-  throw new Error('Full production meeting smoke must target the exact Render frontend commit while Vercel is validated separately');
+if (!liveSmoke.includes('MBOTE_ROOM_SMOKE_APP_URL') || !liveSmoke.includes("|| frontendUrl")) {
+  throw new Error('Full production meeting smoke must exercise the real Vercel frontend, not Render-served static assets');
 }
 
 if (String(packageJson.scripts?.start || '').includes('wait-for-ci-gate.mjs')) {
@@ -251,8 +251,33 @@ if (loginSource.includes('github.com/sysandro02-byte/Mbot-Room/releases/download
   throw new Error('Public login UI must not expose the GitHub release URL');
 }
 const androidMainActivity = fs.readFileSync(new URL('../android/app/src/main/java/com/loukatech/mboteroom/MainActivity.java', import.meta.url), 'utf8');
+const nativeFirebase = fs.readFileSync(new URL('../android/app/src/main/java/com/loukatech/mboteroom/MBoteRoomFirebaseService.java', import.meta.url), 'utf8');
+const nativePushServer = fs.readFileSync(new URL('../server/nativePushService.ts', import.meta.url), 'utf8');
+const nativeBuild = fs.readFileSync(new URL('../android/app/build.gradle.kts', import.meta.url), 'utf8');
+const nativeManifest = fs.readFileSync(new URL('../android/app/src/main/AndroidManifest.xml', import.meta.url), 'utf8');
+if (!nativeBuild.includes('firebase-messaging:26.0.0') || !nativeBuild.includes('MBOTEROOM_FCM_PROJECT_ID')
+    || !nativeFirebase.includes('FirebaseMessagingService') || !nativeFirebase.includes('onNewToken')
+    || !nativeManifest.includes('com.google.firebase.MESSAGING_EVENT')
+    || !nativePushServer.includes('FCM_SERVICE_ACCOUNT_JSON')
+    || nativeBuild.includes('FCM_SERVICE_ACCOUNT_JSON')) {
+  throw new Error('Native FCM must use the Android SDK with independently configured server credentials');
+}
+
 if (!androidMainActivity.includes('WebViewAssetLoader') || !androidMainActivity.includes('LOCAL_APP_URL') || !androidMainActivity.includes('appassets.androidplatform.net') && !androidMainActivity.includes('WebViewAssetLoader.DEFAULT_DOMAIN')) {
   throw new Error('Android APK must load a bundled HTTPS app shell instead of depending on the remote website');
+}
+if (!androidMainActivity.includes('"https".equals(scheme)')
+    || !androidMainActivity.includes('"mailto".equals(scheme)')
+    || !androidMainActivity.includes('(!web && !contact)')
+    || !androidMainActivity.includes('uri.getHost() == null')) {
+  throw new Error('Android external navigation must allowlist safe schemes and reject invalid web hosts');
+}
+if (!androidMainActivity.includes('onShowFileChooser(')
+    || !androidMainActivity.includes('REQUEST_FILE_CHOOSER')
+    || !androidMainActivity.includes('pendingFileChooser.onReceiveValue(')
+    || !androidMainActivity.includes('settings.setAllowFileAccess(false)')
+    || !androidMainActivity.includes('isTrustedAppPage()')) {
+  throw new Error('Android APK must support secure same-app document imports with a managed file chooser');
 }
 if (!androidWorkflow.includes('MBOTEROOM_ANDROID_BUILD') || !androidWorkflow.includes('android/app/src/main/assets') || !androidWorkflow.includes('Verify bundled offline shell')) {
   throw new Error('Android APK workflow must build and verify the bundled offline application shell');

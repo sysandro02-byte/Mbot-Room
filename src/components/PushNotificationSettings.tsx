@@ -33,15 +33,15 @@ export default function PushNotificationSettings({ compact = false }: { compact?
   };
   const test=async()=>{
     setAction('test');setMessage('');
-    try{await notificationService.sendPushTest();setMessage('Notification de test envoyée.');}
+    try{const result=await notificationService.sendPushTest();setMessage(result.delivery.sent>0?'Notification acceptée par le service d’envoi. Vérifiez sa réception sur cet appareil.':'Aucune notification n’a été acceptée pour l’envoi.');}
     catch(error){setMessage(error instanceof Error?error.message:'Impossible d’envoyer la notification de test.');}
     finally{setAction('');}
   };
 
   const statusLabel=!state?.supported?'Non pris en charge'
     :!state?.configured?'Indisponibles'
-    :state.subscribed?'Activées'
-    :state.permission==='denied'?'Bloquées par le système':'Désactivées';
+    :state.permission==='denied'?'Bloquées par le système'
+    :state.subscribed?'Activées':'Désactivées';
 
   if (compact) {
     const toggleDisabled = loading || Boolean(action) || !state?.supported || !state?.configured;
@@ -76,7 +76,7 @@ export default function PushNotificationSettings({ compact = false }: { compact?
         </div>
         <span className={state?.subscribed?'push-status active':'push-status'}>{state?.subscribed?<CheckCircle2 size={14}/>:<XCircle size={14}/>} {loading?'Vérification…':statusLabel}</span>
       </div>
-      <p>Recevez les admissions en salle d’attente, le démarrage des réunions et les alertes MBotéRoom même quand l’application est fermée.</p>
+      <p>Recevez les admissions en salle d’attente, le démarrage des réunions et les alertes MBotéRoom. La réception en arrière-plan dépend des autorisations, du réseau et des réglages de votre appareil.</p>
       {state?.platform==='ios'&&!state.standalone?<div className="push-ios-note"><Smartphone size={17}/><span>Sur iPhone/iPad, installez MBotéRoom sur l’écran d’accueil avant d’activer les notifications.</span></div>:null}
       {message?<div className="push-settings-message" role="status">{message}</div>:null}
       <div className="push-settings-actions">

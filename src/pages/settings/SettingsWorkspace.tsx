@@ -1,4 +1,4 @@
-import { Dispatch, ReactNode, SetStateAction, useEffect, useMemo, useState } from 'react';
+import { Dispatch, ReactNode, SetStateAction, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Accessibility,
@@ -48,6 +48,8 @@ import { authService } from '../../services/authService';
 import { appDataService, type ConnectedSession, type Preferences } from '../../services/appDataService';
 import './SettingsWorkspace.css';
 import AppLoader from '../../components/AppLoader';
+import { isNativeAndroidApp } from '../../lib/nativePlatform';
+import { createPreferencesBackup, parsePreferencesBackup, PREFERENCES_BACKUP_MAX_BYTES } from '../../lib/preferencesBackup';
 
 type SettingsWorkspaceProps = {
   preferences: Preferences;
@@ -138,6 +140,8 @@ export default function SettingsWorkspace({
   const [storageUsage, setStorageUsage] = useState<number | null>(null);
   const [storageQuota, setStorageQuota] = useState<number | null>(null);
   const [storageBusy, setStorageBusy] = useState(false);
+  const [restoringBackup, setRestoringBackup] = useState(false);
+  const backupInputRef = useRef<HTMLInputElement>(null);
   const [connectionCopied, setConnectionCopied] = useState(false);
   const [securityView, setSecurityView] = useState<'security' | 'sessions' | null>(null);
   const [sessions, setSessions] = useState<ConnectedSession[]>([]);
@@ -206,12 +210,7 @@ export default function SettingsWorkspace({
   };
 
   const backupPreferences = () => {
-    const payload = {
-      exportedAt: new Date().toISOString(),
-      application: 'MBotéRoom',
-      user: { id: user?.id, email: user?.email },
-      preferences,
-    };
+    const payload = createPreferencesBackup({ id: user?.id, email: user?.email }, preferences);
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -219,12 +218,37 @@ export default function SettingsWorkspace({
     anchor.download = `mboteroom-preferences-${new Date().toISOString().slice(0, 10)}.json`;
     anchor.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    onNotice('Sauvegarde locale créée.');
+    onNotice('Préférences exportées. Messages, fichiers et réunions non inclus.');
+  };
+
+  const restorePreferencesBackup = async (file: File) => {
+    if (restoringBackup) return;
+    if (file.size > PREFERENCES_BACKUP_MAX_BYTES) {
+      onError('La sauvegarde dépasse 256 Ko.');
+      return;
+    }
+    setRestoringBackup(true);
+    try {
+      const restored = parsePreferencesBackup(await file.text(), { id: user?.id, email: user?.email });
+      if (!window.confirm('Restaurer les préférences de ce fichier ? Cela remplacera les réglages correspondants de votre compte.')) return;
+      const next = { ...preferences, ...restored };
+      const saved = await persistPreferences(next);
+      setPreferences(saved);
+      onNotice('Préférences restaurées avec succès.');
+    } catch (error) {
+      onError(error instanceof Error ? error.message : 'Impossible de restaurer les préférences.');
+    } finally {
+      setRestoringBackup(false);
+    }
   };
 
   const copyPcConnection = async () => {
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/login`);
+      // Android renders local assets inside its WebView: its origin is not a shareable PC URL.
+      const webOrigin = isNativeAndroidApp() || !/^https?:$/.test(window.location.protocol)
+        ? 'https://mboteroom.loukatech.com'
+        : window.location.origin;
+      await navigator.clipboard.writeText(`${webOrigin}/login`);
       setConnectionCopied(true);
       window.setTimeout(() => setConnectionCopied(false), 2200);
       onNotice('Adresse de connexion copiée.');
@@ -338,10 +362,10 @@ export default function SettingsWorkspace({
           </SettingRow>
         </SettingsCard>
 
-        <SettingsCard title="Connexion PC" subtitle="Utilisez MBotéRoom sur votre ordinateur" icon={<MonitorCog/>}>
+        <SettingsCard title="Connexion sur ordinateur" subtitle="Ouvrez la page de connexion sur votre PC ; l’appairage QR n’est pas disponible" icon={<MonitorCog/>}>
           <div className="settings-pc-connect">
             <span><Laptop size={28}/></span>
-            <div><strong>Connecter un appareil</strong><p>Ouvrez MBotéRoom sur l’ordinateur, puis connectez-vous avec votre compte.</p></div>
+            <div><strong>Se connecter depuis un PC</strong><p>Copiez l’adresse, ouvrez-la sur votre ordinateur et connectez-vous normalement. Cette action ne transfère pas votre session.</p></div>
             <button type="button" onClick={() => void copyPcConnection()}>{connectionCopied ? 'Copié' : 'Copier l’adresse'}</button>
           </div>
         </SettingsCard>
@@ -349,14 +373,22 @@ export default function SettingsWorkspace({
         <SettingsCard id="storage-data" title="Stockage & données" subtitle="Gérez l’espace et la consommation" icon={<Database/>}>
           <SettingRow icon={<HardDrive/>} label="Utilisation du stockage" value={storageLabel}/>
           <SettingRow icon={<Trash2/>} label="Nettoyer le cache" description="Supprimer les fichiers temporaires MBotéRoom" onClick={() => void clearMboteCache()} disabled={storageBusy}/>
-          <SettingRow icon={<Save/>} label="Sauvegarde locale" description="Exporter vos préférences sur cet appareil" onClick={backupPreferences}/>
+          <SettingRow icon={<Save/>} label="Exporter mes préférences" description="Télécharger un JSON des réglages uniquement (sans messages, fichiers ni réunions)" onClick={backupPreferences}/>
+          <SettingRow icon={<Archive/>} label="Restaurer mes préférences" description="Importer une sauvegarde JSON du même compte ; aucun message ni fichier importé" onClick={() => backupInputRef.current?.click()} disabled={restoringBackup}/>
+          <input ref={backupInputRef} type="file" accept=".json,application/json" aria-label="Choisir une sauvegarde de préférences"
+            style={{ display: 'none' }}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file) void restorePreferencesBackup(file);
+            }}/> 
           <SettingRow icon={<Gauge/>} label="Économie de données" description="Réduire l’usage réseau quand c’est possible">
             <Switch checked={preferences.dataSaver === true} label="Économie de données" disabled={savingKey==='dataSaver'} onChange={(value) => void update('dataSaver', { dataSaver: value })}/>
           </SettingRow>
         </SettingsCard>
 
-        <SettingsCard id="premium" title="Localiser mon appareil" subtitle="Retrouvez et sécurisez vos appareils" icon={<MapPin/>} badge="Premium">
-          <SettingRow icon={<MapPin/>} label="Retrouver mes appareils" description="Voir la dernière activité de vos sessions MBotéRoom" value="Premium" onClick={() => void loadSessions('sessions')}/>
+        <SettingsCard id="premium" title="Sécurité des appareils" subtitle="Consultez et fermez vos sessions ; aucune géolocalisation n’est effectuée" icon={<MapPin/>}>
+          <SettingRow icon={<Laptop/>} label="Consulter les sessions connectées" description="Afficher la dernière activité et déconnecter un appareil perdu" onClick={() => void loadSessions('sessions')}/>
         </SettingsCard>
       </div>
 

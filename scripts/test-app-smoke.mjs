@@ -124,6 +124,24 @@ try {
   assert.ok(verified.data.token);
   assert.equal(verified.data.user?.role, 'admin');
 
+  const nativePushConfig = await jsonRequest('/api/push/native/config', { headers: authHeaders(verified.data.token) });
+  assert.equal(nativePushConfig.response.status, 200);
+  // CI contains no service-account secrets. Android FCM must fail closed.
+  assert.equal(nativePushConfig.data.configured, false);
+  const nativePushUnavailable = await jsonRequest('/api/push/native/subscribe', {
+    method: 'POST', headers: authHeaders(verified.data.token),
+    body: JSON.stringify({ token: 'A'.repeat(128) }),
+  });
+  assert.equal(nativePushUnavailable.response.status, 503);
+  assert.equal(nativePushUnavailable.data.code, 'FCM_NOT_CONFIGURED');
+  const invalidNativeStatus = await jsonRequest('/api/push/native/status', {
+    method: 'POST', headers: authHeaders(verified.data.token),
+    body: JSON.stringify({ token: 'bad token' }),
+  });
+  assert.equal(invalidNativeStatus.response.status, 400);
+  assert.equal(invalidNativeStatus.data.code, 'FCM_TOKEN_INVALID');
+
+
   const setCookie = verified.response.headers.get('set-cookie') || '';
   assert.match(setCookie, /mbote_room_session=/);
   assert.match(setCookie, /HttpOnly/i);
@@ -283,6 +301,29 @@ try {
   assert.equal(pdfUpload.status, 201, JSON.stringify(uploadedPdf));
   assert.equal(uploadedPdf.name, 'workspace-smoke.pdf');
 
+  // Browser MIME headers alone do not authorize HTML disguised as PDF.
+  const forgedUpload = await fetch(`${baseUrl}/api/files/upload`, {
+    method: 'POST',
+    headers: {
+      ...authHeaders(verified.data.token),
+      Origin: baseUrl,
+      'Content-Type': 'application/pdf',
+      'X-File-Name': encodeURIComponent('forged.pdf'),
+    },
+    body: Buffer.from('<html><script>not a PDF</script></html>'),
+  });
+  const forgedResult = await forgedUpload.json();
+  assert.equal(forgedUpload.status, 415, JSON.stringify(forgedResult));
+  assert.equal(forgedResult.code, 'FILE_SIGNATURE_INVALID');
+
+  const validDownload = await fetch(`${baseUrl}/api/files/${uploadedPdf.id}/content`, {
+    headers: authHeaders(verified.data.token),
+  });
+  assert.equal(validDownload.status, 200);
+  assert.equal(validDownload.headers.get('x-content-type-options'), 'nosniff');
+  assert.match(await validDownload.text(), /^%PDF-/);
+
+
   const attachCall = await jsonRequest(`/api/work-groups/${createGroup.data.id}/calls`, {
     method: 'POST',
     headers: authHeaders(verified.data.token),
@@ -381,8 +422,19 @@ try {
 
   for (const [route, expectedText] of routes) {
     await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 20_000 });
-    await page.waitForFunction(() => !document.querySelector('.route-loading'), undefined, { timeout: 15_000 });
-    await page.waitForTimeout(250);
+    // React's route fallback uses .app-loader, not .route-loading.
+    // Waiting for the fallback to disappear avoids checking an unloaded lazy page.
+    await page.waitForFunction((expected) => {
+      const loadingRoute = [...document.querySelectorAll('.app-loader')].some(
+        (element) => (element.getAttribute('aria-label') || '').includes('Chargement de MBotéRoom')
+      );
+      return !document.querySelector('.route-loading')
+        && !loadingRoute
+        && Boolean(document.body?.innerText?.includes(expected));
+    }, expectedText, { timeout: 25_000 });
+    if (route === '/app/search') {
+      await page.getByRole('heading', { name: 'Recherche MBotéRoom', exact: true }).waitFor({ state: 'visible', timeout: 15_000 });
+    }
 
     assert.ok(!page.url().includes('/login'), `${route} unexpectedly redirected to login`);
     if (route === '/admin') {

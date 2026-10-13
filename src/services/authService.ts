@@ -413,6 +413,20 @@ export const authService = {
 
   async logout(notifyServer = true) {
     const legacyToken = this.getToken();
+    // A device must stop receiving private pushes after an explicit logout.
+    // Revoke only this Android token; do not disconnect other devices.
+    if (legacyToken && typeof window !== 'undefined' && /MBoteRoomAndroid\/\d/i.test(navigator.userAgent)) {
+      try {
+        const bridge=(window as Window & {MBoteRoomAndroid?:{getNativePushToken?:()=>string}}).MBoteRoomAndroid;
+        const token=bridge?.getNativePushToken?.() || '';
+        if(token)await fetchAuth(apiUrl('/api/push/native/unsubscribe'),{
+          method:'POST',
+          headers:{Authorization:`Bearer ${legacyToken}`,'Content-Type':'application/json'},
+          body:JSON.stringify({token}),
+          credentials:'include',
+        }).catch(()=>undefined);
+      }catch{ /* Logout must still complete if the network is unavailable. */ }
+    }
     if (notifyServer) {
       await fetchAuth(apiUrl('/api/auth/logout'), {
         method: 'POST',
