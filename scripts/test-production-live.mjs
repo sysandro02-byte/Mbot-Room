@@ -552,7 +552,7 @@ try {
   const guestLeaveModal = guestRoom.page.locator('.room-v2-confirm-modal');
   await guestLeaveModal.waitFor({ state: 'visible', timeout: 10_000 });
   await guestLeaveModal.getByRole('button', { name: 'Quitter la réunion' }).click();
-  await guestRoom.page.waitForURL((url) => url.pathname === '/reunions', { timeout: 15_000 });
+  await guestRoom.page.waitForURL((url) => url.pathname === '/rejoindre-une-reunion', { timeout: 15_000 });
 
   await hostRoom.page.locator('button.room-v2-control').filter({ hasText: 'Plus' }).first().click();
   await hostRoom.page.getByTestId('end-meeting-for-all').click();

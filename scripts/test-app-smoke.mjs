@@ -453,9 +453,26 @@ try {
   assert.equal(await page.getByText('Enregistrer le live', { exact: true }).count(), 1, 'Live creation must expose recording configuration');
   assert.equal(await page.getByText('Mode modération', { exact: true }).count(), 1, 'Live creation must expose moderation configuration');
 
+  // Verify Live creation switches and compact selection remain tappable.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/app/live/new', { waitUntil: 'domcontentloaded', timeout: 20_000 });
+  const chatSwitch = page.getByRole('switch', { name: 'Activer le chat' });
+  await chatSwitch.waitFor({ state: 'visible', timeout: 10_000 });
+  assert.equal(await chatSwitch.getAttribute('aria-checked'), 'true');
+  await chatSwitch.click();
+  assert.equal(await chatSwitch.getAttribute('aria-checked'), 'false', 'Live chat toggle must respond to real touch-size clicks');
+  await chatSwitch.click();
+  assert.equal(await chatSwitch.getAttribute('aria-checked'), 'true');
+  const visibilityBoxes = await Promise.all(
+    ['Public', 'Privé', 'Abonnés'].map((label) => page.getByRole('button', { name: new RegExp(label) }).first().boundingBox())
+  );
+  assert.ok(visibilityBoxes.every(Boolean), 'All three visibility controls must remain visible on 390px wide phones');
+  const xCoordinates = visibilityBoxes.map((box) => box.x);
+  assert.ok(xCoordinates[0] < xCoordinates[1] && xCoordinates[1] < xCoordinates[2],
+    'Mobile Live visibility buttons must appear in a compact row, not as huge stacked cards');
+
   // Real compact/mobile interaction regression: use an actual Playwright click,
   // not element.click(), so hit-testing and responsive layering are validated.
-  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/admin', { waitUntil: 'domcontentloaded', timeout: 20_000 });
   await page.waitForFunction(() => !document.querySelector('.route-loading'), undefined, { timeout: 15_000 });
   await page.locator('.admin-topbar').waitFor({ state: 'visible', timeout: 10_000 });
