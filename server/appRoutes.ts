@@ -1074,6 +1074,7 @@ export const registerAppRoutes = (app: express.Express, io: Server) => {
       );
       const row=result.rows[0];
       if(!row)return sendApiError(response,404,'RECORDING_NOT_FOUND','Enregistrement introuvable.');
+      if(!['ready','complete'].includes(String(row.status||'')))return sendApiError(response,409,'RECORDING_NOT_READY','L’enregistrement est encore en cours de préparation.');
       const storageUrl=String(row.storage_url||'').trim();
       const marker=parseSupabaseRecordingMarker(storageUrl);
       if(marker){
