@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { collaborationService, type MeetingMessage } from '../services/collaborationService';
+import { appDataService } from '../services/appDataService';
 import { type EndedMeetingPayload, meetingService } from '../services/meetingService';
 import './RealMeetingEndedPage.css';
 
@@ -50,6 +51,8 @@ export default function RealMeetingEndedPage(){
   const [summaryBusy,setSummaryBusy]=useState(false);
   const [restartBusy,setRestartBusy]=useState(false);
   const [restartError,setRestartError]=useState('');
+  const [recordingBusy,setRecordingBusy]=useState(false);
+  const [recordingError,setRecordingError]=useState('');
   const [feedbackRating,setFeedbackRating]=useState(0);
   const [feedbackComment,setFeedbackComment]=useState('');
   const [feedbackBusy,setFeedbackBusy]=useState(false);
@@ -64,7 +67,7 @@ export default function RealMeetingEndedPage(){
       setPayload(value);
       setFeedbackRating(value.feedback?.rating||0);
       setFeedbackComment(value.feedback?.comment||'');
-      setMessages(await collaborationService.getMessages(value.meeting.id).catch(()=>[]));
+      setMessages(value.guestRestrictions?[]:await collaborationService.getMessages(value.meeting.id).catch(()=>[]));
     }catch(cause){
       setError(cause instanceof Error?cause.message:'Impossible de charger le compte rendu.');
     }finally{
@@ -131,6 +134,20 @@ export default function RealMeetingEndedPage(){
     }finally{
       setRestartBusy(false);
     }
+  };
+
+  const openRecording=async()=>{
+    if(!payload?.permissions.canViewRecording||!payload.recording.id||recordingBusy)return;
+    setRecordingBusy(true);setRecordingError('');
+    try{
+      const access=await appDataService.getRecordingAccess(payload.recording.id);
+      if(!/^https:\/\//i.test(access.url))throw new Error('Lien d’enregistrement invalide.');
+      const link=document.createElement('a');
+      link.href=access.url;link.target='_blank';link.rel='noopener noreferrer';
+      document.body.appendChild(link);link.click();link.remove();
+    }catch(cause){
+      setRecordingError(cause instanceof Error?cause.message:'Impossible d’ouvrir cet enregistrement.');
+    }finally{setRecordingBusy(false);}
   };
 
   const generateSummary=async()=>{
@@ -378,10 +395,11 @@ export default function RealMeetingEndedPage(){
         )}
       </section>
 
-      {payload.recording.available&&payload.recording.url?(
+      {payload.permissions.canViewRecording&&payload.recording.available&&payload.recording.id?(
         <section className="real-ended-recording">
-          <div><span><Play size={20}/></span><div><strong>Enregistrement disponible</strong><small>Revoyez l’enregistrement de cette réunion.</small></div></div>
-          <a href={payload.recording.url} target="_blank" rel="noreferrer"><Play size={16}/> Ouvrir</a>
+          <div><span><Play size={20}/></span><div><strong>Enregistrement disponible</strong><small>Un lien de consultation temporaire et autorisé sera généré.</small></div></div>
+          <button type="button" disabled={recordingBusy} onClick={()=>void openRecording()}><Play size={16}/> {recordingBusy?'Ouverture…':'Ouvrir'}</button>
+          {recordingError?<p role="alert">{recordingError}</p>:null}
         </section>
       ):null}
     </main>
