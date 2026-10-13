@@ -199,6 +199,7 @@ export interface EndedMeetingPayload {
   recording: {
     available: boolean;
     retentionDays: number;
+    id?: string | null;
     url?: string | null;
   };
   permissions: {
