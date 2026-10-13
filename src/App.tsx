@@ -1,6 +1,6 @@
 import { ReactNode, Suspense, useEffect, useState } from 'react';
 import { X } from 'lucide-react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { authService } from './services/authService';
 import PwaExperience from './components/PwaExperience';
 import MobileSplash from './components/MobileSplash';
@@ -83,6 +83,14 @@ function ProtectedRoute({ children, allowGuest = false }: { children: ReactNode;
     return <Navigate to={safeLink ? `/reunions/${encodeURIComponent(safeLink)}` : '/rejoindre-une-reunion'} replace />;
   }
   return children;
+}
+
+function InvitationEntry() {
+  const { meetingLink = '' } = useParams();
+  if (!authService.isAuthenticated() || authService.getCurrentUser()?.isGuest) {
+    return <Navigate to={`/rejoindre-une-reunion?meeting=${encodeURIComponent(meetingLink)}`} replace />;
+  }
+  return <AppShell title="Rejoindre"><RealJoinPage /></AppShell>;
 }
 
 function AccountBar() {
@@ -192,7 +200,7 @@ export default function App() {
     <Route path="/" element={<Navigate to="/app" replace />} />
     <Route path="/app" element={<ProtectedRoute showAccountBar={false}><AppShell title="Accueil"><RealDashboardPage /></AppShell></ProtectedRoute>} />
     <Route path="/join" element={<ProtectedRoute><AppShell title="Rejoindre"><RealJoinPage /></AppShell></ProtectedRoute>} />
-    <Route path="/join/:meetingLink" element={<ProtectedRoute><AppShell title="Rejoindre"><RealJoinPage /></AppShell></ProtectedRoute>} />
+    <Route path="/join/:meetingLink" element={<InvitationEntry />} />
     <Route path="*" element={<Navigate to="/app" replace />} />
   </Routes></Suspense><AndroidNativeBottomNav/></></AppErrorBoundary>;
 }

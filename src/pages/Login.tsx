@@ -358,6 +358,10 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const invitedMeeting = searchParams.get('meeting');
+    if (initialView === 'guest' && invitedMeeting) setMeetingCode(extractMeetingIdentifier(invitedMeeting));
+  }, [initialView, searchParams]);
   const copy = translations[language];
   const selectedRegistrationCountry = useMemo(() => getRegistrationCountry(country), [country]);
   const phoneDialCode = selectedRegistrationCountry?.dialCode || '';
