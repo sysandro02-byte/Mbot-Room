@@ -406,7 +406,7 @@ export default function RealMeetingEndedPage(){
 
       {payload.permissions.canViewRecording&&payload.recording.available&&payload.recording.id?(
         <section className="real-ended-recording">
-          <div><span><Play size={20}/></span><div><strong>Enregistrement disponible</strong><small>Un lien de consultation temporaire et autorisé sera généré.</small></div></div>
+          <div><span><Play size={20}/></span><div><strong>Enregistrement disponible</strong><small>L’accès à cet enregistrement sera vérifié avant son ouverture.</small></div></div>
           <button type="button" disabled={recordingBusy} onClick={()=>void openRecording()}><Play size={16}/> {recordingBusy?'Ouverture…':'Ouvrir'}</button>
           {recordingError?<p role="alert">{recordingError}</p>:null}
         </section>
