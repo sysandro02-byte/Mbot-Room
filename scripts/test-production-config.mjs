@@ -266,6 +266,12 @@ if (!nativeBuild.includes('firebase-messaging:26.0.0') || !nativeBuild.includes(
 if (!androidMainActivity.includes('WebViewAssetLoader') || !androidMainActivity.includes('LOCAL_APP_URL') || !androidMainActivity.includes('appassets.androidplatform.net') && !androidMainActivity.includes('WebViewAssetLoader.DEFAULT_DOMAIN')) {
   throw new Error('Android APK must load a bundled HTTPS app shell instead of depending on the remote website');
 }
+if (!androidMainActivity.includes('"https".equals(scheme)')
+    || !androidMainActivity.includes('"mailto".equals(scheme)')
+    || !androidMainActivity.includes('(!web && !contact)')
+    || !androidMainActivity.includes('uri.getHost() == null')) {
+  throw new Error('Android external navigation must allowlist safe schemes and reject invalid web hosts');
+}
 if (!androidMainActivity.includes('onShowFileChooser(')
     || !androidMainActivity.includes('REQUEST_FILE_CHOOSER')
     || !androidMainActivity.includes('pendingFileChooser.onReceiveValue(')
