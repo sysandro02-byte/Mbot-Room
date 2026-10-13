@@ -285,6 +285,12 @@ export default function RealMeetingEndedPage(){
       </section>
 
       <div className="real-ended-grid">
+        {payload.guestRestrictions?(
+          <section className="real-ended-card real-ended-summary-card">
+            <div className="real-ended-title"><h2>Compte rendu réservé aux membres</h2></div>
+            <p>Les invités peuvent laisser leur avis sur la réunion, mais n’ont pas accès aux résumés Luna ni aux transcriptions.</p>
+          </section>
+        ):(
         <section className="real-ended-card real-ended-summary-card">
           <div className="real-ended-title">
             <div>
@@ -345,6 +351,7 @@ export default function RealMeetingEndedPage(){
             </div>
           )}
         </section>
+        )}
 
         <section className="real-ended-card real-ended-participants-card">
           <div className="real-ended-title">
@@ -366,6 +373,7 @@ export default function RealMeetingEndedPage(){
         </section>
       </div>
 
+      {!payload.guestRestrictions?(
       <section className="real-ended-card real-ended-discussion-card">
         <div className="real-ended-title">
           <div>
@@ -394,6 +402,7 @@ export default function RealMeetingEndedPage(){
           </div>
         )}
       </section>
+      ):null}
 
       {payload.permissions.canViewRecording&&payload.recording.available&&payload.recording.id?(
         <section className="real-ended-recording">
