@@ -643,6 +643,13 @@ try {
   assert.deepEqual(participantRoom.browserErrors, [], `Participant browser errors: ${participantRoom.browserErrors.join('\n')}`);
   assert.deepEqual(participantTwoRoom.browserErrors, [], `Participant two browser errors: ${participantTwoRoom.browserErrors.join('\n')}`);
 
+  // Real UI regression: leaving must show a clickable confirmation above
+  // the meeting control strip and return to the meetings list.
+  await participantTwoRoom.page.locator('.room-v2-leave-actions .room-v2-leave').click();
+  await participantTwoRoom.page.locator('.room-v2-confirm-modal').waitFor({ state: 'visible', timeout: 8_000 });
+  await participantTwoRoom.page.locator('.room-v2-confirm-modal').getByRole('button', { name: 'Quitter la réunion' }).click();
+  await participantTwoRoom.page.waitForURL(`${baseUrl}/reunions`, { timeout: 12_000 });
+
   await participantTwoContext.close();
   await participantContext.close();
   await hostContext.close();
@@ -676,7 +683,17 @@ try {
   assert.deepEqual(successfulSfuRoom.browserErrors, [], `Successful SFU browser errors: ${successfulSfuRoom.browserErrors.join('\n')}`);
   await successfulSfuRoom.page.screenshot({ path: 'test-artifacts/video-sfu-active.png', fullPage: true });
 
-  console.log('Three-browser mesh fallback + successful SFU publish checks passed.');
+  // Real UI regression: end-for-all must reach the API and open the end screen.
+  await successfulSfuRoom.page.locator('.room-v2-more-wrap .room-v2-control').click();
+  await successfulSfuRoom.page.locator('[data-testid="end-meeting-for-all"]').click();
+  await successfulSfuRoom.page.locator('.room-v2-confirm-modal').waitFor({ state: 'visible', timeout: 8_000 });
+  await successfulSfuRoom.page.locator('.room-v2-confirm-modal').getByRole('button', { name: 'Terminer pour tous' }).click();
+  await successfulSfuRoom.page.waitForURL(`${baseUrl}/reunions/${meeting.id}/terminee`, { timeout: 20_000 });
+  const ended = await jsonRequest(`/api/meetings/${meeting.id}/ended`, { headers: authHeaders(host.token) });
+  assert.equal(ended.response.status, 200, JSON.stringify(ended.data));
+  assert.equal(ended.data.status, 'ended', 'End-for-all must persist meeting status.');
+
+  console.log('Three-browser mesh fallback, SFU publication and meeting exit controls passed.');
 } catch (error) {
   await mkdir('test-artifacts', { recursive: true }).catch(() => undefined);
   if (hostRoom?.page) {

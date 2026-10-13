@@ -43,7 +43,7 @@ const AdminAuthPage = lazyWithRetry(() => import('./pages/admin/AdminAuthPage'))
 const Login = lazyWithRetry(() => import('./pages/Login'));
 const TermsPage = lazyWithRetry(() => import('./pages/TermsPage'));
 
-function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: boolean }) {
+function ProtectedRoute({ children, allowGuest = false }: { children: ReactNode; showAccountBar?: boolean; allowGuest?: boolean }) {
   const location = useLocation();
   const [isAuthenticated, setIsAuthenticated] = useState(authService.isAuthenticated());
   const [checking, setChecking] = useState(() => !authService.isAuthenticated());
@@ -76,6 +76,11 @@ function ProtectedRoute({ children }: { children: ReactNode; showAccountBar?: bo
     const redirect = sanitizeInternalPath(`${location.pathname}${location.search}`);
     sessionStorage.setItem('mboteroom-login-redirect', redirect);
     return <Navigate to="/login" replace />;
+  }
+  if (!allowGuest && authService.getCurrentUser()?.isGuest) {
+    const link = sessionStorage.getItem('mboteroom-guest-meeting-link') || '';
+    const safeLink = /^[a-zA-Z0-9_-]{3,128}$/.test(link) ? link : '';
+    return <Navigate to={safeLink ? `/reunions/${encodeURIComponent(safeLink)}` : '/rejoindre-une-reunion'} replace />;
   }
   return children;
 }
@@ -129,7 +134,7 @@ function AdminRoute({ children }: { children: ReactNode }) {
 export default function App() {
   const location = useLocation();
   const nativeAndroid = isNativeAndroidApp();
-  const hideGlobalHeader = nativeAndroid || location.pathname.startsWith('/admin')
+  const hideGlobalHeader = nativeAndroid || authService.getCurrentUser()?.isGuest === true || location.pathname.startsWith('/admin')
     || ['/login', '/connexion', '/inscription', '/mot-de-passe-oublie', '/rejoindre-une-reunion'].includes(location.pathname)
     || /^\/reunions\/(?!recentes(?:\/|$)|terminee(?:\/|$))[^/]+(?:\/(?:luna|salle-attente))?$/.test(location.pathname)
     || /^\/app\/live\/(?!new(?:\/|$))[^/]+$/.test(location.pathname);
@@ -178,12 +183,12 @@ export default function App() {
     <Route path="/app/polls" element={<ProtectedRoute><RealFeaturePage kind="polls" /></ProtectedRoute>} />
     <Route path="/app/settings" element={<ProtectedRoute><RealFeaturePage kind="settings" /></ProtectedRoute>} />
     <Route path="/app/profile" element={<ProtectedRoute><AppShell title="Mon profil"><ProfilePage /></AppShell></ProtectedRoute>} />
-    <Route path="/reunions/terminee" element={<ProtectedRoute><RealMeetingEndedPage /></ProtectedRoute>} />
+    <Route path="/reunions/terminee" element={<ProtectedRoute allowGuest><RealMeetingEndedPage /></ProtectedRoute>} />
     <Route path="/reunions" element={<ProtectedRoute><AppShell title="Réunions"><RealMeetingList /></AppShell></ProtectedRoute>} />
     <Route path="/reunions/:meetingId/salle-attente" element={<GuestWaitingRoomPage />} />
-    <Route path="/reunions/:meetingId/terminee" element={<ProtectedRoute><RealMeetingEndedPage /></ProtectedRoute>} />
-    <Route path="/reunions/:meetingId/luna" element={<ProtectedRoute><MeetingRoomV2 /></ProtectedRoute>} />
-    <Route path="/reunions/:meetingId" element={<ProtectedRoute><MeetingRoomV2 /></ProtectedRoute>} />
+    <Route path="/reunions/:meetingId/terminee" element={<ProtectedRoute allowGuest><RealMeetingEndedPage /></ProtectedRoute>} />
+    <Route path="/reunions/:meetingId/luna" element={<ProtectedRoute allowGuest><MeetingRoomV2 /></ProtectedRoute>} />
+    <Route path="/reunions/:meetingId" element={<ProtectedRoute allowGuest><MeetingRoomV2 /></ProtectedRoute>} />
     <Route path="/" element={<Navigate to="/app" replace />} />
     <Route path="/app" element={<ProtectedRoute showAccountBar={false}><AppShell title="Accueil"><RealDashboardPage /></AppShell></ProtectedRoute>} />
     <Route path="/join" element={<ProtectedRoute><AppShell title="Rejoindre"><RealJoinPage /></AppShell></ProtectedRoute>} />

@@ -1,3 +1,4 @@
+import { extractMeetingIdentifier } from '../lib/meetingInvitation';
 import { FocusEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -453,7 +454,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     return () => window.clearInterval(timer);
   }, [otpChallengeId, otpSecondsLeft]);
 
-  if (initialView !== 'forgot' && authService.isAuthenticated() && !registrationSuccess) {
+  if (initialView !== 'forgot' && !(initialView === 'guest' && authService.getCurrentUser()?.isGuest) && authService.isAuthenticated() && !registrationSuccess) {
     return <Navigate to={redirectTo} replace />;
   }
 
@@ -598,7 +599,6 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     const nextErrors: FieldErrors = {};
     if (!guestName.trim()) nextErrors.name = 'Votre nom est obligatoire.';
     if (!meetingCode.trim()) nextErrors.meetingCode = "L'ID ou le lien de réunion est obligatoire.";
-    if (!meetingPassword.trim()) nextErrors.meetingPassword = 'Le mot de passe de réunion est obligatoire.';
     if (!termsAccepted || !termsVersion) {
       setFormError("Vous devez lire et accepter les conditions d’utilisation avant de rejoindre en invité.");
       return;
@@ -612,14 +612,20 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     try {
       const result = await authService.guestJoin({
         name: guestName.trim(),
-        meetingCode: meetingCode.trim(),
+        meetingCode: extractMeetingIdentifier(meetingCode),
         password: meetingPassword,
         termsAccepted,
         termsVersion,
       });
       setMeetingPassword('');
-      const target = result.meeting?.meeting_link ? `/join/${result.meeting.meeting_link}` : '/join';
-      navigate(target, { replace: true });
+      const meetingLink = String(result.meeting?.meeting_link || '');
+      if (!meetingLink) throw new Error('Le lien de réunion est introuvable.');
+      sessionStorage.setItem('mboteroom-guest-meeting-link', meetingLink);
+      const target = `/reunions/${encodeURIComponent(meetingLink)}${result.lobbyStatus === 'requested' ? '/salle-attente' : ''}`;
+      navigate(target, {
+        replace: true,
+        state: { meeting: result.meeting, guestName: guestName.trim(), isGuest: true },
+      });
     } catch (submitError) {
       setFormError(submitError instanceof Error ? submitError.message : 'Accès invité impossible.');
     } finally {

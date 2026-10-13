@@ -1,3 +1,4 @@
+import { extractMeetingIdentifier } from '../lib/meetingInvitation';
 import { FormEvent, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -51,22 +52,8 @@ const footerAdvantages = [
   },
 ] as const;
 
-function normalizeMeetingIdentifier(value: string): string {
-  const trimmedValue = value.trim();
-  if (!trimmedValue) return '';
-
-  try {
-    const url = new URL(trimmedValue);
-    const pathnameParts = url.pathname.split('/').filter(Boolean);
-    return String(pathnameParts[pathnameParts.length - 1] || '').replace(/[\s-]+/g, '');
-  } catch {
-    return trimmedValue.replace(/[\s-]+/g, '');
-  }
-}
-
 function isValidMeetingIdentifier(value: string): boolean {
-  const normalizedValue = normalizeMeetingIdentifier(value);
-  return /^[a-zA-Z0-9]{3,64}$/.test(normalizedValue);
+  return /^[a-zA-Z0-9][a-zA-Z0-9_-]{2,127}$/.test(extractMeetingIdentifier(value));
 }
 
 export default function GuestJoinPage() {
@@ -82,7 +69,7 @@ export default function GuestJoinPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsVersion, setTermsVersion] = useState('');
   const normalizedMeetingIdentifier = useMemo(
-    () => normalizeMeetingIdentifier(form.meetingIdentifier),
+    () => extractMeetingIdentifier(form.meetingIdentifier),
     [form.meetingIdentifier],
   );
 
@@ -133,9 +120,10 @@ export default function GuestJoinPage() {
         termsVersion,
       });
       setForm((currentForm) => ({ ...currentForm, password: '' }));
-      const target = result.meeting?.meeting_link
-        ? `/reunions/${encodeURIComponent(String(result.meeting.meeting_link))}/salle-attente`
-        : '/join';
+      const meetingLink = String(result.meeting?.meeting_link || '');
+      if (!meetingLink) throw new Error('Lien de réunion introuvable.');
+      sessionStorage.setItem('mboteroom-guest-meeting-link', meetingLink);
+      const target = `/reunions/${encodeURIComponent(meetingLink)}${result.lobbyStatus === 'requested' ? '/salle-attente' : ''}`;
       navigate(target, {
         replace: true,
         state: {

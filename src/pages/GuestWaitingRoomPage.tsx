@@ -445,6 +445,7 @@ export default function GuestWaitingRoomPage() {
 
     stopMedia();
     if (currentUser?.isGuest) {
+      sessionStorage.removeItem('mboteroom-guest-meeting-link');
       await authService.logout().catch(() => undefined);
     }
     navigate('/rejoindre-une-reunion', { replace: true });

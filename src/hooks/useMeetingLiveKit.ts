@@ -18,6 +18,7 @@ type UseMeetingLiveKitOptions = {
   meetingId: number;
   breakoutRoomId?: string | null;
   localStream: MediaStream | null;
+  screenStream?: MediaStream | null;
   media: MeetingMediaState;
   enabled?: boolean;
   sessionKey?: string | number;
@@ -52,6 +53,7 @@ export function useMeetingLiveKit({
   meetingId,
   breakoutRoomId = null,
   localStream,
+  screenStream = null,
   media,
   enabled = false,
   sessionKey = 0,
@@ -329,12 +331,13 @@ export function useMeetingLiveKit({
         let publication = publishedTracksRef.current.get(track);
         if (!publication) {
           const isAudio = track.kind === 'audio';
+          const isScreenAudio = isAudio && media.screen && Boolean(screenStream?.getAudioTracks().includes(track));
           const source = isAudio
-            ? (media.screen && sdk.Track.Source.ScreenShareAudio ? sdk.Track.Source.ScreenShareAudio : sdk.Track.Source.Microphone)
+            ? (isScreenAudio && sdk.Track.Source.ScreenShareAudio ? sdk.Track.Source.ScreenShareAudio : sdk.Track.Source.Microphone)
             : (media.screen ? sdk.Track.Source.ScreenShare : sdk.Track.Source.Camera);
           publication = await room.localParticipant.publishTrack(track, {
             source,
-            name: isAudio ? (media.screen ? 'screen-audio' : 'microphone') : (media.screen ? 'screen' : 'camera'),
+            name: isAudio ? (isScreenAudio ? 'screen-audio' : 'microphone') : (media.screen ? 'screen' : 'camera'),
             simulcast: !isAudio,
           });
           publishedTracksRef.current.set(track, publication);
@@ -353,7 +356,7 @@ export function useMeetingLiveKit({
     void sync().catch(() => {
       onNoticeRef.current?.('Une piste locale n’a pas pu être publiée sur le SFU.');
     });
-  }, [localStream, media.audio, media.screen, media.video, status]);
+  }, [localStream, screenStream, media.audio, media.screen, media.video, status]);
 
   return {
     status,

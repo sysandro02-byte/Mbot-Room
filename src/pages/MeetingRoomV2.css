@@ -741,7 +741,7 @@
 /* In-meeting private message and account report dialogs */
 .room-v2-action-modal-backdrop{
   position:fixed;
-  z-index:180;
+  z-index:2500;
   inset:0;
   display:grid;
   place-items:center;

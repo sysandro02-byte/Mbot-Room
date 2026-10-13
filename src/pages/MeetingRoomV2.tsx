@@ -31,7 +31,7 @@ import {
   WifiOff,
   X,
 } from 'lucide-react';
-import { useMeetingMeshWebRTC, type RemoteMeetingParticipant } from '../hooks/useMeetingMeshWebRTC';
+import { useMeetingMeshWebRTC } from '../hooks/useMeetingMeshWebRTC';
 import { useMeetingLiveKit } from '../hooks/useMeetingLiveKit';
 import { useMeetingCaptions } from '../hooks/useMeetingCaptions';
 import { socket } from '../lib/socket';
@@ -110,6 +110,7 @@ const requestAndroidDisplayCapture = async (): Promise<MediaStream> => {
     let activeStream: MediaStream | null = null;
     let settled = false;
     let disposed = false;
+    let projectionStarted = false;
     let lastFrameUrl = '';
     const clearCallbacks = () => {
       delete window.__mboteAndroidScreenStarted;
@@ -123,6 +124,7 @@ const requestAndroidDisplayCapture = async (): Promise<MediaStream> => {
       window.clearTimeout(timeout);
       activeStream?.getTracks().forEach((track) => track.stop());
       clearCallbacks();
+      try { bridge.stopScreenCapture(); } catch { /* native cleanup is best effort */ }
       reject(new DOMException(message, name));
     };
     const timeout = window.setTimeout(() => {
@@ -143,6 +145,17 @@ const requestAndroidDisplayCapture = async (): Promise<MediaStream> => {
         if (disposed || lastFrameUrl !== dataUrl) return;
         try {
           context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          if (projectionStarted && !settled) {
+            const stream = canvas.captureStream(15);
+            if (!stream.getVideoTracks()[0]) {
+              fail('Le flux de partage Android n’a pas pu être créé.', 'NotSupportedError');
+              return;
+            }
+            activeStream = stream;
+            settled = true;
+            window.clearTimeout(timeout);
+            resolve(stream);
+          }
         } catch {
           // A single late frame must not stop the projection.
         }
@@ -154,19 +167,17 @@ const requestAndroidDisplayCapture = async (): Promise<MediaStream> => {
       if (disposed || settled) return;
       canvas.width = Math.max(2, Math.floor(Number(width) || canvas.width));
       canvas.height = Math.max(2, Math.floor(Number(height) || canvas.height));
-      const stream = canvas.captureStream(15);
-      if (!stream.getVideoTracks()[0]) {
-        fail('Le flux de partage Android n’a pas pu être créé.', 'NotSupportedError');
-        return;
-      }
-      activeStream = stream;
-      settled = true;
-      window.clearTimeout(timeout);
-      resolve(stream);
+      projectionStarted = true;
+      // Do not announce success until the first frame is rendered: otherwise
+      // Android can publish a blank track indefinitely.
     };
 
     window.__mboteAndroidScreenEnded = () => {
       if (disposed) return;
+      if (!settled) {
+        fail('Le partage d’écran a été interrompu avant la première image.', 'AbortError');
+        return;
+      }
       disposed = true;
       window.clearTimeout(timeout);
       activeStream?.getTracks().forEach((track) => track.stop());
@@ -397,6 +408,7 @@ export default function MeetingRoomV2() {
 
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
+  const screenShareRequestInFlightRef = useRef(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingSessionRef = useRef<CompositeRecordingSession | null>(null);
@@ -422,6 +434,7 @@ export default function MeetingRoomV2() {
   const [micEnabled, setMicEnabled] = useState(initialMic);
   const [cameraEnabled, setCameraEnabled] = useState(initialCamera);
   const [screenSharing, setScreenSharing] = useState(false);
+  const [screenSharePending, setScreenSharePending] = useState(false);
   const [recording, setRecording] = useState(false);
   const [endingMeeting, setEndingMeeting] = useState(false);
   const [recordingMode, setRecordingMode] = useState<'local' | 'server' | null>(null);
@@ -567,6 +580,7 @@ export default function MeetingRoomV2() {
     meetingId: meeting?.id || 0,
     breakoutRoomId,
     localStream,
+    screenStream: screenStreamRef.current,
     media: mediaState,
     enabled: mediaEnabled && liveKitDesired,
     onNotice: setNotice,
@@ -587,26 +601,9 @@ export default function MeetingRoomV2() {
   });
 
   const usingLiveKit = liveKitDesired && !liveKitMedia.failed;
-  const remoteParticipants = useMemo(() => {
-    if (!usingLiveKit) return meshMedia.remoteParticipants;
-    const realtimeByUser = new Map<string, RemoteMeetingParticipant>(
-      meshMedia.remoteParticipants.map((participant): [string, RemoteMeetingParticipant] => [String(participant.userId), participant]),
-    );
-    return liveKitMedia.remoteParticipants.map((participant) => {
-      const realtime = realtimeByUser.get(String(participant.userId));
-      if (!realtime) return participant;
-      const screenStoppedRealtime = participant.media.screen && !realtime.media.screen;
-      return {
-        ...participant,
-        stream: screenStoppedRealtime ? null : participant.stream,
-        media: {
-          ...participant.media,
-          video: screenStoppedRealtime ? false : participant.media.video,
-          screen: Boolean(realtime.media.screen),
-        },
-      };
-    });
-  }, [liveKitMedia.remoteParticipants, meshMedia.remoteParticipants, usingLiveKit]);
+  // LiveKit's subscribed track is authoritative. Socket presence can lag behind
+  // the SFU publication; masking the track with a stale socket flag hid shares.
+  const remoteParticipants = usingLiveKit ? liveKitMedia.remoteParticipants : meshMedia.remoteParticipants;
   const networkQuality = usingLiveKit ? liveKitMedia.networkQuality : meshMedia.networkQuality;
   const activeSpeakerSocketId = usingLiveKit ? liveKitMedia.activeSpeakerSocketId : meshMedia.activeSpeakerSocketId;
 
@@ -652,10 +649,9 @@ export default function MeetingRoomV2() {
       }
       if (!found) throw new Error('Réunion introuvable ou inaccessible.');
 
-      // Paint the room as soon as we know the meeting. Lobby verification can then
-      // continue without keeping authenticated participants on a blocking loader.
-      setMeeting(found);
+      // Do not publish guest media before lobby membership is verified.
       if (!currentUser?.isGuest) {
+        setMeeting(found);
         setLoading(false);
         return;
       }
@@ -667,6 +663,7 @@ export default function MeetingRoomV2() {
         return;
       }
       if (currentUser?.isGuest && ownLobby?.status === 'rejected') throw new Error('L’hôte a refusé votre demande d’accès.');
+      if (currentUser?.isGuest && ownLobby?.status !== 'accepted') throw new Error('Cette invitation ne vous donne pas accès à cette réunion.');
       setMeeting(found);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossible de charger la réunion.');
@@ -1377,6 +1374,7 @@ export default function MeetingRoomV2() {
   }, [canShareScreen, canUseCamera, canUseMic, meeting, screenSharing, stopScreenShare]);
 
   const toggleScreenShare = async () => {
+    if (screenShareRequestInFlightRef.current) return;
     if (screenSharing) {
       stopScreenShare();
       return;
@@ -1385,6 +1383,8 @@ export default function MeetingRoomV2() {
       setNotice('Le partage d’écran est désactivé pour les participants.');
       return;
     }
+    screenShareRequestInFlightRef.current = true;
+    setScreenSharePending(true);
     try {
       const display = await requestDisplayCapture();
       const videoTrack = display.getVideoTracks()[0];
@@ -1410,8 +1410,11 @@ export default function MeetingRoomV2() {
       } else if (errorName === 'NotSupportedError') {
         setNotice('Ce navigateur ne permet pas encore le partage d’écran sur cet appareil.');
       } else {
-        setNotice('Impossible de démarrer le partage d’écran sur cet appareil.');
+        setNotice(error instanceof Error ? error.message : 'Impossible de démarrer le partage d’écran sur cet appareil.');
       }
+    } finally {
+      screenShareRequestInFlightRef.current = false;
+      setScreenSharePending(false);
     }
   };
 
@@ -1932,7 +1935,7 @@ export default function MeetingRoomV2() {
     } catch (cause) {
       if (endForAll) setEndingMeeting(false);
       setNotice(cause instanceof Error ? cause.message : 'Impossible de terminer la réunion.');
-      return;
+      throw cause;
     }
 
     // Do not block the exit UI on media/recording teardown. The socket leave is
@@ -1947,6 +1950,10 @@ export default function MeetingRoomV2() {
 
     if (endForAll) {
       navigate(`/reunions/${meeting.id}/terminee`, { replace: true });
+    } else if (guestMode) {
+      sessionStorage.removeItem('mboteroom-guest-meeting-link');
+      navigate('/rejoindre-une-reunion', { replace: true });
+      void authService.logout(false);
     } else {
       navigate('/reunions', { replace: true });
     }
@@ -2645,7 +2652,7 @@ export default function MeetingRoomV2() {
         <div className="room-v2-control-strip">
         <Control active={micEnabled} disabled={!canUseMic} title={!canUseMic ? 'Microphone désactivé par l’hôte' : undefined} label={micEnabled ? 'Micro' : 'Micro coupé'} onClick={() => void toggleMic()}>{micEnabled ? <Mic/> : <MicOff/>}</Control>
         <Control active={cameraEnabled} disabled={!canUseCamera} title={!canUseCamera ? 'Caméra désactivée par l’hôte' : undefined} label={cameraEnabled ? 'Caméra' : 'Caméra coupée'} onClick={() => void toggleCamera()}>{cameraEnabled ? <Camera/> : <CameraOff/>}</Control>
-        <Control active={screenSharing} disabled={!canShareScreen} title={!canShareScreen ? (guestMode && !guestScreenShareAllowed ? 'Partage d’écran non autorisé pour les invités' : 'Partage d’écran désactivé par l’hôte') : undefined} label="Partager" onClick={() => void toggleScreenShare()}><MonitorUp/></Control>
+        <Control active={screenSharing} disabled={!canShareScreen || screenSharePending} title={!canShareScreen ? (guestMode && !guestScreenShareAllowed ? 'Partage d’écran non autorisé pour les invités' : 'Partage d’écran désactivé par l’hôte') : undefined} label={screenSharePending ? 'Démarrage…' : screenSharing ? 'Arrêter partage' : 'Partager'} onClick={() => void toggleScreenShare()}><MonitorUp/></Control>
         <Control
           active={captionsEnabled}
           disabled={!canUseTranscription || userPreferences.lunaRealtimeTranslation !== true}

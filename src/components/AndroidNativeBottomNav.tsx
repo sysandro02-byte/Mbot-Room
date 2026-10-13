@@ -1,3 +1,4 @@
+import { authService } from '../services/authService';
 import { Home, MessageCircle, Radio, UserRound, Video } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isNativeAndroidApp } from '../lib/nativePlatform';
@@ -11,7 +12,7 @@ const activeFor = (pathname: string, target: string) => {
 export default function AndroidNativeBottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
-  if (!isNativeAndroidApp()) return null;
+  if (!isNativeAndroidApp() || authService.getCurrentUser()?.isGuest) return null;
 
   const hidden = location.pathname.startsWith('/admin')
     || location.pathname.startsWith('/login')

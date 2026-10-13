@@ -1,3 +1,4 @@
+import { extractMeetingIdentifier } from '../lib/meetingInvitation';
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import {
@@ -98,7 +99,7 @@ export default function RealJoinPage(){
     event.preventDefault();
     if(!value.trim())return;
     setLoading(true);setError('');
-    try{setMeeting(await meetingService.lookupMeetingAccess(value.trim(),password));}
+    try{setMeeting(await meetingService.lookupMeetingAccess(extractMeetingIdentifier(value),password));}
     catch(cause){setMeeting(null);setError(cause instanceof Error?cause.message:'Réunion introuvable.');}
     finally{setLoading(false);}
   };

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { collaborationService, type MeetingMessage } from '../services/collaborationService';
+import { authService } from '../services/authService';
 import { type EndedMeetingPayload, meetingService } from '../services/meetingService';
 import './RealMeetingEndedPage.css';
 
@@ -42,6 +43,15 @@ const formatMeetingDate=(value:string)=>{
 export default function RealMeetingEndedPage(){
   const navigate=useNavigate();
   const {meetingId}=useParams();
+  const exitEndedView = () => {
+    if (authService.getCurrentUser()?.isGuest) {
+      sessionStorage.removeItem('mboteroom-guest-meeting-link');
+      navigate('/rejoindre-une-reunion', { replace: true });
+      void authService.logout(false);
+    } else {
+      navigate('/app');
+    }
+  };
   const [payload,setPayload]=useState<EndedMeetingPayload|null>(null);
   const [messages,setMessages]=useState<MeetingMessage[]>([]);
   const [loading,setLoading]=useState(Boolean(meetingId));
@@ -153,7 +163,7 @@ export default function RealMeetingEndedPage(){
     <main className="real-ended-state">
       <FileText size={42}/>
       <h1>Aucune réunion sélectionnée</h1>
-      <button onClick={()=>navigate('/app')}>Retour au tableau de bord</button>
+      <button onClick={exitEndedView}>Retour au tableau de bord</button>
     </main>
   );
 
@@ -162,7 +172,7 @@ export default function RealMeetingEndedPage(){
       <FileText size={42}/>
       <h1>Compte rendu indisponible</h1>
       <p>{error}</p>
-      <button onClick={()=>navigate('/app')}>Retour au tableau de bord</button>
+      <button onClick={exitEndedView}>Retour au tableau de bord</button>
     </main>
   );
 
@@ -227,7 +237,7 @@ export default function RealMeetingEndedPage(){
   return (
     <main className="real-ended-page">
       <header className="real-ended-header">
-        <button className="back" onClick={()=>navigate('/app')}><ArrowLeft size={18}/> Tableau de bord</button>
+        <button className="back" onClick={exitEndedView}><ArrowLeft size={18}/> Tableau de bord</button>
         <div className="real-ended-hero">
           <span className="real-ended-hero-icon"><CheckCircle2 size={30}/></span>
           <div className="real-ended-hero-copy">
