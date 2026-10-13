@@ -891,7 +891,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
               <p className="android-welcome-footer">MBotéRoom application créée par LoukaTech</p>
             </section>
           )}
-          {showAndroidCredentials && (
+          {showAndroidCredentials && !otpChallengeId && (
             <div className="android-login-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAndroidCredentials(false); }}><section className="login-card android-login-form-card android-login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="android-login-modal-close" type="button" aria-label="Fermer" onClick={() => setShowAndroidCredentials(false)}>×</button>
               <header className="login-card-header">
                 <span className="auth-card-kicker">Espace sécurisé MBotéRoom</span>
