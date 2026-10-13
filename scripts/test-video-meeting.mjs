@@ -455,7 +455,17 @@ try {
   const loginOtp = String(otpMail?.body?.text || '').match(/\b\d{6}\b/)?.[0];
   assert.ok(loginOtp, 'OTP email must contain a six-digit code');
   await loginPage.locator('#login-otp').fill(loginOtp);
-  await loginPage.locator('.otp-login-form .primary-login-button').click();
+  assert.equal(await loginPage.locator('.android-login-modal').count(), 0,
+    'The credentials bottom sheet must unmount while the OTP dialog is active');
+  const otpButton = loginPage.locator('.otp-login-form .primary-login-button');
+  await otpButton.waitFor({ state: 'visible', timeout: 10_000 });
+  const otpIsTopmost = await otpButton.evaluate((button) => {
+    const bounds = button.getBoundingClientRect();
+    const element = document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    return element === button || button.contains(element);
+  });
+  assert.equal(otpIsTopmost, true, 'The OTP confirmation must be the topmost clickable control');
+  await otpButton.click();
   await loginPage.waitForURL(/\/app(?:\?|$)/, { timeout: 20_000 });
   const browserStorage = await loginPage.evaluate(() => ({
     localToken: localStorage.getItem('token'),
