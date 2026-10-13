@@ -870,3 +870,22 @@
   .room-v2-panel{top:max(86px,calc(env(safe-area-inset-top,0px) + 66px))!important;border-radius:17px 17px 0 0!important}
   .room-v2-chat-list article{max-width:92%}
 }
+
+
+/* Confirmation dialogs are portaled to document.body to escape in-room stacking
+   contexts. On Android they sit ABOVE the meeting controls, not behind them. */
+.room-v2-action-modal-backdrop{
+  box-sizing:border-box;z-index:5000;overflow-y:auto;overscroll-behavior:contain;
+}
+.room-v2-action-modal{box-sizing:border-box;max-height:calc(100dvh - 36px);overflow-y:auto;overscroll-behavior:contain}
+.room-v2-confirm-modal>header{min-width:0}
+.room-v2-confirm-modal>header>div{min-width:0;flex:1}
+.room-v2-confirm-modal>header strong{font-size:16px;line-height:1.4;overflow-wrap:anywhere}
+.room-v2-confirm-modal>p{font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.room-v2-confirm-modal>footer button{font-size:12px;min-height:46px}
+@media(max-width:600px){
+  .room-v2-action-modal-backdrop{align-items:end;padding:10px 10px calc(88px + env(safe-area-inset-bottom,0px))}
+  .room-v2-confirm-modal{width:100%;max-height:calc(100dvh - 125px);border-radius:20px;padding:18px 16px}
+  .room-v2-confirm-modal>footer{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .room-v2-confirm-modal>footer button{min-height:48px;padding:6px;font-size:12px}
+}

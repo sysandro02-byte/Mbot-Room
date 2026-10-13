@@ -2332,3 +2332,44 @@
   .admin-ai-report-actions{display:grid;grid-template-columns:1fr}
   .admin-ai-report-actions button{width:100%;min-height:48px}
 }
+
+
+/* Compact admin permissions: consistent touch targets and readable switches. */
+.admin-control-grid article{box-sizing:border-box;min-width:0}
+.admin-control-grid article>div{min-width:0}
+.admin-control-grid article>button[role="switch"]{display:block;flex:none;box-sizing:border-box;min-width:48px;min-height:28px;cursor:pointer}
+.admin-control-grid article>button[role="switch"]:disabled{opacity:.6;cursor:progress}
+.admin-control-grid article>button[role="switch"]:focus-visible{outline:3px solid #07aba8;outline-offset:3px}
+.admin-control-grid strong,.admin-control-grid small{overflow-wrap:anywhere}
+@media(max-width:760px){
+  .admin-dashboard-content{min-width:0;padding:14px 10px 24px}
+  .admin-dashboard-heading h1{font-size:21px}
+  .admin-mobile-quick-actions{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:8px;margin-bottom:12px}
+  .admin-mobile-new-meeting{min-width:0;padding:0 10px!important;font-size:11px!important;gap:5px}
+  .admin-control-card{padding:12px!important}
+  .admin-control-grid{grid-template-columns:minmax(0,1fr)!important;gap:9px!important}
+  .admin-control-grid article{
+    grid-template-columns:38px minmax(0,1fr) 52px!important;
+    min-height:76px!important;gap:10px!important;padding:11px 12px!important;
+    border-radius:15px!important;
+  }
+  .admin-control-grid article>span{width:38px!important;height:38px!important;border-radius:11px!important}
+  .admin-control-grid strong{font-size:13px!important;line-height:1.3}
+  .admin-control-grid small{font-size:10.5px!important;line-height:1.4}
+  .admin-control-grid article>button[role="switch"]{
+    width:50px!important;min-width:50px!important;height:30px!important;min-height:30px!important;padding:3px!important;
+  }
+  .admin-control-grid article>button[role="switch"] i{width:24px!important;height:24px!important}
+  .admin-control-grid article.is-enabled>button[role="switch"] i{transform:translateX(20px)!important}
+  .admin-control-subsection{padding:13px!important;margin-top:16px!important;gap:12px}
+  .admin-control-subsection p{font-size:11px!important}
+  .admin-control-default-badge{align-self:flex-start}
+}
+@media(max-width:380px){
+  .admin-topbar-brand strong{font-size:14px!important}
+  .admin-mobile-quick-actions{grid-template-columns:1fr}
+  .admin-control-grid article{grid-template-columns:32px minmax(0,1fr) 48px!important;padding:10px!important;gap:8px!important}
+  .admin-control-grid article>span{width:32px!important;height:32px!important}
+  .admin-control-grid article>button[role="switch"]{width:48px!important;min-width:48px!important}
+  .admin-control-grid article.is-enabled>button[role="switch"] i{transform:translateX(18px)!important}
+}

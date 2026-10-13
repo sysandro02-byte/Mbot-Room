@@ -69,6 +69,7 @@ export default function AdminControlCenter({ section = 'admin-controls' }: { sec
   const [lastInvitePath,setLastInvitePath]=useState('');
   const [search,setSearch]=useState('');
   const [busy,setBusy]=useState(false);
+  const [savingSetting,setSavingSetting]=useState<keyof AdminPlatformSettings|null>(null);
   const [termsBusy,setTermsBusy]=useState(false);
   const [message,setMessage]=useState('');
   const [error,setError]=useState('');
@@ -121,13 +122,15 @@ export default function AdminControlCenter({ section = 'admin-controls' }: { sec
   },[search,users,countryFilter,cityFilter,organizationFilter,statusFilter,minAge,maxAge]);
 
   const toggle=async(key:keyof AdminPlatformSettings)=>{
+    if(busy||savingSetting)return;
     const previous=settings;
     const next={...settings,[key]:!settings[key]};
-    setSettings(next);setMessage('');setError('');
+    setSettings(next);setMessage('');setError('');setSavingSetting(key);
     try{
       setSettings(await adminDashboardService.updatePlatformSettings({[key]:next[key]}));
       setMessage('Réglage mis à jour.');
     }catch(cause){setSettings(previous);setError(cause instanceof Error?cause.message:'Modification impossible.');}
+    finally{setSavingSetting(null);}
   };
 
   const startEdit=(user:AdminManagedUser)=>{
@@ -259,7 +262,7 @@ export default function AdminControlCenter({ section = 'admin-controls' }: { sec
         {generalLabels.map(item=><article key={item.key} className={settings[item.key]?'is-enabled':'is-disabled'}>
           <span>{settings[item.key]?<CheckCircle2 size={19}/>:<LockKeyhole size={19}/>}</span>
           <div><strong>{item.title}</strong><small>{item.description}</small></div>
-          <button type="button" role="switch" aria-label={item.title} aria-checked={settings[item.key]} onClick={()=>void toggle(item.key)} disabled={busy}><i/></button>
+          <button type="button" role="switch" aria-label={item.title} aria-checked={settings[item.key]} onClick={()=>void toggle(item.key)} disabled={busy||savingSetting!==null} aria-busy={savingSetting===item.key}><i/></button>
         </article>)}
       </div>
 
@@ -271,7 +274,7 @@ export default function AdminControlCenter({ section = 'admin-controls' }: { sec
         {guestLabels.map(item=><article key={item.key} className={settings[item.key]?'is-enabled':'is-disabled'}>
           <span>{settings[item.key]?<CheckCircle2 size={19}/>:<LockKeyhole size={19}/>}</span>
           <div><strong>{item.title}</strong><small>{item.description}</small></div>
-          <button type="button" role="switch" aria-label={item.title} aria-checked={settings[item.key]} onClick={()=>void toggle(item.key)} disabled={busy}><i/></button>
+          <button type="button" role="switch" aria-label={item.title} aria-checked={settings[item.key]} onClick={()=>void toggle(item.key)} disabled={busy||savingSetting!==null} aria-busy={savingSetting===item.key}><i/></button>
         </article>)}
       </div>
       <div className="admin-control-note"><ShieldCheck size={17}/><span>Ces réglages sont appliqués côté interface, API, temps réel et médias : masquer un bouton ne suffit pas à contourner la restriction.</span></div>

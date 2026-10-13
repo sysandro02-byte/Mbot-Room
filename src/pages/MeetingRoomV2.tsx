@@ -1,4 +1,5 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Bot,
@@ -1998,8 +1999,8 @@ export default function MeetingRoomV2() {
               tone: 'warning' as const,
             }
           : {
-              title: `Retirer le rôle co-hôte à ${member.name} ?`,
-              message: 'Cette personne redeviendra participant et perdra les commandes de modération.',
+              title: 'Retirer le rôle de co-hôte ?',
+              message: `${member.name} redeviendra participant et perdra les commandes de modération.`,
               confirmLabel: 'Retirer le rôle',
               tone: 'warning' as const,
             };
@@ -2532,7 +2533,7 @@ export default function MeetingRoomV2() {
         </section>
       ) : null}
 
-      {confirmation ? (
+      {confirmation ? createPortal(
         <div
           className="room-v2-action-modal-backdrop"
           role="presentation"
@@ -2562,7 +2563,7 @@ export default function MeetingRoomV2() {
               </button>
             </footer>
           </section>
-        </div>
+        </div>, document.body
       ) : null}
 
       {privateMessageTarget ? (

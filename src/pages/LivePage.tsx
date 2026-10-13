@@ -12,6 +12,7 @@ import { collaborationService } from '../services/collaborationService';
 import { liveCategoryLabel, liveMediaUrl, liveService, type LiveCategory, type LiveComment, type LiveParticipationRequest, type LiveSession, type LiveVisibility } from '../services/liveService';
 import { socket } from '../lib/socket';
 import { useMeetingLiveKit } from '../hooks/useMeetingLiveKit';
+import { requestDisplayCapture } from './MeetingRoomV2';
 import './LivePage.css';
 
 const categories:Array<{value:string;label:string;icon?:typeof Radio}>=[
@@ -164,7 +165,11 @@ export function LiveCreatePage(){
     setBusy(startNow?'start':'schedule');setError('');
     try{
       const shouldSchedule=scheduleLater||forceSchedule;
-      const scheduledFor=shouldSchedule?new Date(`${date}T${time}`).toISOString():undefined;
+      const scheduleDate=shouldSchedule?new Date(`${date}T${time}`):null;
+      if(scheduleDate&&(!Number.isFinite(scheduleDate.getTime())||scheduleDate.getTime()<=Date.now()+60_000)){
+        throw new Error('Choisissez une date et une heure futures pour programmer le Live.');
+      }
+      const scheduledFor=scheduleDate?.toISOString();
       const created=await liveService.createLive({
         title:title.trim(),description:description.trim(),category,visibility,coverUrl:coverUrl.trim(),
         scheduledFor,startNow:startNow&&!shouldSchedule,chatEnabled,cohostsEnabled,recordingEnabled,moderationEnabled,
@@ -197,10 +202,10 @@ export function LiveCreatePage(){
         <fieldset className="live-visibility"><legend>Visibilité *</legend>
           {([
             ['public','Public','Tout le monde'],['private','Privé','Sur invitation'],['followers','Abonnés','Mes abonnés'],
-          ] as Array<[LiveVisibility,string,string]>).map(([value,label,caption])=><button type="button" key={value} className={visibility===value?'active':''} onClick={()=>setVisibility(value)}><strong>{label}</strong><small>{caption}</small></button>)}
+          ] as Array<[LiveVisibility,string,string]>).map(([value,label,caption])=><button type="button" key={value} className={visibility===value?'active':''} aria-pressed={visibility===value} onClick={()=>setVisibility(value)}><strong>{label}</strong><small>{caption}</small></button>)}
         </fieldset>
 
-        <div className="live-option schedule"><div><CalendarDays/><span><strong>Programmer pour plus tard</strong><small>Choisissez la date et l’heure du direct.</small></span></div><button className={scheduleLater?'switch on':'switch'} type="button" onClick={()=>setScheduleLater((value)=>!value)}><i/></button></div>
+        <div className="live-option schedule"><div><CalendarDays/><span><strong>Programmer pour plus tard</strong><small>Choisissez la date et l’heure du direct.</small></span></div><button className={scheduleLater?'switch on':'switch'} type="button" role="switch" aria-label="Programmer pour plus tard" aria-checked={scheduleLater} onClick={()=>setScheduleLater((value)=>!value)}><i/></button></div>
         {scheduleLater?<div className="live-schedule-fields"><label>Date<input type="date" value={date} onChange={(event)=>setDate(event.target.value)}/></label><label>Heure<input type="time" value={time} onChange={(event)=>setTime(event.target.value)}/></label></div>:null}
 
         <section className="live-options">
@@ -209,11 +214,11 @@ export function LiveCreatePage(){
             {label:'Inviter des co-animateurs',caption:'Permettre les demandes de participation',value:cohostsEnabled,set:setCohostsEnabled,icon:UsersRound},
             {label:'Enregistrer le live',caption:'Replay via LiveKit + stockage MBotéRoom',value:recordingEnabled,set:setRecordingEnabled,icon:Video},
             {label:'Mode modération',caption:'Outils de suppression et contrôle du chat',value:moderationEnabled,set:setModerationEnabled,icon:Bell},
-          ].map((item)=>{const Icon=item.icon;return <div className="live-option" key={item.label}><div><Icon/><span><strong>{item.label}</strong><small>{item.caption}</small></span></div><button className={item.value?'switch on':'switch'} type="button" onClick={()=>item.set(!item.value)}><i/></button></div>;})}
+          ].map((item)=>{const Icon=item.icon;return <div className="live-option" key={item.label}><div><Icon/><span><strong>{item.label}</strong><small>{item.caption}</small></span></div><button className={item.value?'switch on':'switch'} type="button" role="switch" aria-label={item.label} aria-checked={item.value} onClick={()=>item.set(!item.value)}><i/></button></div>;})}
         </section>
 
         <button className="live-primary-action" disabled={Boolean(busy)} onClick={()=>void submit(true)}>{busy==='start'?<LoaderCircle className="spin"/>:<Radio/>}{scheduleLater?'Créer le Live':'Lancer le live'}</button>
-        <button className="live-secondary-action" disabled={Boolean(busy)} onClick={()=>{setScheduleLater(true);void submit(false,true);}}>{busy==='schedule'?<LoaderCircle className="spin"/>:<CalendarDays/>} Programmer</button>
+        <button className="live-secondary-action" disabled={Boolean(busy)} onClick={()=>void submit(false,true)}>{busy==='schedule'?<LoaderCircle className="spin"/>:<CalendarDays/>} Programmer</button>
       </section>
     </main>
   </AppShell>;
@@ -248,6 +253,11 @@ export function LiveRoomPage(){
   const [hostPanel,setHostPanel]=useState<'public'|'comments'|'moderation'>('comments');
   const [moreOpen,setMoreOpen]=useState(false);
   const recordingIdRef=useRef('');
+  const recordingAttemptRef=useRef(false);
+  const sharePendingRef=useRef(false);
+  const [sharePending,setSharePending]=useState(false);
+  const [recordingError,setRecordingError]=useState('');
+  const [confirmEndOpen,setConfirmEndOpen]=useState(false);
   const mediaRetryAttemptsRef=useRef(0);
   const localVideoRef=useRef<HTMLVideoElement|null>(null);
   const remoteVideoRef=useRef<HTMLVideoElement|null>(null);
@@ -257,6 +267,7 @@ export function LiveRoomPage(){
   const liveKit=useMeetingLiveKit({
     meetingId:live?.meetingId||0,
     localStream:publisher?localStream:null,
+    screenStream:screenStreamRef.current,
     media:publisher?media:{audio:false,video:false,screen:false},
     enabled:Boolean(joined&&live?.status==='live'&&live?.meetingId),
     sessionKey:mediaSessionKey,
@@ -396,9 +407,23 @@ export function LiveRoomPage(){
     tick();const timer=window.setInterval(tick,1000);return()=>window.clearInterval(timer);
   },[live?.startedAt,live?.status]);
 
+  const startLiveRecording=async(meetingId:number)=>{
+    if(recordingIdRef.current||recordingAttemptRef.current)return;
+    recordingAttemptRef.current=true;
+    setRecordingError('');
+    try{
+      const recording=await collaborationService.startServerRecording(meetingId,{layout:'speaker'});
+      if(!recording.id)throw new Error('Le serveur n’a pas renvoyé de référence d’enregistrement.');
+      recordingIdRef.current=recording.id;
+      setNotice('Enregistrement du Live activé.');
+    }catch(cause){
+      setRecordingError(cause instanceof Error?cause.message:'Enregistrement serveur indisponible. Vérifiez la configuration LiveKit Egress.');
+    }
+  };
+
   useEffect(()=>{
     if(!live?.isHost||!live.recordingEnabled||!joined||!liveKit.connected||recordingIdRef.current)return;
-    void collaborationService.startServerRecording(live.meetingId,{layout:'speaker'}).then((recording)=>{recordingIdRef.current=recording.id;setNotice('Enregistrement du Live activé.');}).catch(()=>setNotice('Le Live continue, mais l’enregistrement serveur n’a pas pu démarrer.'));
+    void startLiveRecording(live.meetingId);
   },[joined,live?.isHost,live?.recordingEnabled,live?.meetingId,liveKit.connected]);
 
   useEffect(()=>()=>{
@@ -419,7 +444,9 @@ export function LiveRoomPage(){
     finally{setBusy('');}
   };
   const endLive=async()=>{
-    if(!live||!window.confirm('Terminer ce Live pour tous les spectateurs ?'))return;setBusy('end');
+    if(!live||busy==='end')return;
+    setConfirmEndOpen(false);
+    setBusy('end');
     try{
       if(recordingIdRef.current)await collaborationService.stopServerRecording(live.meetingId,recordingIdRef.current).catch(()=>undefined);
       await liveService.end(live.id);setLive((current)=>current?{...current,status:'ended',viewerCount:0}:current);setJoined(false);
@@ -427,32 +454,49 @@ export function LiveRoomPage(){
     finally{setBusy('');}
   };
   const toggleMic=()=>{
-    if(!localStream?.getAudioTracks().length){setNotice('Le microphone n’est pas encore disponible.');return;}
-    localStream.getAudioTracks().forEach((track)=>{track.enabled=!media.audio;});setMedia((current)=>({...current,audio:!current.audio}));
+    const tracks=cameraStreamRef.current?.getAudioTracks()||[];
+    if(!tracks.length){setNotice('Le microphone n’est pas encore disponible.');return;}
+    tracks.forEach((track)=>{track.enabled=!media.audio;});setMedia((current)=>({...current,audio:!current.audio}));
   };
   const toggleCamera=()=>{
-    if(!localStream?.getVideoTracks().length){setNotice('La caméra n’est pas encore disponible.');return;}
-    localStream.getVideoTracks().forEach((track)=>{track.enabled=!media.video;});setMedia((current)=>({...current,video:!current.video}));
+    if(media.screen){setNotice('Arrêtez le partage avant de modifier la caméra.');return;}
+    const tracks=cameraStreamRef.current?.getVideoTracks()||[];
+    if(!tracks.length){setNotice('La caméra n’est pas encore disponible.');return;}
+    tracks.forEach((track)=>{track.enabled=!media.video;});setMedia((current)=>({...current,video:!current.video}));
+  };
+  const stopLiveScreenShare=()=>{
+    const capture=screenStreamRef.current;
+    screenStreamRef.current=null;
+    // Only stop capture tracks. Microphone belongs to cameraStreamRef and must
+    // survive a screen-share toggle.
+    capture?.getTracks().forEach((track)=>track.stop());
+    try{window.MBoteRoomAndroid?.stopScreenCapture?.();}catch{/* native bridge optional */}
+    setLocalStream(cameraStreamRef.current);
+    setMedia((current)=>({...current,screen:false,video:Boolean(cameraStreamRef.current?.getVideoTracks().some((track)=>track.enabled))}));
   };
   const shareScreen=async()=>{
-    if(media.screen){
-      screenStreamRef.current?.getTracks().forEach((track)=>track.stop());screenStreamRef.current=null;
-      const camera=cameraStreamRef.current;if(camera)setLocalStream(camera);setMedia((current)=>({...current,screen:false}));return;
-    }
+    if(sharePendingRef.current)return;
+    if(media.screen){stopLiveScreenShare();return;}
+    sharePendingRef.current=true;setSharePending(true);
     try{
-      const {requestDisplayCapture}=await import('./MeetingRoomV2');
+      // Browser capture permissions require a user gesture. Do not insert an
+      // asynchronous dynamic import between the button click and the request.
       const display=await requestDisplayCapture();
-      const mic=cameraStreamRef.current?.getAudioTracks()[0];if(mic&&!display.getAudioTracks().length)display.addTrack(mic);
+      const video=display.getVideoTracks()[0];
+      if(!video)throw new Error('Aucun écran sélectionné.');
+      const mic=cameraStreamRef.current?.getAudioTracks().filter((track)=>track.readyState==='live')||[];
+      const stream=new MediaStream([...display.getTracks(),...mic]);
       screenStreamRef.current=display;
-      display.getVideoTracks()[0]?.addEventListener('ended',()=>{
-        screenStreamRef.current?.getTracks().forEach((track)=>track.stop());screenStreamRef.current=null;
-        if(cameraStreamRef.current)setLocalStream(cameraStreamRef.current);setMedia((current)=>({...current,screen:false}));
-      },{once:true});
-      setLocalStream(display);setMedia((current)=>({...current,screen:true,video:true}));
+      video.addEventListener('ended',stopLiveScreenShare,{once:true});
+      setLocalStream(stream);
+      setMedia((current)=>({...current,screen:true,video:true}));
+      setNotice('Partage d’écran démarré.');
     }catch(cause){
-      if(cause instanceof DOMException&&cause.name==='NotAllowedError')setNotice('Le partage d’écran a été refusé.');
-      else setNotice('Le partage d’écran a été annulé ou n’est pas disponible.');
-    }
+      const name=cause instanceof DOMException?cause.name:'';
+      setNotice(name==='NotAllowedError'||name==='AbortError'
+        ? 'Partage d’écran annulé ou non autorisé.'
+        : cause instanceof Error?cause.message:'Partage d’écran indisponible sur cet appareil.');
+    }finally{sharePendingRef.current=false;setSharePending(false);}
   };
   const sendComment=async(event:FormEvent)=>{
     event.preventDefault();if(!commentText.trim()||!live)return;
@@ -514,7 +558,7 @@ export function LiveRoomPage(){
     </header>
 
     {notice?<div className="live-toast" onClick={()=>setNotice('')}>{notice}</div>:null}
-    {error?<div className="live-toast error" onClick={()=>setError('')}>{error}</div>:null}
+    {error?<div className="live-toast error" role="alert" onClick={()=>setError('')}>{error}</div>:null}
 
     {live.status==='scheduled'?<section className="live-scheduled-panel"><CalendarDays/><h1>{live.title}</h1><p>{live.scheduledFor?new Intl.DateTimeFormat('fr-FR',{dateStyle:'full',timeStyle:'short'}).format(new Date(live.scheduledFor)):''}</p>{live.isHost?<button className="live-primary-action" disabled={busy==='start'} onClick={()=>void startLive()}>{busy==='start'?<LoaderCircle className="spin"/>:<Radio/>} Lancer le Live maintenant</button>:<span>Ce Live n’a pas encore commencé.</span>}</section>:
     live.status==='ended'?<section className="live-scheduled-panel"><Square/><h1>Live terminé</h1><p>{live.title}</p>{live.recordingEnabled?<span>Le replay apparaîtra dans vos enregistrements lorsqu’il sera prêt.</span>:null}<button onClick={()=>navigate('/app/live')}>Découvrir d’autres Lives</button></section>:
@@ -537,15 +581,18 @@ export function LiveRoomPage(){
       </section>
 
       {publisher?<section className="live-host-dashboard">
+        {recordingError&&live.isHost?<div className="live-recording-warning" role="alert">
+          <span><strong>Enregistrement indisponible</strong><small>{recordingError}</small></span>
+          <button type="button" onClick={()=>{recordingAttemptRef.current=false;void startLiveRecording(live.meetingId);}}>Réessayer</button>
+        </div>:null}
         <div className="live-host-stats"><span><Eye/><strong>{fmtCount(live.viewerCount)}</strong><small>spectateurs</small></span><span><Heart/><strong>{fmtCount(live.likeCount)}</strong><small>j’aime</small></span><span><Send/><strong>{comments.length}</strong><small>commentaires</small></span><span><Share2/><strong>{fmtCount(live.shareCount)}</strong><small>partages</small></span></div>
         <div className="live-host-controls">
           <button className={media.audio?'active':''} onClick={toggleMic}>{media.audio?<Mic/>:<MicOff/>}<span>Micro<small>{media.audio?'Activé':'Muet'}</small></span></button>
-          <button className={media.video?'active':''} onClick={toggleCamera}>{media.video?<Video/>:<VideoOff/>}<span>Caméra<small>{media.video?'Activée':'Coupée'}</small></span></button>
-          <button className={media.screen?'active':''} onClick={()=>void shareScreen()}><Camera/><span>Partager<small>l’écran</small></span></button>
+          <button className={media.video?'active':''} disabled={media.screen} onClick={toggleCamera}>{media.video?<Video/>:<VideoOff/>}<span>Caméra<small>{media.video?'Activée':'Coupée'}</small></span></button>
+          <button className={media.screen?'active':''} disabled={sharePending} onClick={()=>void shareScreen()}><Camera/><span>{sharePending?'Démarrage…':media.screen?'Arrêter':'Partager'}<small>l’écran</small></span></button>
           <label className="live-quality-control"><Video/><span>Qualité<small>{videoQuality==='auto'?`Auto · ${activeVideoQuality==='high'?'HD':activeVideoQuality==='standard'?'standard':'éco'}`:videoQuality==='high'?'HD 720p':videoQuality==='standard'?'Standard':'Éco'}</small></span><select aria-label="Qualité vidéo du Live" value={videoQuality} disabled={media.screen} onChange={(event)=>setVideoQuality(event.target.value as VideoQuality)}><option value="auto">Automatique</option><option value="data-saver">Économie</option><option value="standard">Standard</option><option value="high">HD</option></select></label>
           <button onClick={()=>{setInviteOpen((value)=>!value);void liveService.getParticipationRequests(live.id).then(setRequests);}}><UserPlus/><span>Inviter<small>un invité</small></span></button>
           <button className={!live.chatEnabled?'active danger':''} onClick={()=>void toggleChat()}><Send/><span>Chat<small>{live.chatEnabled?'Actif':'Muet'}</small></span></button>
-          <button className="danger" disabled={busy==='end'} onClick={()=>void endLive()}><X/><span>Terminer<small>le Live</small></span></button>
         </div>
 
         {inviteOpen?<section className="live-invite-panel">
@@ -558,11 +605,18 @@ export function LiveRoomPage(){
         <section className="live-host-comments"><header><button type="button" className={hostPanel==='public'?'active':''} onClick={()=>setHostPanel('public')}>Public</button><button type="button" className={hostPanel==='comments'?'active':''} onClick={()=>setHostPanel('comments')}>Commentaires <b>{comments.length}</b></button><button type="button" className={hostPanel==='moderation'?'active':''} onClick={()=>setHostPanel('moderation')}>Modération</button></header>{hostPanel==='public'?<div className="live-panel-note"><strong>Vue publique</strong><span>Les spectateurs voient actuellement le direct, les réactions et les {live.chatEnabled?'commentaires.':'commentaires sont désactivés.'}</span></div>:comments.slice(-20).reverse().map((comment)=><article key={comment.id}><Avatar name={comment.name} src={comment.avatar}/><div><strong>{comment.name}</strong><p>{comment.text}</p></div>{hostPanel==='moderation'&&live.moderationEnabled?<button type="button" aria-label="Supprimer ce commentaire" onClick={()=>void deleteComment(comment.id)}><X/></button>:null}</article>)}{hostPanel==='moderation'&&!live.moderationEnabled?<div className="live-panel-note"><strong>Mode modération désactivé</strong><span>Activez-le lors de la création du Live pour gérer les commentaires ici.</span></div>:null}</section>
 
         <section className="live-luna-card"><header><div><Sparkles/><span><strong>Résumé Luna IA</strong><small>Analyse du direct et points importants</small></span></div><button disabled={busy==='summary'} onClick={()=>void generateSummary()}>{busy==='summary'?<LoaderCircle className="spin"/>:<Sparkles/>} Générer</button></header>{summary?<ul>{summary.bullets.slice(0,5).map((item)=><li key={item}>{item}</li>)}</ul>:<p>Luna peut générer les points clés, décisions et actions du Live.</p>}</section>
-        <button className="live-end-button" disabled={busy==='end'} onClick={()=>void endLive()}><Square/> Terminer le live</button>
+        <button className="live-end-button" type="button" disabled={busy==='end'} onClick={()=>setConfirmEndOpen(true)}><Square/> {busy==='end'?'Fin du Live…':'Terminer le Live'}</button>
       </section>:<section className="live-viewer-bottom">
         {live.chatEnabled&&live.canComment?<form className="live-comment-form" onSubmit={sendComment}><input value={commentText} onChange={(event)=>setCommentText(event.target.value)} placeholder="Écrire un commentaire…"/><button><Send/></button></form>:<div className="live-chat-disabled">{user?.isGuest?'Créez un compte pour commenter.':'Le chat est désactivé pour ce Live.'}</div>}
         {live.cohostsEnabled&&live.canRequestParticipation?<button className="live-request-button" onClick={()=>void requestParticipation()}><UserPlus/> Demander à participer</button>:null}
       </section>}
     </>}
+    {confirmEndOpen&&<div className="live-confirm-backdrop" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)setConfirmEndOpen(false);}}>
+      <section className="live-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="live-confirm-title">
+        <strong id="live-confirm-title">Terminer le Live pour tous ?</strong>
+        <p>Les spectateurs seront déconnectés et le direct ne pourra plus être rejoint.</p>
+        <div><button type="button" disabled={busy==='end'} onClick={()=>setConfirmEndOpen(false)}>Annuler</button><button type="button" className="danger" disabled={busy==='end'} onClick={()=>void endLive()}>{busy==='end'?'Fin en cours…':'Terminer pour tous'}</button></div>
+      </section>
+    </div>}
   </main>;
 }
