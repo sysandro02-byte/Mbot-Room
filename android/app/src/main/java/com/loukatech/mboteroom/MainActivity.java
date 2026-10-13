@@ -113,10 +113,17 @@ public class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 if (isTrustedAppUri(uri)) return false;
+                // Never dispatch javascript:, file:, content:, intent: or custom
+                // deep links from an untrusted page into other Android apps.
+                String scheme = uri == null || uri.getScheme() == null
+                        ? "" : uri.getScheme().toLowerCase(java.util.Locale.ROOT);
+                boolean web = "https".equals(scheme) || "http".equals(scheme);
+                boolean contact = "mailto".equals(scheme) || "tel".equals(scheme);
+                if ((!web && !contact) || (web && uri.getHost() == null)) return true;
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, uri));
                 } catch (Exception ignored) {
-                    // Keep unsupported external schemes out of the privileged WebView.
+                    // Unsupported links must not gain access to the privileged WebView.
                 }
                 return true;
             }
