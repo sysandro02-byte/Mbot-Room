@@ -556,7 +556,7 @@ try {
     const video = tile?.querySelector('video');
     return Boolean(tile?.classList.contains('is-screen') && video && video.videoWidth > 0 && video.videoHeight > 0);
   }, undefined, { timeout: 15_000 });
-  await clickControl(participantRoom.page, 'Partager');
+  await clickControl(participantRoom.page, 'Arrêter partage');
   await hostRoom.page.waitForFunction(() => {
     const tile = Array.from(document.querySelectorAll('.room-v2-tile')).find((candidate) => candidate.textContent?.includes('Participant Vidéo') && !candidate.textContent?.includes('(vous)'));
     return Boolean(tile && !tile.classList.contains('is-screen'));
