@@ -117,7 +117,7 @@ ${password ? `Mot de passe : ${password}\n` : ''}Rejoindre : ${joinUrl}`,
 ${passwordRow}
 </table>
 <p style="margin:28px 0 12px"><a href="${escapeHtml(joinUrl)}" style="display:inline-block;padding:13px 20px;border-radius:12px;background:#3156eb;color:#fff;text-decoration:none;font-weight:850">Rejoindre la réunion</a></p>
-<p style="margin:0;color:#7b8798;font-size:12px;line-height:1.6">Vous pouvez rejoindre depuis un ordinateur, un téléphone ou une tablette. L’hôte peut utiliser une salle d’attente avant de vous admettre.</p></td></tr>
+<p style="margin:0;color:#7b8798;font-size:12px;line-height:1.6">Vous pouvez rejoindre depuis un ordinateur, un téléphone ou une tablette. L’hôte ou le co-hôte doit vous admettre depuis la salle d’attente avant votre entrée.</p></td></tr>
 <tr><td style="padding:19px 34px;border-top:1px solid #edf1f7;background:#fafcff;color:#7a879d;font-size:12px;line-height:1.6">Ne transférez cette invitation qu’aux personnes autorisées à participer.<br>MBotéRoom est une application créée par LoukaTech.<br>© LoukaTech · MBotéRoom</td></tr>
 </table></td></tr></table></body></html>`,
   })));
@@ -145,6 +145,8 @@ const defaultSettings = (): MeetingSettings => ({
 const buildSettings = (body: any, existing?: Meeting) => {
   const incoming = (body?.settings || {}) as MeetingSettings & { password?: string };
   const settings: MeetingSettings = { ...defaultSettings(), ...(existing?.settings || {}), ...incoming };
+  // Password and invitation never bypass moderation, including legacy meetings.
+  settings.waitingRoom = true;
   const invitationEmails = normalizeInvitationEmails(body?.participants || incoming.participants);
   if (invitationEmails.length) settings.participants = invitationEmails;
   const plainPassword = String(incoming.password || '').trim();
@@ -622,18 +624,20 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
         `SELECT status FROM room_meeting_members WHERE meeting_id=$1 AND user_id=$2 LIMIT 1`,
         [meeting.id, request.user!.id],
       );
-      const alreadyAccepted = existingMember.rows[0]?.status === 'accepted';
-      const previouslyRemoved = existingMember.rows[0]?.status === 'removed';
-      if (meeting.settings.locked === true && !canModerateMeeting(meeting, request.user!) && !alreadyAccepted) {
+      const moderator = canModerateMeeting(meeting, request.user!);
+      if (meeting.settings.locked === true && !moderator) {
         return sendApiError(response, 423, 'MEETING_LOCKED', 'La réunion est verrouillée par l’hôte.');
       }
-      const moderator = canModerateMeeting(meeting, request.user!);
-      const hostHasStarted = meeting.is_active || meeting.status === 'live';
-      const blockedUntilHost = !moderator && !alreadyAccepted && !hostHasStarted && meeting.settings.joinBeforeHost !== true;
-      const status = moderator || alreadyAccepted || (!previouslyRemoved && !blockedUntilHost && meeting.settings.waitingRoom === false) ? 'accepted' : 'requested';
-      if (status === 'accepted' && !alreadyAccepted && !moderator) {
-        const count = await acceptedMemberCount(meeting.id);
-        if (count >= meetingCapacity(meeting)) return sendApiError(response, 409, 'MEETING_CAPACITY_REACHED', 'La capacité maximale de la réunion est atteinte.');
+      // Every explicit join attempt by a participant returns to the waiting room.
+      // An admitted participant who reconnects does not call join-request again.
+      const status = moderator ? 'accepted' : 'requested';
+      if (!moderator && existingMember.rows[0]?.status === 'accepted') {
+        await query(
+          `UPDATE room_meeting_members SET status='left',left_at=now(),updated_at=now()
+            WHERE meeting_id=$1 AND user_id=$2 AND status='accepted'`,
+          [meeting.id, request.user!.id],
+        );
+        await ejectParticipant?.(io, meeting.id, request.user!.id);
       }
       await query(
         `INSERT INTO room_lobby (meeting_id,user_id,status,name,avatar) VALUES ($1,$2,$3,$4,$5)
@@ -855,24 +859,6 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
       if (meeting.status === 'ended' || meeting.status === 'cancelled') return sendApiError(response, 409, 'MEETING_ALREADY_ENDED', 'Cette réunion est déjà terminée ou annulée.');
       if (!canModerateMeeting(meeting, request.user!)) return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte ou le co-hôte peut démarrer la réunion.');
       const updated = await query(`UPDATE room_meetings SET status='live',is_active=true,started_at=COALESCE(started_at,now()),ended_at=NULL,updated_at=now() WHERE id=$1 RETURNING *`, [meeting.id]);
-      if (meeting.settings.waitingRoom === false) {
-        const pending = await query(`SELECT user_id FROM room_lobby WHERE meeting_id=$1 AND status='requested' ORDER BY user_id`, [meeting.id]);
-        const currentCount = await acceptedMemberCount(meeting.id);
-        const availableSlots = Math.max(0, meetingCapacity(meeting) - currentCount);
-        const autoAdmitIds = pending.rows.map((row) => Number(row.user_id)).filter(Boolean).slice(0, availableSlots);
-        if (autoAdmitIds.length) {
-          await query(`UPDATE room_lobby SET status='accepted' WHERE meeting_id=$1 AND user_id = ANY($2::int[])`, [meeting.id, autoAdmitIds]);
-          for (const userId of autoAdmitIds) {
-            await query(
-              `INSERT INTO room_meeting_members (meeting_id,user_id,role,status,joined_at) VALUES ($1,$2,'participant','accepted',now())
-               ON CONFLICT (meeting_id,user_id) DO UPDATE SET status='accepted',joined_at=COALESCE(room_meeting_members.joined_at,now()),updated_at=now()`,
-              [meeting.id, userId],
-            );
-            io.to(`user:${userId}`).emit('meeting:lobby-status', { meetingId: meeting.id, status: 'accepted' });
-          }
-          io.to(`meeting:${meeting.id}`).emit('meeting:lobby-updated', { meetingId: meeting.id, autoAdmitted: true });
-        }
-      }
       const members = await query(`SELECT DISTINCT user_id FROM room_meeting_members WHERE meeting_id=$1 AND user_id<>$2`, [meeting.id, request.user!.id]);
       const memberIds=members.rows.map((row)=>Number(row.user_id)).filter(Boolean);
       const value = publicMeeting(updated.rows[0]);

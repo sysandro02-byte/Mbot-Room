@@ -27,6 +27,7 @@ import {
 import { sendTransactionalEmail } from './emailDelivery.js';
 import { resolveAllowedClientOrigin } from './originPolicy.js';
 import { isPlatformFeatureEnabled } from './platformSettings.js';
+import { createNotificationAndPush } from './pushService.js';
 import { companyCategories, getRegistrationCountry, isRegistrationCity } from '../src/lib/registrationCatalog.js';
 
 const challenges = new Map<string, { profile: any; createdAt: number }>();
@@ -619,13 +620,8 @@ export const registerAuthRoutes = (app: express.Express, io: Server) => {
         return sendApiError(response, 403, 'MEETING_PASSWORD_INVALID', 'Mot de passe de réunion incorrect.');
       }
 
-      const hostHasStarted = meeting.is_active || meeting.status === 'live';
-      const blockedUntilHost = !hostHasStarted && meeting.settings.joinBeforeHost !== true;
-      const status = !blockedUntilHost && meeting.settings.waitingRoom === false ? 'accepted' : 'requested';
-
-      if (status === 'accepted' && await acceptedMemberCount(meeting.id) >= meetingCapacity(meeting)) {
-        return sendApiError(response, 409, 'MEETING_CAPACITY_REACHED', 'La capacité maximale de la réunion est atteinte.');
-      }
+      // All guests wait for a moderator, even in a meeting without a password.
+      const status = 'requested';
 
       const randomPassword = hashPassword(createToken());
       const guestEmail = `guest-${createId()}@guest.mbote.local`;
@@ -642,15 +638,6 @@ export const registerAuthRoutes = (app: express.Express, io: Server) => {
          ON CONFLICT (meeting_id,user_id) DO UPDATE SET status=excluded.status,name=excluded.name,avatar=excluded.avatar`,
         [meeting.id, user.id, status, user.name, user.avatar],
       );
-      if (status === 'accepted') {
-        await query(
-          `INSERT INTO room_meeting_members (meeting_id,user_id,role,status,joined_at)
-           VALUES ($1,$2,'participant','accepted',now())
-           ON CONFLICT (meeting_id,user_id) DO UPDATE SET role='participant',status='accepted',joined_at=COALESCE(room_meeting_members.joined_at,now()),left_at=NULL,updated_at=now()`,
-          [meeting.id, user.id],
-        );
-      }
-
       io.to(`meeting:${meeting.id}:moderators`).emit('meeting:lobby-updated', {
         meetingId: meeting.id,
         userId: user.id,
@@ -658,6 +645,19 @@ export const registerAuthRoutes = (app: express.Express, io: Server) => {
         name: user.name,
         avatar: user.avatar,
       });
+
+      const moderatorIds = [...new Set([meeting.host_id, meeting.co_host_id].map(Number).filter(Boolean))];
+      await Promise.all(moderatorIds.map(async (userId) => {
+        const notification = await createNotificationAndPush(userId, {
+          type: 'MEETING_LOBBY_REQUEST',
+          title: 'Invité en salle d’attente',
+          body: `${user.name || 'Un invité'} souhaite rejoindre « ${meeting.title} ».`,
+          url: `/reunions/${meeting.meeting_link}`,
+          tag: `meeting-lobby-${meeting.id}`,
+          data: { meetingId: meeting.id, userId: user.id },
+        });
+        io.to(`user:${userId}`).emit('notification:new', notification);
+      })).catch(() => undefined);
 
       const session = await createSession(user.id, false);
       attachSessionCookie(response, session);

@@ -731,21 +731,27 @@ export default function MeetingRoomV2() {
       }
       if (!found) throw new Error('Réunion introuvable ou inaccessible.');
 
-      // Do not publish guest media before lobby membership is verified.
-      if (!currentUser?.isGuest) {
-        setMeeting(found);
-        setLoading(false);
-        return;
+      // Room entry (including LiveKit/media) requires actual admission, for
+      // registered accounts AND guests. Host/co-host can enter to moderate.
+      const moderator = Boolean(currentUser && (
+        Number(found.host_id) === Number(currentUser.id)
+        || Number(found.co_host_id || 0) === Number(currentUser.id)
+        || Number(found.temporary_host_id || 0) === Number(currentUser.id)
+        || currentUser.role === 'admin'
+      ));
+      if (!moderator) {
+        const lobby = await meetingService.getLobby(found.id);
+        const ownLobby = lobby.find((item) => String(item.user_id) === String(currentUser?.id || ''));
+        if (ownLobby?.status === 'requested') {
+          navigate(`/reunions/${found.meeting_link}/salle-attente`, { replace: true, state: location.state });
+          return;
+        }
+        if (ownLobby?.status === 'rejected') throw new Error('L’hôte a refusé votre demande d’accès.');
+        if (ownLobby?.status !== 'accepted') {
+          navigate(`/join/${encodeURIComponent(found.meeting_link)}`, { replace: true });
+          return;
+        }
       }
-
-      const lobby = await meetingService.getLobby(found.id).catch(() => []);
-      const ownLobby = lobby.find((item) => String(item.user_id) === String(currentUser?.id || ''));
-      if (currentUser?.isGuest && ownLobby?.status === 'requested') {
-        navigate(`/reunions/${found.meeting_link}/salle-attente`, { replace: true, state: location.state });
-        return;
-      }
-      if (currentUser?.isGuest && ownLobby?.status === 'rejected') throw new Error('L’hôte a refusé votre demande d’accès.');
-      if (currentUser?.isGuest && ownLobby?.status !== 'accepted') throw new Error('Cette invitation ne vous donne pas accès à cette réunion.');
       setMeeting(found);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Impossible de charger la réunion.');

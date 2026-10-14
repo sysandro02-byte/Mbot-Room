@@ -33,6 +33,7 @@ type WaitingRoomState = {
   meetingId?: string | number;
   meeting?: Partial<Meeting>;
   isGuest?: boolean;
+  joinOptions?: { mic?: boolean; camera?: boolean; audioInputId?: string; videoInputId?: string };
 };
 
 const initialDevices: MediaDevicesState = {
@@ -214,17 +215,15 @@ export default function GuestWaitingRoomPage() {
     let cancelled = false;
     const loadMeeting = async () => {
       try {
-        const meetings = await meetingService.getMeetings();
+        // Restore the meeting after page reload, including private invitations.
+        const found: Meeting | null = locationState?.meeting?.id
+          ? locationState.meeting as Meeting
+          : /^\d+$/.test(meetingId)
+            ? (await meetingService.getMeetings()).find((item) => String(item.id) === meetingId) || null
+            : await meetingService.getMeetingByLink(meetingId);
         if (cancelled) return;
-        const found = meetings.find((item) => {
-          const accessCode = getMeetingAccessCode(item);
-          return String(item.id) === String(meetingId)
-            || String(item.meeting_link) === String(meetingId)
-            || accessCode === String(meetingId).toUpperCase()
-            || String(locationState?.meeting?.id || '') === String(item.id);
-        }) || null;
-        setMeeting(found || (locationState?.meeting as Meeting | undefined) || null);
-        if (!found && !locationState?.meeting) setMeetingError('Réunion introuvable ou inaccessible.');
+        setMeeting(found);
+        if (!found) setMeetingError('Réunion introuvable ou inaccessible.');
       } catch (error) {
         if (!cancelled) setMeetingError(error instanceof Error ? error.message : 'Impossible de charger la réunion.');
       }
@@ -299,10 +298,13 @@ export default function GuestWaitingRoomPage() {
           state: {
             guestName,
             meeting,
-            isGuest: true,
+            isGuest: currentUser?.isGuest === true,
             joinOptions: {
+              ...locationState?.joinOptions,
               mic: microphoneEnabledRef.current,
               camera: cameraEnabledRef.current,
+              audioInputId: selectedMicrophone || locationState?.joinOptions?.audioInputId,
+              videoInputId: selectedCamera || locationState?.joinOptions?.videoInputId,
               background: backgroundMode !== 'none',
               backgroundUrl: customBackgroundUrl || undefined,
             },
@@ -345,7 +347,7 @@ export default function GuestWaitingRoomPage() {
       window.clearInterval(intervalId);
       if (rejectionTimer !== null) window.clearTimeout(rejectionTimer);
     };
-  }, [backgroundMode, currentUser?.id, customBackgroundUrl, guestName, meeting, navigate, stopMedia]);
+  }, [backgroundMode, currentUser?.id, currentUser?.isGuest, customBackgroundUrl, guestName, meeting, navigate, stopMedia, selectedMicrophone, selectedCamera, locationState?.joinOptions]);
 
   useEffect(() => {
     return () => {
@@ -461,7 +463,7 @@ export default function GuestWaitingRoomPage() {
       sessionStorage.removeItem('mboteroom-guest-meeting-link');
       await authService.logout().catch(() => undefined);
     }
-    navigate('/rejoindre-une-reunion', { replace: true });
+    navigate(currentUser?.isGuest ? '/rejoindre-une-reunion' : '/app/meetings', { replace: true });
   };
 
   const openDeviceSettings = () => {

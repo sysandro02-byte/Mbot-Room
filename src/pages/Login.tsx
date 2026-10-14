@@ -633,7 +633,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
       const meetingLink = String(result.meeting?.meeting_link || '');
       if (!meetingLink) throw new Error('Le lien de réunion est introuvable.');
       sessionStorage.setItem('mboteroom-guest-meeting-link', meetingLink);
-      const target = `/reunions/${encodeURIComponent(meetingLink)}${result.lobbyStatus === 'requested' ? '/salle-attente' : ''}`;
+      const target = `/reunions/${encodeURIComponent(meetingLink)}/salle-attente`;
       navigate(target, {
         replace: true,
         state: { meeting: result.meeting, guestName: guestName.trim(), isGuest: true },

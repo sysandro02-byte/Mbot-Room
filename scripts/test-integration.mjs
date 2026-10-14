@@ -1431,6 +1431,86 @@ try {
   assert.equal(outsiderMediaSession.response.status, 403);
   assert.equal(outsiderMediaSession.data.code, 'MEETING_ACCESS_DENIED');
 
+  // Admission is mandatory with or without passwords, on both Android and web
+  // because the API, realtime socket and LiveKit gate access server-side.
+  const openMeetingResponse = await jsonRequest('/api/meetings', {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({
+      title: 'Salle d’attente obligatoire sans mot de passe',
+      startTime: new Date(Date.now() + 60_000).toISOString(),
+      duration: 45,
+      settings: { waitingRoom: false, joinBeforeHost: true, participantCapacity: 10 },
+    }),
+  });
+  assert.equal(openMeetingResponse.response.status, 201, JSON.stringify(openMeetingResponse.data));
+  const openMeeting = openMeetingResponse.data;
+  assert.equal(openMeeting.settings.waitingRoom, true, 'Server overrides obsolete direct-entry setting');
+  const openLookup = await jsonRequest('/api/meetings/join-lookup', {
+    method: 'POST',
+    headers: authHeaders(outsider.token),
+    body: JSON.stringify({ value: openMeeting.settings.meetingAccessId, password: '' }),
+  });
+  assert.equal(openLookup.response.status, 200, JSON.stringify(openLookup.data));
+
+  const openJoin = await jsonRequest(`/api/meetings/${openMeeting.id}/join-request`, {
+    method: 'POST', headers: authHeaders(outsider.token), body: JSON.stringify({ password: '' }),
+  });
+  assert.equal(openJoin.response.status, 200, JSON.stringify(openJoin.data));
+  assert.equal(openJoin.data.status, 'requested');
+  const pendingMedia = await jsonRequest(`/api/meetings/${openMeeting.id}/media-session`, { headers: authHeaders(outsider.token) });
+  assert.equal(pendingMedia.response.status, 403, 'No LiveKit credentials before admission');
+
+  const guestOpenJoin = await jsonRequest('/api/auth/guest-join', {
+    method: 'POST',
+    headers: { 'X-MBote-Room-Session-Mode': 'bearer' },
+    body: JSON.stringify({
+      name: 'Invité en attente',
+      meetingCode: openMeeting.settings.meetingAccessId,
+      password: '',
+      termsAccepted: true,
+      termsVersion: '2026-09-24',
+    }),
+  });
+  assert.equal(guestOpenJoin.response.status, 201, JSON.stringify(guestOpenJoin.data));
+  assert.equal(guestOpenJoin.data.lobbyStatus, 'requested');
+  assert.ok(guestOpenJoin.data.token);
+  const guestPendingMedia = await jsonRequest(`/api/meetings/${openMeeting.id}/media-session`, { headers: authHeaders(guestOpenJoin.data.token) });
+  assert.equal(guestPendingMedia.response.status, 403, 'Guest cannot publish video before acceptance');
+
+  const startOpen = await jsonRequest(`/api/meetings/${openMeeting.id}/start-notify`, {
+    method: 'POST', headers: authHeaders(host.token),
+  });
+  assert.equal(startOpen.response.status, 200, JSON.stringify(startOpen.data));
+  const lobbyStillPending = await jsonRequest(`/api/meetings/${openMeeting.id}/lobby`, { headers: authHeaders(host.token) });
+  assert.equal(lobbyStillPending.response.status, 200);
+  assert.ok(lobbyStillPending.data.some((entry) => Number(entry.user_id) === Number(outsider.user.id) && entry.status === 'requested'));
+  assert.ok(lobbyStillPending.data.some((entry) => Number(entry.user_id) === Number(guestOpenJoin.data.user.id) && entry.status === 'requested'));
+
+  const moderatorAdmits = await jsonRequest(`/api/meetings/${openMeeting.id}/lobby/respond`, {
+    method: 'POST', headers: authHeaders(host.token),
+    body: JSON.stringify({ userId: outsider.user.id, status: 'accepted' }),
+  });
+  assert.equal(moderatorAdmits.response.status, 200);
+  const admittedMedia = await jsonRequest(`/api/meetings/${openMeeting.id}/media-session`, { headers: authHeaders(outsider.token) });
+  assert.equal(admittedMedia.response.status, 200, JSON.stringify(admittedMedia.data));
+
+  // A fresh explicit join must again wait; previous acceptance cannot bypass it.
+  const rejoinOpen = await jsonRequest(`/api/meetings/${openMeeting.id}/join-request`, {
+    method: 'POST', headers: authHeaders(outsider.token), body: JSON.stringify({ password: '' }),
+  });
+  assert.equal(rejoinOpen.response.status, 200);
+  assert.equal(rejoinOpen.data.status, 'requested');
+  const revokedMedia = await jsonRequest(`/api/meetings/${openMeeting.id}/media-session`, { headers: authHeaders(outsider.token) });
+  assert.equal(revokedMedia.response.status, 403);
+  const guestAdmit = await jsonRequest(`/api/meetings/${openMeeting.id}/lobby/respond`, {
+    method: 'POST', headers: authHeaders(host.token),
+    body: JSON.stringify({ userId: guestOpenJoin.data.user.id, status: 'accepted' }),
+  });
+  assert.equal(guestAdmit.response.status, 200);
+  const guestAdmittedMedia = await jsonRequest(`/api/meetings/${openMeeting.id}/media-session`, { headers: authHeaders(guestOpenJoin.data.token) });
+  assert.equal(guestAdmittedMedia.response.status, 200);
+
   const recordingCapability = await jsonRequest('/api/recording/status');
   assert.equal(recordingCapability.response.status, 200, JSON.stringify(recordingCapability.data));
   assert.equal(recordingCapability.data.ready, true);

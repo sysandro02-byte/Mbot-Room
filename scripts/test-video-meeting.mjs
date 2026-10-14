@@ -423,6 +423,16 @@ try {
     headers: authHeaders(host.token),
   });
   assert.equal(start.response.status, 200, JSON.stringify(start.data));
+  const stillWaiting = await jsonRequest(`/api/meetings/${meeting.id}/lobby`, { headers: authHeaders(host.token) });
+  assert.equal(stillWaiting.response.status, 200);
+  assert.ok(stillWaiting.data.filter((entry) => entry.status === 'requested').length >= 2,
+    'Starting a meeting with legacy waitingRoom=false must not automatically admit participants');
+  const hostAdmits = await jsonRequest(`/api/meetings/${meeting.id}/lobby/admit-all`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+  });
+  assert.equal(hostAdmits.response.status, 200, JSON.stringify(hostAdmits.data));
+  assert.equal(hostAdmits.data.admitted, 2, 'Only explicit host approval unlocks video media');
 
   browser = await chromium.launch({
     headless: true,

@@ -128,12 +128,8 @@ export default function RealJoinPage(){
         return;
       }
       const numericUserId=Number(user?.id);
-      const result=await meetingService.requestJoin(meeting.id,Number.isFinite(numericUserId)?numericUserId:undefined,password);
-      if(result.status==='requested'){
-        navigate('/reunions/'+meeting.meeting_link+'/salle-attente',{state:{meeting,joinOptions:{mic,camera,audioInputId:selectedMic,videoInputId:selectedCamera}}});
-        return;
-      }
-      navigate('/reunions/'+meeting.meeting_link,{state:{meeting,joinOptions:{mic,camera,audioInputId:selectedMic,videoInputId:selectedCamera}}});
+      await meetingService.requestJoin(meeting.id,Number.isFinite(numericUserId)?numericUserId:undefined,password);
+      navigate('/reunions/'+meeting.meeting_link+'/salle-attente',{state:{meeting,joinOptions:{mic,camera,audioInputId:selectedMic,videoInputId:selectedCamera}}});
     }catch(cause){setError(cause instanceof Error?cause.message:'Impossible de rejoindre la réunion.');}
     finally{setLoading(false);}
   };
@@ -305,7 +301,7 @@ export default function RealJoinPage(){
           <dl>
             <div><dt>Hôte</dt><dd>{meeting.host_name}</dd></div>
             <div><dt>Début</dt><dd>{new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(meeting.start_time))}</dd></div>
-            <div><dt>Salle d’attente</dt><dd>{meeting.settings?.waitingRoom===false?'Non':'Oui'}</dd></div>
+            <div><dt>Salle d’attente</dt><dd>Obligatoire · admission par l’hôte ou le co-hôte</dd></div>
           </dl>
           <div className="real-join-media">
             <button className={mic?'on':''} onClick={()=>setMic((current)=>!current)} disabled={!micAllowed}>{mic?<Mic/>:<MicOff/>}<span>{!micAllowed?'Micro désactivé':mic?'Micro actif':'Micro coupé'}</span></button>
