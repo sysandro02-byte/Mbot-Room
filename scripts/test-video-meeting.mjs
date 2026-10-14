@@ -438,6 +438,11 @@ try {
   const loginContext = await browser.newContext({ locale: 'fr-FR' });
   const loginPage = await loginContext.newPage();
   await loginPage.goto(`${baseUrl}/login`, { waitUntil: 'domcontentloaded' });
+  const apkButton = loginPage.locator('a.android-apk-action');
+  await apkButton.waitFor({ state: 'visible', timeout: 10_000 });
+  const apkHref = await apkButton.getAttribute('href');
+  assert.equal(apkHref, 'https://mboteroom.loukatech.com/download/android', 'Login APK button must use the MBotéRoom download endpoint');
+  assert.ok(!apkHref?.includes('supabase.co'), 'Login must not reveal the Supabase storage URL');
   await loginPage.locator('.android-welcome-connect').click();
   await loginPage.locator('.android-login-modal').waitFor({ state: 'visible', timeout: 10_000 });
   await loginPage.locator('#login-email').fill('host.video@mbote.test');

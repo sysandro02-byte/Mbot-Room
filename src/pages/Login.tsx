@@ -1,4 +1,5 @@
 import { extractMeetingIdentifier } from '../lib/meetingInvitation';
+import { isNativeAndroidApp } from '../lib/nativePlatform';
 import { FocusEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -891,6 +892,13 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                 <button className="android-welcome-connect" type="button" onClick={() => setShowAndroidCredentials(true)}><User size={25}/><span><b>Connexion</b><small>Se connecter à mon compte</small></span><ChevronRight/></button>
                 <button type="button" onClick={() => { clearErrors(); setRegisterModalOpen(true); }}><span className="android-action-icon">+</span><span><b>Créer un compte</b><small>Rejoignez MBotéRoom gratuitement</small></span><ChevronRight/></button>
                 <button className="android-guest-action" type="button" onClick={goToGuestJoin}><span className="android-action-icon"><User size={20}/></span><span><b>Continuer en tant qu’invité</b><small>Rejoindre sans créer de compte</small></span><ChevronRight/></button>
+                {!isNativeAndroidApp() ? (
+                  <a className="android-apk-action" href={ANDROID_APK_URL} aria-label={copy.apkDownload}>
+                    <span className="android-action-icon"><Smartphone size={20} aria-hidden="true"/></span>
+                    <span><b>{copy.apkTitle}</b><small>{copy.apkDownload}</small></span>
+                    <Download size={22} aria-hidden="true"/>
+                  </a>
+                ) : null}
               </div>
               <div className="android-welcome-shortcuts">
                 <button type="button"><Sparkles/><b>Premium</b><small>Fonctionnalités avancées</small></button>
