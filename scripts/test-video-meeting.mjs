@@ -518,7 +518,8 @@ try {
   assert.notEqual(chronoAfter, chronoBefore, 'Meeting chrono must advance while the meeting is live');
 
   // Waiting-room control must open an actual admission panel, even when empty.
-  await hostRoom.page.locator('.room-v2-lobby-live-button').click();
+  await hostRoom.page.locator('.room-v2-more-wrap .room-v2-control').click();
+  await hostRoom.page.locator('.room-v2-more-menu').getByRole('button',{name:/Salle d’attente/}).click();
   const lobbyManager = hostRoom.page.locator('[data-testid="lobby-manager"]');
   await lobbyManager.waitFor({state:'visible',timeout:10_000});
   assert.match(await lobbyManager.innerText(),/en attente|Aucun participant/);

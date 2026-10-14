@@ -2182,7 +2182,7 @@ export default function MeetingRoomV2() {
         {screenShareActive ? <button type="button" className="active room-v2-share-tab"><MonitorUp/><span>Partage d’écran</span></button> : null}
       </nav>
 
-      {isModerator ? (
+      {isModerator && lobbyParticipants.length > 0 ? (
         <button
           type="button"
           className="room-v2-lobby-live-button"
