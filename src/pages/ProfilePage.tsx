@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   UserRound,
   UsersRound,
+  Video,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { appDataService, type Preferences, type ProfileStats } from '../services/appDataService';

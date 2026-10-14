@@ -3,7 +3,7 @@ import { extractMeetingIdentifier } from '../lib/meetingInvitation';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft, ChevronRight, CircleHelp, Clock3, Eye, EyeOff, Laptop, Link2, LockKeyhole,
-  Mail, Mic, MicOff, QrCode, ShieldCheck, UsersRound, Video, VideoOff, X,
+  Mail, Mic, MicOff, QrCode, ShieldCheck, UsersRound, Video, VideoOff, Volume2, X, CalendarDays, Copy,
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { authService } from '../services/authService';
@@ -11,6 +11,7 @@ import { readCachedPreferences } from '../lib/userPreferences';
 import { Meeting, meetingService } from '../services/meetingService';
 import { showAppMessage } from '../lib/appMessage';
 import { isNativeAndroidApp } from '../lib/nativePlatform';
+import { cameraVideoConstraints, cameraResolutionLabel } from '../lib/videoQuality';
 import './RealJoinPage.css';
 
 type BarcodeDetectorInstance={detect:(source:CanvasImageSource)=>Promise<Array<{rawValue:string}>>};
@@ -31,6 +32,12 @@ export default function RealJoinPage(){
   const [mic,setMic]=useState(initialPreferences.defaultMic!==false);
   const [camera,setCamera]=useState(initialPreferences.defaultCamera!==false);
   const [loading,setLoading]=useState(false);
+  const [deviceList,setDeviceList]=useState<MediaDeviceInfo[]>([]);
+  const [selectedCamera,setSelectedCamera]=useState('');
+  const [selectedMic,setSelectedMic]=useState('');
+  const [previewBlur,setPreviewBlur]=useState(false);
+  const [previewResolution,setPreviewResolution]=useState('Résolution automatique');
+  const [testingDevices,setTestingDevices]=useState(false);
   const [error,setError]=useState('');
   const [qrOpen,setQrOpen]=useState(false);
   const [nativeJoinMode,setNativeJoinMode]=useState<'code'|'link'>('code');
@@ -114,19 +121,19 @@ export default function RealJoinPage(){
         if(!meeting.is_active){
           const result=await meetingService.startMeetingAndNotify(meeting.id);
           const live=result.meeting||{...meeting,is_active:true};
-          navigate('/reunions/'+meeting.meeting_link,{state:{meeting:live,joinOptions:{mic,camera}}});
+          navigate('/reunions/'+meeting.meeting_link,{state:{meeting:live,joinOptions:{mic,camera,audioInputId:selectedMic,videoInputId:selectedCamera}}});
           return;
         }
-        navigate('/reunions/'+meeting.meeting_link,{state:{meeting,joinOptions:{mic,camera}}});
+        navigate('/reunions/'+meeting.meeting_link,{state:{meeting,joinOptions:{mic,camera,audioInputId:selectedMic,videoInputId:selectedCamera}}});
         return;
       }
       const numericUserId=Number(user?.id);
       const result=await meetingService.requestJoin(meeting.id,Number.isFinite(numericUserId)?numericUserId:undefined,password);
       if(result.status==='requested'){
-        navigate('/reunions/'+meeting.meeting_link+'/salle-attente',{state:{meeting,joinOptions:{mic,camera}}});
+        navigate('/reunions/'+meeting.meeting_link+'/salle-attente',{state:{meeting,joinOptions:{mic,camera,audioInputId:selectedMic,videoInputId:selectedCamera}}});
         return;
       }
-      navigate('/reunions/'+meeting.meeting_link,{state:{meeting,joinOptions:{mic,camera}}});
+      navigate('/reunions/'+meeting.meeting_link,{state:{meeting,joinOptions:{mic,camera,audioInputId:selectedMic,videoInputId:selectedCamera}}});
     }catch(cause){setError(cause instanceof Error?cause.message:'Impossible de rejoindre la réunion.');}
     finally{setLoading(false);}
   };
@@ -149,16 +156,33 @@ export default function RealJoinPage(){
     if(!isNativeAndroidApp()||!meeting||!camera||!cameraAllowed)return;
     let active=true;
     let stream:MediaStream|null=null;
-    navigator.mediaDevices?.getUserMedia({video:{facingMode:'user'},audio:false})
+    navigator.mediaDevices?.getUserMedia({video:{...cameraVideoConstraints('hd'),...(selectedCamera?{deviceId:{ideal:selectedCamera}}:{})},audio:false})
       .then((next)=>{
         if(!active){next.getTracks().forEach((track)=>track.stop());return;}
         stream=next;
+        setPreviewResolution(cameraResolutionLabel(next.getVideoTracks()[0]));
+        void navigator.mediaDevices.enumerateDevices().then(setDeviceList).catch(()=>undefined);
         if(previewRef.current){previewRef.current.srcObject=next;void previewRef.current.play().catch(()=>undefined);}
       })
       .catch(()=>undefined);
     return ()=>{active=false;stream?.getTracks().forEach((track)=>track.stop());if(previewRef.current)previewRef.current.srcObject=null;};
-  },[camera,cameraAllowed,meeting]);
+  },[camera,cameraAllowed,meeting,selectedCamera]);
 
+  const testMedia=async()=>{
+    if(testingDevices)return;
+    setTestingDevices(true);
+    try{
+      if(!navigator.mediaDevices?.getUserMedia)throw new Error('Test des périphériques non disponible.');
+      const stream=await navigator.mediaDevices.getUserMedia({audio:selectedMic?{deviceId:{ideal:selectedMic}}:true,video:false});
+      const working=stream.getAudioTracks().some((track)=>track.readyState==='live');
+      stream.getTracks().forEach((track)=>track.stop());
+      if(!working)throw new Error('Le microphone ne répond pas.');
+      const cameraMessage=camera&&cameraAllowed ? `Caméra : ${previewResolution}` : 'Caméra désactivée';
+      showAppMessage(`Microphone accessible · ${cameraMessage}`,{tone:'success',title:'Test audio et vidéo'});
+      void navigator.mediaDevices.enumerateDevices().then(setDeviceList).catch(()=>undefined);
+    }catch(cause){showAppMessage(cause instanceof Error?cause.message:'Test impossible.',{tone:'warning',title:'Test des périphériques'});}
+    finally{setTestingDevices(false);}
+  };
   const openQr=()=>{
     const Detector=(window as typeof window & {BarcodeDetector?:BarcodeDetectorConstructor}).BarcodeDetector;
     if(!Detector){
@@ -205,9 +229,16 @@ export default function RealJoinPage(){
           <button type="button" className="android-join-recent" onClick={()=>navigate('/app/meetings')}><Clock3/><span><strong>Réunions récentes</strong><small>Retrouvez rapidement vos réunions MBotéRoom</small></span><ChevronRight/></button>
         </section>
       </>:<>
+        <section className="android-preview-meeting-card">
+          <span><Video size={24}/></span>
+          <div><strong>{meeting.title}</strong><small>ID : {meeting.settings?.meetingAccessId||meeting.meeting_link}</small>
+            <small><CalendarDays size={14}/> {new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(meeting.start_time))} · {meeting.duration} min</small>
+          </div>
+          <button type="button" aria-label="Copier l’ID de réunion" onClick={()=>void navigator.clipboard.writeText(meeting.settings?.meetingAccessId||meeting.meeting_link).then(()=>showAppMessage('ID copié.',{tone:'success'})).catch(()=>showAppMessage('Copie impossible.',{tone:'warning'}))}><Copy size={18}/></button>
+        </section>
         <section className="android-preview-stage">
           <div className="android-preview-video">
-            {camera&&cameraAllowed?<video ref={previewRef} autoPlay playsInline muted/>:<div className="android-preview-off"><VideoOff/><strong>Caméra désactivée</strong></div>}
+            {camera&&cameraAllowed?<video ref={previewRef} autoPlay playsInline muted className={previewBlur?'is-blurred':''}/>:<div className="android-preview-off"><VideoOff/><strong>Caméra désactivée</strong></div>}
             <span className={camera&&cameraAllowed?'android-preview-state on':'android-preview-state'}>{camera&&cameraAllowed?<Video/>:<VideoOff/>}{camera&&cameraAllowed?'Caméra activée':'Caméra coupée'}</span>
             <span className="android-preview-name">{user?.name||user?.email||'Vous'}</span>
             <div className="android-preview-overlay-controls">
@@ -216,10 +247,13 @@ export default function RealJoinPage(){
             </div>
           </div>
           <section className="android-preview-settings">
-            <div><span><Video/></span><strong>Caméra</strong><small>{cameraAllowed?'Caméra intégrée (avant)':'Désactivée par l’hôte'}</small></div>
-            <div><span><Mic/></span><strong>Microphone</strong><small>{micAllowed?'Micro intégré':'Désactivé par l’hôte'}</small></div>
-            <div className="android-preview-backgrounds"><strong>Arrière-plan</strong><button type="button" className="active">Aucun</button><button type="button">Flou</button></div>
-            <div className="android-preview-test"><span>🎧</span><div><strong>Test audio et vidéo</strong><small>Vérifiez que tout fonctionne correctement</small></div></div>
+            <label className="android-preview-device-row"><span><Video/></span><strong>Caméra</strong><select aria-label="Choisir la caméra" value={selectedCamera} disabled={!cameraAllowed} onChange={(event)=>setSelectedCamera(event.target.value)}><option value="">Par défaut ({previewResolution})</option>{deviceList.filter((device)=>device.kind==='videoinput').map((device,i)=><option key={device.deviceId} value={device.deviceId}>{device.label||`Caméra ${i+1}`}</option>)}</select></label>
+            <label className="android-preview-device-row"><span><Mic/></span><strong>Microphone</strong><select aria-label="Choisir le microphone" value={selectedMic} disabled={!micAllowed} onChange={(event)=>setSelectedMic(event.target.value)}><option value="">Microphone par défaut</option>{deviceList.filter((device)=>device.kind==='audioinput').map((device,i)=><option key={device.deviceId} value={device.deviceId}>{device.label||`Micro ${i+1}`}</option>)}</select></label>
+            <div className="android-preview-backgrounds"><strong>Arrière-plan (aperçu)</strong>
+              <button type="button" className={!previewBlur?'active':''} aria-pressed={!previewBlur} onClick={()=>setPreviewBlur(false)}>Aucun</button>
+              <button type="button" className={previewBlur?'active':''} aria-pressed={previewBlur} onClick={()=>setPreviewBlur(true)}>Flou</button>
+            </div>
+            <button type="button" className="android-preview-test" onClick={()=>void testMedia()} disabled={testingDevices}><span><Volume2/></span><div><strong>{testingDevices?'Test en cours…':'Tester l’audio et la vidéo'}</strong><small>Autorise et vérifie le microphone</small></div></button>
           </section>
           {error?<div className="android-join-error">{error}</div>:null}
           <button type="button" className="android-preview-submit" onClick={()=>void join()} disabled={loading||meeting.status==='ended'||meeting.status==='cancelled'}><Video/>{loading?'Connexion…':meeting.status==='ended'||meeting.status==='cancelled'?'Réunion terminée':'Rejoindre la réunion'}</button>

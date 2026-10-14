@@ -133,3 +133,14 @@
   .real-meeting-form{padding:17px}
   .real-meeting-field-help{font-size:10px}
 }
+
+@media(max-width:760px){
+ body.mboteroom-native-android .real-meeting-modal{position:fixed!important;inset:0!important;z-index:4600!important;display:flex!important;align-items:end!important;padding:8px!important;box-sizing:border-box!important;background:rgba(2,19,39,.65)!important}
+ body.mboteroom-native-android .real-meeting-form{box-sizing:border-box!important;width:100%!important;max-width:none!important;max-height:calc(100dvh - 24px)!important;overflow-y:auto!important;overscroll-behavior:contain!important;border-radius:23px 23px 12px 12px!important;padding:16px 12px calc(28px + env(safe-area-inset-bottom,0px))!important}
+ body.mboteroom-native-android .real-meeting-form h2{font-size:19px!important}
+ body.mboteroom-native-android .real-meeting-form input,body.mboteroom-native-android .real-meeting-form select,body.mboteroom-native-android .real-meeting-form textarea{box-sizing:border-box;min-width:0;width:100%;font-size:14px;min-height:45px}
+ body.mboteroom-native-android .real-meeting-form-row{grid-template-columns:minmax(0,1fr)!important;gap:9px}
+ body.mboteroom-native-android .real-meeting-options{display:grid;grid-template-columns:minmax(0,1fr)!important;gap:7px}
+ body.mboteroom-native-android .real-meeting-form footer{position:sticky;bottom:0;z-index:2;display:grid;grid-template-columns:1fr 1.5fr;gap:7px;padding:10px 0;background:#fff}
+ body.mboteroom-native-android .real-meeting-form footer button{min-height:49px;font-size:12px}
+}

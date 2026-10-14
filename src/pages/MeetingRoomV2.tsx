@@ -57,7 +57,7 @@ import './MeetingRoomV2.css';
 type Panel = 'participants' | 'chat' | 'polls' | 'luna' | 'breakouts' | null;
 type MeetingLocationState = {
   guestName?: string;
-  joinOptions?: { mic?: boolean; camera?: boolean; backgroundUrl?: string };
+  joinOptions?: { mic?: boolean; camera?: boolean; backgroundUrl?: string; audioInputId?: string; videoInputId?: string };
   meeting?: Partial<Meeting>;
 };
 
@@ -428,8 +428,8 @@ export default function MeetingRoomV2() {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [participantSearch, setParticipantSearch] = useState('');
   const [clockTick, setClockTick] = useState(Date.now());
-  const [selectedAudioInputId, setSelectedAudioInputId] = useState('');
-  const [selectedVideoInputId, setSelectedVideoInputId] = useState('');
+  const [selectedAudioInputId, setSelectedAudioInputId] = useState(state?.joinOptions?.audioInputId||'');
+  const [selectedVideoInputId, setSelectedVideoInputId] = useState(state?.joinOptions?.videoInputId||'');
   const [selectedAudioOutputId, setSelectedAudioOutputId] = useState('');
   const [viewMode, setViewMode] = useState<'participants' | 'gallery' | 'speaker'>('gallery');
   const [pinnedSocketId, setPinnedSocketId] = useState<string | null>(null);
@@ -816,12 +816,16 @@ export default function MeetingRoomV2() {
         const hdVideo = userPreferences.hdVideo !== false && !dataSaver;
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: audioRequested ? {
+            ...(state?.joinOptions?.audioInputId ? { deviceId: { ideal: state.joinOptions.audioInputId } } : {}),
             echoCancellation: true,
             noiseSuppression: userPreferences.noiseReduction !== false,
             autoGainControl: true,
             channelCount: { ideal: 1 },
           } : false,
-          video: videoRequested ? cameraVideoConstraints(dataSaver ? 'economy' : hdVideo ? 'hd' : 'standard') : false,
+          video: videoRequested ? {
+            ...cameraVideoConstraints(dataSaver ? 'economy' : hdVideo ? 'hd' : 'standard'),
+            ...(state?.joinOptions?.videoInputId ? { deviceId: { ideal: state.joinOptions.videoInputId } } : {}),
+          } : false,
         });
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop());
