@@ -309,6 +309,25 @@ try {
     args: ['--no-sandbox', '--disable-dev-shm-usage'],
   });
 
+  // Use a standard user for the public login form. Admin accounts are purposely
+  // forbidden from authenticating here and must use /admin/login.
+  const termsForLogin = await jsonRequest('/api/public/legal/terms');
+  assert.equal(termsForLogin.response.status, 200, JSON.stringify(termsForLogin.data));
+  const testLoginUser = 'android.login.smoke@mbote.test';
+  const registerLoginUser = await jsonRequest('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'Android Login Smoke',
+      email: testLoginUser,
+      password: 'Password2026!',
+      country: 'Congo-Brazzaville',
+      city: 'Brazzaville',
+      termsAccepted: true,
+      termsVersion: termsForLogin.data.version,
+    }),
+  });
+  assert.equal(registerLoginUser.response.status, 201, JSON.stringify(registerLoginUser.data));
+
   // Android-size end-to-end login regression, no manual clicks or synthetic DOM events.
   // Prove welcome tap -> credentials -> server challenge -> OTP -> authenticated app.
   const signInContext = await browser.newContext({ baseURL: baseUrl, viewport: { width: 390, height: 844 } });
@@ -326,7 +345,7 @@ try {
     // A direct /connexion deep link must open the sheet after an APK/browser restart.
     await signInPage.reload({ waitUntil: 'domcontentloaded' });
     await signInPage.getByRole('dialog', { name: /connexion/i }).waitFor({ state: 'visible', timeout: 10_000 });
-    await signInPage.locator('#login-email').fill('admin.smoke@mbote.test');
+    await signInPage.locator('#login-email').fill(testLoginUser);
     await signInPage.locator('#login-password').fill('Password2026!');
     const emailsBeforeSignIn = sentEmails.length;
     await signInPage.getByRole('button', { name: 'Se connecter', exact: true }).click();
