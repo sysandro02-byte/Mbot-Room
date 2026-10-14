@@ -10,7 +10,13 @@ import './styles/android-native.css';
 import { registerPwa } from './lib/pwa';
 import { initOfflineMode } from './lib/offline';
 import { isChunkLoadError } from './lib/lazyWithRetry';
+import { isNativeAndroidApp } from './lib/nativePlatform';
 
+// Apply APK presentation BEFORE the first React paint. Previously the PWA
+// effect set this marker after rendering, briefly showing the web design.
+const nativeAndroid = isNativeAndroidApp();
+document.documentElement.dataset.nativeApp = nativeAndroid ? 'android' : 'web';
+document.body.classList.toggle('mboteroom-native-android', nativeAndroid);
 registerPwa();
 initOfflineMode();
 

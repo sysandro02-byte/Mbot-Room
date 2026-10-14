@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { authService } from '../services/authService';
+import { isNativeAndroidApp } from '../lib/nativePlatform';
 import './AppShell.css';
 
 type AppShellProps = {
@@ -59,6 +60,7 @@ export default function AppShell({ children }: AppShellProps) {
   });
   const user = authService.getCurrentUser();
   const guestMode = user?.isGuest === true;
+  const nativeAndroid = isNativeAndroidApp();
   const userName = user?.name || user?.email || 'Utilisateur';
   const initials = userName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'MB';
 
@@ -144,7 +146,7 @@ export default function AppShell({ children }: AppShellProps) {
 
         <div className="app-shell-content">{children}</div>
 
-        {!guestMode ? <nav className="app-shell-bottom-nav" aria-label="Navigation mobile">
+        {!guestMode && !nativeAndroid ? <nav className="app-shell-bottom-nav" aria-label="Navigation mobile">
           {mobileNavItems.map((item) => {
             const Icon = item.icon;
             const active = location.pathname === item.to || (item.to !== '/app' && location.pathname.startsWith(item.to));

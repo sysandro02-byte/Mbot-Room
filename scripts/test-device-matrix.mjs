@@ -70,6 +70,73 @@ const register = async () => {
   return data;
 };
 
+// The APK uses a trusted WebView user-agent marker. Test that actual mode rather
+// than treating a mobile Chrome viewport as equivalent to the Android application.
+const runNativeAndroidCase = async (session) => {
+  const browser = await chromium.launch({ headless: true });
+  const pixel = devices['Pixel 7'];
+  const context = await browser.newContext({
+    ...pixel,
+    userAgent: pixel.userAgent + ' MBoteRoomAndroid/0.3.0',
+    locale: 'fr-FR',
+  });
+  await context.addInitScript(({user,token})=>{
+    localStorage.setItem('user',JSON.stringify(user));
+    localStorage.setItem('token',token);
+  },{user:session.user,token:session.token});
+  const page=await context.newPage();
+  const errors=[];
+  page.on('pageerror',(error)=>errors.push(error.message));
+  try {
+    for(const [route,primary] of [
+      ['/app','.android-home-redesign'],
+      ['/app/messages','.messages-pro-page'],
+      ['/app/files','.files-page'],
+      ['/app/profile','.profile-pro-page'],
+      ['/app/live','.live-feed-page'],
+    ]){
+      await page.goto(baseUrl+route,{waitUntil:'domcontentloaded'});
+      await page.locator(primary).waitFor({state:'visible',timeout:15_000});
+      assert.equal(await page.locator('html[data-native-app="android"]').count(),1,route+': early Android theme marker absent');
+      assert.equal(await page.locator('body.mboteroom-native-android').count(),1,route+': native body marker absent');
+      assert.equal(await page.locator('.android-native-bottom-nav:visible').count(),1,route+': expected one native bottom navigation');
+      assert.equal(await page.locator('.app-shell-bottom-nav:visible').count(),0,route+': duplicate web bottom navigation');
+      assert.equal(await page.locator('.global-app-header:visible').count(),0,route+': web header must not appear inside APK');
+      assert.equal(await page.locator('.app-shell-sidebar:visible').count(),0,route+': desktop sidebar must not appear inside APK');
+      const measurements=await page.evaluate(()=>({
+        root:document.documentElement.scrollWidth,
+        body:document.body.scrollWidth,
+        viewport:window.innerWidth,
+      }));
+      assert.ok(Math.max(measurements.root,measurements.body)<=measurements.viewport+2,
+        route+': horizontal overflow '+JSON.stringify(measurements));
+      if(route==='/app'){
+        assert.equal(await page.locator('.android-home-redesign:visible').count(),1,'Native home must have exactly one design');
+        assert.equal(await page.locator('.real-dashboard:visible').count(),0,'Legacy web home must not render in the native shell');
+      }
+      if(route==='/app/messages'){
+        assert.equal(await page.locator('.messages-pro-list:visible').count(),1,'Android inbox should be visible');
+        assert.equal(await page.locator('.messages-pro-chat:visible').count(),0,'Conversation should not overlay inbox before selection');
+      }
+      if(route==='/app/profile'){
+        assert.equal(await page.locator('.profile-mobile-settings:visible').count(),1,'Native profile settings must render');
+        assert.equal(await page.locator('.profile-pro-layout:visible').count(),0,'Desktop profile editor must stay hidden until requested');
+      }
+      if(route==='/app/files'){
+        assert.equal(await page.locator('.files-category-tabs:visible').count(),1,'Native file categories missing');
+      }
+    }
+    await page.locator('.android-native-bottom-nav').getByRole('button',{name:'Messages'}).click();
+    await page.locator('.messages-pro-page').waitFor({state:'visible',timeout:15_000});
+    assert.equal(await page.locator('.android-native-bottom-nav:visible').count(),1,'Navigation duplicated after client-side route change');
+    assert.deepEqual(errors,[],'Native Android WebView browser errors: '+errors.join(' | '));
+    console.log('ANDROID_NATIVE_UI_OK unique navigation, single theme, routes and responsive layout');
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+};
+
 const runCase = async ({ name, browserType, device, session }) => {
   const browser = await browserType.launch({ headless: true });
   const context = await browser.newContext({
@@ -166,6 +233,7 @@ try {
   const sharedSession = await register();
   await runCase({ name: 'PC Chromium', browserType: chromium, session: sharedSession });
   await runCase({ name: 'Android Pixel 7', browserType: chromium, device: devices['Pixel 7'], session: sharedSession });
+  await runNativeAndroidCase(sharedSession);
   await runCase({ name: 'iPhone 15 WebKit', browserType: webkit, device: devices['iPhone 15'], session: sharedSession });
   await runCase({
     name: 'Tablet 820x1180 WebKit',
