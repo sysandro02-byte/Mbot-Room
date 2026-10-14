@@ -1,5 +1,5 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { CirclePlay, Eye, FileImage, FileText, FolderOpen, LoaderCircle, Search, Sparkles, Trash2, Upload } from 'lucide-react';
+import { CirclePlay, Cloud, Eye, FileImage, FileText, FolderOpen, Grid2X2, Image, List, LoaderCircle, Music, Search, Sparkles, Trash2, Upload, Video } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { appDataService, type Preferences, type Recording, type Whiteboard } from '../services/appDataService';
 import { authService } from '../services/authService';
@@ -10,7 +10,8 @@ import './FilesPage.css';
 const formatBytes=(value:number)=>{
   if(value<1024)return `${value} o`;
   if(value<1024*1024)return `${(value/1024).toFixed(1)} Ko`;
-  return `${(value/1024/1024).toFixed(1)} Mo`;
+  if(value<1024*1024*1024)return `${(value/1024/1024).toFixed(1)} Mo`;
+  return `${(value/1024/1024/1024).toFixed(1)} Go`;
 };
 
 export default function FilesPage() {
@@ -22,6 +23,9 @@ export default function FilesPage() {
   const [uploadedFiles,setUploadedFiles]=useState<WorkspaceFile[]>([]);
   const [preferences,setPreferences]=useState<Preferences>({});
   const [query, setQuery] = useState('');
+  const [fileCategory, setFileCategory] = useState<'all'|'documents'|'images'|'videos'|'audio'>('all');
+  const [sortBy,setSortBy]=useState<'recent'|'name'|'size'>('recent');
+  const [viewMode,setViewMode]=useState<'list'|'grid'>('list');
   const [loading, setLoading] = useState(true);
   const [uploading,setUploading]=useState(false);
   const [error, setError] = useState('');
@@ -99,9 +103,19 @@ export default function FilesPage() {
   };
 
   const normalized = query.trim().toLowerCase();
-  const visibleRecordings = useMemo(() => recordings.filter((item) => !normalized || item.title.toLowerCase().includes(normalized)), [recordings, normalized]);
-  const visibleWhiteboards = useMemo(() => whiteboards.filter((item) => !normalized || item.title.toLowerCase().includes(normalized)), [whiteboards, normalized]);
-  const visibleFiles=useMemo(()=>uploadedFiles.filter((item)=>!normalized||item.name.toLowerCase().includes(normalized)),[uploadedFiles,normalized]);
+  const visibleRecordings = useMemo(() => recordings.filter((item) => !normalized || item.title.toLowerCase().includes(normalized))
+    .sort((a,b)=>sortBy==='name'?a.title.localeCompare(b.title):sortBy==='size'?b.size_bytes-a.size_bytes:new Date(b.created_at).getTime()-new Date(a.created_at).getTime()), [recordings, normalized, sortBy]);
+  const visibleWhiteboards = useMemo(() => whiteboards.filter((item) => !normalized || item.title.toLowerCase().includes(normalized))
+    .sort((a,b)=>sortBy==='name'?a.title.localeCompare(b.title):new Date(b.updated_at).getTime()-new Date(a.updated_at).getTime()), [whiteboards, normalized, sortBy]);
+  const visibleFiles=useMemo(()=>uploadedFiles.filter((item)=>
+    (!normalized||item.name.toLowerCase().includes(normalized)) &&
+    (fileCategory==='all'||fileCategory==='documents'&&item.mimeType==='application/pdf'||fileCategory==='images'&&item.mimeType.startsWith('image/')))
+    .sort((a,b)=>sortBy==='name'?a.name.localeCompare(b.name):sortBy==='size'?b.sizeBytes-a.sizeBytes:new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime()),[uploadedFiles,normalized,fileCategory,sortBy]);
+  const storedBytes=uploadedFiles.reduce((sum,file)=>sum+Math.max(0,file.sizeBytes),0)+recordings.reduce((sum,rec)=>sum+Math.max(0,rec.size_bytes),0);
+  const categories=[
+    {id:'all',label:'Tous',icon:FolderOpen},{id:'documents',label:'Documents',icon:FileText},
+    {id:'images',label:'Images',icon:Image},{id:'videos',label:'Vidéos',icon:Video},{id:'audio',label:'Audio',icon:Music},
+  ] as const;
 
   return <main className="files-page">
     <header className="files-page-head">
@@ -116,12 +130,32 @@ export default function FilesPage() {
       </div>
     </header>
 
+    <section className="files-storage-summary" aria-label="Espace occupé par vos fichiers">
+      <span><Cloud size={24}/></span><div><strong>Espace de stockage</strong>
+      <small>{formatBytes(storedBytes)} de documents et enregistrements répertoriés</small></div>
+      <button type="button" onClick={()=>navigate('/app/settings#storage-data')}>Gérer</button>
+    </section>
+    <nav className="files-category-tabs" aria-label="Catégories des fichiers">
+      {categories.map(({id,label,icon:Icon})=><button key={id} type="button" aria-pressed={fileCategory===id}
+        className={fileCategory===id?'active':''} onClick={()=>setFileCategory(id)}><Icon size={19}/>{label}</button>)}
+    </nav>
+    <div className="files-tools">
+      <strong>{fileCategory==='all'?'Récents':categories.find((c)=>c.id===fileCategory)?.label}</strong>
+      <label>Trier par <select aria-label="Trier les fichiers" value={sortBy} onChange={(event)=>setSortBy(event.target.value as typeof sortBy)}>
+        <option value="recent">Date</option><option value="name">Nom</option><option value="size">Taille</option>
+      </select></label>
+      <div role="group" aria-label="Affichage des fichiers">
+        <button type="button" aria-label="Vue liste" aria-pressed={viewMode==='list'} onClick={()=>setViewMode('list')}><List size={20}/></button>
+        <button type="button" aria-label="Vue grille" aria-pressed={viewMode==='grid'} onClick={()=>setViewMode('grid')}><Grid2X2 size={20}/></button>
+      </div>
+    </div>
     {error ? <div className="utility-error">{error}</div> : null}
     {loading ? <div className="files-skeleton-grid">{Array.from({length:4}).map((_,index)=><span key={index}/>)}</div> : null}
 
-    {!loading ? <div className="files-grid">
-      <section className="files-card files-uploaded-card">
-        <div className="files-card-title"><Upload size={20}/><div><h2>PDF et images</h2><small>{visibleFiles.length}</small></div></div>
+    {!loading ? <div className={`files-grid ${viewMode==='grid'?'is-grid-view':''}`}>
+      {fileCategory==='audio'?<section className="files-card files-uploaded-card"><p className="files-empty">Aucun fichier audio. L’import audio n’est pas encore disponible dans cet espace.</p></section>:null}
+      {(fileCategory==='all'||fileCategory==='documents'||fileCategory==='images')?<section className="files-card files-uploaded-card">
+        <div className="files-card-title"><Upload size={20}/><div><h2>{fileCategory==='images'?'Images':fileCategory==='documents'?'Documents':'PDF et images'}</h2><small>{visibleFiles.length}</small></div></div>
         {visibleFiles.length?visibleFiles.map((file)=><article key={file.id}>
           <span>{file.mimeType==='application/pdf'?<FileText size={18}/>:<FileImage size={18}/>}</span>
           <div><strong>{file.name}</strong><small>{file.mimeType==='application/pdf'?'PDF':'Image'} · {formatBytes(file.sizeBytes)}</small></div>
@@ -129,26 +163,25 @@ export default function FilesPage() {
             <button type="button" onClick={()=>void workspaceService.openFile(file.id,shouldDownloadMedia()?file.name:undefined)}><Eye size={15}/>{shouldDownloadMedia()?'Télécharger':'Ouvrir'}</button>
             {Number(file.ownerId)===Number(currentUser?.id)?<button className="is-danger" type="button" aria-label={`Supprimer ${file.name}`} onClick={()=>void remove(file)}><Trash2 size={15}/></button>:null}
           </div>
-        </article>):<p className="files-empty">Aucun PDF ou image envoyé.</p>}
-      </section>
-
-      <section className="files-card">
+        </article>):<p className="files-empty">Aucun fichier correspondant.</p>}
+      </section>:null}
+      {(fileCategory==='all'||fileCategory==='videos')?<section className="files-card">
         <div className="files-card-title"><CirclePlay size={20}/><div><h2>Enregistrements</h2><small>{visibleRecordings.length}</small></div></div>
         {visibleRecordings.length ? visibleRecordings.map((recording) => <article key={recording.id}>
           <span><CirclePlay size={18}/></span>
           <div><strong>{recording.title}</strong><small>{Math.max(0, Math.round(recording.duration_seconds / 60))} min · {Math.round(recording.size_bytes / 1024 / 1024)} Mo</small></div>
           <button type="button" onClick={() => void openRecording(recording)}>Ouvrir</button>
         </article>) : <p className="files-empty">Aucun enregistrement correspondant.</p>}
-      </section>
+      </section>:null}
 
-      <section className="files-card">
+      {(fileCategory==='all'||fileCategory==='documents')?<section className="files-card">
         <div className="files-card-title"><Sparkles size={20}/><div><h2>Tableaux blancs</h2><small>{visibleWhiteboards.length}</small></div></div>
         {visibleWhiteboards.length ? visibleWhiteboards.map((board) => <article key={board.id}>
           <span><FileText size={18}/></span>
           <div><strong>{board.title}</strong><small>Tableau collaboratif</small></div>
           <button type="button" onClick={() => navigate('/app/whiteboard')}>Ouvrir</button>
         </article>) : <p className="files-empty">Aucun tableau correspondant.</p>}
-      </section>
+      </section>:null}
     </div> : null}
   </main>;
 }

@@ -2,3 +2,33 @@
 @media(max-width:1200px){.messages-pro-layout{grid-template-columns:270px minmax(0,1fr)}.messages-pro-detail{grid-column:1/-1;border-left:0;border-top:1px solid #e5ebf1;display:grid;grid-template-columns:180px 1fr 1fr;gap:12px}.messages-pro-detail-cover{height:130px}.messages-pro-detail-title,.messages-pro-detail-actions{grid-column:2/-1}.messages-pro-detail-section{margin-top:0}.messages-pro-detail-section.settings{grid-column:1/-1}}
 @media(max-width:820px){.messages-pro-page{padding:12px}.messages-pro-heading{grid-template-columns:48px 1fr}.messages-pro-heading-icon{width:46px;height:46px}.messages-pro-heading h1{font-size:24px}.messages-pro-heading>button{grid-column:1/-1;justify-content:center}.messages-pro-layout{grid-template-columns:1fr;min-height:auto}.messages-pro-list{border-right:0;border-bottom:1px solid #e5ebf1}.messages-pro-conversations{max-height:280px}.messages-pro-chat{min-height:620px}.messages-pro-thread{max-height:500px}.messages-pro-detail{display:block}.messages-pro-detail-title,.messages-pro-detail-actions{grid-column:auto}.messages-pro-detail-cover{height:105px}}
 @media(max-width:560px){.messages-pro-chat-head{grid-template-columns:42px 1fr}.messages-pro-chat-actions{grid-column:1/-1;justify-content:center;padding-bottom:8px}.messages-pro-composer{grid-template-columns:36px 36px 1fr}.messages-pro-composer .send{grid-column:1/-1;justify-content:center}.messages-pro-bubble{max-width:86%}.messages-pro-schedule{grid-template-columns:1fr}.messages-pro-schedule>button{grid-column:auto}}
+
+/* Mobile-first messages: show the inbox OR one conversation instead of stacking both. */
+body.mboteroom-native-android .messages-pro-page{box-sizing:border-box;min-height:100dvh;max-width:none;padding:16px 10px calc(104px + env(safe-area-inset-bottom,0px));background:#f8fdff}
+body.mboteroom-native-android .messages-pro-heading{grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:8px 4px 0}
+body.mboteroom-native-android .messages-pro-heading-icon{display:none}
+body.mboteroom-native-android .messages-pro-heading h1{font-size:29px;color:#0b193e}
+body.mboteroom-native-android .messages-pro-heading p{font-size:12px;line-height:1.4}
+body.mboteroom-native-android .messages-pro-heading>button{grid-column:auto;justify-self:end;align-self:start;width:45px;height:45px;min-height:45px;padding:0;overflow:hidden;font-size:0;border-radius:14px}
+body.mboteroom-native-android .messages-pro-heading>button svg{width:22px;height:22px}
+body.mboteroom-native-android .messages-pro-layout{display:block;min-height:0;overflow:visible;border:0;background:transparent;box-shadow:none}
+body.mboteroom-native-android .messages-pro-list{border:0;background:transparent;min-width:0}
+body.mboteroom-native-android .messages-pro-tabs{display:flex;gap:7px;overflow-x:auto;padding:8px 2px;scrollbar-width:none}
+body.mboteroom-native-android .messages-pro-tabs button{flex:0 0 auto;min-height:46px;padding:0 12px;border:1px solid #e3eef3;border-radius:14px;background:#f1f9fb;color:#1a3657;font-size:12px}
+body.mboteroom-native-android .messages-pro-tabs button.active{background:linear-gradient(140deg,#03c2bf,#075eac);border-color:transparent;color:#fff}
+body.mboteroom-native-android .messages-pro-tabs button svg{width:16px;vertical-align:middle}
+body.mboteroom-native-android .messages-pro-search{order:0;height:47px;margin:10px 2px;border-radius:14px;background:#fff;border:1px solid #ddeaf0}
+body.mboteroom-native-android .messages-pro-conversations{max-height:none;overflow:visible}
+body.mboteroom-native-android .messages-pro-conversations>button{min-height:78px;border-radius:14px;margin:3px 0;background:#fff;padding:10px 8px;border-bottom:1px solid #e9eef5}
+body.mboteroom-native-android .messages-pro-list-avatar{width:50px;height:50px;flex:none}
+body.mboteroom-native-android .messages-pro-chat{display:none;min-height:0;background:#fff;border-radius:18px}
+body.mboteroom-native-android .messages-pro-detail{display:none}
+body.mboteroom-native-android .messages-pro-layout.is-chat-open .messages-pro-list{display:none}
+body.mboteroom-native-android .messages-pro-layout.is-chat-open .messages-pro-chat{display:flex;flex-direction:column;min-height:calc(100dvh - 220px)}
+body.mboteroom-native-android .messages-pro-chat-head{flex:none}
+body.mboteroom-native-android .messages-mobile-back{display:flex;align-items:center;justify-content:flex-start;width:100%;min-height:45px;padding:0 12px;border:0;background:#f0fbfb;color:#087f89;text-align:left;font-size:13px;font-weight:850}
+body.mboteroom-native-android .messages-pro-thread{max-height:min(58dvh,650px);min-height:240px}
+body.mboteroom-native-android .messages-pro-composer{flex:none}
+body.mboteroom-native-android .messages-pro-modal{z-index:4800}
+body.mboteroom-native-android .messages-pro-modal>section{max-height:84dvh}
+.messages-mobile-back{display:none}

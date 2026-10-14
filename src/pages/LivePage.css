@@ -181,3 +181,53 @@
   .live-confirm-backdrop{align-items:flex-end;padding:10px 10px calc(18px + env(safe-area-inset-bottom,0px))}
   .live-confirm-dialog{border-radius:20px;padding:19px 16px}
 }
+
+.live-capture-status{margin-top:11px;padding:9px 11px;border:1px solid #cfe9ee;border-radius:12px;background:#f1fbfb;color:#276579;font-size:11px;font-weight:700}
+
+/* Discovery layout follows the Android Live mockup using API-backed sessions. */
+.live-featured-card{display:block;width:100%;margin:12px 0 20px;padding:0;border:0;border-radius:22px;overflow:hidden;cursor:pointer;background:#082a44;text-align:left;color:#fff}
+.live-featured-cover{position:relative;min-height:260px;aspect-ratio:16/8;overflow:hidden}
+.live-featured-cover>img{width:100%;height:100%;position:absolute;inset:0;object-fit:cover}
+.live-featured-fallback{position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(145deg,#004052,#07378c)}
+.live-featured-cover:after{position:absolute;content:"";inset:25% 0 0;pointer-events:none;background:linear-gradient(180deg,transparent,rgba(3,13,31,.82))}
+.live-featured-cover>.live-badge{position:absolute;z-index:2;top:12px;left:12px}
+.live-featured-cover>.live-viewers{z-index:2;top:12px;right:12px}
+.live-featured-caption{position:absolute;z-index:2;left:18px;right:132px;bottom:19px;display:grid;gap:6px;color:#fff}
+.live-featured-caption strong{font-size:23px;line-height:1.2;overflow-wrap:anywhere}
+.live-featured-caption small{font-size:12px;color:#e0e9f1}
+.live-featured-watch{position:absolute;z-index:2;bottom:17px;right:15px;padding:11px 14px;border-radius:12px;background:#f42a51;color:#fff;font-size:12px;font-weight:800}
+.live-collection-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:16px 0 10px}
+.live-collection-heading h2{margin:0;font-size:21px;color:#14294b}
+.live-collection-heading span{font-size:11px;color:#5b8a91}
+.live-upcoming{margin-top:16px}
+.live-upcoming-row{display:grid;grid-template-columns:70px minmax(0,1fr) 22px;gap:12px;align-items:center;width:100%;min-height:81px;padding:12px 14px;margin:8px 0;border:1px solid #e5edf3;border-radius:15px;background:#fff;color:#18314a;text-align:left}
+.live-upcoming-row>span:nth-child(2){min-width:0}
+.live-upcoming-row strong,.live-upcoming-row small{display:block}
+.live-upcoming-row strong{font-size:13px;line-height:1.3}
+.live-upcoming-row small{margin-top:5px;color:#798ba0;font-size:10px}
+.live-upcoming-date{display:grid;place-items:center;min-height:48px;padding:5px;border-radius:12px;background:#eaf4ff;color:#194f90;font-size:12px;font-weight:850;text-transform:uppercase}
+.live-create-fab{display:none}
+@media(max-width:720px){
+  .live-featured-cover{min-height:190px;aspect-ratio:16/10}
+  .live-featured-caption{left:13px;right:105px;bottom:12px}
+  .live-featured-caption strong{font-size:17px}
+  .live-featured-watch{right:9px;bottom:10px;font-size:10px;padding:10px}
+  .live-collection-heading h2{font-size:18px}
+}
+body.mboteroom-native-android .live-feed-page{box-sizing:border-box;width:100%;max-width:none;padding:14px 11px calc(110px + env(safe-area-inset-bottom,0px))!important;background:#f9fdff}
+body.mboteroom-native-android .live-feed-hero{border:0;background:linear-gradient(130deg,#071a34,#0b3555);color:#fff;padding:18px 15px;border-radius:22px}
+body.mboteroom-native-android .live-feed-hero h1{color:#fff;font-size:24px}
+body.mboteroom-native-android .live-feed-hero p{color:#c3dae8;font-size:11px}
+body.mboteroom-native-android .live-feed-hero>button{display:none}
+body.mboteroom-native-android .live-feed-search{margin-top:13px}
+body.mboteroom-native-android .live-feed-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+body.mboteroom-native-android .live-feed-card{min-width:0;border-radius:15px}
+body.mboteroom-native-android .live-feed-cover{aspect-ratio:4/3}
+body.mboteroom-native-android .live-feed-card-body{padding:10px}
+body.mboteroom-native-android .live-feed-card-body h2{font-size:13px;line-height:1.3;margin:7px 0 3px}
+body.mboteroom-native-android .live-feed-card-body>p{font-size:10px;line-height:1.4;max-height:42px;overflow:hidden}
+body.mboteroom-native-android .live-feed-host strong{font-size:11px;overflow-wrap:anywhere}
+body.mboteroom-native-android .live-feed-host small{font-size:9px}
+body.mboteroom-native-android .live-feed-meta{font-size:9px;gap:4px}
+body.mboteroom-native-android .live-create-fab{position:fixed;display:flex;z-index:1550;align-items:center;justify-content:center;gap:7px;right:14px;bottom:calc(88px + env(safe-area-inset-bottom,0px));width:62px;height:62px;border:0;border-radius:50%;background:linear-gradient(145deg,#04c4c4,#084f98);color:#fff;box-shadow:0 14px 32px rgba(2,62,103,.27)}
+body.mboteroom-native-android .live-create-fab span{display:none}

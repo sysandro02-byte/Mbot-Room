@@ -1,5 +1,6 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { cameraVideoConstraints } from '../lib/videoQuality';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Bot,
@@ -217,7 +218,7 @@ export const requestDisplayCapture = async () => {
   const touchDevice = navigator.maxTouchPoints > 0 || window.matchMedia?.('(pointer: coarse)').matches;
   const options: DisplayMediaStreamOptions = touchDevice
     ? { video: true, audio: false }
-    : { video: { frameRate: { ideal: 15, max: 30 } }, audio: true };
+    : { video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 15, max: 20 } }, audio: true };
 
   try {
     return await capture(options);
@@ -820,13 +821,7 @@ export default function MeetingRoomV2() {
             autoGainControl: true,
             channelCount: { ideal: 1 },
           } : false,
-          video: videoRequested
-            ? {
-                width: { ideal: hdVideo ? 1280 : 640 },
-                height: { ideal: hdVideo ? 720 : 360 },
-                frameRate: { ideal: dataSaver ? 15 : 30, max: dataSaver ? 20 : 30 },
-              }
-            : false,
+          video: videoRequested ? cameraVideoConstraints(dataSaver ? 'economy' : hdVideo ? 'hd' : 'standard') : false,
         });
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop());

@@ -1,5 +1,5 @@
 import { authService } from '../services/authService';
-import { Home, MessageCircle, Radio, UserRound, Video } from 'lucide-react';
+import { FolderOpen, Home, MessageCircle, Radio, UserRound, Video } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isNativeAndroidApp } from '../lib/nativePlatform';
 
@@ -31,7 +31,9 @@ export default function AndroidNativeBottomNav() {
     { label: 'Réunions', path: '/app/meetings', icon: Video },
     { label: 'Live', path: '/app/live', icon: Radio },
     { label: 'Messages', path: '/app/messages', icon: MessageCircle },
-    { label: 'Profil', path: '/app/profile', icon: UserRound },
+    location.pathname.startsWith('/app/files')
+      ? { label: 'Fichiers', path: '/app/files', icon: FolderOpen }
+      : { label: 'Profil', path: '/app/profile', icon: UserRound },
   ];
 
   return <nav className="android-native-bottom-nav" aria-label="Navigation Android MBotéRoom">

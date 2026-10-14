@@ -35,7 +35,7 @@ import { showAppMessage } from '../lib/appMessage';
 import './MessagesPage.css';
 import AppLoader from '../components/AppLoader';
 
-type ConversationFilter='all'|'groups'|'contacts'|'unread';
+type ConversationFilter='all'|'meetings'|'groups'|'contacts'|'unread';
 
 const initials=(name:string)=>name.split(/\s+/).filter(Boolean).slice(0,2).map((part)=>part[0]?.toUpperCase()).join('')||'MB';
 const formatTime=(value:string)=>new Intl.DateTimeFormat('fr-FR',{hour:'2-digit',minute:'2-digit'}).format(new Date(value));
@@ -78,6 +78,7 @@ export default function MessagesPage(){
   const [filter,setFilter]=useState<ConversationFilter>('all');
   const [search,setSearch]=useState('');
   const [newOpen,setNewOpen]=useState(false);
+  const [mobileConversationOpen,setMobileConversationOpen]=useState(Boolean(params.get('conversation')||params.get('user')||params.get('group')));
   const [directorySearch,setDirectorySearch]=useState('');
   const [directoryResults,setDirectoryResults]=useState<DirectoryContact[]>([]);
   const [scheduleOpen,setScheduleOpen]=useState(false);
@@ -188,6 +189,7 @@ export default function MessagesPage(){
     return conversations.filter((conversation)=>{
       if(conversation.archived)return false;
       if(filter==='groups'&&conversation.kind!=='work_group')return false;
+      if(filter==='meetings'&&!(conversation.kind==='work_group'&&groups.some((group)=>group.name===conversation.title&&group.calls?.length)))return false;
       if(filter==='contacts'&&conversation.kind!=='direct')return false;
       if(filter==='unread'&&conversation.unreadCount<1)return false;
       if(q&&![
@@ -197,7 +199,7 @@ export default function MessagesPage(){
       ].some((value)=>value.toLowerCase().includes(q)))return false;
       return true;
     });
-  },[conversations,filter,search]);
+  },[conversations,filter,search,groups]);
 
   const sendMessage=async(event:FormEvent)=>{
     event.preventDefault();
@@ -352,20 +354,21 @@ export default function MessagesPage(){
 
     {error?<div className="messages-pro-error">{error}</div>:null}
 
-    <div className="messages-pro-layout">
+    <div className={`messages-pro-layout ${mobileConversationOpen?'is-chat-open':''}`}>
       <aside className="messages-pro-list">
-        <label className="messages-pro-search"><Search size={17}/><input value={search} onChange={(event)=>setSearch(event.target.value)} placeholder="Rechercher une conversation…"/></label>
-        <div className="messages-pro-tabs">
-          <button className={filter==='all'?'active':''} onClick={()=>setFilter('all')}>Toutes</button>
-          <button className={filter==='groups'?'active':''} onClick={()=>setFilter('groups')}>Groupes</button>
-          <button className={filter==='contacts'?'active':''} onClick={()=>setFilter('contacts')}>Contacts</button>
-          <button className={filter==='unread'?'active':''} onClick={()=>setFilter('unread')}>Non lus {unreadTotal?<b>{unreadTotal}</b>:null}</button>
+        <div className="messages-pro-tabs" role="group" aria-label="Filtres des conversations">
+          <button aria-pressed={filter==='all'} className={filter==='all'?'active':''} onClick={()=>setFilter('all')}>Tous {unreadTotal?<b>{unreadTotal}</b>:null}</button>
+          <button aria-pressed={filter==='meetings'} className={filter==='meetings'?'active':''} onClick={()=>setFilter('meetings')}><Video size={16}/> Réunions</button>
+          <button aria-pressed={filter==='contacts'} className={filter==='contacts'?'active':''} onClick={()=>setFilter('contacts')}>Contacts</button>
+          <button aria-pressed={filter==='groups'} className={filter==='groups'?'active':''} onClick={()=>setFilter('groups')}>Groupes</button>
+          <button aria-pressed={filter==='unread'} className={filter==='unread'?'active':''} onClick={()=>setFilter('unread')}>Non lus</button>
         </div>
+        <label className="messages-pro-search"><Search size={17}/><input value={search} onChange={(event)=>setSearch(event.target.value)} placeholder="Rechercher une conversation, un contact…"/></label>
         <div className="messages-pro-conversations">
           {loading?<AppLoader label="Chargement des conversations…" compact />:filteredConversations.map((conversation)=>{
             const other=conversation.participants.find((participant)=>participant.id!==currentUserId);
             const online=conversation.kind==='direct'&&Boolean(other?.online);
-            return <button key={conversation.id} className={selectedId===conversation.id?'active':''} onClick={()=>{setSelectedId(conversation.id);setParams({conversation:conversation.id},{replace:true});}}>
+            return <button key={conversation.id} className={selectedId===conversation.id?'active':''} onClick={()=>{setSelectedId(conversation.id);setMobileConversationOpen(true);setParams({conversation:conversation.id},{replace:true});}}>
               <span className="messages-pro-list-avatar">{conversation.avatar?<img src={conversation.avatar} alt=""/>:conversation.kind==='work_group'?<UsersRound/>:initials(conversation.title)}{online?<i/>:null}</span>
               <div><strong>{conversation.title}</strong><small>{conversation.lastMessage?(`${conversation.lastMessage.userId===currentUserId?'Vous : ':''}${conversation.lastMessage.text||conversation.lastMessage.file?.name||'Pièce jointe'}`):conversation.kind==='work_group'?conversation.participants.length+' membres':'Nouvelle conversation'}</small></div>
               <span className="messages-pro-list-meta"><time>{formatShortDate(conversation.updatedAt)}</time>{conversation.unreadCount?<b>{conversation.unreadCount}</b>:conversation.pinned?<Pin size={12}/>:null}</span>
@@ -376,7 +379,7 @@ export default function MessagesPage(){
       </aside>
 
       <main className="messages-pro-chat">
-        {selected?<>
+        {selected?<><button className="messages-mobile-back" type="button" onClick={()=>{setMobileConversationOpen(false);setParams({},{replace:true});}}>← Toutes les conversations</button>
           <header className="messages-pro-chat-head">
             <span className="messages-pro-chat-avatar">{selected.avatar?<img src={selected.avatar} alt=""/>:selected.kind==='work_group'?<UsersRound/>:initials(selected.title)}</span>
             <div><h2>{selected.title}{selected.pinned?<Star size={15} fill="currentColor"/>:null}</h2><p>{selected.kind==='work_group'?`${selected.participants.length} participants`:selected.participants.find((participant)=>participant.id!==currentUserId)?.online?'En ligne':'Compte MBotéRoom'}</p></div>

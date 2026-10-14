@@ -23,3 +23,20 @@
 .android-home-redesign button:active{transform:scale(.988)}
 @media(max-width:360px){.android-home.android-home-redesign{padding-left:13px;padding-right:13px}.android-home-brand{font-size:23px}.android-home-welcome h1{font-size:31px}.android-home-welcome p{font-size:19px}.android-home-action-copy strong{font-size:18px}.android-home-start-icon,.android-home-join-icon{width:58px;height:58px}.android-home-quick{gap:6px}.android-home-quick small{font-size:10px}}
 @media(prefers-reduced-motion:reduce){.android-home-redesign *{transition:none!important}}
+
+/* Keep home cards faithful at Android widths without overflowing 320–420 px. */
+body.mboteroom-native-android .android-home.android-home-redesign{width:100%;max-width:none;padding:18px 12px calc(108px + env(safe-area-inset-bottom,0px))}
+body.mboteroom-native-android .android-home-brand{font-size:24px}
+body.mboteroom-native-android .android-home-welcome h1{font-size:clamp(27px,8vw,38px)}
+body.mboteroom-native-android .android-home-welcome p{font-size:17px}
+body.mboteroom-native-android .android-home-start,body.mboteroom-native-android .android-home-join{min-height:94px;padding:14px;gap:11px;border-radius:20px}
+body.mboteroom-native-android .android-home-start-icon,body.mboteroom-native-android .android-home-join-icon{width:53px;height:53px}
+body.mboteroom-native-android .android-home-action-copy strong{font-size:16px}
+body.mboteroom-native-android .android-home-action-copy small{font-size:11px}
+body.mboteroom-native-android .android-home-banner{min-height:132px}
+body.mboteroom-native-android .android-home-section-title h2{font-size:20px}
+body.mboteroom-native-android .android-home-next{min-height:94px;padding:12px}
+body.mboteroom-native-android .android-home-quick{gap:7px}
+body.mboteroom-native-android .android-home-quick button>span{border-radius:14px}
+body.mboteroom-native-android .android-home-quick small{font-size:10px}
+body.mboteroom-native-android .android-home-premium{margin-top:16px;min-height:72px}

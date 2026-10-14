@@ -27,7 +27,7 @@ export type LiveKitParticipantLike = {
 export type LiveKitLocalParticipantLike = LiveKitParticipantLike & {
   publishTrack: (
     track: MediaStreamTrack,
-    options?: { name?: string; source?: string; simulcast?: boolean },
+    options?: { name?: string; source?: string; simulcast?: boolean; videoEncoding?: { maxBitrate: number; maxFramerate: number } },
   ) => Promise<LiveKitTrackPublicationLike>;
   unpublishTrack: (track: MediaStreamTrack, stopOnUnpublish?: boolean) => Promise<unknown>;
 };

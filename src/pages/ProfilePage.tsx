@@ -1,6 +1,16 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import {
   BarChart3,
+  Bell,
+  ChevronRight,
+  Database,
+  Laptop,
+  LockKeyhole,
+  Mic,
+  Moon,
+  Palette,
+  Sparkles,
+  Wifi,
   BriefcaseBusiness,
   CalendarDays,
   Camera,
@@ -63,6 +73,7 @@ export default function ProfilePage(){
   const [preferences,setPreferences]=useState<Preferences>({});
   const [stats,setStats]=useState<ProfileStats>({meetings:0,participants:0,files:0,meetingMinutes:0});
   const [loading,setLoading]=useState(true);
+  const [mobileEditing,setMobileEditing]=useState(false);
   const [saving,setSaving]=useState(false);
   const [photoBusy,setPhotoBusy]=useState(false);
   const [error,setError]=useState('');
@@ -147,8 +158,21 @@ export default function ProfilePage(){
 
   const location=[profile.city,profile.country].filter(Boolean).join(', ')||profile.address||'Non renseignée';
   const hours=Math.round(stats.meetingMinutes/60);
+  const accountSettings=[
+    {title:'Compte',description:'Informations personnelles, e-mail, téléphone',icon:UserRound,target:'account'},
+    {title:'Confidentialité',description:'Sécurité, visibilité, blocages',icon:LockKeyhole,target:'privacy'},
+    {title:'Apparence',description:'Thème, couleur, mode sombre',icon:Palette,target:'appearance'},
+    {title:'Discussions',description:'Messages, groupes et préférences',icon:MessageCircle,target:'discussions'},
+    {title:'Audio & Vidéo',description:'Caméra, microphone, qualité',icon:Mic,target:'media'},
+    {title:'Notifications',description:'Alertes, sons et vibrations',icon:Bell,target:'notifications'},
+    {title:'Mode hors ligne',description:'Téléchargements, accès sans connexion',icon:Wifi,target:'sync'},
+    {title:'Connexion PC / QR',description:'Connecter vos appareils',icon:Laptop,target:'pc'},
+    {title:'Outils IA',description:'Luna, résumés, génération de messages',icon:Sparkles,target:'ai'},
+    {title:'Stockage & données',description:'Gérer le cache et les contenus',icon:Database,target:'storage-data'},
+    {title:'Préférences',description:'Langue et fuseau horaire',icon:Moon,target:'preferences'},
+  ] as const;
 
-  return <section className="profile-pro-page">
+  return <section className={`profile-pro-page ${mobileEditing?'is-editing':''}`}>
     {error?<div className="profile-pro-error">{error}</div>:null}
 
     <header className="profile-pro-cover">
@@ -159,12 +183,27 @@ export default function ProfilePage(){
         <p><Mail/> {profile.email} <b/> <CheckCircle2/> En ligne <b/> <BriefcaseBusiness/> {profile.organization||'Organisation non renseignée'}</p>
       </div>
       <div className="profile-pro-cover-actions">
-        <button onClick={()=>formRef.current?.scrollIntoView({behavior:'smooth',block:'start'})}><UserRound/> Modifier le profil</button>
+        <button onClick={()=>{setMobileEditing(true);window.setTimeout(()=>formRef.current?.scrollIntoView({behavior:'smooth',block:'start'}),60);}}><UserRound/> Modifier le profil</button>
         <button onClick={()=>photoInput.current?.click()} disabled={photoBusy}><Camera/> {photoBusy?'Traitement…':'Changer la photo'}</button>
         <button onClick={()=>void shareProfile()}><Share2/> Partager le profil</button>
       </div>
     </header>
 
+    <nav className="profile-mobile-settings" aria-label="Paramètres de mon profil">
+      <div className="profile-mobile-stat-grid">
+        <span><Video size={21}/><strong>{stats.meetings}</strong><small>Réunions</small></span>
+        <span><UsersRound size={21}/><strong>{stats.participants}</strong><small>Participants</small></span>
+        <span><FileText size={21}/><strong>{stats.files}</strong><small>Fichiers</small></span>
+        <span><BarChart3 size={21}/><strong>{hours} h</strong><small>En réunion</small></span>
+      </div>
+      {accountSettings.map(({title,description,icon:Icon,target})=><button key={target} type="button"
+        onClick={()=>navigate(`/app/settings#${target}`)}>
+        <span className="profile-mobile-settings-icon"><Icon size={22}/></span>
+        <span><strong>{title}</strong><small>{description}</small></span>
+        <ChevronRight size={19}/>
+      </button>)}
+    </nav>
+    {mobileEditing?<button className="profile-mobile-back" type="button" onClick={()=>setMobileEditing(false)}>← Retour au profil</button>:null}
     <div className="profile-pro-layout">
       <aside className="profile-pro-side">
         <section className="profile-pro-security">

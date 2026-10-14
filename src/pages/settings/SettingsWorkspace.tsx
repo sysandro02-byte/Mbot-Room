@@ -1,5 +1,5 @@
 import { Dispatch, ReactNode, SetStateAction, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Accessibility,
   Archive,
@@ -133,6 +133,13 @@ export default function SettingsWorkspace({
   onError,
 }: SettingsWorkspaceProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+  useEffect(()=>{
+    const id=decodeURIComponent(location.hash.slice(1));
+    if(!id)return;
+    const timeout=window.setTimeout(()=>document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'}),90);
+    return()=>window.clearTimeout(timeout);
+  },[location.hash]);
   const user = authService.getCurrentUser();
   const [savingKey, setSavingKey] = useState('');
   const [storageUsage, setStorageUsage] = useState<number | null>(null);
@@ -297,7 +304,7 @@ export default function SettingsWorkspace({
 
     <div className="settings-desktop-grid">
       <div className="settings-column">
-        <SettingsCard title="Compte" subtitle="Gérez votre compte et votre sécurité" icon={<UserRound/>}>
+        <SettingsCard id="account" title="Compte" subtitle="Gérez votre compte et votre sécurité" icon={<UserRound/>}>
           <SettingRow icon={<UserRound/>} label="Mon profil" description="Identité, avatar et organisation" onClick={() => navigate('/app/profile')}/>
           <SettingRow icon={<ShieldCheck/>} label="Sécurité" description="Mot de passe, sessions et protection" onClick={() => void loadSessions('security')}/>
           <SettingRow icon={<Laptop/>} label="Appareils connectés" description="Consultez et fermez vos sessions actives" value={sessions.length ? String(sessions.length) : undefined} onClick={() => void loadSessions('sessions')}/>
@@ -319,7 +326,7 @@ export default function SettingsWorkspace({
           </SettingRow>
         </SettingsCard>
 
-        <SettingsCard title="Notifications" subtitle="Choisissez comment vous êtes notifié" icon={<Bell/>}>
+        <SettingsCard id="notifications" title="Notifications" subtitle="Choisissez comment vous êtes notifié" icon={<Bell/>}>
           <SettingRow icon={<Bell/>} label="Notifications dans l’application" description="Messages, réunions et alertes">
             <Switch checked={preferences.notifications !== false} label="Notifications dans l’application" disabled={savingKey==='notifications'} onChange={(value) => void update('notifications', { notifications: value })}/>
           </SettingRow>
@@ -338,7 +345,7 @@ export default function SettingsWorkspace({
           </SettingRow>
         </SettingsCard>
 
-        <SettingsCard title="Connexion PC" subtitle="Utilisez MBotéRoom sur votre ordinateur" icon={<MonitorCog/>}>
+        <SettingsCard id="pc" title="Connexion PC" subtitle="Utilisez MBotéRoom sur votre ordinateur" icon={<MonitorCog/>}>
           <div className="settings-pc-connect">
             <span><Laptop size={28}/></span>
             <div><strong>Connecter un appareil</strong><p>Ouvrez MBotéRoom sur l’ordinateur, puis connectez-vous avec votre compte.</p></div>
@@ -361,7 +368,7 @@ export default function SettingsWorkspace({
       </div>
 
       <div className="settings-column">
-        <SettingsCard title="Préférences" subtitle="Personnalisez votre expérience" icon={<Palette/>}>
+        <SettingsCard id="appearance" title="Préférences" subtitle="Personnalisez votre expérience" icon={<Palette/>}>
           <SettingRow icon={<Languages/>} label="Langue">
             <select aria-label="Langue" value={preferences.language || 'fr'} disabled={savingKey==='language'} onChange={(event) => void update('language', { language: event.target.value })}>
               <option value="fr">Français</option><option value="en">English</option><option value="ln">Lingala</option><option value="ar">العربية</option>
@@ -382,7 +389,7 @@ export default function SettingsWorkspace({
           </SettingRow>
         </SettingsCard>
 
-        <SettingsCard title="Discussions" subtitle="Personnalisez vos conversations" icon={<MessageCircle/>}>
+        <SettingsCard id="discussions" title="Discussions" subtitle="Personnalisez vos conversations" icon={<MessageCircle/>}>
           <SettingRow icon={<Archive/>} label="Archivage automatique">
             <select aria-label="Archivage automatique" value={preferences.autoArchiveDays ?? 30} disabled={savingKey==='autoArchiveDays'} onChange={(event) => void update('autoArchiveDays', { autoArchiveDays: Number(event.target.value) })}>
               <option value="0">Jamais</option><option value="7">Après 7 jours</option><option value="30">Après 30 jours</option><option value="90">Après 90 jours</option>
@@ -400,7 +407,7 @@ export default function SettingsWorkspace({
           </SettingRow>
         </SettingsCard>
 
-        <SettingsCard title="Audio & Vidéo" subtitle="Configurez vos préférences de réunion" icon={<Video/>}>
+        <SettingsCard id="media" title="Audio & Vidéo" subtitle="Configurez vos préférences de réunion" icon={<Video/>}>
           <SettingRow icon={<Mic/>} label="Micro actif par défaut">
             <Switch checked={preferences.defaultMic !== false} label="Micro actif par défaut" disabled={savingKey==='defaultMic'} onChange={(value) => void update('defaultMic', { defaultMic: value })}/>
           </SettingRow>
@@ -415,7 +422,7 @@ export default function SettingsWorkspace({
           </SettingRow>
         </SettingsCard>
 
-        <SettingsCard title="Outils IA Luna" subtitle="Boostez votre productivité avec l’IA" icon={<Sparkles/>}>
+        <SettingsCard id="ai" title="Outils IA Luna" subtitle="Boostez votre productivité avec l’IA" icon={<Sparkles/>}>
           <SettingRow icon={<FileText/>} label="Résumés automatiques">
             <Switch checked={preferences.lunaAutoSummary !== false} label="Résumés automatiques Luna" disabled={savingKey==='lunaAutoSummary'} onChange={(value) => void update('lunaAutoSummary', { lunaAutoSummary: value })}/>
           </SettingRow>
@@ -431,7 +438,7 @@ export default function SettingsWorkspace({
       </div>
 
       <div className="settings-column">
-        <SettingsCard title="Confidentialité" subtitle="Contrôlez vos données et votre vie privée" icon={<LockKeyhole/>}>
+        <SettingsCard id="privacy" title="Confidentialité" subtitle="Contrôlez vos données et votre vie privée" icon={<LockKeyhole/>}>
           <SettingRow icon={<UsersRound/>} label="Salle d’attente" description="Activer par défaut pour les nouvelles réunions">
             <Switch checked={preferences.waitingRoomDefault !== false} label="Salle d’attente par défaut" disabled={savingKey==='waitingRoomDefault'} onChange={(value) => void update('waitingRoomDefault', { waitingRoomDefault: value })}/>
           </SettingRow>
@@ -457,7 +464,7 @@ export default function SettingsWorkspace({
           <SettingRow icon={<Info/>} label="À propos" value="Version 0.2.0" onClick={() => navigate('/fonctionnalites')}/>
         </SettingsCard>
 
-        <SettingsCard title="Synchronisation" subtitle="Continuité de service et données locales" icon={<Wifi/>}>
+        <SettingsCard id="sync" title="Synchronisation" subtitle="Continuité de service et données locales" icon={<Wifi/>}>
           <div className="settings-sync-note"><RefreshCw size={18}/><div><strong>Synchronisation automatique</strong><p>Vos changements sont enregistrés dans votre compte et repris dès que la connexion revient.</p></div></div>
         </SettingsCard>
       </div>

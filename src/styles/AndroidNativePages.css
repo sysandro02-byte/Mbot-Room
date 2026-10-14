@@ -120,3 +120,9 @@ body.mboteroom-native-android .room-v2-shell{background:linear-gradient(180deg,#
 body.mboteroom-native-android .room-v2-controls{min-height:78px!important;gap:2px!important}body.mboteroom-native-android .room-v2-control{border-radius:16px!important}body.mboteroom-native-android .room-v2-control.active{background:#0b5c68!important;color:#8af7ef!important}
 body.mboteroom-native-android .room-v2-desktop-rail{position:fixed!important;inset:calc(env(safe-area-inset-top) + 4px) 0 0!important;z-index:190!important;width:100%!important;max-width:none!important;border:0!important;border-radius:0!important;background:#fbfeff!important;color:#06113f!important;overflow:auto!important}body.mboteroom-native-android .room-v2-rail-participants header{position:sticky!important;top:0!important;z-index:2!important;background:#fff!important}body.mboteroom-native-android .room-v2-rail-participants article{min-height:64px!important;border-bottom:1px solid #e8eef4!important}
 @media(max-width:380px){body.mboteroom-native-android .real-meeting-form-row{grid-template-columns:1fr!important}body.mboteroom-native-android .android-native-bottom-nav button{font-size:9px}}
+
+/* Put functional tab headers, dialogs and content ahead of the Android bottom dock. */
+body.mboteroom-native-android .android-native-bottom-nav{min-height:70px;padding-bottom:max(12px,env(safe-area-inset-bottom,0px))}
+body.mboteroom-native-android .android-native-bottom-nav button{min-height:54px;font-size:10px}
+body.mboteroom-native-android .android-native-bottom-nav button.is-active{background:transparent;color:#078e99}
+body.mboteroom-native-android .android-native-bottom-nav button.is-active::after{content:"";display:block;width:30px;height:3px;border-radius:3px;background:#078e99;margin-top:2px}

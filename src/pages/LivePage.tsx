@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Bell, CalendarDays, Camera, ChevronLeft, Eye, Gamepad2, Gift, Heart, LoaderCircle, Mic,
+  Bell, CalendarDays, Camera, ChevronLeft, Eye, Gamepad2, Gift, Heart, LoaderCircle, Mic, Plus,
   MicOff, MoreVertical, Music2, Radio, Search, Send, Share2, Sparkles, Square, UserPlus,
   UsersRound, Video, VideoOff, X,
 } from 'lucide-react';
@@ -13,6 +13,7 @@ import { liveCategoryLabel, liveMediaUrl, liveService, type LiveCategory, type L
 import { socket } from '../lib/socket';
 import { useMeetingLiveKit } from '../hooks/useMeetingLiveKit';
 import { requestDisplayCapture } from './MeetingRoomV2';
+import { cameraVideoConstraints, cameraResolutionLabel, type CameraQuality } from '../lib/videoQuality';
 import './LivePage.css';
 
 const categories:Array<{value:string;label:string;icon?:typeof Radio}>=[
@@ -30,7 +31,7 @@ const liveDuration=(startedAt:string|null)=>{
   return [h,m,s].map((value)=>String(value).padStart(2,'0')).join(':');
 };
 const absoluteUrl=(path:string)=>path.startsWith('http')?path:window.location.origin+path;
-type VideoQuality='auto'|'data-saver'|'standard'|'high';
+type VideoQuality='auto'|'data-saver'|'standard'|'high'|'full-hd';
 type NetworkInformationLike=EventTarget&{effectiveType?:string;saveData?:boolean;downlink?:number};
 const networkInformation=()=>((navigator as Navigator&{connection?:NetworkInformationLike;mozConnection?:NetworkInformationLike;webkitConnection?:NetworkInformationLike}).connection||(navigator as Navigator&{mozConnection?:NetworkInformationLike}).mozConnection||(navigator as Navigator&{webkitConnection?:NetworkInformationLike}).webkitConnection);
 const automaticQuality=():Exclude<VideoQuality,'auto'>=>{
@@ -41,9 +42,8 @@ const automaticQuality=():Exclude<VideoQuality,'auto'>=>{
 };
 const videoConstraints=(quality:VideoQuality):MediaTrackConstraints=>{
   const resolved=quality==='auto'?automaticQuality():quality;
-  const profiles={'data-saver':{width:640,height:360,frameRate:15},standard:{width:960,height:540,frameRate:24},high:{width:1280,height:720,frameRate:30}} as const;
-  const profile=profiles[resolved];
-  return {width:{ideal:profile.width,min:320},height:{ideal:profile.height,min:180},frameRate:{ideal:profile.frameRate,max:profile.frameRate},facingMode:{ideal:'user'}};
+  const mapped:CameraQuality=resolved==='data-saver'?'economy':resolved==='high'?'hd':resolved==='full-hd'?'full-hd':'standard';
+  return cameraVideoConstraints(mapped);
 };
 
 const validateCoverDimensions=(file:File)=>new Promise<void>((resolve,reject)=>{
@@ -66,6 +66,7 @@ function Avatar({name,src,className=''}:{name:string;src?:string;className?:stri
 export function LiveFeedPage(){
   const navigate=useNavigate();
   const [items,setItems]=useState<LiveSession[]>([]);
+  const [upcoming,setUpcoming]=useState<LiveSession[]>([]);
   const [q,setQ]=useState('');
   const [category,setCategory]=useState('');
   const [loading,setLoading]=useState(true);
@@ -73,7 +74,15 @@ export function LiveFeedPage(){
 
   const load=async()=>{
     setLoading(true);setError('');
-    try{setItems(await liveService.getFeed({q,category:category==='trending'?'':category,mode:category==='trending'?'trending':'live'}));}
+    try{
+      const selectedCategory=category==='trending'?'':category;
+      const [liveItems,allItems]=await Promise.all([
+        liveService.getFeed({q,category:selectedCategory,mode:category==='trending'?'trending':'live'}),
+        liveService.getFeed({q,category:selectedCategory}),
+      ]);
+      setItems(liveItems.filter((item)=>item.status==='live'));
+      setUpcoming(allItems.filter((item)=>item.status==='scheduled'));
+    }
     catch(cause){setError(cause instanceof Error?cause.message:'Impossible de charger les Lives.');}
     finally{setLoading(false);}
   };
@@ -87,6 +96,8 @@ export function LiveFeedPage(){
     return()=>{socket.off('live:status',onStatus);};
   },[]);
 
+  const featured=items[0]||null;
+  const otherLive=items.slice(1);
   return <AppShell title="Live">
     <main className="live-feed-page">
       <header className="live-feed-hero">
@@ -109,10 +120,20 @@ export function LiveFeedPage(){
       </nav>
 
       {error?<div className="live-error">{error}</div>:null}
-      {!loading&&items.length===0?<section className="live-empty"><Radio/><h2>Aucun Live pour le moment</h2><p>Créez le premier direct ou revenez un peu plus tard.</p><button onClick={()=>navigate('/app/live/new')}>Créer un Live</button></section>:null}
-
+      {!loading&&items.length===0&&upcoming.length===0?<section className="live-empty"><Radio/><h2>Aucun Live pour le moment</h2><p>Créez le premier direct ou revenez un peu plus tard.</p><button onClick={()=>navigate('/app/live/new')}>Créer un Live</button></section>:null}
+      {featured?<button className="live-featured-card" type="button" onClick={()=>navigate('/app/live/'+featured.id)}>
+        <div className="live-featured-cover">
+          {featured.coverUrl?<img src={liveMediaUrl(featured.coverUrl)} loading="lazy" decoding="async" alt=""/>:<span className="live-featured-fallback"><Radio size={42}/></span>}
+          <span className="live-badge">EN DIRECT</span>
+          <span className="live-viewers"><Eye size={15}/>{fmtCount(featured.viewerCount)}</span>
+          <span className="live-featured-caption"><strong>{featured.title}</strong>
+            <small>{featured.hostName} · {liveCategoryLabel(featured.category)}</small></span>
+          <span className="live-featured-watch">▶ Regarder</span>
+        </div>
+      </button>:null}
+      {otherLive.length?<header className="live-collection-heading"><h2>Lives en cours</h2><span>{otherLive.length} autre(s) direct(s)</span></header>:null}
       <section className="live-feed-grid">
-        {items.map((item)=><article key={item.id} className="live-feed-card" onClick={()=>navigate('/app/live/'+item.id)}>
+        {otherLive.map((item)=><article key={item.id} className="live-feed-card" onClick={()=>navigate('/app/live/'+item.id)}>
           <div className="live-feed-cover">
             {item.coverUrl?<img src={liveMediaUrl(item.coverUrl)} alt="" loading="lazy" decoding="async"/>:<div className="live-cover-fallback"><Avatar name={item.hostName} src={item.hostAvatar}/><Radio/></div>}
             <span className={item.status==='live'?'live-badge':'live-badge scheduled'}>{item.status==='live'?'EN DIRECT':'PROGRAMMÉ'}</span>
@@ -126,6 +147,14 @@ export function LiveFeedPage(){
           </div>
         </article>)}
       </section>
+      {upcoming.length?<section className="live-upcoming"><header className="live-collection-heading"><h2>À venir</h2><span>{upcoming.length} diffusion(s)</span></header>
+        {upcoming.map((item)=><button key={item.id} type="button" className="live-upcoming-row" onClick={()=>navigate('/app/live/'+item.id)}>
+          <span className="live-upcoming-date">{item.scheduledFor?new Intl.DateTimeFormat('fr-FR',{day:'2-digit',month:'short'}).format(new Date(item.scheduledFor)):'Bientôt'}</span>
+          <span><strong>{item.title}</strong><small>{item.scheduledFor?new Intl.DateTimeFormat('fr-FR',{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.scheduledFor)):'Date à confirmer'} · {item.hostName}</small></span>
+          <CalendarDays size={19}/>
+        </button>)}
+      </section>:null}
+      <button className="live-create-fab" type="button" onClick={()=>navigate('/app/live/new')} aria-label="Créer un live"><Plus size={23}/><span>Créer un live</span></button>
       {loading?<AppLoader label="Chargement des Lives…"/>:null}
     </main>
   </AppShell>;
@@ -238,6 +267,7 @@ export function LiveRoomPage(){
   const [joinRole,setJoinRole]=useState<'host'|'cohost'|'viewer'>('viewer');
   const [joined,setJoined]=useState(false);
   const [localStream,setLocalStream]=useState<MediaStream|null>(null);
+  const [captureResolution,setCaptureResolution]=useState('Résolution automatique');
   const cameraStreamRef=useRef<MediaStream|null>(null);
   const screenStreamRef=useRef<MediaStream|null>(null);
   const [media,setMedia]=useState({audio:true,video:true,screen:false});
@@ -396,8 +426,25 @@ export function LiveRoomPage(){
     }).then((stream)=>{
       if(cancelled){stream.getTracks().forEach((track)=>track.stop());return;}
       captured=stream;
-      cameraStreamRef.current=stream;setLocalStream(stream);setMedia({audio:true,video:true,screen:false});
-    }).catch(()=>setError('Autorisez la caméra et le microphone pour diffuser.'));
+      cameraStreamRef.current=stream;setLocalStream(stream);setCaptureResolution(cameraResolutionLabel(stream.getVideoTracks()[0]));setMedia({audio:true,video:true,screen:false});
+    }).catch(async(cause)=>{
+      if(cancelled)return;
+      if(videoQuality==='full-hd'||videoQuality==='high'){
+        try{
+          const stream=await navigator.mediaDevices.getUserMedia({
+            audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},
+            video:cameraVideoConstraints('standard'),
+          });
+          if(cancelled){stream.getTracks().forEach((track)=>track.stop());return;}
+          captured=stream;cameraStreamRef.current=stream;setLocalStream(stream);
+          setCaptureResolution(cameraResolutionLabel(stream.getVideoTracks()[0]));
+          setMedia({audio:true,video:true,screen:false});
+          setNotice('La caméra utilise une résolution compatible avec votre appareil.');
+          return;
+        }catch{/* Hardware fallback failed; preserve original error. */}
+      }
+      setError(cause instanceof Error ? `Caméra ou micro indisponible : ${cause.message}` : 'Autorisez la caméra et le microphone pour diffuser.');
+    });
     return()=>{cancelled=true;captured?.getTracks().forEach((track)=>track.stop());};
   },[publisher,live?.status,videoQuality,networkQuality]);
 
@@ -586,11 +633,12 @@ export function LiveRoomPage(){
           <button type="button" onClick={()=>{recordingAttemptRef.current=false;void startLiveRecording(live.meetingId);}}>Réessayer</button>
         </div>:null}
         <div className="live-host-stats"><span><Eye/><strong>{fmtCount(live.viewerCount)}</strong><small>spectateurs</small></span><span><Heart/><strong>{fmtCount(live.likeCount)}</strong><small>j’aime</small></span><span><Send/><strong>{comments.length}</strong><small>commentaires</small></span><span><Share2/><strong>{fmtCount(live.shareCount)}</strong><small>partages</small></span></div>
+        <div className="live-capture-status" role="status">Qualité caméra réelle : {captureResolution} · diffusion adaptative selon le réseau</div>
         <div className="live-host-controls">
           <button className={media.audio?'active':''} onClick={toggleMic}>{media.audio?<Mic/>:<MicOff/>}<span>Micro<small>{media.audio?'Activé':'Muet'}</small></span></button>
           <button className={media.video?'active':''} disabled={media.screen} onClick={toggleCamera}>{media.video?<Video/>:<VideoOff/>}<span>Caméra<small>{media.video?'Activée':'Coupée'}</small></span></button>
           <button className={media.screen?'active':''} disabled={sharePending} onClick={()=>void shareScreen()}><Camera/><span>{sharePending?'Démarrage…':media.screen?'Arrêter':'Partager'}<small>l’écran</small></span></button>
-          <label className="live-quality-control"><Video/><span>Qualité<small>{videoQuality==='auto'?`Auto · ${activeVideoQuality==='high'?'HD':activeVideoQuality==='standard'?'standard':'éco'}`:videoQuality==='high'?'HD 720p':videoQuality==='standard'?'Standard':'Éco'}</small></span><select aria-label="Qualité vidéo du Live" value={videoQuality} disabled={media.screen} onChange={(event)=>setVideoQuality(event.target.value as VideoQuality)}><option value="auto">Automatique</option><option value="data-saver">Économie</option><option value="standard">Standard</option><option value="high">HD</option></select></label>
+          <label className="live-quality-control"><Video/><span>Qualité<small>{videoQuality==='auto'?`Auto · ${activeVideoQuality==='high'?'HD':activeVideoQuality==='standard'?'standard':'éco'}`:videoQuality==='full-hd'?'Full HD 1080p':videoQuality==='high'?'HD 720p':videoQuality==='standard'?'Standard':'Éco'}</small></span><select aria-label="Qualité vidéo du Live" value={videoQuality} disabled={media.screen} onChange={(event)=>setVideoQuality(event.target.value as VideoQuality)}><option value="auto">Automatique</option><option value="data-saver">Économie</option><option value="standard">Standard</option><option value="high">HD 720p</option><option value="full-hd">Full HD 1080p</option></select></label>
           <button onClick={()=>{setInviteOpen((value)=>!value);void liveService.getParticipationRequests(live.id).then(setRequests);}}><UserPlus/><span>Inviter<small>un invité</small></span></button>
           <button className={!live.chatEnabled?'active danger':''} onClick={()=>void toggleChat()}><Send/><span>Chat<small>{live.chatEnabled?'Actif':'Muet'}</small></span></button>
         </div>

@@ -889,3 +889,6 @@
   .room-v2-confirm-modal>footer{grid-template-columns:repeat(2,minmax(0,1fr))}
   .room-v2-confirm-modal>footer button{min-height:48px;padding:6px;font-size:12px}
 }
+
+/* Full shared documents should remain readable without crop. */
+.room-v2-tile.is-screen video{object-fit:contain!important;background:#020a12}

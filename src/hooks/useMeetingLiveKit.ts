@@ -6,6 +6,7 @@ import {
   type LiveKitTrackPublicationLike,
 } from '../lib/livekitClient';
 import { mediaTransportService } from '../services/mediaTransportService';
+import { videoEncodingFromTrack } from '../lib/videoQuality';
 import type { MeetingNetworkQuality, RemoteMeetingParticipant } from './useMeetingMeshWebRTC';
 
 type MeetingMediaState = {
@@ -338,7 +339,8 @@ export function useMeetingLiveKit({
           publication = await room.localParticipant.publishTrack(track, {
             source,
             name: isAudio ? (isScreenAudio ? 'screen-audio' : 'microphone') : (media.screen ? 'screen' : 'camera'),
-            simulcast: !isAudio,
+            simulcast: !isAudio && !media.screen,
+            ...(!isAudio ? { videoEncoding: videoEncodingFromTrack(track, media.screen) } : {}),
           });
           publishedTracksRef.current.set(track, publication);
         }
