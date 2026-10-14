@@ -110,6 +110,19 @@ export default function GuestWaitingRoomPage() {
     setSelectedSpeaker((currentValue) => currentValue && speakers.some((device) => device.deviceId === currentValue) ? currentValue : speakers[0]?.deviceId || '');
   }, []);
 
+  useEffect(() => {
+    if (!navigator.mediaDevices?.addEventListener) return undefined;
+    const updateDevices = () => { void refreshDevices().catch(() => undefined); };
+    navigator.mediaDevices.addEventListener('devicechange', updateDevices);
+    window.addEventListener('focus', updateDevices);
+    const poll = window.setInterval(() => { if (showDeviceSettings) updateDevices(); }, 5000);
+    return () => {
+      navigator.mediaDevices.removeEventListener('devicechange', updateDevices);
+      window.removeEventListener('focus', updateDevices);
+      window.clearInterval(poll);
+    };
+  }, [refreshDevices, showDeviceSettings]);
+
   const requestPartialMedia = useCallback(async (audioConstraint: boolean | MediaTrackConstraints, videoConstraint: boolean | MediaTrackConstraints) => {
     const tracks: MediaStreamTrack[] = [];
 
@@ -544,6 +557,12 @@ export default function GuestWaitingRoomPage() {
 
             <div className="waiting-simple-setting-row waiting-simple-audio-test">
               <div><span><Volume2 size={17}/> Haut-parleurs</span><small>{devices.speakers.length ? 'Sortie détectée' : 'Sortie par défaut'}</small></div>
+              <select aria-label="Choisir la sortie audio connectée" value={selectedSpeaker} onChange={(event) => setSelectedSpeaker(event.target.value)}>
+                <option value="">Sortie audio système</option>
+                {devices.speakers.filter((device)=>device.deviceId).map((device,index)=>(
+                  <option key={device.deviceId} value={device.deviceId}>{getDeviceLabel(device,'Sortie audio',index)}</option>
+                ))}
+              </select>
               <button type="button" onClick={() => void testSpeaker()} disabled={isTestingSpeaker}>{isTestingSpeaker ? 'Test…' : 'Tester'}</button>
             </div>
 

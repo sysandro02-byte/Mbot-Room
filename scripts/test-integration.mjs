@@ -968,12 +968,37 @@ try {
   assert.equal(storedCover.headers.get('content-type'), 'image/png');
   assert.ok((await storedCover.arrayBuffer()).byteLength > 0);
 
+  // Start request alone must never create a fake active broadcast.
+  const noPublisherFeed = await jsonRequest('/api/live/feed?mode=live&category=business', { headers: authHeaders(participant.token) });
+  assert.equal(noPublisherFeed.response.status,200,JSON.stringify(noPublisherFeed.data));
+  assert.ok(!noPublisherFeed.data.some((item)=>item.id===liveCreate.data.id),'Host has not published any video, Live must remain hidden.');
+
+  const hostLiveJoin = await jsonRequest(`/api/live/${liveCreate.data.id}/join`, {
+    method: 'POST', headers: authHeaders(host.token), body: JSON.stringify({}),
+  });
+  assert.equal(hostLiveJoin.response.status,200,JSON.stringify(hostLiveJoin.data));
+  const publishing = await jsonRequest(`/api/live/${liveCreate.data.id}/heartbeat`, {
+    method:'POST', headers:authHeaders(host.token), body:JSON.stringify({broadcasting:true}),
+  });
+  assert.equal(publishing.response.status,200,JSON.stringify(publishing.data));
+  assert.equal(publishing.data.broadcastActive,true);
+
   const liveFeed = await jsonRequest('/api/live/feed?category=business', { headers: authHeaders(participant.token) });
   assert.equal(liveFeed.response.status, 200, JSON.stringify(liveFeed.data));
   assert.ok(liveFeed.data.some((item) => item.id === liveCreate.data.id && item.status === 'live'));
   const trendingLiveFeed = await jsonRequest('/api/live/feed?mode=trending', { headers: authHeaders(participant.token) });
   assert.equal(trendingLiveFeed.response.status, 200, JSON.stringify(trendingLiveFeed.data));
   assert.ok(trendingLiveFeed.data.some((item) => item.id === liveCreate.data.id), 'Trending feed must include active Live sessions');
+  const paused = await jsonRequest(`/api/live/${liveCreate.data.id}/heartbeat`, {
+    method:'POST',headers:authHeaders(host.token),body:JSON.stringify({broadcasting:false}),
+  });
+  assert.equal(paused.response.status,200);
+  const invisibleFeed = await jsonRequest('/api/live/feed?mode=live', {headers:authHeaders(participant.token)});
+  assert.ok(!invisibleFeed.data.some((item)=>item.id===liveCreate.data.id),'Stopped publication must hide the Live.');
+  const resumed = await jsonRequest(`/api/live/${liveCreate.data.id}/heartbeat`, {
+    method:'POST',headers:authHeaders(host.token),body:JSON.stringify({broadcasting:true}),
+  });
+  assert.equal(resumed.response.status,200);
 
   const liveHostSocket = await socketConnect(host.token);
   const liveParticipantSocket = await socketConnect(participant.token);

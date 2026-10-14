@@ -19,6 +19,20 @@ const visibilities = new Set(['public','private','followers']);
 const giftTypes = new Set(['star','heart','fire','applause','celebrate']);
 const coverTypes = new Set(['image/jpeg','image/png','image/webp']);
 const MAX_COVER_BYTES = 5 * 1024 * 1024;
+// A live-start request is not proof that a camera stream is reaching the SFU.
+// Host publication heartbeats register presence without an additional migration;
+// missing heartbeats automatically expire and prevent "ghost Lives" in discovery.
+const activeBroadcastSql = `EXISTS(
+  SELECT 1 FROM room_live_viewers host_presence
+  WHERE host_presence.live_id=l.id AND host_presence.user_id=l.host_id
+    AND host_presence.left_at IS NULL
+    AND host_presence.last_seen_at > now()-interval '90 seconds'
+)`;
+const liveViewerCountSql = `SELECT COUNT(*)::int AS count
+  FROM room_live_viewers v
+  WHERE v.live_id=$1
+    AND v.user_id <> (SELECT host_id FROM room_live_sessions WHERE id=$1)
+    AND v.left_at IS NULL AND v.last_seen_at>now()-interval '2 minutes'`;
 const clean = (value:unknown,max=500)=>String(value||'').trim().slice(0,max);
 const normalizeEmail=(value:unknown)=>String(value||'').trim().toLowerCase().slice(0,254);
 const readCoverBody=async(request:express.Request)=>{
@@ -41,6 +55,7 @@ const mapLive=(row:any)=>({
   scheduledFor:row.scheduled_for?new Date(row.scheduled_for).toISOString():null,
   startedAt:row.started_at?new Date(row.started_at).toISOString():null,
   endedAt:row.ended_at?new Date(row.ended_at).toISOString():null,
+  broadcastActive:row.broadcast_active===true,
   chatEnabled:row.chat_enabled!==false,cohostsEnabled:row.cohosts_enabled!==false,
   recordingEnabled:row.recording_enabled===true,moderationEnabled:row.moderation_enabled!==false,
   viewerCount:Number(row.viewer_count||0),peakViewerCount:Number(row.peak_viewer_count||0),
@@ -54,6 +69,7 @@ const mapLive=(row:any)=>({
 const loadLive=async(id:string,userId:number)=>{
   const result=await query(`
     SELECT l.*,u.name AS host_name,u.avatar AS host_avatar,
+      ${activeBroadcastSql} AS broadcast_active,
       (l.host_id=$2) AS is_host,
       EXISTS(SELECT 1 FROM room_live_likes x WHERE x.live_id=l.id AND x.user_id=$2) AS is_liked,
       EXISTS(SELECT 1 FROM room_live_follows f WHERE f.creator_id=l.host_id AND f.follower_id=$2) AS is_following,
@@ -113,24 +129,30 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
       const user=request.user!;
       const result=await query(`
         SELECT l.*,u.name AS host_name,u.avatar AS host_avatar,
+          ${activeBroadcastSql} AS broadcast_active,
           (l.host_id=$1) AS is_host,
           EXISTS(SELECT 1 FROM room_live_likes x WHERE x.live_id=l.id AND x.user_id=$1) AS is_liked,
           EXISTS(SELECT 1 FROM room_live_follows f WHERE f.creator_id=l.host_id AND f.follower_id=$1) AS is_following,
           (SELECT COUNT(*)::int FROM room_live_comments c WHERE c.live_id=l.id AND c.deleted_at IS NULL) AS comment_count
-        FROM room_live_sessions l JOIN room_users u ON u.id=l.host_id
-        WHERE l.status IN ('live','scheduled')
+        FROM room_live_sessions l
+        JOIN room_users u ON u.id=l.host_id
+        JOIN room_meetings m ON m.id=l.meeting_id
+        WHERE (l.status='scheduled' OR (l.status='live'
+          AND l.started_at IS NOT NULL AND l.ended_at IS NULL
+          AND m.status='live' AND m.is_active=true
+          AND ${activeBroadcastSql}))
           AND (
             l.host_id=$1 OR l.visibility='public'
             OR (l.visibility='followers' AND EXISTS(SELECT 1 FROM room_live_follows f WHERE f.creator_id=l.host_id AND f.follower_id=$1))
           )
           AND ($2='' OR l.category=$2)
           AND ($3='' OR lower(l.title) LIKE '%'||$3||'%' OR lower(l.description) LIKE '%'||$3||'%' OR lower(u.name) LIKE '%'||$3||'%')
-          AND ($4<>'live' OR l.status='live')
+          AND ($4='all' OR l.status='live')
         ORDER BY
           CASE WHEN $4='trending' THEN (l.viewer_count*5 + l.like_count*2 + l.share_count*3 + l.gift_count*4) ELSE 0 END DESC,
           CASE WHEN l.status='live' THEN 0 ELSE 1 END,
           l.viewer_count DESC,l.scheduled_for ASC
-        LIMIT 100`,[user.id,category&&categories.has(category)?category:'',q,mode==='trending'?'trending':'live']);
+        LIMIT 100`,[user.id,category&&categories.has(category)?category:'',q,mode==='trending'?'trending':mode==='all'||!mode?'all':'live']);
       response.json(result.rows.map((row:any)=>mapLive({...row,can_comment:!user.isGuest&&row.chat_enabled!==false,can_request_participation:!user.isGuest&&row.cohosts_enabled!==false})));
     }catch(error){next(error);}
   });
@@ -173,7 +195,7 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
           request.body?.chatEnabled!==false,request.body?.cohostsEnabled!==false,request.body?.recordingEnabled===true,request.body?.moderationEnabled!==false,shareToken,
         ]);
       io.to('admins').emit('live:created',{liveId:id,hostId:user.id,status:result.rows[0].status});
-      response.status(201).json(mapLive({...result.rows[0],host_name:user.name,host_avatar:user.avatar,is_host:true,is_liked:false,is_following:false,comment_count:0,can_comment:true,can_request_participation:false}));
+      response.status(201).json(mapLive({...result.rows[0],broadcast_active:false,host_name:user.name,host_avatar:user.avatar,is_host:true,is_liked:false,is_following:false,comment_count:0,can_comment:true,can_request_participation:false}));
     }catch(error){next(error);}
   });
 
@@ -200,7 +222,7 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
       }).then((notification)=>io.to(`user:${item.follower_id}`).emit('notification:new',notification)).catch(()=>undefined)));
       io.to(`live:${row.id}`).emit('live:status',{liveId:row.id,status:'live',startedAt:now});
       io.emit('live:status',{liveId:row.id,status:'live',startedAt:now});
-      response.json(mapLive({...updated.rows[0],host_name:row.host_name,host_avatar:row.host_avatar,is_host:true}));
+      response.json(mapLive({...updated.rows[0],broadcast_active:false,host_name:row.host_name,host_avatar:row.host_avatar,is_host:true}));
     }catch(error){next(error);}
   });
 
@@ -226,14 +248,18 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
       if(!(await allowed(row,request.user!,clean(request.body?.inviteToken,200))))return sendApiError(response,403,'LIVE_ACCESS_DENIED','Ce Live est privé.');
       await query(`INSERT INTO room_meeting_members(meeting_id,user_id,role,status,joined_at) VALUES($1,$2,'participant','accepted',now())
         ON CONFLICT(meeting_id,user_id) DO UPDATE SET status='accepted',left_at=NULL,updated_at=now()`,[row.meeting_id,request.user!.id]);
-      await query(`INSERT INTO room_live_viewers(live_id,user_id,joined_at,last_seen_at,left_at) VALUES($1,$2,now(),now(),NULL)
-        ON CONFLICT(live_id,user_id) DO UPDATE SET joined_at=now(),last_seen_at=now(),left_at=NULL`,[row.id,request.user!.id]);
-      const count=await query(`SELECT COUNT(*)::int AS count FROM room_live_viewers WHERE live_id=$1 AND left_at IS NULL AND last_seen_at>now()-interval '2 minutes'`,[row.id]);
+      const isHost=Number(row.host_id)===request.user!.id;
+      await query(`INSERT INTO room_live_viewers(live_id,user_id,joined_at,last_seen_at,left_at)
+        VALUES($1,$2,now(),now(),${isHost?'now()':'NULL'})
+        ON CONFLICT(live_id,user_id) DO UPDATE SET joined_at=now(),last_seen_at=now(),left_at=${isHost?'now()':'NULL'}`,
+        [row.id,request.user!.id]);
+      // Host media is not live yet; only a publish-confirmed heartbeat can activate the feed.
+      const count=await query(liveViewerCountSql,[row.id]);
       const viewers=Number(count.rows[0]?.count||0);
       await query('UPDATE room_live_sessions SET viewer_count=$2,peak_viewer_count=GREATEST(peak_viewer_count,$2),updated_at=now() WHERE id=$1',[row.id,viewers]);
       io.to(`live:${row.id}`).emit('live:presence',{liveId:row.id,viewerCount:viewers});
       const roleRow=await query("SELECT role FROM room_meeting_members WHERE meeting_id=$1 AND user_id=$2 AND status='accepted' LIMIT 1",[row.meeting_id,request.user!.id]);
-      const role=Number(row.host_id)===request.user!.id?'host':roleRow.rows[0]?.role==='cohost'?'cohost':'viewer';
+      const role=isHost?'host':roleRow.rows[0]?.role==='cohost'?'cohost':'viewer';
       response.json({success:true,meetingId:Number(row.meeting_id),viewerCount:viewers,role});
     }catch(error){next(error);}
   });
@@ -241,8 +267,13 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
   app.post('/api/live/:liveId/leave',...protectedApi,async(request:AuthedRequest,response,next)=>{
     try{
       const id=String(request.params.liveId);
+      const live=await loadLive(id,request.user!.id);
+      if(!live)return sendApiError(response,404,'LIVE_NOT_FOUND','Live introuvable.');
       await query('UPDATE room_live_viewers SET left_at=now(),last_seen_at=now() WHERE live_id=$1 AND user_id=$2',[id,request.user!.id]);
-      const count=await query(`SELECT COUNT(*)::int AS count FROM room_live_viewers WHERE live_id=$1 AND left_at IS NULL AND last_seen_at>now()-interval '2 minutes'`,[id]);
+      if(Number(live.host_id)===request.user!.id&&live.broadcast_active){
+        io.emit('live:status',{liveId:id,status:'live',broadcastActive:false});
+      }
+      const count=await query(liveViewerCountSql,[id]);
       const viewers=Number(count.rows[0]?.count||0);
       await query('UPDATE room_live_sessions SET viewer_count=$2,updated_at=now() WHERE id=$1',[id,viewers]);
       io.to(`live:${id}`).emit('live:presence',{liveId:id,viewerCount:viewers});
@@ -253,12 +284,27 @@ export const registerLiveRoutes=(app:express.Express,io:Server)=>{
   app.post('/api/live/:liveId/heartbeat',...protectedApi,async(request:AuthedRequest,response,next)=>{
     try{
       const id=String(request.params.liveId);
-      await query('UPDATE room_live_viewers SET last_seen_at=now(),left_at=NULL WHERE live_id=$1 AND user_id=$2',[id,request.user!.id]);
-      const count=await query(`SELECT COUNT(*)::int AS count FROM room_live_viewers WHERE live_id=$1 AND left_at IS NULL AND last_seen_at>now()-interval '2 minutes'`,[id]);
+      const live=await loadLive(id,request.user!.id);
+      if(!live)return sendApiError(response,404,'LIVE_NOT_FOUND','Live introuvable.');
+      if(live.status!=='live'||live.ended_at)return sendApiError(response,409,'LIVE_NOT_ACTIVE','Ce Live n’est pas actif.');
+      const host=Number(live.host_id)===request.user!.id;
+      if(host){
+        const publishing=request.body?.broadcasting===true;
+        await query(`INSERT INTO room_live_viewers(live_id,user_id,joined_at,last_seen_at,left_at)
+          VALUES($1,$2,now(),now(),${publishing?'NULL':'now()'})
+          ON CONFLICT(live_id,user_id) DO UPDATE SET last_seen_at=now(),left_at=${publishing?'NULL':'now()'}`,[id,request.user!.id]);
+        // Notify subscribers only when the host's publishing state changes.
+        if(Boolean(live.broadcast_active)!==publishing){
+          io.emit('live:status',{liveId:id,status:'live',broadcastActive:publishing});
+        }
+      }else{
+        await query('UPDATE room_live_viewers SET last_seen_at=now(),left_at=NULL WHERE live_id=$1 AND user_id=$2',[id,request.user!.id]);
+      }
+      const count=await query(liveViewerCountSql,[id]);
       const viewerCount=Number(count.rows[0]?.count||0);
       await query('UPDATE room_live_sessions SET viewer_count=$2,peak_viewer_count=GREATEST(peak_viewer_count,$2),updated_at=now() WHERE id=$1',[id,viewerCount]);
       io.to(`live:${id}`).emit('live:presence',{liveId:id,viewerCount});
-      response.json({success:true,viewerCount});
+      response.json({success:true,viewerCount,broadcastActive:host?request.body?.broadcasting===true:live.broadcast_active===true});
     }catch(error){next(error);}
   });
 

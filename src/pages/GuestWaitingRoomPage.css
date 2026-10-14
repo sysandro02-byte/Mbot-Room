@@ -1242,3 +1242,7 @@ body.mboteroom-native-android .waiting-simple-preview video{object-fit:cover}
 body.mboteroom-native-android .waiting-simple-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
 body.mboteroom-native-android .waiting-simple-controls button{min-width:0;min-height:68px;padding:7px 4px;font-size:10px}
 body.mboteroom-native-android .waiting-simple-exit{min-height:50px}
+
+.waiting-simple-audio-test select{max-width:100%;min-width:0;min-height:41px;padding:0 8px;border:1px solid #cddfea;border-radius:11px;background:#fff;color:#18435f;font-size:11px}
+.waiting-simple-audio-test button{min-height:41px}
+@media(max-width:650px){.waiting-simple-audio-test{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.waiting-simple-audio-test select{grid-column:1/-1}}

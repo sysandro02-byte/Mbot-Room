@@ -67,6 +67,7 @@ export function useMeetingLiveKit({
   const onFailureRef = useRef(onFailure);
   const publishedTracksRef = useRef<Map<MediaStreamTrack, LiveKitTrackPublicationLike>>(new Map());
   const publishGenerationRef = useRef(0);
+  const [videoPublished, setVideoPublished] = useState(false);
   const remoteStreamsRef = useRef<Map<string, MediaStream>>(new Map());
   const [status, setStatus] = useState<LiveKitStatus>('idle');
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteMeetingParticipant[]>([]);
@@ -171,6 +172,7 @@ export function useMeetingLiveKit({
 
   useEffect(() => {
     if (!enabled || !meetingId) {
+      setVideoPublished(false);
       setStatus('idle');
       setRemoteParticipants([]);
       remoteStreamsRef.current.clear();
@@ -214,6 +216,7 @@ export function useMeetingLiveKit({
         };
         const handleDisconnected = () => {
           if (cancelled) return;
+          setVideoPublished(false);
           setStatus('failed');
           setNetworkQuality({ level: 'offline', rttMs: null, packetLossPct: null, connectedPeers: 0, totalPeers: 0 });
           onFailureRef.current?.('La connexion de la réunion a changé automatiquement pour rester active.');
@@ -284,6 +287,7 @@ export function useMeetingLiveKit({
         refresh();
       } catch (cause) {
         if (cancelled) return;
+        setVideoPublished(false);
         const message = cause instanceof Error ? cause.message : 'Connexion au serveur média impossible.';
         await room?.disconnect(false).catch(() => undefined);
         if (roomRef.current === room) roomRef.current = null;
@@ -297,6 +301,7 @@ export function useMeetingLiveKit({
 
     return () => {
       cancelled = true;
+      setVideoPublished(false);
       publishGenerationRef.current += 1;
       publishedTracksRef.current.clear();
       remoteStreamsRef.current.clear();
@@ -353,9 +358,13 @@ export function useMeetingLiveKit({
         if (shouldBeEnabled && publication.isMuted) await publication.unmute?.().catch(() => undefined);
         if (!shouldBeEnabled && !publication.isMuted) await publication.mute?.().catch(() => undefined);
       }
+      if (generation === publishGenerationRef.current) {
+        setVideoPublished(desiredTracks.some((track) => track.kind === 'video' && track.enabled && publishedTracksRef.current.has(track)));
+      }
     };
 
     void sync().catch(() => {
+      setVideoPublished(false);
       onNoticeRef.current?.('Une piste locale n’a pas pu être publiée sur le SFU.');
     });
   }, [localStream, screenStream, media.audio, media.screen, media.video, status]);
@@ -363,6 +372,7 @@ export function useMeetingLiveKit({
   return {
     status,
     connected: status === 'connected',
+    videoPublished,
     failed: status === 'failed',
     remoteParticipants,
     activeSpeakerSocketId,

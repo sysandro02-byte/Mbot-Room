@@ -54,7 +54,7 @@ import { getAppLocale } from '../lib/appLanguage';
 import { readCachedPreferences } from '../lib/userPreferences';
 import './MeetingRoomV2.css';
 
-type Panel = 'participants' | 'chat' | 'polls' | 'luna' | 'breakouts' | null;
+type Panel = 'participants' | 'lobby' | 'chat' | 'polls' | 'luna' | 'breakouts' | null;
 type MeetingLocationState = {
   guestName?: string;
   joinOptions?: { mic?: boolean; camera?: boolean; backgroundUrl?: string; audioInputId?: string; videoInputId?: string };
@@ -425,6 +425,8 @@ export default function MeetingRoomV2() {
   const [mediaReady, setMediaReady] = useState(false);
   const [mediaDevices, setMediaDevices] = useState<MediaDeviceInfo[]>([]);
   const [devicePanelOpen, setDevicePanelOpen] = useState(false);
+  const [deviceAccessBusy, setDeviceAccessBusy] = useState(false);
+  const [deviceError, setDeviceError] = useState('');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [participantSearch, setParticipantSearch] = useState('');
   const [clockTick, setClockTick] = useState(Date.now());
@@ -451,6 +453,7 @@ export default function MeetingRoomV2() {
   const [onlineParticipantIds, setOnlineParticipantIds] = useState<Set<number>>(() => new Set());
   const [lobbyParticipants, setLobbyParticipants] = useState<LobbyParticipant[]>([]);
   const [lobbyAlert, setLobbyAlert] = useState<{ userId:number; name:string; avatar?:string } | null>(null);
+  const [lobbyActionBusy, setLobbyActionBusy] = useState<number | 'all' | null>(null);
   const [breakoutRooms, setBreakoutRooms] = useState<BreakoutRoom[]>([]);
   const [breakoutRoomId, setBreakoutRoomId] = useState<string | null>(null);
   const [breakoutRoomName, setBreakoutRoomName] = useState('');
@@ -543,12 +546,67 @@ export default function MeetingRoomV2() {
       setMediaDevices(devices);
       const currentAudioId = cameraStreamRef.current?.getAudioTracks()[0]?.getSettings().deviceId;
       const currentVideoId = cameraStreamRef.current?.getVideoTracks()[0]?.getSettings().deviceId;
-      if (currentAudioId) setSelectedAudioInputId(currentAudioId);
-      if (currentVideoId) setSelectedVideoInputId(currentVideoId);
+      const audioDevices = devices.filter((device) => device.kind === 'audioinput');
+      const videoDevices = devices.filter((device) => device.kind === 'videoinput');
+      setSelectedAudioInputId((current) =>
+        current && audioDevices.some((device) => device.deviceId === current) ? current :
+        currentAudioId && audioDevices.some((device) => device.deviceId === currentAudioId) ? currentAudioId : ''
+      );
+      setSelectedVideoInputId((current) =>
+        current && videoDevices.some((device) => device.deviceId === current) ? current :
+        currentVideoId && videoDevices.some((device) => device.deviceId === currentVideoId) ? currentVideoId : ''
+      );
     } catch {
       // Device labels may be unavailable until permission is granted.
     }
   }, []);
+
+  const authorizeDeviceDiscovery = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia || deviceAccessBusy) {
+      if (!navigator.mediaDevices?.getUserMedia) setDeviceError('Votre navigateur ne permet pas l’accès aux périphériques multimédias.');
+      return;
+    }
+    setDeviceAccessBusy(true);
+    setDeviceError('');
+    try {
+      let granted = false;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        stream.getTracks().forEach((track) => track.stop());
+        granted = true;
+      } catch {
+        // Microphone-only and camera-only hardware must remain discoverable.
+        for (const kind of ['audio','video'] as const) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ [kind]: true });
+            stream.getTracks().forEach((track) => track.stop());
+            granted = true;
+          } catch { /* Other input may still work. */ }
+        }
+      }
+      if (!granted) setDeviceError('Accès refusé ou aucun micro/caméra disponible. Vérifiez les autorisations du système.');
+      await refreshMediaDevices();
+    } catch (cause) {
+      setDeviceError(cause instanceof Error ? cause.message : 'Détection des périphériques impossible.');
+    } finally {
+      setDeviceAccessBusy(false);
+    }
+  }, [deviceAccessBusy, refreshMediaDevices]);
+
+  useEffect(() => {
+    if (!devicePanelOpen) return undefined;
+    void refreshMediaDevices();
+    const refresh = () => { void refreshMediaDevices(); };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    // Android WebView does not consistently dispatch mediaDevices.devicechange.
+    const interval = window.setInterval(refresh, 5000);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+      window.clearInterval(interval);
+    };
+  }, [devicePanelOpen, refreshMediaDevices]);
 
   const mediaState = useMemo(() => {
     const micActive = canUseMic && micEnabled && Boolean(cameraStreamRef.current?.getAudioTracks().some((track) => track.readyState === 'live' && track.enabled));
@@ -880,6 +938,13 @@ export default function MeetingRoomV2() {
     const rows = await meetingService.getLobby(meeting.id).catch(() => []);
     setLobbyParticipants(rows.filter((item) => item.status === 'requested'));
   }, [isModerator, meeting?.id]);
+
+  const openLobbyPanel = () => {
+    if (!isModerator) return;
+    setPanel('lobby');
+    setLobbyAlert(null);
+    void refreshLobby();
+  };
 
   const refreshBreakouts = useCallback(async () => {
     if (!meeting?.id) return;
@@ -1260,18 +1325,18 @@ export default function MeetingRoomV2() {
   }, []);
 
   const switchInputDevice = useCallback(async (kind: 'audioinput' | 'videoinput', deviceId: string) => {
-    if (!deviceId || !navigator.mediaDevices?.getUserMedia) return;
+    if (!navigator.mediaDevices?.getUserMedia) return;
     const previousId = kind === 'audioinput' ? selectedAudioInputId : selectedVideoInputId;
     if (kind === 'audioinput') setSelectedAudioInputId(deviceId);
     else setSelectedVideoInputId(deviceId);
 
     try {
       const exactConstraints: MediaStreamConstraints = kind === 'audioinput'
-        ? { audio: { deviceId: { exact: deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: { ideal: 1 } }, video: false }
-        : { audio: false, video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } } };
+        ? { audio: { ...(deviceId ? { deviceId: { exact: deviceId } } : {}), echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: { ideal: 1 } }, video: false }
+        : { audio: false, video: { ...(deviceId ? { deviceId: { exact: deviceId } } : {}), width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } } };
       const fallbackConstraints: MediaStreamConstraints = kind === 'audioinput'
-        ? { audio: { deviceId: { ideal: deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false }
-        : { audio: false, video: { deviceId: { ideal: deviceId } } };
+        ? { audio: { ...(deviceId ? { deviceId: { ideal: deviceId } } : {}), echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false }
+        : { audio: false, video: deviceId ? { deviceId: { ideal: deviceId } } : true };
 
       let fresh: MediaStream;
       try {
@@ -1715,7 +1780,8 @@ export default function MeetingRoomV2() {
   };
 
   const respondToLobby = async (userId: number, status: 'accepted' | 'rejected') => {
-    if (!meeting?.id) return;
+    if (!meeting?.id || lobbyActionBusy !== null) return;
+    setLobbyActionBusy(userId);
     try {
       await meetingService.respondToLobby(meeting.id, userId, status);
       setLobbyParticipants((current) => current.filter((item) => Number(item.user_id) !== userId));
@@ -1724,11 +1790,12 @@ export default function MeetingRoomV2() {
       setNotice(status === 'accepted' ? 'Participant admis.' : 'Demande refusée.');
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : 'Action salle d’attente impossible.');
-    }
+    } finally { setLobbyActionBusy(null); }
   };
 
   const admitAllLobby = async () => {
-    if (!meeting?.id) return;
+    if (!meeting?.id || lobbyActionBusy !== null) return;
+    setLobbyActionBusy('all');
     try {
       const result = await meetingService.admitAllLobby(meeting.id);
       setLobbyParticipants([]);
@@ -1737,7 +1804,7 @@ export default function MeetingRoomV2() {
       setNotice(`${result.admitted} participant${result.admitted > 1 ? 's' : ''} admis.`);
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : 'Admission globale impossible.');
-    }
+    } finally { setLobbyActionBusy(null); }
   };
 
   const muteAllParticipants = async () => {
@@ -2115,11 +2182,13 @@ export default function MeetingRoomV2() {
         {screenShareActive ? <button type="button" className="active room-v2-share-tab"><MonitorUp/><span>Partage d’écran</span></button> : null}
       </nav>
 
-      {isModerator && lobbyParticipants.length ? (
+      {isModerator ? (
         <button
           type="button"
           className="room-v2-lobby-live-button"
-          onClick={() => { setPanel('participants'); setLobbyAlert(null); }}
+          onClick={openLobbyPanel}
+          aria-expanded={panel === 'lobby'}
+          aria-controls="room-v2-lobby-panel"
           aria-live="polite"
           aria-label={`${lobbyParticipants.length} participant${lobbyParticipants.length > 1 ? 's' : ''} en salle d’attente`}
         >
@@ -2141,7 +2210,7 @@ export default function MeetingRoomV2() {
             <span>{lobbyAlert.name} souhaite rejoindre la réunion.</span>
           </div>
           <div className="room-v2-lobby-alert-actions">
-            <button type="button" className="secondary" onClick={() => setPanel('participants')}>Voir</button>
+            <button type="button" className="secondary" onClick={openLobbyPanel}>Voir</button>
             <button type="button" onClick={() => void respondToLobby(lobbyAlert.userId, 'accepted')}>Admettre</button>
             <button type="button" className="dismiss" aria-label="Fermer la notification" onClick={() => setLobbyAlert(null)}><X size={16}/></button>
           </div>
@@ -2396,13 +2465,32 @@ export default function MeetingRoomV2() {
         </aside> : null}
 
         {panel && panel !== 'participants' ? (
-          <aside className="room-v2-panel">
+          <aside className="room-v2-panel" id={panel === 'lobby' ? 'room-v2-lobby-panel' : undefined}>
             <div className="room-v2-panel-title">
-              <h2>{panel === 'chat' ? 'Discussion' : panel === 'polls' ? 'Sondages' : panel === 'breakouts' ? 'Sous-salles' : 'Luna IA'}</h2>
+              <h2>{panel === 'lobby' ? 'Salle d’attente' : panel === 'chat' ? 'Discussion' : panel === 'polls' ? 'Sondages' : panel === 'breakouts' ? 'Sous-salles' : 'Luna IA'}</h2>
               <button type="button" onClick={() => setPanel(null)} aria-label="Fermer"><X size={20}/></button>
             </div>
 
 
+            {panel === 'lobby' && isModerator ? (
+              <section className="room-v2-lobby-manager" data-testid="lobby-manager" aria-label="Gérer la salle d’attente">
+                <div className="room-v2-lobby-manager-toolbar">
+                  <strong>{lobbyParticipants.length} personne{lobbyParticipants.length > 1 ? 's' : ''} en attente</strong>
+                  <button type="button" onClick={() => void refreshLobby()}><Radio size={15}/> Actualiser</button>
+                  {lobbyParticipants.length > 0 ? <button className="admit-all" type="button" disabled={lobbyActionBusy !== null} onClick={() => void admitAllLobby()}>Admettre tous</button> : null}
+                </div>
+                {lobbyParticipants.length ? lobbyParticipants.map((person) => (
+                  <article key={person.user_id} className="room-v2-lobby-manager-row">
+                    <div className="room-v2-person-avatar">{person.avatar ? <img src={person.avatar} alt=""/> : initials(person.name)}</div>
+                    <div><strong>{person.name}</strong><small>Attend votre autorisation</small></div>
+                    <div className="room-v2-lobby-manager-actions">
+                      <button type="button" disabled={lobbyActionBusy !== null} onClick={() => void respondToLobby(Number(person.user_id), 'accepted')}>Admettre</button>
+                      <button type="button" className="danger" disabled={lobbyActionBusy !== null} onClick={() => void respondToLobby(Number(person.user_id), 'rejected')}>Refuser</button>
+                    </div>
+                  </article>
+                )) : <p className="room-v2-lobby-manager-empty">Aucun participant dans la salle d’attente pour le moment. Les nouvelles demandes apparaîtront ici automatiquement.</p>}
+              </section>
+            ) : null}
             {panel === 'chat' ? (
               <div className="room-v2-chat">
                 <div className="room-v2-chat-list">
@@ -2695,6 +2783,7 @@ export default function MeetingRoomV2() {
             <button type="button" disabled={!canUseLuna} onClick={() => {setPanel(panel==='luna'?null:'luna');setMoreMenuOpen(false);}}><Bot/><span>Luna IA</span></button>
             {isModerator ? <button type="button" onClick={() => {setPanel(panel==='breakouts'?null:'breakouts');void refreshBreakouts();setMoreMenuOpen(false);}}><UsersRound/><span>Sous-salles</span></button> : null}
             {isModerator ? <button type="button" onClick={() => {void toggleMeetingLock();setMoreMenuOpen(false);}}><ShieldCheck/><span>{meeting.settings?.locked?'Déverrouiller':'Verrouiller'}</span></button> : null}
+            {isModerator ? <button type="button" onClick={() => {openLobbyPanel();setMoreMenuOpen(false);}}><UsersRound/><span>Salle d’attente</span><b>{lobbyParticipants.length}</b></button> : null}
             <button type="button" onClick={() => {setDevicePanelOpen(true);void refreshMediaDevices();setMoreMenuOpen(false);}}><Settings2/><span>Périphériques</span></button>
             <button type="button" onClick={() => {void inviteParticipants();setMoreMenuOpen(false);}}><UsersRound/><span>Inviter</span></button>
             <div/>
@@ -2719,27 +2808,34 @@ export default function MeetingRoomV2() {
 
       {devicePanelOpen ? (
         <div className="room-v2-device-panel" data-testid="device-settings-panel">
-          <div className="room-v2-device-title"><strong>Audio et vidéo</strong><button type="button" onClick={() => setDevicePanelOpen(false)} aria-label="Fermer"><X size={16}/></button></div>
+          <div className="room-v2-device-title"><strong>Périphériques audio et vidéo</strong><button type="button" onClick={() => setDevicePanelOpen(false)} aria-label="Fermer"><X size={16}/></button></div>
+          <div className="room-v2-device-discovery">
+            <span>Appareils intégrés, USB et Bluetooth reconnus par votre système</span>
+            <button type="button" onClick={() => void authorizeDeviceDiscovery()} disabled={deviceAccessBusy}>{deviceAccessBusy ? 'Recherche…' : 'Détecter les appareils'}</button>
+          </div>
+          {deviceError ? <p className="room-v2-device-error" role="alert">{deviceError}</p> : null}
           <label>
             <Mic size={16}/> Microphone
-            <select value={selectedAudioInputId} onChange={(event) => void switchInputDevice('audioinput', event.target.value)}>
-              {mediaDevices.filter((device) => device.kind === 'audioinput').map((device, index) => <option key={device.deviceId || `audio-${index}`} value={device.deviceId}>{device.label || `Microphone ${index + 1}`}</option>)}
+            <select aria-label="Choisir le microphone connecté" value={selectedAudioInputId} onChange={(event) => void switchInputDevice('audioinput', event.target.value)}>
+              <option value="">Microphone système par défaut</option>
+              {mediaDevices.filter((device) => device.kind === 'audioinput' && device.deviceId).map((device, index) => <option key={device.deviceId || `audio-${index}`} value={device.deviceId}>{device.label || `Microphone ${index + 1}`}</option>)}
             </select>
           </label>
           <label>
             <Camera size={16}/> Caméra
-            <select value={selectedVideoInputId} onChange={(event) => void switchInputDevice('videoinput', event.target.value)}>
-              {mediaDevices.filter((device) => device.kind === 'videoinput').map((device, index) => <option key={device.deviceId || `video-${index}`} value={device.deviceId}>{device.label || `Caméra ${index + 1}`}</option>)}
+            <select aria-label="Choisir la caméra connectée" value={selectedVideoInputId} onChange={(event) => void switchInputDevice('videoinput', event.target.value)}>
+              <option value="">Caméra système par défaut</option>
+              {mediaDevices.filter((device) => device.kind === 'videoinput' && device.deviceId).map((device, index) => <option key={device.deviceId || `video-${index}`} value={device.deviceId}>{device.label || `Caméra ${index + 1}`}</option>)}
             </select>
           </label>
           <label>
             <Volume2 size={16}/> Haut-parleur
             <select value={selectedAudioOutputId} onChange={(event) => void applyAudioOutputDevice(event.target.value)} disabled={typeof HTMLMediaElement === 'undefined' || !('setSinkId' in HTMLMediaElement.prototype)}>
               <option value="">Sortie système</option>
-              {mediaDevices.filter((device) => device.kind === 'audiooutput').map((device, index) => <option key={device.deviceId || `output-${index}`} value={device.deviceId}>{device.label || `Haut-parleur ${index + 1}`}</option>)}
+              {mediaDevices.filter((device) => device.kind === 'audiooutput' && device.deviceId).map((device, index) => <option key={device.deviceId || `output-${index}`} value={device.deviceId}>{device.label || `Haut-parleur ${index + 1}`}</option>)}
             </select>
           </label>
-          <small>Le choix du haut-parleur dépend du navigateur utilisé.</small>
+          <small>{mediaDevices.filter((device) => device.kind === 'audioinput').length} micro(s), {mediaDevices.filter((device) => device.kind === 'videoinput').length} caméra(s), {mediaDevices.filter((device) => device.kind === 'audiooutput').length} sortie(s). La sélection des haut-parleurs dépend des capacités du navigateur ou de l’APK.</small>
         </div>
       ) : null}
     </main>

@@ -517,12 +517,24 @@ try {
   const chronoAfter = (await chrono.innerText()).trim();
   assert.notEqual(chronoAfter, chronoBefore, 'Meeting chrono must advance while the meeting is live');
 
+  // Waiting-room control must open an actual admission panel, even when empty.
+  await hostRoom.page.locator('.room-v2-lobby-live-button').click();
+  const lobbyManager = hostRoom.page.locator('[data-testid="lobby-manager"]');
+  await lobbyManager.waitFor({state:'visible',timeout:10_000});
+  assert.match(await lobbyManager.innerText(),/en attente|Aucun participant/);
+  await lobbyManager.getByRole('button',{name:'Actualiser'}).click();
+  await hostRoom.page.locator('#room-v2-lobby-panel .room-v2-panel-title button').click();
+
   const deviceButton = hostRoom.page.locator('[data-testid="device-settings-button"]');
   await deviceButton.waitFor({ state: 'visible', timeout: 10_000 });
   await deviceButton.click();
   const devicePanel = hostRoom.page.locator('[data-testid="device-settings-panel"]');
   await devicePanel.waitFor({ state: 'visible', timeout: 10_000 });
   assert.ok(await devicePanel.locator('select').count() >= 3, 'Device panel should expose microphone, camera and speaker selectors');
+  await devicePanel.getByRole('button',{name:'Détecter les appareils'}).click();
+  await hostRoom.page.waitForTimeout(350);
+  assert.ok(await devicePanel.locator('select').nth(0).locator('option').count()>=1);
+  assert.equal(await devicePanel.locator('select').nth(0).locator('option').first().getAttribute('value'),'');
   assert.ok(await devicePanel.locator('select').nth(0).locator('option').count() >= 1, 'At least one microphone should be available in the fake media environment');
   assert.ok(await devicePanel.locator('select').nth(1).locator('option').count() >= 1, 'At least one camera should be available in the fake media environment');
 

@@ -22,6 +22,7 @@ export type LiveSession={
   visibility:LiveVisibility|string;
   coverUrl:string;
   status:LiveStatus|string;
+  broadcastActive:boolean;
   scheduledFor:string|null;
   startedAt:string|null;
   endedAt:string|null;
@@ -54,7 +55,7 @@ export const liveMediaUrl=(value:string)=>{
 };
 
 export const liveService={
-  async getFeed(filters:{q?:string;category?:string;mode?:'live'|'trending'}={}){
+  async getFeed(filters:{q?:string;category?:string;mode?:'live'|'trending'|'all'}={}){
     const params=new URLSearchParams();
     if(filters.q)params.set('q',filters.q);
     if(filters.category)params.set('category',filters.category);
@@ -85,7 +86,7 @@ export const liveService={
   async end(id:string){return readJson<{success:boolean;status:string}>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/end`),{method:'POST',headers:getAuthHeaders(),body:'{}'}));},
   async join(id:string,inviteToken=''){return readJson<LiveJoinResult>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/join`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({inviteToken})}));},
   async leave(id:string){return readJson<{success:boolean;viewerCount:number}>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/leave`),{method:'POST',headers:getAuthHeaders(),body:'{}'}));},
-  async heartbeat(id:string){return readJson<{success:boolean;viewerCount:number}>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/heartbeat`),{method:'POST',headers:getAuthHeaders(),body:'{}'}));},
+  async heartbeat(id:string,options:{broadcasting?:boolean}={}){return readJson<{success:boolean;viewerCount:number;broadcastActive:boolean}>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/heartbeat`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify(options)}));},
   async getComments(id:string,inviteToken=''){const suffix=inviteToken?'?invite='+encodeURIComponent(inviteToken):'';return readJson<LiveComment[]>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/comments${suffix}`),{headers:getAuthHeaders(),cache:'no-store'}));},
   async comment(id:string,text:string,inviteToken=''){return readJson<LiveComment>(await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/comments`),{method:'POST',headers:getAuthHeaders(),body:JSON.stringify({text,inviteToken})}));},
   async deleteComment(id:string,commentId:string){const response=await apiFetch(apiUrl(`/api/live/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`),{method:'DELETE',headers:getAuthHeaders()});if(!response.ok)throw new Error((await response.json().catch(()=>({}))).error||'Suppression impossible.');},

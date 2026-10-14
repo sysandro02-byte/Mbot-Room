@@ -72,29 +72,33 @@ export function LiveFeedPage(){
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
 
-  const load=async()=>{
-    setLoading(true);setError('');
+  const load=async(quiet=false)=>{
+    if(!quiet){setLoading(true);setError('');}
     try{
       const selectedCategory=category==='trending'?'':category;
       const [liveItems,allItems]=await Promise.all([
         liveService.getFeed({q,category:selectedCategory,mode:category==='trending'?'trending':'live'}),
-        liveService.getFeed({q,category:selectedCategory}),
+        liveService.getFeed({q,category:selectedCategory,mode:'all'}),
       ]);
-      setItems(liveItems.filter((item)=>item.status==='live'));
+      setItems(liveItems.filter((item)=>item.status==='live'&&item.broadcastActive&&Boolean(item.startedAt)&&!item.endedAt));
       setUpcoming(allItems.filter((item)=>item.status==='scheduled'));
     }
     catch(cause){setError(cause instanceof Error?cause.message:'Impossible de charger les Lives.');}
-    finally{setLoading(false);}
+    finally{if(!quiet)setLoading(false);}
   };
-  useEffect(()=>{const timer=window.setTimeout(()=>void load(),q?300:0);return()=>window.clearTimeout(timer);},[q,category]);
   useEffect(()=>{
-    const onStatus=(payload:{liveId:string;status:string})=>setItems((current)=>payload.status==='ended'
-      ?current.filter((item)=>item.id!==payload.liveId)
-      :current.map((item)=>item.id===payload.liveId?{...item,status:payload.status as LiveSession['status']}:item));
+    const timer=window.setTimeout(()=>void load(),q?300:0);
+    const refresh=window.setInterval(()=>void load(true),25_000);
+    const onStatus=(payload:{liveId:string;status:string;broadcastActive?:boolean})=>{
+      if(payload.status==='ended'||payload.broadcastActive===false){
+        setItems((current)=>current.filter((item)=>item.id!==payload.liveId));
+      }
+      void load(true);
+    };
     if(!socket.connected)socket.connect();
     socket.on('live:status',onStatus);
-    return()=>{socket.off('live:status',onStatus);};
-  },[]);
+    return()=>{window.clearTimeout(timer);window.clearInterval(refresh);socket.off('live:status',onStatus);};
+  },[q,category]);
 
   const featured=items[0]||null;
   const otherLive=items.slice(1);
@@ -120,7 +124,7 @@ export function LiveFeedPage(){
       </nav>
 
       {error?<div className="live-error">{error}</div>:null}
-      {!loading&&items.length===0&&upcoming.length===0?<section className="live-empty"><Radio/><h2>Aucun Live pour le moment</h2><p>Créez le premier direct ou revenez un peu plus tard.</p><button onClick={()=>navigate('/app/live/new')}>Créer un Live</button></section>:null}
+      {!loading&&items.length===0?<section className="live-empty" data-testid="no-live-state"><Radio/><h2>Aucun direct en cours</h2><p>Un Live apparaît ici dès que l’animateur diffuse réellement sa vidéo. Les programmations restent dans la rubrique À venir.</p>{upcoming.length===0?<button onClick={()=>navigate('/app/live/new')}>Créer un Live</button>:null}</section>:null}
       {featured?<button className="live-featured-card" type="button" onClick={()=>navigate('/app/live/'+featured.id)}>
         <div className="live-featured-cover">
           {featured.coverUrl?<img src={liveMediaUrl(featured.coverUrl)} loading="lazy" decoding="async" alt=""/>:<span className="live-featured-fallback"><Radio size={42}/></span>}
@@ -388,7 +392,7 @@ export function LiveRoomPage(){
     const onDeleted=(payload:{commentId:string})=>setComments((current)=>current.filter((item)=>item.id!==payload.commentId));
     const onPresence=(payload:{viewerCount:number})=>setLive((current)=>current?{...current,viewerCount:Number(payload.viewerCount||0)}:current);
     const onLikes=(payload:{likeCount:number})=>setLive((current)=>current?{...current,likeCount:Number(payload.likeCount||0)}:current);
-    const onStatus=(payload:{status:string;startedAt?:string;endedAt?:string})=>setLive((current)=>current?{...current,status:payload.status,startedAt:payload.startedAt||current.startedAt,endedAt:payload.endedAt||current.endedAt}:current);
+    const onStatus=(payload:{status:string;broadcastActive?:boolean;startedAt?:string;endedAt?:string})=>setLive((current)=>current?{...current,status:payload.status,broadcastActive:payload.broadcastActive??current.broadcastActive,startedAt:payload.startedAt||current.startedAt,endedAt:payload.endedAt||current.endedAt}:current);
     const onSettings=(payload:{chatEnabled:boolean;cohostsEnabled:boolean;moderationEnabled:boolean})=>setLive((current)=>current?{...current,...payload}:current);
     const onRequest=()=>{if(live.isHost)void liveService.getParticipationRequests(liveId).then(setRequests).catch(()=>undefined);};
     const onReaction=(payload:{name:string;reaction:string})=>setNotice(`${payload.name} ${payload.reaction}`);
@@ -405,13 +409,23 @@ export function LiveRoomPage(){
     };
     socket.on('connect',joinRealtime).on('live:comment',onComment).on('live:comment-deleted',onDeleted).on('live:presence',onPresence).on('live:likes',onLikes).on('live:status',onStatus).on('live:settings',onSettings).on('live:reaction',onReaction).on('live:gift',onGift).on('live:participation-request',onRequest).on('live:participation-response',onParticipation);
     if(socket.connected)joinRealtime();else socket.connect();
-    const heartbeat=window.setInterval(()=>void liveService.heartbeat(liveId).catch(()=>undefined),45_000);
+    const heartbeat=window.setInterval(()=>{if(!live.isHost)void liveService.heartbeat(liveId).catch(()=>undefined);},45_000);
     return()=>{
       window.clearInterval(heartbeat);
       socket.emit('live:leave',{liveId});
       socket.off('connect',joinRealtime).off('live:comment',onComment).off('live:comment-deleted',onDeleted).off('live:presence',onPresence).off('live:likes',onLikes).off('live:status',onStatus).off('live:settings',onSettings).off('live:reaction',onReaction).off('live:gift',onGift).off('live:participation-request',onRequest).off('live:participation-response',onParticipation);
     };
   },[joined,live?.isHost,liveId]);
+
+  useEffect(()=>{
+    if(!joined||!live?.isHost||live.status!=='live')return undefined;
+    const broadcast=()=>void liveService.heartbeat(liveId,{broadcasting:liveKit.videoPublished})
+      .then((result)=>setLive((current)=>current?{...current,broadcastActive:result.broadcastActive}:current))
+      .catch(()=>undefined);
+    broadcast();
+    const timer=window.setInterval(broadcast,20_000);
+    return()=>{window.clearInterval(timer);if(liveKit.videoPublished)void liveService.heartbeat(liveId,{broadcasting:false}).catch(()=>undefined);};
+  },[joined,live?.isHost,live?.status,liveId,liveKit.videoPublished]);
 
   useEffect(()=>{
     if(!publisher||live?.status!=='live'){
@@ -599,7 +613,7 @@ export function LiveRoomPage(){
     <header className="live-room-topbar">
       <button onClick={()=>navigate('/app/live')}><ChevronLeft/></button>
       <div className="live-room-host"><Avatar name={live.hostName} src={live.hostAvatar}/><span><strong>{live.hostName}</strong><small>{duration||liveCategoryLabel(live.category)}</small></span></div>
-      {live.status==='live'?<span className="live-badge">EN DIRECT</span>:<span className="live-badge scheduled">{live.status==='scheduled'?'PROGRAMMÉ':'TERMINÉ'}</span>}
+      {live.status==='live'&&live.broadcastActive?<span className="live-badge">EN DIRECT</span>:<span className="live-badge scheduled">{live.status==='ended'?'TERMINÉ':live.status==='scheduled'?'PROGRAMMÉ':'EN PRÉPARATION'}</span>}
       {!live.isHost?<button className={live.isFollowing?'live-follow following':'live-follow'} onClick={()=>void follow()}>{live.isFollowing?'Suivi':'Suivre'}</button>:null}
       <div className="live-more-wrap"><button type="button" aria-label="Plus d’actions" aria-expanded={moreOpen} onClick={()=>setMoreOpen((value)=>!value)}><MoreVertical/></button>{moreOpen?<div className="live-more-menu"><button type="button" onClick={()=>{setMoreOpen(false);void share();}}><Share2/> Partager le Live</button><button type="button" onClick={()=>{setMoreOpen(false);void navigator.clipboard.writeText(window.location.href).then(()=>setNotice('Lien du Live copié.')).catch(()=>setNotice('Copie du lien impossible.'));}}><Send/> Copier le lien</button></div>:null}</div>
     </header>

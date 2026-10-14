@@ -121,7 +121,7 @@ try{
   const feed=await api('/api/live/feed?mode=live',{},viewer.token);
   assert.equal(feed.response.status,200,JSON.stringify(feed.data));
   assert.ok(Array.isArray(feed.data));
-  assert.ok(feed.data.some((item)=>String(item.id)===String(live.id)&&item.status==='live'),'Created Live must appear in viewer feed');
+  assert.ok(!feed.data.some((item)=>String(item.id)===String(live.id)),'A Live must stay out of discovery until the host actually publishes video.');
 
   const hostJoin=await api(`/api/live/${encodeURIComponent(live.id)}/join`,{method:'POST',body:'{}'},host.token);
   assert.equal(hostJoin.response.status,200,JSON.stringify(hostJoin.data));
@@ -170,6 +170,16 @@ try{
   hostRoom=await openLive(browser,host,live.id,'host');
   await waitForMainVideo(hostRoom.page);
 
+  // Host client marks publication ready only after a successful LiveKit publish.
+  let publishedFeed=null;
+  for(let attempt=0;attempt<24;attempt+=1){
+    publishedFeed=await api('/api/live/feed?mode=live',{},viewer.token);
+    if(publishedFeed.data.some((item)=>String(item.id)===String(live.id)&&item.broadcastActive===true))break;
+    await new Promise((resolve)=>setTimeout(resolve,1000));
+  }
+  assert.ok(publishedFeed?.data.some((item)=>String(item.id)===String(live.id)&&item.broadcastActive===true),
+    'A successfully published host stream must appear in Live discovery.');
+
   viewerRoom=await openLive(browser,viewer,live.id,'viewer');
   await waitForMainVideo(viewerRoom.page);
 
@@ -202,6 +212,8 @@ try{
   const end=await api(`/api/live/${encodeURIComponent(live.id)}/end`,{method:'POST',body:'{}'},host.token);
   assert.equal(end.response.status,200,JSON.stringify(end.data));
   assert.equal(end.data.status,'ended');
+  const afterEnd=await api('/api/live/feed?mode=live',{},viewer.token);
+  assert.ok(!afterEnd.data.some((item)=>String(item.id)===String(live.id)),'Finished broadcast must not remain in discovery.');
 
   console.log('BROADCAST_LIVE_SMOKE_RESULT',JSON.stringify({
     ok:true,
