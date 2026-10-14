@@ -1,7 +1,8 @@
 import { extractMeetingIdentifier } from '../lib/meetingInvitation';
 import { isNativeAndroidApp } from '../lib/nativePlatform';
 import { FocusEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronRight,
@@ -312,6 +313,7 @@ const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.
 const ANDROID_APK_URL = 'https://mboteroom.loukatech.com/download/android';
 
 export default function Login({ initialView = 'login' }: LoginProps) {
+  const location = useLocation();
   const [language, setLanguage] = useState<Language>(() => getStoredLanguage());
   const [loginBranding, setLoginBranding] = useState<LoginBranding>(defaultLoginBranding);
   const [name, setName] = useState('');
@@ -337,7 +339,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [meetingCode, setMeetingCode] = useState('');
   const [meetingPassword, setMeetingPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showAndroidCredentials, setShowAndroidCredentials] = useState(false);
+  const [showAndroidCredentials, setShowAndroidCredentials] = useState(() => window.location.pathname === '/connexion');
   const [showGuestSheet, setShowGuestSheet] = useState(initialView === 'guest');
   const [isLoading, setIsLoading] = useState(false);
   const [isMboteLoading, setIsMboteLoading] = useState(false);
@@ -358,6 +360,11 @@ export default function Login({ initialView = 'login' }: LoginProps) {
   const [mboteProfile, setMboteProfile] = useState<{ name: string; email: string; avatar?: string } | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const navigate = useNavigate();
+  useEffect(() => {
+    // /connexion is a real deep link on the APK and the public website.
+    // Navigation between /login and /connexion must always show the right sheet.
+    setShowAndroidCredentials(location.pathname === '/connexion');
+  }, [location.pathname]);
   const [searchParams] = useSearchParams();
   useEffect(() => {
     const invitedMeeting = searchParams.get('meeting');
@@ -748,6 +755,13 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     }
   };
 
+  const closeCredentialSheet = () => {
+    setShowAndroidCredentials(false);
+    setFormError('');
+    setFieldErrors({});
+    if (location.pathname === '/connexion') navigate('/login', { replace: true });
+  };
+
   const goToGuestJoin = () => {
     clearErrors();
     setShowGuestSheet(true);
@@ -889,7 +903,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                 <span><UsersRound size={21}/><b>Haute qualité</b><small>Audio et vidéo en HD</small></span>
               </div>
               <div className="android-welcome-actions">
-                <button className="android-welcome-connect" type="button" onClick={() => setShowAndroidCredentials(true)}><User size={25}/><span><b>Connexion</b><small>Se connecter à mon compte</small></span><ChevronRight/></button>
+                <button className="android-welcome-connect" type="button" aria-haspopup="dialog" onClick={() => { clearErrors(); navigate('/connexion'); }}><User size={25}/><span><b>Connexion</b><small>Se connecter à mon compte</small></span><ChevronRight/></button>
                 <button type="button" onClick={() => { clearErrors(); setRegisterModalOpen(true); }}><span className="android-action-icon">+</span><span><b>Créer un compte</b><small>Rejoignez MBotéRoom gratuitement</small></span><ChevronRight/></button>
                 <button className="android-guest-action" type="button" onClick={goToGuestJoin}><span className="android-action-icon"><User size={20}/></span><span><b>Continuer en tant qu’invité</b><small>Rejoindre sans créer de compte</small></span><ChevronRight/></button>
                 {!isNativeAndroidApp() ? (
@@ -909,8 +923,8 @@ export default function Login({ initialView = 'login' }: LoginProps) {
               <p className="android-welcome-footer">MBotéRoom application créée par LoukaTech</p>
             </section>
           )}
-          {showAndroidCredentials && !otpChallengeId && (
-            <div className="android-login-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowAndroidCredentials(false); }}><section className="login-card android-login-form-card android-login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="android-login-modal-close" type="button" aria-label="Fermer" onClick={() => setShowAndroidCredentials(false)}>×</button>
+          {showAndroidCredentials && !otpChallengeId && createPortal(
+            <div className="android-login-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeCredentialSheet(); }}><section className="login-card android-login-form-card android-login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="android-login-modal-close" type="button" aria-label="Fermer" onClick={closeCredentialSheet}>×</button>
               <header className="login-card-header">
                 <span className="auth-card-kicker">Espace sécurisé MBotéRoom</span>
                 <h1 id="login-title">{copy.title}</h1>
@@ -1062,7 +1076,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
                   </button>
                 </p>
               </form>
-            </section></div>
+            </section></div>, document.body
           )}
 
           {initialView === 'register' && (
@@ -1244,8 +1258,8 @@ export default function Login({ initialView = 'login' }: LoginProps) {
         </div>
       )}
 
-      {otpChallengeId && (
-        <div className="auth-modal-backdrop" role="presentation">
+      {otpChallengeId && createPortal(
+        <div className="auth-modal-backdrop login-otp-portal" role="presentation">
           <section className="auth-modal otp-login-modal" role="dialog" aria-modal="true" aria-labelledby="otp-login-title">
             <span className="auth-modal-icon otp" aria-hidden="true"><KeyRound size={27}/></span>
             <h2 id="otp-login-title">Vérifiez votre connexion</h2>
@@ -1270,7 +1284,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
               <button className="otp-cancel-button" type="button" onClick={() => { setOtpChallengeId(''); setOtpRedirectTo(''); setOtpCode(''); setFormError(''); }}>Changer de compte</button>
             </form>
           </section>
-        </div>
+        </div>, document.body
       )}
 
       {mboteStep && (

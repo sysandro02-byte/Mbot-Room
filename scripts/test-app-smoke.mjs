@@ -308,6 +308,48 @@ try {
     headless: true,
     args: ['--no-sandbox', '--disable-dev-shm-usage'],
   });
+
+  // Android-size end-to-end login regression, no manual clicks or synthetic DOM events.
+  // Prove welcome tap -> credentials -> server challenge -> OTP -> authenticated app.
+  const signInContext = await browser.newContext({ baseURL: baseUrl, viewport: { width: 390, height: 844 } });
+  try {
+    const signInPage = await signInContext.newPage();
+    await signInPage.goto('/login', { waitUntil: 'domcontentloaded', timeout: 20_000 });
+    const openLogin = signInPage.locator('.android-welcome-connect');
+    await openLogin.waitFor({ state: 'visible', timeout: 15_000 });
+    await openLogin.click();
+    await signInPage.waitForURL('**/connexion', { timeout: 10_000 });
+    await signInPage.getByRole('dialog', { name: /connexion/i }).waitFor({ state: 'visible', timeout: 10_000 });
+    await signInPage.getByRole('button', { name: 'Se connecter', exact: true }).click();
+    await signInPage.locator('#login-email-error').waitFor({ state: 'visible', timeout: 8_000 });
+
+    // A direct /connexion deep link must open the sheet after an APK/browser restart.
+    await signInPage.reload({ waitUntil: 'domcontentloaded' });
+    await signInPage.getByRole('dialog', { name: /connexion/i }).waitFor({ state: 'visible', timeout: 10_000 });
+    await signInPage.locator('#login-email').fill('admin.smoke@mbote.test');
+    await signInPage.locator('#login-password').fill('Password2026!');
+    const emailsBeforeSignIn = sentEmails.length;
+    await signInPage.getByRole('button', { name: 'Se connecter', exact: true }).click();
+    await signInPage.getByRole('dialog', { name: /vérifiez votre connexion/i }).waitFor({ state: 'visible', timeout: 15_000 });
+    assert.ok(sentEmails.length > emailsBeforeSignIn, 'Login must send an OTP to email');
+    const loginCode = sentEmails.at(-1)?.text?.match(/est (\d{6})\./)?.[1];
+    assert.ok(loginCode, 'Login OTP must be delivered');
+    await signInPage.locator('#login-otp').fill(loginCode);
+    await signInPage.getByRole('button', { name: /confirmer et se connecter/i }).click();
+    await signInPage.waitForURL('**/app', { timeout: 15_000 });
+
+    // Closing the credential modal must restore the welcome route.
+    const unauthContext = await browser.newContext({ baseURL: baseUrl, viewport: { width: 390, height: 844 } });
+    try {
+      const p = await unauthContext.newPage();
+      await p.goto('/connexion', { waitUntil: 'domcontentloaded', timeout: 20_000 });
+      await p.getByRole('dialog', { name: /connexion/i }).waitFor({ state: 'visible', timeout: 10_000 });
+      await p.getByRole('button', { name: 'Fermer', exact: true }).click();
+      await p.waitForURL('**/login', { timeout: 10_000 });
+      assert.equal(await p.getByRole('dialog', { name: /connexion/i }).count(), 0);
+    } finally { await unauthContext.close(); }
+  } finally { await signInContext.close(); }
+
   context = await browser.newContext({ baseURL: baseUrl });
   await context.addCookies([{
     name: cookieName,

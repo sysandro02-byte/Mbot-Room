@@ -2851,3 +2851,51 @@ body.mboteroom-native-android .login-page .android-welcome-actions .android-apk-
 @media(prefers-reduced-motion:reduce) {
   .login-page .android-welcome-actions .android-apk-action { transition: none; }
 }
+
+/* Android login route and OTP: top-level portals avoid clipped fixed sheets,
+   nested backdrop stacking contexts and WebView hit-test failures. */
+.android-login-modal-backdrop{
+  z-index:5200!important;
+  pointer-events:auto!important;
+  box-sizing:border-box;
+  overscroll-behavior:contain;
+}
+.android-login-modal-backdrop>.android-login-modal{
+  pointer-events:auto!important;
+  box-sizing:border-box!important;
+  overscroll-behavior:contain;
+}
+.login-otp-portal{
+  z-index:5300!important;
+  pointer-events:auto!important;
+  overflow-y:auto;
+}
+.login-otp-portal .otp-login-modal{
+  pointer-events:auto!important;
+}
+.android-login-modal .external-login-row{
+  display:flex!important;align-items:center;justify-content:center!important;width:100%;
+}
+.android-login-modal .google-login-button.mbote-auth-button{
+  display:inline-flex!important;align-items:center;justify-content:space-between;
+  width:min(100%,260px)!important;min-width:0!important;margin-inline:auto!important;
+}
+@media(max-width:900px){
+ .android-login-modal-backdrop{
+  display:flex!important;align-items:flex-end!important;justify-content:center!important;
+  height:100dvh;max-height:100dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+ }
+ .android-login-modal-backdrop>.android-login-modal{
+  width:100%!important;max-width:none!important;
+  max-height:calc(100dvh - max(10px,env(safe-area-inset-top,0px)))!important;
+  overflow-y:auto!important;
+  padding-bottom:calc(22px + env(safe-area-inset-bottom,0px))!important;
+ }
+ .login-otp-portal{
+  display:flex;align-items:flex-end;justify-content:center;
+  padding-bottom:env(safe-area-inset-bottom,0px);
+ }
+ .login-otp-portal .otp-login-modal{
+  max-height:calc(100dvh - 15px);overflow-y:auto;
+ }
+}
