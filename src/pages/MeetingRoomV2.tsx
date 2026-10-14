@@ -471,6 +471,8 @@ export default function MeetingRoomV2() {
   const [catchUpMinutes, setCatchUpMinutes] = useState(15);
   const [catchUpDismissed, setCatchUpDismissed] = useState(false);
   const [menuUserId, setMenuUserId] = useState<number | null>(null);
+  const [participantMenuPosition, setParticipantMenuPosition] = useState<{top:number;left:number}>({top:0,left:0});
+  const endingMeetingRef = useRef(false);
   const [privateMessageTarget, setPrivateMessageTarget] = useState<{ userId:number; name:string; avatar?:string } | null>(null);
   const [privateMessageDraft, setPrivateMessageDraft] = useState('');
   const [privateMessageSending, setPrivateMessageSending] = useState(false);
@@ -538,6 +540,26 @@ export default function MeetingRoomV2() {
       setConfirmationBusy(false);
     }
   }, [confirmation, confirmationBusy]);
+
+  // Floating menus must not be clipped by the participant-list scroll container.
+  useEffect(() => {
+    if (menuUserId === null) return;
+    const dismiss = (event: PointerEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest('.room-v2-rail-menu,.room-v2-rail-more')) setMenuUserId(null);
+    };
+    const onScroll = (event: Event) => {
+      if (!(event.target instanceof Element) || !event.target.closest('.room-v2-rail-menu')) setMenuUserId(null);
+    };
+    const onResize = () => setMenuUserId(null);
+    document.addEventListener('pointerdown', dismiss, true);
+    document.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onResize);
+    return () => {
+      document.removeEventListener('pointerdown', dismiss, true);
+      document.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [menuUserId]);
 
   const refreshMediaDevices = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return;
@@ -881,7 +903,7 @@ export default function MeetingRoomV2() {
             channelCount: { ideal: 1 },
           } : false,
           video: videoRequested ? {
-            ...cameraVideoConstraints(dataSaver ? 'economy' : hdVideo ? 'hd' : 'standard'),
+            ...cameraVideoConstraints(dataSaver ? 'economy' : hdVideo ? 'full-hd' : 'standard'),
             ...(state?.joinOptions?.videoInputId ? { deviceId: { ideal: state.joinOptions.videoInputId } } : {}),
           } : false,
         });
@@ -1161,7 +1183,11 @@ export default function MeetingRoomV2() {
       screenStreamRef.current?.getTracks().forEach((track) => track.stop());
       navigate(`/reunions/${id}/terminee`, { replace: true });
     };
-    const onEnded = () => leaveByHost('La réunion a été terminée par l’hôte.');
+    const onEnded = () => {
+      // Do not unmount the host's room before its own end API promise resolves.
+      if (endingMeetingRef.current) return;
+      leaveByHost('La réunion a été terminée par l’hôte.');
+    };
     const onCancelled = () => leaveByHost('La réunion a été annulée par l’hôte.');
     const onRemoved = () => leaveByHost('Vous avez été retiré de la réunion.');
     const onBanned = () => leaveByHost('Vous avez été exclu de cette réunion.');
@@ -1837,9 +1863,14 @@ export default function MeetingRoomV2() {
       if (action === 'remove') await collaborationService.removeParticipant(meeting.id, userId);
       if (action === 'ban') await collaborationService.banParticipant(meeting.id, userId, 'Exclusion par le modérateur');
       if (action === 'lobby') await collaborationService.moveToLobby(meeting.id, userId);
+      if (action === 'remove' || action === 'ban' || action === 'lobby') {
+        setParticipants((current) => current.filter((person) => person.userId !== userId));
+        setNotice(action === 'remove' ? 'Participant retiré de la réunion.' : action === 'ban' ? 'Participant banni.' : 'Participant déplacé en salle d’attente.');
+      }
       await refreshParticipants();
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : 'Action de modération impossible.');
+      if (['remove','ban','lobby','participant'].includes(action)) throw cause;
     }
   };
 
@@ -1992,6 +2023,7 @@ export default function MeetingRoomV2() {
     }
 
     if (endForAll) {
+      endingMeetingRef.current = true;
       setEndingMeeting(true);
       setMoreMenuOpen(false);
       setNotice('Fin de la réunion en cours…');
@@ -2000,7 +2032,10 @@ export default function MeetingRoomV2() {
     try {
       if (endForAll) await collaborationService.endMeeting(meeting.id);
     } catch (cause) {
-      if (endForAll) setEndingMeeting(false);
+      if (endForAll) {
+        endingMeetingRef.current = false;
+        setEndingMeeting(false);
+      }
       setNotice(cause instanceof Error ? cause.message : 'Impossible de terminer la réunion.');
       throw cause;
     }
@@ -2142,7 +2177,7 @@ export default function MeetingRoomV2() {
     : activeMembers;
 
   return (
-    <main className={`room-v2-shell${moreMenuOpen ? ' more-menu-open' : ''}`}>
+    <main className={`room-v2-shell${moreMenuOpen ? ' more-menu-open' : ''}${confirmation ? ' has-confirmation' : ''}`}>
       <header className="room-v2-header">
         <div className="room-v2-brand">
           <img src="/icons/mboteroom-wordmark.png" alt="MBotéRoom"/>
@@ -2403,10 +2438,19 @@ export default function MeetingRoomV2() {
                       className="room-v2-rail-more"
                       aria-label={`Actions pour ${member.name}`}
                       aria-expanded={menuUserId===member.userId}
-                      onClick={()=>setMenuUserId(menuUserId===member.userId?null:member.userId)}
+                      onClick={(event)=>{
+                        if (menuUserId === member.userId) { setMenuUserId(null); return; }
+                        const rect = event.currentTarget.getBoundingClientRect();
+                        const menuHeight = Math.min(382,window.innerHeight-36);
+                        setParticipantMenuPosition({
+                          top: rect.bottom+menuHeight+10 <= window.innerHeight ? rect.bottom+6 : Math.max(8,rect.top-menuHeight-6),
+                          left: Math.max(8,Math.min(window.innerWidth-248,rect.right-240)),
+                        });
+                        setMenuUserId(member.userId);
+                      }}
                     ><MoreVertical/></button>
-                    {menuUserId===member.userId?(
-                      <div className="room-v2-rail-menu" role="menu">
+                    {menuUserId===member.userId?createPortal(
+                      <div className="room-v2-rail-menu is-floating" role="menu" aria-label={`Actions pour ${member.name}`} style={{top:participantMenuPosition.top,left:participantMenuPosition.left}}>
                         {isSelf?(
                           <>
                             <button type="button" onClick={()=>{setMenuUserId(null);void toggleMic();}}>{micEnabled?'Couper mon micro':'Activer mon micro'}</button>
@@ -2454,7 +2498,7 @@ export default function MeetingRoomV2() {
                             ):null}
                           </>
                         )}
-                      </div>
+                      </div>, document.body
                     ):null}
                   </div>
                 </article>;
@@ -2794,7 +2838,8 @@ export default function MeetingRoomV2() {
         </div>
 
         <div className="room-v2-leave-actions">
-          <button type="button" className="room-v2-leave" onClick={confirmLeaveMeeting}><PhoneOff size={18}/> Quitter la réunion</button>
+          <button type="button" className="room-v2-leave" onClick={confirmLeaveMeeting}><LogOut size={18}/> Quitter</button>
+          {canEndForAll ? <button type="button" className="room-v2-end" data-testid="end-meeting-direct" disabled={endingMeeting} onClick={confirmEndMeeting}><PhoneOff size={18}/>{endingMeeting ? 'Fin en cours…' : 'Terminer pour tous'}</button> : null}
         </div>
       </footer>
 

@@ -665,8 +665,29 @@ try {
   // the meeting control strip and return to the meetings list.
   await participantTwoRoom.page.locator('.room-v2-leave-actions .room-v2-leave').click();
   await participantTwoRoom.page.locator('.room-v2-confirm-modal').waitFor({ state: 'visible', timeout: 8_000 });
-  await participantTwoRoom.page.locator('.room-v2-confirm-modal').getByRole('button', { name: 'Quitter la réunion' }).click();
+  const leaveConfirm = participantTwoRoom.page.locator('.room-v2-confirm-modal').getByRole('button', { name: 'Quitter la réunion' });
+  const hitTarget = await leaveConfirm.evaluate((element) => {
+    const rect=element.getBoundingClientRect();
+    const target=document.elementFromPoint(rect.left+rect.width/2,rect.top+rect.height/2);
+    return target===element || element.contains(target);
+  });
+  assert.ok(hitTarget,'The participant leave confirmation must remain clickable above the footer.');
+  await leaveConfirm.click();
   await participantTwoRoom.page.waitForURL(`${baseUrl}/reunions`, { timeout: 12_000 });
+
+  // Host-side participant menu must escape the scroll container and actually
+  // remove the selected participant from the active meeting.
+  await hostRoom.page.getByRole('button',{name:'Participants',exact:true}).first().click();
+  await hostRoom.page.getByRole('button',{name:'Actions pour Participant Vidéo'}).click();
+  const participantActions=hostRoom.page.locator('.room-v2-rail-menu.is-floating');
+  await participantActions.waitFor({state:'visible',timeout:8000});
+  const menuOutsideScroll=await participantActions.evaluate((menu)=>menu.parentElement===document.body);
+  assert.ok(menuOutsideScroll,'Participant actions must be portaled outside the scrollable sidebar.');
+  await participantActions.getByRole('button',{name:'Retirer',exact:true}).click();
+  await hostRoom.page.locator('.room-v2-confirm-modal').getByRole('button',{name:'Retirer',exact:true}).click();
+  await participantRoom.page.waitForURL(new RegExp(`/reunions/${meeting.id}/terminee$`),{timeout:15000});
+  const removedMembers=await jsonRequest(`/api/meetings/${meeting.id}/participants`,{headers:authHeaders(host.token)});
+  assert.equal(removedMembers.data.find((member)=>Number(member.userId)===Number(participant.user.id))?.status,'removed');
 
   await participantTwoContext.close();
   await participantContext.close();
@@ -702,8 +723,7 @@ try {
   await successfulSfuRoom.page.screenshot({ path: 'test-artifacts/video-sfu-active.png', fullPage: true });
 
   // Real UI regression: end-for-all must reach the API and open the end screen.
-  await successfulSfuRoom.page.locator('.room-v2-more-wrap .room-v2-control').click();
-  await successfulSfuRoom.page.locator('[data-testid="end-meeting-for-all"]').click();
+  await successfulSfuRoom.page.locator('[data-testid="end-meeting-direct"]').click();
   await successfulSfuRoom.page.locator('.room-v2-confirm-modal').waitFor({ state: 'visible', timeout: 8_000 });
   await successfulSfuRoom.page.locator('.room-v2-confirm-modal').getByRole('button', { name: 'Terminer pour tous' }).click();
   await successfulSfuRoom.page.waitForURL(`${baseUrl}/reunions/${meeting.id}/terminee`, { timeout: 20_000 });

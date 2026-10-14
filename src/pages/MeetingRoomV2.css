@@ -920,3 +920,57 @@
   .room-v2-device-discovery{align-items:stretch;flex-direction:column}
   .room-v2-lobby-manager{padding:10px 9px calc(20px + env(safe-area-inset-bottom,0px))}
 }
+
+/* October 2026 meeting usability: never crop participant faces to fill a tile. */
+.room-v2-tile video:not(.room-v2-ignore-fit) {
+  width:100%;height:100%;object-fit:contain!important;object-position:center;background:#07111e;
+}
+.room-v2-tile.is-screen video{object-fit:contain!important}
+.room-v2-rail-participants>div,
+.room-v2-desktop-rail.is-panel-open,
+.room-v2-rail-menu.is-floating {
+  scrollbar-width:none;
+  -ms-overflow-style:none;
+}
+.room-v2-rail-participants>div::-webkit-scrollbar,
+.room-v2-desktop-rail.is-panel-open::-webkit-scrollbar,
+.room-v2-rail-menu.is-floating::-webkit-scrollbar{display:none;width:0;height:0}
+.room-v2-rail-menu.is-floating{
+  position:fixed;
+  z-index:4600;
+  right:auto;
+  bottom:auto;
+  width:min(240px,calc(100vw - 16px));
+  max-height:min(382px,calc(100dvh - 30px));
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  padding:7px;
+  border:1px solid #2f637e;
+  border-radius:14px;
+  background:#0b263e;
+  box-shadow:0 20px 60px rgba(0,0,0,.55);
+}
+.room-v2-rail-menu.is-floating button{min-height:39px;font-size:11px}
+.room-v2-rail-menu.is-floating button:focus-visible{outline:2px solid #16d9df;outline-offset:-2px}
+.room-v2-leave-actions{position:absolute;right:14px;display:flex;align-items:center;gap:8px}
+.room-v2-end{height:46px;padding:0 14px;border-radius:12px;background:#be283a;box-shadow:0 8px 22px rgba(190,40,58,.22)}
+.room-v2-shell.has-confirmation .room-v2-controls{pointer-events:none}
+.room-v2-confirm-modal .room-v2-action-modal>footer{pointer-events:auto}
+.room-v2-action-modal-backdrop{
+  position:fixed!important;inset:0!important;z-index:12000!important;
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  padding:max(14px,env(safe-area-inset-top,0px)) 12px max(14px,env(safe-area-inset-bottom,0px))!important;
+  overflow-y:auto;
+}
+.room-v2-confirm-modal{
+  flex-shrink:0;
+  width:min(450px,calc(100vw - 24px))!important;
+  max-height:calc(100dvh - 36px)!important;
+  overflow-y:auto;
+}
+@media(max-width:760px){
+  .room-v2-action-modal-backdrop{align-items:center!important}
+  .room-v2-confirm-modal{border-radius:20px!important;padding:18px 15px!important}
+  .room-v2-leave-actions{display:none}
+}

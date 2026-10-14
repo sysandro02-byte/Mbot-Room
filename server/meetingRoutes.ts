@@ -410,7 +410,7 @@ const generateSummary = async (meeting: Meeting) => {
   }
 };
 
-export const registerMeetingRoutes = (app: express.Express, io: Server) => {
+export const registerMeetingRoutes = (app: express.Express, io: Server, ejectParticipant?: (io:Server,meetingId:number,userId:number)=>Promise<void>) => {
   const protectedApi = [requireDatabase, authenticateToken] as const;
 
   app.get('/api/meetings', ...protectedApi, async (request: AuthedRequest, response, next) => {
@@ -623,13 +623,14 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
         [meeting.id, request.user!.id],
       );
       const alreadyAccepted = existingMember.rows[0]?.status === 'accepted';
+      const previouslyRemoved = existingMember.rows[0]?.status === 'removed';
       if (meeting.settings.locked === true && !canModerateMeeting(meeting, request.user!) && !alreadyAccepted) {
         return sendApiError(response, 423, 'MEETING_LOCKED', 'La réunion est verrouillée par l’hôte.');
       }
       const moderator = canModerateMeeting(meeting, request.user!);
       const hostHasStarted = meeting.is_active || meeting.status === 'live';
       const blockedUntilHost = !moderator && !alreadyAccepted && !hostHasStarted && meeting.settings.joinBeforeHost !== true;
-      const status = moderator || alreadyAccepted || (!blockedUntilHost && meeting.settings.waitingRoom === false) ? 'accepted' : 'requested';
+      const status = moderator || alreadyAccepted || (!previouslyRemoved && !blockedUntilHost && meeting.settings.waitingRoom === false) ? 'accepted' : 'requested';
       if (status === 'accepted' && !alreadyAccepted && !moderator) {
         const count = await acceptedMemberCount(meeting.id);
         if (count >= meetingCapacity(meeting)) return sendApiError(response, 409, 'MEETING_CAPACITY_REACHED', 'La capacité maximale de la réunion est atteinte.');
@@ -1036,6 +1037,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       await query(`UPDATE room_meeting_members SET role='participant',status='removed',left_at=now(),updated_at=now() WHERE meeting_id=$1 AND user_id=$2`, [meeting.id,userId]);
       await query(`UPDATE room_lobby SET status='rejected' WHERE meeting_id=$1 AND user_id=$2`, [meeting.id,userId]);
       io.to(`user:${userId}`).emit('meeting:removed', { meetingId: meeting.id });
+      await ejectParticipant?.(io,meeting.id,userId);
       io.to(`meeting:${meeting.id}`).emit('meeting:presence', { meetingId: meeting.id, removedUserId: userId });
       response.status(204).end();
     } catch (error) { next(error); }
@@ -1060,6 +1062,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server) => {
       await query(`INSERT INTO room_meeting_bans (meeting_id,user_id,banned_by,reason) VALUES ($1,$2,$3,$4) ON CONFLICT (meeting_id,user_id) DO UPDATE SET banned_by=excluded.banned_by,reason=excluded.reason,created_at=now()`, [meeting.id,userId,request.user!.id,normalizeText(request.body?.reason).slice(0,500)]);
       await query(`UPDATE room_meeting_members SET role='participant',status='removed',left_at=now(),updated_at=now() WHERE meeting_id=$1 AND user_id=$2`, [meeting.id,userId]);
       io.to(`user:${userId}`).emit('meeting:banned', { meetingId: meeting.id });
+      await ejectParticipant?.(io,meeting.id,userId);
       response.json({ success: true });
     } catch (error) { next(error); }
   });

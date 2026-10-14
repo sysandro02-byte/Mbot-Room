@@ -13,7 +13,7 @@ import { registerMeetingRoutes } from './server/meetingRoutes.js';
 import { registerAdminRoutes } from './server/adminRoutes.js';
 import { registerAppRoutes } from './server/appRoutes.js';
 import { registerWorkspaceRoutes } from './server/workspaceRoutes.js';
-import { registerRealtime } from './server/realtime.js';
+import { ejectMeetingParticipant, registerRealtime } from './server/realtime.js';
 import { registerRtcRoutes } from './server/rtcRoutes.js';
 import { registerSfuRoutes } from './server/sfuRoutes.js';
 import { registerRecordingRoutes } from './server/recordingRoutes.js';
@@ -159,7 +159,7 @@ app.use('/api/live', rateLimit(240, 60_000));
 app.use('/api', rateLimit(600, 60_000));
 
 registerAuthRoutes(app, io);
-registerMeetingRoutes(app, io);
+registerMeetingRoutes(app, io, ejectMeetingParticipant);
 registerAdminRoutes(app, io);
 registerAppRoutes(app, io);
 registerWorkspaceRoutes(app, io);

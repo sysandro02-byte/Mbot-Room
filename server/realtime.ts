@@ -171,6 +171,18 @@ const removeSocketFromMeeting = async (io: Server, socket: Socket) => {
   socket.data.meetingId = null;
 };
 
+// Eject a removed participant's active signalling sockets immediately.
+export const ejectMeetingParticipant = async (io: Server, meetingId: number, userId: number) => {
+  const targetSocketIds = [...(meetings.get(meetingId)?.values() || [])]
+    .filter((participant) => participant.userId === userId)
+    .map((participant) => participant.socketId);
+  for (const socketId of targetSocketIds) {
+    const client = io.sockets.sockets.get(socketId);
+    if (client) await removeSocketFromMeeting(io, client);
+    else meetings.get(meetingId)?.delete(socketId);
+  }
+};
+
 export const registerRealtime = (io: Server) => {
   io.use(async (socket, next) => {
     try {
