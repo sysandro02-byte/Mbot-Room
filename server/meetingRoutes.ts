@@ -797,6 +797,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
       const now = new Date();
       const nextSettings: MeetingSettings = {
         ...source.settings,
+        waitingRoom: true,
         locked: false,
         meetingAccessId: request.user!.personalMeetingId || source.settings.meetingAccessId || createMeetingAccessId(),
       };
@@ -831,11 +832,12 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
         if (!userId || copied.has(userId)) continue;
         copied.add(userId);
         const role = userId === source.host_id ? 'host' : userId === Number(source.co_host_id || 0) ? 'cohost' : 'participant';
+        const membershipStatus = role === 'participant' ? 'left' : 'accepted';
         await query(
           `INSERT INTO room_meeting_members (meeting_id,user_id,role,status,joined_at,left_at,updated_at)
-           VALUES ($1,$2,$3,'accepted',NULL,NULL,now())
-           ON CONFLICT (meeting_id,user_id) DO UPDATE SET role=excluded.role,status='accepted',left_at=NULL,updated_at=now()`,
-          [meeting.id, userId, role],
+           VALUES ($1,$2,$3,$4,NULL,NULL,now())
+           ON CONFLICT (meeting_id,user_id) DO UPDATE SET role=excluded.role,status=excluded.status,left_at=NULL,updated_at=now()`,
+          [meeting.id, userId, role, membershipStatus],
         );
       }
       if (!copied.has(source.host_id)) {

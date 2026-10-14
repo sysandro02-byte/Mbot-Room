@@ -134,6 +134,13 @@ try {
     body: JSON.stringify({}),
   });
   assert.equal(join.response.status, 200, JSON.stringify(join.data));
+  assert.equal(join.data.status, 'requested');
+  const admitParticipant = await jsonRequest(`/api/meetings/${meeting.id}/lobby/respond`, {
+    method: 'POST',
+    headers: authHeaders(host.token),
+    body: JSON.stringify({ userId: participant.user.id, status: 'accepted' }),
+  });
+  assert.equal(admitParticipant.response.status, 200, JSON.stringify(admitParticipant.data));
 
   const createBreakouts = await jsonRequest(`/api/meetings/${meeting.id}/breakouts`, {
     method: 'POST',
