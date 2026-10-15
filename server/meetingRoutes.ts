@@ -622,9 +622,10 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
       ]);
       const membershipStatus=String(membership.rows[0]?.status||'');
       const lobbyStatus=String(lobby.rows[0]?.status||'');
-      const status=membershipStatus==='accepted'&&lobbyStatus==='accepted'?'accepted'
-        :lobbyStatus==='requested'?'requested'
-        :membershipStatus==='removed'||lobbyStatus==='rejected'?'removed':'left';
+      const status=lobbyStatus==='requested'?'requested'
+        :lobbyStatus==='rejected'?'removed'
+        :membershipStatus==='accepted'?'accepted'
+        :membershipStatus==='removed'?'removed':'left';
       response.json({meetingId:meeting.id,status});
     }catch(error){next(error);}
   });
