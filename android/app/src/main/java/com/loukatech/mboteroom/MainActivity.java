@@ -33,7 +33,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.webkit.WebViewRenderProcessGoneDetail;
+import android.webkit.RenderProcessGoneDetail;
 
 import androidx.webkit.WebViewAssetLoader;
 
@@ -139,7 +139,7 @@ public class MainActivity extends Activity {
             }
 
             @Override
-            public boolean onRenderProcessGone(WebView view, WebViewRenderProcessGoneDetail detail) {
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
                 // Android can kill the WebView renderer while the APK is in the
                 // background. Replace that WebView and restore its trusted route.
                 if (view != webView) return true;
