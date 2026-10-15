@@ -40,7 +40,7 @@ export default function SessionSecurity(){
   const [authenticated,setAuthenticated]=useState(authService.isAuthenticated());
   const [idleMinutes,setIdleMinutes]=useState(()=>resolveIdleMinutes(readCachedPreferences()));
   // A participant waiting for admission must not be logged out after 5 minutes.
-  const inActiveMeeting=/^\\/reunions\\/[^/]+(?:\\/luna|\\/salle-attente)?\\/?$/.test(location.pathname);
+  const inActiveMeeting=/^\/reunions\/[^/]+(?:\/luna|\/salle-attente)?\/?$/.test(location.pathname);
   const lastPingRef=useRef(0);
   const loggingOutRef=useRef(false);
 
