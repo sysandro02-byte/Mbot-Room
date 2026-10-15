@@ -184,7 +184,7 @@ export const ejectMeetingParticipant = async (io: Server, meetingId: number, use
   }
   // An exiting host must hand control to the co-host / eligible participant
   // without accidentally ending the meeting for the other participants.
-  if (targetSocketIds.length) await rebalanceTemporaryHost(io, meetingId);
+  await rebalanceTemporaryHost(io, meetingId);
 };
 
 export const registerRealtime = (io: Server) => {

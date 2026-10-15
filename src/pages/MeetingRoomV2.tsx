@@ -475,6 +475,7 @@ export default function MeetingRoomV2() {
   const [participantMenuPosition, setParticipantMenuPosition] = useState<{top:number;left:number}>({top:0,left:0});
   const endingMeetingRef = useRef(false);
   const leavingMeetingRef = useRef(false);
+  const participantRequestsRef = useRef<Set<AbortController>>(new Set());
   const [privateMessageTarget, setPrivateMessageTarget] = useState<{ userId:number; name:string; avatar?:string } | null>(null);
   const [privateMessageDraft, setPrivateMessageDraft] = useState('');
   const [privateMessageSending, setPrivateMessageSending] = useState(false);
@@ -960,8 +961,20 @@ export default function MeetingRoomV2() {
   }, [refreshMediaDevices]);
 
   const refreshParticipants = useCallback(async () => {
-    if (!meeting?.id) return;
-    setParticipants(await collaborationService.getParticipants(meeting.id).catch(() => []));
+    if (!meeting?.id || leavingMeetingRef.current || endingMeetingRef.current) return;
+    const controller = new AbortController();
+    participantRequestsRef.current.add(controller);
+    try {
+      const rows = await collaborationService.getParticipants(meeting.id, controller.signal);
+      if (!controller.signal.aborted && !leavingMeetingRef.current && !endingMeetingRef.current) {
+        setParticipants(rows);
+      }
+    } catch {
+      // A user departing a room is expected to lose permission to refresh it.
+      // Aborted refresh requests must not clear the participant list or warn.
+    } finally {
+      participantRequestsRef.current.delete(controller);
+    }
   }, [meeting?.id]);
 
   const refreshLobby = useCallback(async () => {
@@ -977,7 +990,7 @@ export default function MeetingRoomV2() {
     let cancelled = false;
     let busy = false;
     const verify = async () => {
-      if (cancelled || busy || endingMeetingRef.current) return;
+      if (cancelled || busy || endingMeetingRef.current || leavingMeetingRef.current) return;
       busy = true;
       try {
         const own = await meetingService.getMyMeetingStatus(meeting.id);
@@ -2074,6 +2087,9 @@ export default function MeetingRoomV2() {
     }
 
     leavingMeetingRef.current = true;
+    // Stop authorized-room reads BEFORE revoking membership server-side. This
+    // prevents late /participants GETs from returning an expected 403 in Android.
+    participantRequestsRef.current.forEach((request) => request.abort());
     setLeavingMeeting(true);
     if (endForAll) {
       endingMeetingRef.current = true;

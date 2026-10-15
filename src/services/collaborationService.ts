@@ -168,8 +168,11 @@ export const collaborationService = {
     const response=await apiFetch(apiUrl(`/api/meetings/${meetingId}/messages/${encodeURIComponent(messageId)}`),{method:'DELETE',headers:getAuthHeaders()});
     if(!response.ok) throw new Error((await response.json().catch(()=>({}))).error||'Suppression impossible.');
   },
-  async getParticipants(meetingId:number) {
-    return readJson<MeetingParticipant[]>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/participants`),{headers:getAuthHeaders()}));
+  async getParticipants(meetingId:number, signal?:AbortSignal) {
+    return readJson<MeetingParticipant[]>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/participants`),{
+      headers:getAuthHeaders(),
+      signal,
+    }));
   },
   async muteAllParticipants(meetingId:number) {
     return readJson<{success:boolean;muted:number;userIds:number[]}>(await apiFetch(apiUrl(`/api/meetings/${meetingId}/participants/mute-all`),{method:'POST',headers:getAuthHeaders()}));
