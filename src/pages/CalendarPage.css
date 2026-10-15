@@ -154,3 +154,48 @@
     display:none;
   }
 }
+
+
+/* Consistent responsive desktop calendar cards: no squeezed options or labels */
+.calendar-pro-page,.calendar-pro-grid,.calendar-create-card,.calendar-pro-right,.calendar-board{min-width:0;box-sizing:border-box}
+.calendar-pro-grid{grid-template-columns:minmax(360px,.86fr) minmax(0,1.14fr)}
+.calendar-pro-hero{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.calendar-pro-hero-stats article{min-width:0}
+.calendar-form-dates fieldset,.calendar-form-row>*{min-width:0}
+.calendar-advanced-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.calendar-advanced-grid article{min-width:0;min-height:109px;padding:12px;border-radius:13px;box-sizing:border-box}
+.calendar-advanced-grid article:last-child{grid-column:1/-1;min-height:80px}
+.calendar-advanced-grid article>div{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:8px;align-items:center;min-width:0}
+.calendar-advanced-grid article>div>span{min-width:0}
+.calendar-advanced-grid article>div>svg{width:19px;flex:none}
+.calendar-advanced-grid strong{font-size:12px;line-height:1.3}
+.calendar-advanced-grid small{font-size:10px;line-height:1.4;overflow-wrap:anywhere}
+.calendar-advanced-grid article select{width:100%;min-width:0;box-sizing:border-box;margin-top:12px;font-size:11px;min-height:39px}
+.calendar-advanced-grid .switch{box-sizing:border-box;flex:none;min-width:42px;width:42px;height:26px;justify-self:end}
+.calendar-advanced-grid .switch i{width:20px;height:20px}
+.calendar-advanced-grid .switch.on i{left:19px}
+.calendar-advanced-grid .switch:disabled{opacity:.8;cursor:not-allowed}
+.calendar-advanced-grid .switch:focus-visible{outline:3px solid #0b9e9c;outline-offset:3px}
+.calendar-board>header,.calendar-board-controls{flex-wrap:wrap}
+.calendar-month-grid>button{overflow:hidden}
+.calendar-month-grid i{box-sizing:border-box}
+@media(max-width:1320px){
+ .calendar-pro-grid,.calendar-pro-hero{grid-template-columns:1fr}
+ .calendar-advanced-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .calendar-advanced-grid article:last-child{grid-column:auto;min-height:109px}
+}
+@media(max-width:950px){
+ .calendar-advanced-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .calendar-advanced-grid article:last-child{grid-column:1/-1;min-height:80px}
+}
+@media(max-width:540px){
+ .calendar-pro-page{padding:10px}
+ .calendar-create-card{padding:12px}
+ .calendar-advanced-grid,.calendar-form-dates,.calendar-form-row{grid-template-columns:1fr}
+ .calendar-advanced-grid article:last-child{grid-column:auto}
+ .calendar-google-card{grid-template-columns:44px minmax(0,1fr)}
+ .calendar-google-actions{grid-column:1/-1;flex-wrap:wrap}
+ .calendar-google-status{grid-column:2;justify-self:start}
+ .calendar-board>header{padding:10px}
+ .calendar-month-grid{grid-auto-rows:minmax(65px,1fr)}
+}

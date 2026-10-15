@@ -160,7 +160,8 @@ export default function FilesPage() {
           <span>{file.mimeType==='application/pdf'?<FileText size={18}/>:<FileImage size={18}/>}</span>
           <div><strong>{file.name}</strong><small>{file.mimeType==='application/pdf'?'PDF':'Image'} · {formatBytes(file.sizeBytes)}</small></div>
           <div className="files-row-actions">
-            <button type="button" onClick={()=>void workspaceService.openFile(file.id,shouldDownloadMedia()?file.name:undefined)}><Eye size={15}/>{shouldDownloadMedia()?'Télécharger':'Ouvrir'}</button>
+            <button type="button" onClick={()=>void workspaceService.openFile(file.id,shouldDownloadMedia()?file.name:undefined)
+              .catch((cause)=>setError(cause instanceof Error?cause.message:'Ouverture du fichier impossible.'))}><Eye size={15}/>{shouldDownloadMedia()?'Télécharger':'Ouvrir'}</button>
             {Number(file.ownerId)===Number(currentUser?.id)?<button className="is-danger" type="button" aria-label={`Supprimer ${file.name}`} onClick={()=>void remove(file)}><Trash2 size={15}/></button>:null}
           </div>
         </article>):<p className="files-empty">Aucun fichier correspondant.</p>}

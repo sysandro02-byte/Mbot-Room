@@ -1230,15 +1230,23 @@ export default function MeetingRoomV2() {
       screenStreamRef.current?.getTracks().forEach((track) => track.stop());
       navigate(`/reunions/${id}/terminee`, { replace: true });
     };
-    const onEnded = () => {
-      // Do not unmount the host's room before its own end API promise resolves.
+    const onEnded = (payload?: {meetingId?: number}) => {
+      if (Number(payload?.meetingId) !== id) return;
+      // The host must await their own end API response before unmounting.
       if (endingMeetingRef.current) return;
       leaveByHost('La réunion a été terminée par l’hôte.');
     };
-    const onCancelled = () => leaveByHost('La réunion a été annulée par l’hôte.');
-    const onRemoved = () => leaveByHost('Vous avez été retiré de la réunion.');
-    const onBanned = () => leaveByHost('Vous avez été exclu de cette réunion.');
-    const onMoved = () => {
+    const onCancelled = (payload?: {meetingId?: number}) => {
+      if (Number(payload?.meetingId) === id) leaveByHost('La réunion a été annulée par l’hôte.');
+    };
+    const onRemoved = (payload?: {meetingId?: number}) => {
+      if (Number(payload?.meetingId) === id) leaveByHost('Vous avez été retiré de la réunion.');
+    };
+    const onBanned = (payload?: {meetingId?: number}) => {
+      if (Number(payload?.meetingId) === id) leaveByHost('Vous avez été exclu de cette réunion.');
+    };
+    const onMoved = (payload?: {meetingId?: number}) => {
+      if (Number(payload?.meetingId) !== id) return;
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       screenStreamRef.current?.getTracks().forEach((track) => track.stop());
       try { window.MBoteRoomAndroid?.stopScreenCapture?.(); } catch { /* optional bridge */ }

@@ -921,7 +921,9 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
       for (const row of connectedMembers.rows) {
         const userId = Number(row.user_id);
         io.to(`user:${userId}`).emit('meeting:ended', ending);
-        await ejectParticipant?.(io, meeting.id, userId);
+        await ejectParticipant?.(io, meeting.id, userId).catch((error) => {
+          console.warn('[meeting:end] Signalling cleanup failed', { meetingId: meeting.id, userId, error });
+        });
       }
       io.to(`meeting:${meeting.id}:moderators`).emit('meeting:lobby-updated', { meetingId: meeting.id, status: 'ended' });
       response.json({ success: true, meeting: publicMeeting(updated.rows[0]) });

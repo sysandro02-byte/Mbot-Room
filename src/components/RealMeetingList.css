@@ -144,3 +144,40 @@
  body.mboteroom-native-android .real-meeting-form footer{position:sticky;bottom:0;z-index:2;display:grid;grid-template-columns:1fr 1.5fr;gap:7px;padding:10px 0;background:#fff}
  body.mboteroom-native-android .real-meeting-form footer button{min-height:49px;font-size:12px}
 }
+
+
+/* Keep the contextual actions separated on desktop and small screens. */
+.meeting-pro-page{box-sizing:border-box;min-width:0;width:100%;max-width:1440px}
+.meeting-pro-page .meeting-pro-layout{grid-template-columns:minmax(0,1fr) minmax(250px,285px)}
+.meeting-pro-main,.meeting-pro-list,.meeting-pro-row,.meeting-pro-info,.meeting-pro-toolbar{min-width:0}
+.meeting-pro-page .meeting-pro-row{
+ grid-template-columns:74px minmax(0,1fr) minmax(100px,140px);
+ grid-template-rows:auto auto;gap:12px 14px;align-items:center;
+}
+.meeting-pro-page .meeting-pro-row-actions{
+ grid-column:2/-1;grid-row:2;display:flex;align-items:center;justify-content:flex-start;
+ flex-wrap:wrap;gap:8px;min-width:0;overflow:visible;
+}
+.meeting-pro-page .meeting-pro-row-actions>button{
+ flex:0 0 auto;min-width:100px;min-height:41px!important;
+ padding:8px 12px!important;font-size:11px!important;white-space:normal;line-height:1.25;
+}
+.meeting-pro-page .meeting-pro-row-actions>button svg{flex:0 0 auto;width:15px}
+.meeting-pro-page .meeting-pro-row-actions .real-meeting-menu-trigger{min-width:39px;width:39px;padding:0!important}
+.meeting-pro-page .meeting-pro-info h2{white-space:normal;overflow-wrap:anywhere}
+.meeting-pro-page .meeting-pro-toolbar{grid-template-columns:minmax(0,1fr)}
+.meeting-pro-page .meeting-pro-tabs{scrollbar-width:thin}
+.meeting-pro-page .meeting-pro-search{width:100%;max-width:400px;box-sizing:border-box}
+@media(max-width:1250px){
+ .meeting-pro-page .meeting-pro-layout{grid-template-columns:minmax(0,1fr)}
+ .meeting-pro-page .meeting-pro-side{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:760px){
+ .meeting-pro-page .meeting-pro-row{grid-template-columns:55px minmax(0,1fr);gap:8px 12px}
+ .meeting-pro-page .meeting-pro-participants{grid-column:2;grid-row:2}
+ .meeting-pro-page .meeting-pro-row-actions{grid-column:1/-1;grid-row:3}
+ .meeting-pro-page .meeting-pro-row-actions>button.secondary{display:inline-flex}
+ .meeting-pro-page .meeting-pro-row-actions>button{flex:1 1 auto;min-width:105px}
+ .meeting-pro-page .meeting-pro-row-actions .real-meeting-menu-trigger{flex:none}
+ .meeting-pro-page .meeting-pro-side{grid-template-columns:1fr}
+}

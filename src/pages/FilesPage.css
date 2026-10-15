@@ -58,3 +58,55 @@ body.mboteroom-native-android .files-grid.is-grid-view .files-uploaded-card arti
   body.mboteroom-native-android .files-card article>button,body.mboteroom-native-android .files-row-actions{grid-column:2;justify-self:start}
   body.mboteroom-native-android .files-tools>strong{font-size:16px}
 }
+
+
+/* Apply the same file-manager design to the WEB page, not only Android. */
+.files-page{box-sizing:border-box;max-width:1440px;min-width:0;padding:20px;gap:16px}
+.files-page-head,.files-page-head>div,.files-page-head-actions{min-width:0}
+.files-page-head-actions{flex-wrap:wrap;justify-content:flex-end}
+.files-page-head-actions>label{flex:1;min-width:180px;max-width:340px}
+.files-storage-summary{display:grid;grid-template-columns:56px minmax(0,1fr) auto;align-items:center;gap:14px;padding:17px 19px;background:#fff;border:1px solid #dfebef;border-radius:18px;box-shadow:0 10px 25px rgba(15,65,92,.045)}
+.files-storage-summary>span{display:grid;place-items:center;width:56px;height:56px;border-radius:17px;background:linear-gradient(140deg,#0bbfc0,#08639b);color:#fff}
+.files-storage-summary>div{min-width:0}
+.files-storage-summary strong,.files-storage-summary small{display:block;overflow-wrap:anywhere}
+.files-storage-summary strong{color:#153353;font-size:15px}
+.files-storage-summary small{margin-top:4px;color:#70849b;font-size:12px;line-height:1.5}
+.files-storage-summary>button{min-height:42px;padding:0 16px;border:0;border-radius:11px;background:#eaf3ff;color:#0c6eaa;font-weight:800;cursor:pointer}
+.files-category-tabs{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.files-category-tabs>button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;padding:0 14px;border:1px solid #dce8ec;border-radius:12px;background:#fff;color:#385471;font-size:12px;font-weight:750;cursor:pointer}
+.files-category-tabs>button.active,.files-category-tabs>button[aria-pressed="true"]{background:linear-gradient(135deg,#0bb8b2,#0b619d);border-color:transparent;color:white}
+.files-category-tabs>button:focus-visible,.files-tools button:focus-visible,.files-storage-summary>button:focus-visible{outline:3px solid #0aa4a1;outline-offset:3px}
+.files-tools{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.files-tools>strong{margin-right:auto;font-size:19px;color:#173452}
+.files-tools>label{display:flex;align-items:center;gap:7px;color:#5c7288;font-size:12px}
+.files-tools select{min-height:40px;padding:0 10px;border:1px solid #dbe6ed;border-radius:10px;background:#fff;color:#274b69;cursor:pointer}
+.files-tools>div{display:flex;align-items:center;gap:3px;padding:3px;border:1px solid #dde8ed;border-radius:11px;background:#fff}
+.files-tools>div button{display:grid;place-items:center;width:39px;height:35px;padding:0;border:0;border-radius:8px;background:transparent;color:#5a7187;cursor:pointer}
+.files-tools>div button[aria-pressed="true"]{background:#e3f7f6;color:#087f81}
+.files-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.files-card{min-width:0;box-sizing:border-box}
+.files-grid .files-uploaded-card{grid-column:1/-1}
+.files-grid.is-grid-view .files-uploaded-card{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.files-grid.is-grid-view .files-uploaded-card>.files-card-title,.files-grid.is-grid-view .files-uploaded-card>.files-empty{grid-column:1/-1}
+.files-grid.is-grid-view .files-uploaded-card article{display:flex;align-items:flex-start;flex-direction:column;gap:9px;border:1px solid #e2edf1;border-radius:13px;padding:12px;min-width:0}
+.files-grid.is-grid-view .files-uploaded-card article>div{min-width:0}
+.files-grid.is-grid-view .files-uploaded-card article .files-row-actions{margin-top:auto}
+.files-card .files-row-actions{display:flex;flex-wrap:wrap;justify-content:flex-end}
+.files-card .files-row-actions button{gap:6px}
+.files-card article>div:nth-child(2){min-width:0}
+.files-card article strong{overflow-wrap:anywhere}
+.files-card article a,.files-card article button{cursor:pointer}
+@media(max-width:1100px){.files-grid{grid-template-columns:1fr}.files-grid .files-uploaded-card{grid-column:auto}}
+@media(max-width:760px){
+ .files-page{padding:14px 10px}
+ .files-page-head-actions{width:100%;justify-content:stretch}
+ .files-page-head-actions>label{max-width:none}
+ .files-storage-summary{grid-template-columns:46px minmax(0,1fr) auto;gap:9px;padding:12px}
+ .files-storage-summary>span{width:46px;height:46px}
+ .files-storage-summary strong{font-size:12px}
+ .files-storage-summary small{font-size:10px}
+ .files-category-tabs{flex-wrap:nowrap;overflow-x:auto;padding:2px 0;scrollbar-width:none}
+ .files-category-tabs>button{flex:0 0 auto;min-height:43px;padding:0 11px}
+ .files-tools>strong{font-size:17px}
+ .files-card{padding:13px}
+}
