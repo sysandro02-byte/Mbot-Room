@@ -2,10 +2,11 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
 const apiPort = Number(process.env.VITE_API_PORT || 3004);
-const androidBuild = String(process.env.MBOTEROOM_ANDROID_BUILD || '').toLowerCase() === 'true';
 
 export default defineConfig({
-  base: androidBuild ? './' : '/',
+  // The APK serves the bundled app at the root of appassets.androidplatform.net.
+  // Absolute assets are essential when WebView restores a nested BrowserRouter route.
+  base: '/',
   plugins: [react()],
   server: {
     host: '0.0.0.0',

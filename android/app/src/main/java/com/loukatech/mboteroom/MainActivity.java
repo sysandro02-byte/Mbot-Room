@@ -24,6 +24,7 @@ import android.os.SystemClock;
 import android.util.Base64;
 import android.util.DisplayMetrics;
 import android.view.WindowMetrics;
+import android.view.ViewGroup;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
@@ -32,12 +33,14 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebViewRenderProcessGoneDetail;
 
 import androidx.webkit.WebViewAssetLoader;
 
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -80,6 +83,16 @@ public class MainActivity extends Activity {
                 .setDomain(LOCAL_APP_HOST)
                 .addPathHandler("/", new WebViewAssetLoader.AssetsPathHandler(this))
                 .build();
+        createWebView();
+
+        requestRuntimePermissions();
+        // WebView restores its history after Activity recreation. Routes in that
+        // history are served by the bundled React entry document below.
+        boolean restored = savedInstanceState != null && webView.restoreState(savedInstanceState) != null;
+        if (!restored) webView.loadUrl(LOCAL_APP_URL);
+    }
+
+    private void createWebView() {
         webView = new WebView(this);
         setContentView(webView);
 
@@ -100,6 +113,15 @@ public class MainActivity extends Activity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                // BrowserRouter routes such as /connexion and /app/calendar are
+                // documents on restore, not files in the Android assets folder.
+                if (isBundledSpaNavigation(request)) {
+                    try {
+                        return new WebResourceResponse("text/html", "UTF-8", getAssets().open("index.html"));
+                    } catch (IOException ignored) {
+                        // Don't disguise a missing APK bundle as a successful page.
+                    }
+                }
                 WebResourceResponse local = assetLoader.shouldInterceptRequest(request.getUrl());
                 return local != null ? local : super.shouldInterceptRequest(view, request);
             }
@@ -113,6 +135,23 @@ public class MainActivity extends Activity {
                 } catch (Exception ignored) {
                     // Keep unsupported external schemes out of the privileged WebView.
                 }
+                return true;
+            }
+
+            @Override
+            public boolean onRenderProcessGone(WebView view, WebViewRenderProcessGoneDetail detail) {
+                // Android can kill the WebView renderer while the APK is in the
+                // background. Replace that WebView and restore its trusted route.
+                if (view != webView) return true;
+                String lastUrl = view.getUrl();
+                releaseScreenCapture(true, false);
+                if (view.getParent() instanceof ViewGroup) {
+                    ((ViewGroup) view.getParent()).removeView(view);
+                }
+                view.destroy();
+                webView = null;
+                createWebView();
+                webView.loadUrl(isLocalAppUrl(lastUrl) ? lastUrl : LOCAL_APP_URL);
                 return true;
             }
         });
@@ -142,11 +181,28 @@ public class MainActivity extends Activity {
             }
         });
 
-        requestRuntimePermissions();
-        // Preserve the exact SPA route when Android recreates the activity after app switching.
-        // If no WebView state exists, the bundled shell still opens without a network connection.
-        boolean restored = savedInstanceState != null && webView.restoreState(savedInstanceState) != null;
-        if (!restored) webView.loadUrl(LOCAL_APP_URL);
+    }
+
+    private boolean isLocalAppUrl(String value) {
+        if (value == null) return false;
+        Uri uri;
+        try { uri = Uri.parse(value); } catch (Exception ignored) { return false; }
+        return "https".equalsIgnoreCase(uri.getScheme()) && LOCAL_APP_HOST.equalsIgnoreCase(uri.getHost());
+    }
+
+    private boolean isBundledSpaNavigation(WebResourceRequest request) {
+        if (!request.isForMainFrame() || !"GET".equalsIgnoreCase(request.getMethod())) return false;
+        Uri uri = request.getUrl();
+        if (!"https".equalsIgnoreCase(uri.getScheme()) || !LOCAL_APP_HOST.equalsIgnoreCase(uri.getHost())) return false;
+        String path = uri.getPath();
+        if (path == null || path.isEmpty() || "/".equals(path)) return true;
+        // Only extensionless navigation paths are React routes, never static
+        // JS/CSS, icons, API calls or a missing index.html file.
+        if ("/index.html".equals(path) || path.startsWith("/assets/")
+                || path.startsWith("/icons/") || path.startsWith("/images/")
+                || path.startsWith("/api/") || path.startsWith("/socket.io/")) return false;
+        String finalSegment = path.substring(path.lastIndexOf('/') + 1);
+        return !finalSegment.contains(".");
     }
 
     @Override

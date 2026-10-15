@@ -43,6 +43,9 @@ jobs:
           test -s android/app/src/main/assets/index.html
           test -d android/app/src/main/assets/assets
 
+      - name: Validate offline APK asset URLs on restored routes
+        run: node scripts/test-android-spa-bundle.mjs
+
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
