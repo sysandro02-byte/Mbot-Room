@@ -178,6 +178,16 @@ const openMeeting = async (browser, session, meetingId, label) => {
 
   const page = await context.newPage();
   const browserErrors = [];
+  const forbiddenResponses = [];
+  page.on('response', (response) => {
+    if (response.status() === 403) {
+      forbiddenResponses.push({
+        path: new URL(response.url()).pathname,
+        method: response.request().method(),
+        at: Date.now(),
+      });
+    }
+  });
   page.on('pageerror', (error) => browserErrors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error' && !/favicon|ResizeObserver/i.test(message.text())) {
@@ -196,7 +206,7 @@ const openMeeting = async (browser, session, meetingId, label) => {
     })).catch(() => ({ href: page.url(), title: '', text: '' }));
     throw new Error(`${label} meeting UI unavailable at exact production app: ${JSON.stringify(diagnostics)}`, { cause: error });
   }
-  return { context, page, browserErrors, label };
+  return { context, page, browserErrors, forbiddenResponses, label };
 };
 
 let browser;
@@ -565,6 +575,12 @@ try {
   assert.equal(ended.response.status, 200, JSON.stringify(ended.data));
   assert.equal(ended.data.status, 'ended');
 
+  if (hostRoom.forbiddenResponses.length || guestRoom.forbiddenResponses.length) {
+    console.log('PRODUCTION_BROWSER_403_DIAGNOSTICS', JSON.stringify({
+      host: hostRoom.forbiddenResponses,
+      guest: guestRoom.forbiddenResponses,
+    }));
+  }
   assert.deepEqual(hostRoom.browserErrors, [], `Host browser errors: ${hostRoom.browserErrors.join('\n')}`);
   assert.deepEqual(guestRoom.browserErrors, [], `Guest browser errors: ${guestRoom.browserErrors.join('\n')}`);
 
