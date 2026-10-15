@@ -967,7 +967,8 @@ export default function MeetingRoomV2() {
     setLobbyParticipants(rows.filter((item) => item.status === 'requested'));
   }, [isModerator, meeting?.id]);
 
-  // A missed websocket event must not leave a removed user in a media session.
+  // Recover from missed Socket.IO events after an Android WebView was paused.
+  // Server state is authoritative and remains readable even after expulsion.
   useEffect(() => {
     if (!meeting?.id) return;
     let cancelled = false;
@@ -976,37 +977,22 @@ export default function MeetingRoomV2() {
       if (cancelled || busy || endingMeetingRef.current) return;
       busy = true;
       try {
-        const current = await meetingService.getMeetingByLink(meeting.meeting_link);
+        const own = await meetingService.getMyMeetingStatus(meeting.id);
         if (cancelled) return;
-        if (current.status === 'ended' || current.status === 'cancelled') {
+        if (own.status === 'ended' || own.status === 'removed' || own.status === 'left') {
           navigate(`/reunions/${meeting.id}/terminee`, { replace: true });
-          return;
+        } else if (own.status === 'requested') {
+          navigate(`/reunions/${meeting.meeting_link}/salle-attente`, { replace: true, state: location.state });
+        } else {
+          void refreshParticipants();
         }
-        if (!isModerator) {
-          const rows = await collaborationService.getParticipants(meeting.id);
-          if (cancelled) return;
-          const own = rows.find((entry) => Number(entry.userId) === Number(currentUser?.id));
-          if (own?.status !== 'accepted') {
-            const lobby = await meetingService.getLobby(meeting.id).catch(() => []);
-            if (cancelled) return;
-            const waiting = lobby.some((entry) =>
-              Number(entry.user_id) === Number(currentUser?.id) && entry.status === 'requested');
-            navigate(waiting
-              ? `/reunions/${meeting.meeting_link}/salle-attente`
-              : `/reunions/${meeting.id}/terminee`, { replace: true, state: location.state });
-            return;
-          }
-        }
-        void refreshParticipants();
       } catch {
-        // Network loss is not proof of expulsion. Retry on the next tick.
-      } finally {
-        busy = false;
-      }
+        // Temporary connection loss does not mean the host removed a user.
+      } finally {busy = false;}
     };
     const interval = window.setInterval(() => { void verify(); }, 6500);
     return () => { cancelled = true; window.clearInterval(interval); };
-  }, [meeting?.id, meeting?.meeting_link, currentUser?.id, isModerator, location.state, navigate, refreshParticipants]);
+  }, [meeting?.id, meeting?.meeting_link, location.state, navigate, refreshParticipants]);
 
   const openLobbyPanel = () => {
     if (!isModerator) return;

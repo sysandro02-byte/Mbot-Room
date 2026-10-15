@@ -1521,6 +1521,11 @@ try {
     headers: authHeaders(guestOpenJoin.data.token),
   });
   assert.equal(movedGuestMedia.response.status, 403, 'Moving guest to lobby revokes SFU credentials');
+  const movedOwnStatus = await jsonRequest(`/api/meetings/${openMeeting.id}/my-status`, {
+    headers: authHeaders(guestOpenJoin.data.token),
+  });
+  assert.equal(movedOwnStatus.response.status, 200);
+  assert.equal(movedOwnStatus.data.status, 'requested');
   const pendingGuestLobby = await jsonRequest(`/api/meetings/${openMeeting.id}/lobby`, { headers: authHeaders(host.token) });
   assert.ok(pendingGuestLobby.data.some((entry) =>
     Number(entry.user_id) === Number(guestOpenJoin.data.user.id) && entry.status === 'requested'));
@@ -1538,12 +1543,22 @@ try {
     headers: authHeaders(guestOpenJoin.data.token),
   });
   assert.equal(removedGuestMedia.response.status, 403, 'Removed guest must lose media access');
+  const removedOwnStatus = await jsonRequest(`/api/meetings/${openMeeting.id}/my-status`, {
+    headers: authHeaders(guestOpenJoin.data.token),
+  });
+  assert.equal(removedOwnStatus.response.status, 200);
+  assert.equal(removedOwnStatus.data.status, 'removed');
 
   const terminateOpenMeeting = await jsonRequest(`/api/meetings/${openMeeting.id}/end`, {
     method: 'POST', headers: authHeaders(host.token),
   });
   assert.equal(terminateOpenMeeting.response.status, 200, JSON.stringify(terminateOpenMeeting.data));
   assert.equal(terminateOpenMeeting.data.meeting?.status, 'ended');
+  const endedOwnStatus = await jsonRequest(`/api/meetings/${openMeeting.id}/my-status`, {
+    headers: authHeaders(guestOpenJoin.data.token),
+  });
+  assert.equal(endedOwnStatus.response.status, 200);
+  assert.equal(endedOwnStatus.data.status, 'ended');
   const afterEnd = await jsonRequest(`/api/meetings/${openMeeting.id}/participants`, {
     headers: authHeaders(host.token),
   });

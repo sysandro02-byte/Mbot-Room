@@ -603,6 +603,32 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
     } catch (error) { next(error); }
   });
 
+  // Own admission state remains readable after removal. This enables a mobile
+  // WebView to recover even when its realtime connection was suspended.
+  app.get('/api/meetings/:meetingId/my-status', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const meeting=await getMeetingById(Number(request.params.meetingId));
+      if(!meeting)return sendApiError(response,404,'MEETING_NOT_FOUND','Réunion introuvable.');
+      response.setHeader('Cache-Control','no-store');
+      if(meeting.status==='ended'||meeting.status==='cancelled'){
+        return response.json({meetingId:meeting.id,status:'ended'});
+      }
+      if(canModerateMeeting(meeting,request.user!)){
+        return response.json({meetingId:meeting.id,status:'accepted'});
+      }
+      const [membership,lobby]=await Promise.all([
+        query('SELECT status FROM room_meeting_members WHERE meeting_id=$1 AND user_id=$2 LIMIT 1',[meeting.id,request.user!.id]),
+        query('SELECT status FROM room_lobby WHERE meeting_id=$1 AND user_id=$2 LIMIT 1',[meeting.id,request.user!.id]),
+      ]);
+      const membershipStatus=String(membership.rows[0]?.status||'');
+      const lobbyStatus=String(lobby.rows[0]?.status||'');
+      const status=membershipStatus==='accepted'&&lobbyStatus==='accepted'?'accepted'
+        :lobbyStatus==='requested'?'requested'
+        :membershipStatus==='removed'||lobbyStatus==='rejected'?'removed':'left';
+      response.json({meetingId:meeting.id,status});
+    }catch(error){next(error);}
+  });
+
   app.get('/api/meetings/:meetingId/lobby', ...protectedApi, async (request: AuthedRequest, response, next) => {
     try {
       const meeting = await getMeetingById(Number(request.params.meetingId));

@@ -237,6 +237,12 @@ export const meetingService = {
     return response.json();
   },
 
+  async getMyMeetingStatus(meetingId:number):Promise<{meetingId:number;status:'accepted'|'requested'|'removed'|'left'|'ended'}>{
+    const response=await apiFetch(apiUrl(`/api/meetings/${meetingId}/my-status`),{headers:getAuthHeaders()},15_000);
+    if(!response.ok)throw new Error('Vérification de votre accès indisponible.');
+    return response.json();
+  },
+
   async getMeetingByLink(meetingLink: string): Promise<Meeting> {
     const response = await apiFetch(apiUrl(`/api/meetings/link/${encodeURIComponent(meetingLink)}`), { headers: getAuthHeaders() });
     if (!response.ok) {
