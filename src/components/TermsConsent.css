@@ -93,3 +93,13 @@
  body:has(.terms-modal-backdrop) .android-login-modal-close{visibility:hidden!important;pointer-events:none!important}
  body:has(.terms-modal-backdrop) .terms-modal>header>button{visibility:visible!important;pointer-events:auto!important}
 }
+
+/* Portaled legal dialog must remain fully visible on Android WebView. */
+.terms-modal-backdrop{isolation:isolate}
+@media(max-width:640px){
+ .terms-modal-backdrop{padding:12px!important;align-items:center!important;justify-content:center!important}
+ .terms-modal-backdrop>.terms-modal{height:min(86dvh,720px)!important;max-height:calc(100dvh - 24px)!important;grid-template-rows:auto minmax(0,1fr) auto!important}
+ .terms-modal h2{overflow-wrap:anywhere!important;max-width:none!important}
+ .terms-modal-footer{max-height:35dvh!important;overflow-y:auto!important}
+ .terms-modal-footer>div{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}
+}

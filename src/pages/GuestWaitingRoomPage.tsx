@@ -323,14 +323,32 @@ export default function GuestWaitingRoomPage() {
     };
 
     const checkLobby = async () => {
-      const lobby = await meetingService.getLobby(meeting.id).catch(() => []);
-      if (cancelled) return;
-      const me = lobby.find((item) => String(item.user_id) === String(currentUser.id));
-      applyLobbyStatus(me?.status);
+      try {
+        // A failed poll must never masquerade as an unprocessed request.
+        const access = await meetingService.getMyMeetingStatus(meeting.id);
+        if (cancelled) return;
+        setMeetingError('');
+        if (access.status === 'ended') {
+          setLobbyStatus('ended');
+          stopMedia();
+          navigate(`/reunions/${encodeURIComponent(meeting.meeting_link)}/terminee`, { replace: true, state: { meeting } });
+        } else if (access.status === 'removed') {
+          applyLobbyStatus('rejected');
+        } else if (access.status === 'left') {
+          setMeetingError('Votre demande n’est plus en attente. Quittez cette page et effectuez une nouvelle demande.');
+        } else {
+          applyLobbyStatus(access.status === 'accepted' ? 'accepted' : 'requested');
+        }
+      } catch (error) {
+        if (!cancelled) setMeetingError(error instanceof Error
+          ? error.message
+          : 'Vérification de votre accès indisponible. Nouvelle tentative automatique…');
+      }
     };
 
     const onLobbyStatus = (payload: { meetingId?: number; status?: 'accepted' | 'rejected' | 'requested' }) => {
       if (Number(payload?.meetingId || 0) !== Number(meeting.id)) return;
+      setMeetingError('');
       applyLobbyStatus(payload.status);
     };
 
@@ -494,9 +512,10 @@ export default function GuestWaitingRoomPage() {
         <div className={lobbyStatus === 'rejected' ? 'waiting-simple-status is-rejected' : 'waiting-simple-status'}>
           <span><Hourglass size={20} aria-hidden="true" /></span>
           <div>
-            <strong>{lobbyStatus === 'rejected' ? 'Demande refusée' : 'En attente de l’hôte'}</strong>
+            <strong>{lobbyStatus === 'rejected' ? 'Demande refusée' : lobbyStatus === 'ended' ? 'Réunion terminée' : 'En attente de l’hôte'}</strong>
             <p>{lobbyStatus === 'rejected'
               ? 'Vous allez être redirigé.'
+              : lobbyStatus === 'ended' ? 'La réunion a été clôturée.'
               : 'Votre demande a été envoyée. Vous entrerez automatiquement dès que l’hôte vous admettra.'}</p>
           </div>
         </div>

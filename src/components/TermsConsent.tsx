@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, FileText, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { legalService, type LegalDocument } from '../services/legalService';
 import './TermsConsent.css';
 import AppLoader from './AppLoader';
@@ -68,7 +69,7 @@ export default function TermsConsent({accepted,version,onAccepted,compact=false,
       </button>
     </div>
 
-    {open?<div className="terms-modal-backdrop" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)setOpen(false);}}>
+    {open ? createPortal(<div className="terms-modal-backdrop" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)setOpen(false);}}>
       <section className="terms-modal" role="dialog" aria-modal="true" aria-labelledby="terms-modal-title" onMouseDown={(event)=>event.stopPropagation()}>
         <header><div><FileText size={22}/><div><h2 id="terms-modal-title">{document?.title||'Conditions d’utilisation'}</h2><small>{document?.version?'Version '+document.version:'Chargement…'}</small></div></div><button type="button" aria-label="Fermer" onClick={()=>setOpen(false)}><X size={19}/></button></header>
         <div className="terms-modal-body" ref={scrollRef} onScroll={onScroll}>
@@ -80,6 +81,6 @@ export default function TermsConsent({accepted,version,onAccepted,compact=false,
           <div><button type="button" onClick={()=>setOpen(false)}>Annuler</button><button className="primary" type="button" disabled={!document||!readToEnd||!checked} onClick={confirm}>Accepter les conditions</button></div>
         </div>
       </section>
-    </div>:null}
+    </div>, document.body) : null}
   </>;
 }

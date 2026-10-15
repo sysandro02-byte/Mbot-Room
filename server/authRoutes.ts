@@ -177,7 +177,9 @@ const findAndLinkExternalUser = async (profile: ReturnType<typeof normalizeExter
 const findMeeting = async (value: unknown) => {
   const normalized = String(value || '').replace(/\s+/g, '').toLowerCase();
   if (!normalized) return null;
-  const result = await query(`SELECT * FROM room_meetings ORDER BY id DESC`);
+  // Prefer the active session when a personal meeting ID was used previously.
+  const result = await query(`SELECT * FROM room_meetings
+    ORDER BY CASE status WHEN 'live' THEN 0 WHEN 'scheduled' THEN 1 ELSE 2 END, id DESC`);
   return result.rows.map(mapMeeting).find((meeting) =>
     String(meeting.id) === normalized
     || meeting.meeting_link.toLowerCase() === normalized

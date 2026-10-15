@@ -1,4 +1,5 @@
 import { extractMeetingIdentifier } from '../lib/meetingInvitation';
+import { meetingService } from '../services/meetingService';
 import { isNativeAndroidApp } from '../lib/nativePlatform';
 import { FocusEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -610,7 +611,8 @@ export default function Login({ initialView = 'login' }: LoginProps) {
 
     const nextErrors: FieldErrors = {};
     if (!guestName.trim()) nextErrors.name = 'Votre nom est obligatoire.';
-    if (!meetingCode.trim()) nextErrors.meetingCode = "L'ID ou le lien de réunion est obligatoire.";
+    const identifier = extractMeetingIdentifier(meetingCode);
+    if (!identifier) nextErrors.meetingCode = "Saisissez un ID ou un lien de réunion valide.";
     if (!termsAccepted || !termsVersion) {
       setFormError("Vous devez lire et accepter les conditions d’utilisation avant de rejoindre en invité.");
       return;
@@ -622,21 +624,33 @@ export default function Login({ initialView = 'login' }: LoginProps) {
 
     setIsLoading(true);
     try {
+      // Keep a connected member's real session: joining is not a guest login.
+      const signedInUser = authService.isAuthenticated() ? authService.getCurrentUser() : null;
+      if (signedInUser && !signedInUser.isGuest) {
+        const meeting = await meetingService.lookupMeetingAccess(identifier, meetingPassword);
+        const request = await meetingService.requestJoin(meeting.id, Number(signedInUser.id), meetingPassword);
+        if (!request.success) throw new Error('La demande d’accès n’a pas été enregistrée.');
+        setMeetingPassword('');
+        navigate(`/reunions/${encodeURIComponent(meeting.meeting_link)}/salle-attente`, {
+          replace: true,
+          state: { meeting, guestName: signedInUser.name, isGuest: false },
+        });
+        return;
+      }
       const result = await authService.guestJoin({
         name: guestName.trim(),
-        meetingCode: extractMeetingIdentifier(meetingCode),
+        meetingCode: identifier,
         password: meetingPassword,
         termsAccepted,
         termsVersion,
       });
-      setMeetingPassword('');
       const meetingLink = String(result.meeting?.meeting_link || '');
       if (!meetingLink) throw new Error('Le lien de réunion est introuvable.');
       sessionStorage.setItem('mboteroom-guest-meeting-link', meetingLink);
-      const target = `/reunions/${encodeURIComponent(meetingLink)}/salle-attente`;
-      navigate(target, {
+      setMeetingPassword('');
+      navigate(`/reunions/${encodeURIComponent(meetingLink)}/salle-attente`, {
         replace: true,
-        state: { meeting: result.meeting, guestName: guestName.trim(), isGuest: true },
+        state: { meeting: result.meeting, meetingId: result.meeting.id, guestName: guestName.trim(), isGuest: true },
       });
     } catch (submitError) {
       setFormError(submitError instanceof Error ? submitError.message : 'Accès invité impossible.');
@@ -1115,7 +1129,7 @@ export default function Login({ initialView = 'login' }: LoginProps) {
               <FormField id="guest-code" label="ID ou lien de réunion" icon={<UsersRound size={21} aria-hidden="true" />} error={fieldErrors.meetingCode}>
                 <input id="guest-code" value={meetingCode} placeholder="Ex : 9845671234" onChange={(event) => { setMeetingCode(event.target.value); clearErrors(); }} />
               </FormField>
-              <FormField id="guest-password" label="Mot de passe de réunion" icon={<Lock size={21} aria-hidden="true" />} error={fieldErrors.meetingPassword}>
+              <FormField id="guest-password" label="Mot de passe de réunion (si requis)" icon={<Lock size={21} aria-hidden="true" />} error={fieldErrors.meetingPassword}>
                 <input id="guest-password" type="password" value={meetingPassword} placeholder="Code donné par l'hôte" autoComplete="off" onChange={(event) => { setMeetingPassword(event.target.value); clearErrors(); }} />
               </FormField>
               <TermsConsent accepted={termsAccepted} version={termsVersion} onAccepted={(accepted,version)=>{setTermsAccepted(accepted);setTermsVersion(version);setFormError('');}} />

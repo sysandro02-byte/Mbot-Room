@@ -39,7 +39,8 @@ export default function SessionSecurity(){
   const [secondsLeft,setSecondsLeft]=useState<number|null>(null);
   const [authenticated,setAuthenticated]=useState(authService.isAuthenticated());
   const [idleMinutes,setIdleMinutes]=useState(()=>resolveIdleMinutes(readCachedPreferences()));
-  const inActiveMeeting=/^\/reunions\/[^/]+(?:\/luna)?\/?$/.test(location.pathname);
+  // A participant waiting for admission must not be logged out after 5 minutes.
+  const inActiveMeeting=/^\\/reunions\\/[^/]+(?:\\/luna|\\/salle-attente)?\\/?$/.test(location.pathname);
   const lastPingRef=useRef(0);
   const loggingOutRef=useRef(false);
 
@@ -119,6 +120,11 @@ export default function SessionSecurity(){
       if(inActiveMeeting){
         localStorage.setItem(LAST_ACTIVITY_KEY,String(Date.now()));
         setSecondsLeft(null);
+        const now=Date.now();
+        if(navigator.onLine&&now-lastPingRef.current>30_000){
+          lastPingRef.current=now;
+          void authService.touchActivity().catch(()=>undefined);
+        }
         return;
       }
       if(!navigator.onLine){

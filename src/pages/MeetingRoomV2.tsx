@@ -740,14 +740,15 @@ export default function MeetingRoomV2() {
         || currentUser.role === 'admin'
       ));
       if (!moderator) {
-        const lobby = await meetingService.getLobby(found.id);
-        const ownLobby = lobby.find((item) => String(item.user_id) === String(currentUser?.id || ''));
-        if (ownLobby?.status === 'requested') {
-          navigate(`/reunions/${found.meeting_link}/salle-attente`, { replace: true, state: location.state });
+        // Admission is resolved from the authoritative per-user endpoint.
+        const access = await meetingService.getMyMeetingStatus(found.id);
+        if (access.status === 'requested') {
+          navigate(`/reunions/${encodeURIComponent(found.meeting_link)}/salle-attente`, { replace: true, state: location.state });
           return;
         }
-        if (ownLobby?.status === 'rejected') throw new Error('L’hôte a refusé votre demande d’accès.');
-        if (ownLobby?.status !== 'accepted') {
+        if (access.status === 'removed') throw new Error('L’hôte a refusé ou retiré votre accès à cette réunion.');
+        if (access.status === 'ended') throw new Error('Cette réunion est terminée.');
+        if (access.status !== 'accepted') {
           navigate(`/join/${encodeURIComponent(found.meeting_link)}`, { replace: true });
           return;
         }
