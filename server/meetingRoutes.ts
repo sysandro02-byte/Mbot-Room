@@ -896,16 +896,34 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
           RETURNING *`,
         [meeting.id],
       );
+      const connectedMembers = await query(
+        `SELECT user_id FROM room_meeting_members
+          WHERE meeting_id=$1 AND status='accepted'`,
+        [meeting.id],
+      );
       await query(
         `UPDATE room_meeting_members
-            SET left_at=COALESCE(left_at,now()),updated_at=now()
-          WHERE meeting_id=$1 AND left_at IS NULL`,
+            SET status='left',left_at=COALESCE(left_at,now()),updated_at=now()
+          WHERE meeting_id=$1 AND status='accepted'`,
+        [meeting.id],
+      );
+      await query(
+        `UPDATE room_lobby SET status='rejected'
+          WHERE meeting_id=$1 AND status='requested'`,
         [meeting.id],
       );
 
       const endedMeeting = mapMeeting(updated.rows[0]);
-      io.to(`meeting:${meeting.id}`).emit('meeting:ended', { meetingId: meeting.id, endedBy: request.user!.id });
-      io.to('admins').emit('meeting:ended', { meetingId: meeting.id, endedBy: request.user!.id });
+      const ending = { meetingId: meeting.id, endedBy: request.user!.id };
+      io.to(`meeting:${meeting.id}`).emit('meeting:ended', ending);
+      io.to('admins').emit('meeting:ended', ending);
+      // Cover disconnected signalling / backgrounded WebViews on their user sockets.
+      for (const row of connectedMembers.rows) {
+        const userId = Number(row.user_id);
+        io.to(`user:${userId}`).emit('meeting:ended', ending);
+        await ejectParticipant?.(io, meeting.id, userId);
+      }
+      io.to(`meeting:${meeting.id}:moderators`).emit('meeting:lobby-updated', { meetingId: meeting.id, status: 'ended' });
       response.json({ success: true, meeting: publicMeeting(updated.rows[0]) });
 
       // Summary generation is intentionally detached from the client response:
@@ -1076,6 +1094,8 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
       await query(`INSERT INTO room_lobby (meeting_id,user_id,status,name,avatar) VALUES ($1,$2,'requested',$3,$4) ON CONFLICT (meeting_id,user_id) DO UPDATE SET status='requested',name=excluded.name,avatar=excluded.avatar`, [meeting.id,userId,user.rows[0].name,user.rows[0].avatar]);
       await query(`UPDATE room_meeting_members SET role='participant',status='left',left_at=now(),updated_at=now() WHERE meeting_id=$1 AND user_id=$2`, [meeting.id,userId]);
       io.to(`user:${userId}`).emit('meeting:moved-to-lobby', { meetingId: meeting.id });
+      await ejectParticipant?.(io, meeting.id, userId);
+      io.to(`meeting:${meeting.id}`).emit('meeting:presence', { meetingId: meeting.id, movedToLobbyUserId: userId });
       io.to(`meeting:${meeting.id}:moderators`).emit('meeting:lobby-updated', {
         meetingId: meeting.id,
         userId,

@@ -967,6 +967,47 @@ export default function MeetingRoomV2() {
     setLobbyParticipants(rows.filter((item) => item.status === 'requested'));
   }, [isModerator, meeting?.id]);
 
+  // A missed websocket event must not leave a removed user in a media session.
+  useEffect(() => {
+    if (!meeting?.id) return;
+    let cancelled = false;
+    let busy = false;
+    const verify = async () => {
+      if (cancelled || busy || endingMeetingRef.current) return;
+      busy = true;
+      try {
+        const current = await meetingService.getMeetingByLink(meeting.meeting_link);
+        if (cancelled) return;
+        if (current.status === 'ended' || current.status === 'cancelled') {
+          navigate(`/reunions/${meeting.id}/terminee`, { replace: true });
+          return;
+        }
+        if (!isModerator) {
+          const rows = await collaborationService.getParticipants(meeting.id);
+          if (cancelled) return;
+          const own = rows.find((entry) => Number(entry.userId) === Number(currentUser?.id));
+          if (own?.status !== 'accepted') {
+            const lobby = await meetingService.getLobby(meeting.id).catch(() => []);
+            if (cancelled) return;
+            const waiting = lobby.some((entry) =>
+              Number(entry.user_id) === Number(currentUser?.id) && entry.status === 'requested');
+            navigate(waiting
+              ? `/reunions/${meeting.meeting_link}/salle-attente`
+              : `/reunions/${meeting.id}/terminee`, { replace: true, state: location.state });
+            return;
+          }
+        }
+        void refreshParticipants();
+      } catch {
+        // Network loss is not proof of expulsion. Retry on the next tick.
+      } finally {
+        busy = false;
+      }
+    };
+    const interval = window.setInterval(() => { void verify(); }, 6500);
+    return () => { cancelled = true; window.clearInterval(interval); };
+  }, [meeting?.id, meeting?.meeting_link, currentUser?.id, isModerator, location.state, navigate, refreshParticipants]);
+
   const openLobbyPanel = () => {
     if (!isModerator) return;
     setPanel('lobby');
@@ -1197,7 +1238,12 @@ export default function MeetingRoomV2() {
     const onCancelled = () => leaveByHost('La réunion a été annulée par l’hôte.');
     const onRemoved = () => leaveByHost('Vous avez été retiré de la réunion.');
     const onBanned = () => leaveByHost('Vous avez été exclu de cette réunion.');
-    const onMoved = () => navigate(`/reunions/${id}/salle-attente`, { replace: true, state: location.state });
+    const onMoved = () => {
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+      screenStreamRef.current?.getTracks().forEach((track) => track.stop());
+      try { window.MBoteRoomAndroid?.stopScreenCapture?.(); } catch { /* optional bridge */ }
+      navigate(`/reunions/${id}/salle-attente`, { replace: true, state: location.state });
+    };
 
     socket.on('meeting:chat-message', onChat);
     socket.on('meeting:chat-deleted', onChatDeleted);
@@ -1871,6 +1917,9 @@ export default function MeetingRoomV2() {
       if (action === 'lobby') await collaborationService.moveToLobby(meeting.id, userId);
       if (action === 'remove' || action === 'ban' || action === 'lobby') {
         setParticipants((current) => current.filter((person) => person.userId !== userId));
+        setOnlineParticipantIds((current) => {
+          const next = new Set(current); next.delete(userId); return next;
+        });
         setNotice(action === 'remove' ? 'Participant retiré de la réunion.' : action === 'ban' ? 'Participant banni.' : 'Participant déplacé en salle d’attente.');
       }
       await refreshParticipants();

@@ -79,7 +79,7 @@ const makeInitialForm=():CalendarForm=>{
     participants:'',
     reminder:true,
     reminderMinutes:15,
-    waitingRoom:preferences.waitingRoomDefault!==false,
+    waitingRoom:true,
     recurrence:'none',
     location:'',
     priority:'normal',
@@ -257,7 +257,7 @@ export default function CalendarPage(){
         participants,
         reminderEnabled:form.reminder,
         reminderMinutes:form.reminder?form.reminderMinutes:0,
-        waitingRoom:form.waitingRoom,
+        waitingRoom:true,
         recurrence:form.recurrence,
         location:form.location.trim(),
         priority:form.priority,
@@ -278,7 +278,7 @@ export default function CalendarPage(){
               settings:{
                 ...(existingMeeting.settings||{}),
                 participants,
-                waitingRoom:form.waitingRoom,
+                waitingRoom:true,
               },
             });
             setMeetings((current)=>current.map((meeting)=>meeting.id===updatedMeeting!.id?updatedMeeting!:meeting));
@@ -310,7 +310,7 @@ export default function CalendarPage(){
           participants,
           settings:{
             participants,
-            waitingRoom:form.waitingRoom,
+            waitingRoom:true,
             participantAudio:true,
             participantVideo:true,
             screenShare:true,
@@ -503,7 +503,7 @@ export default function CalendarPage(){
             <div className="calendar-advanced-title"><ShieldCheck/> Options avancées</div>
             <div className="calendar-advanced-grid">
               <article><div><Bell/><span><strong>Rappel</strong><small>{form.reminder?form.reminderMinutes+' minutes avant':'Désactivé'}</small></span><button type="button" className={form.reminder?'switch on':'switch'} onClick={()=>setForm((current)=>({...current,reminder:!current.reminder}))}><i/></button></div>{form.reminder?<select value={form.reminderMinutes} onChange={(event)=>setForm((current)=>({...current,reminderMinutes:Number(event.target.value)}))}><option value={5}>5 minutes avant</option><option value={15}>15 minutes avant</option><option value={30}>30 minutes avant</option><option value={60}>1 heure avant</option></select>:null}</article>
-              <article><div><ShieldCheck/><span><strong>Salle d’attente</strong><small>Les participants attendent votre admission.</small></span><button type="button" className={form.waitingRoom?'switch on':'switch'} onClick={()=>setForm((current)=>({...current,waitingRoom:!current.waitingRoom}))}><i/></button></div></article>
+              <article><div><ShieldCheck/><span><strong>Salle d’attente</strong><small>Les participants attendent votre admission.</small></span><button type="button" className="switch on" disabled role="switch" aria-label="Salle d’attente obligatoire" aria-checked={true} title="Admission obligatoire pour chaque réunion"><i/></button></div></article>
               <article><div><Repeat2/><span><strong>Répétition</strong><small>{form.recurrence==='none'?'Aucune répétition':form.recurrence==='daily'?'Chaque jour':form.recurrence==='weekly'?'Chaque semaine':'Chaque mois'}</small></span></div><select value={form.recurrence} onChange={(event)=>setForm((current)=>({...current,recurrence:event.target.value as Recurrence}))}><option value="none">Aucune répétition</option><option value="daily">Chaque jour</option><option value="weekly">Chaque semaine</option><option value="monthly">Chaque mois</option></select></article>
             </div>
             <button className="calendar-create-submit" disabled={saving}>{saving?<><RefreshCw className="spin"/> Enregistrement…</>:editingItem?<><Pencil/> Enregistrer les modifications</>:<><CalendarDays/> Enregistrer l’événement</>}</button>
