@@ -83,6 +83,47 @@ const liveKitConfig = () => ({
   apiSecret: String(process.env.LIVEKIT_API_SECRET || '').trim(),
 });
 
+// Force SFU disconnection on server-side removal/lobby changes. Sign only on
+// the backend: a browser token cannot administer rooms.
+const liveKitRoomAdminCall = async (room: string, method: 'RemoveParticipant'|'DeleteRoom', identity?: string) => {
+  const config=liveKitConfig();
+  if (!config.serverUrl || !config.apiKey || !config.apiSecret) return;
+  const now=Math.floor(Date.now()/1000);
+  const jwtHeader=base64url(JSON.stringify({alg:'HS256',typ:'JWT'}));
+  const jwtPayload=base64url(JSON.stringify({
+    iss:config.apiKey,sub:'mboteroom-server-moderation',nbf:now-5,exp:now+60,
+    video:{room,roomAdmin:true},
+  }));
+  const signature=crypto.createHmac('sha256',config.apiSecret).update(`${jwtHeader}.${jwtPayload}`).digest('base64url');
+  const token=`${jwtHeader}.${jwtPayload}.${signature}`;
+  const httpUrl=config.serverUrl.replace(/^wss:\/\//,'https://').replace(/^ws:\/\//,'http://');
+  const controller=new AbortController();
+  const deadline=setTimeout(()=>controller.abort(),3500);
+  try {
+    const response=await fetch(`${httpUrl}/twirp/livekit.RoomService/${method}`,{
+      method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+      body:JSON.stringify(method==='RemoveParticipant'?{room,identity}:{room}),
+      signal:controller.signal,
+    });
+    // A participant who already disconnected or a deleted room is not an error.
+    if(!response.ok && response.status!==404) throw new Error(`LiveKit ${method}: HTTP ${response.status}`);
+  } finally {clearTimeout(deadline);}
+};
+
+export const disconnectMeetingMediaUser = async (meetingId:number,userId:number) => {
+  const breakoutRooms=await query('SELECT id FROM room_breakout_rooms WHERE meeting_id=$1',[meetingId])
+    .then((value)=>value.rows.map((row)=>String(row.id))).catch(()=>[] as string[]);
+  const rooms=[`mboteroom-${meetingId}`,...breakoutRooms.map((id)=>`mboteroom-${meetingId}-breakout-${id}`)];
+  await Promise.all(rooms.map((room)=>liveKitRoomAdminCall(room,'RemoveParticipant',`mboteroom-user-${userId}`)));
+};
+
+export const terminateMeetingMediaRooms = async (meetingId:number) => {
+  const breakoutRooms=await query('SELECT id FROM room_breakout_rooms WHERE meeting_id=$1',[meetingId])
+    .then((value)=>value.rows.map((row)=>String(row.id))).catch(()=>[] as string[]);
+  const rooms=[`mboteroom-${meetingId}`,...breakoutRooms.map((id)=>`mboteroom-${meetingId}-breakout-${id}`)];
+  await Promise.all(rooms.map((room)=>liveKitRoomAdminCall(room,'DeleteRoom')));
+};
+
 export const registerSfuRoutes = (app: express.Express) => {
   app.get('/api/media/status', (_request, response) => {
     const mode = configuredMode();
