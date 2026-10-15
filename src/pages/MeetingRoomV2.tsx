@@ -441,6 +441,7 @@ export default function MeetingRoomV2() {
   const [screenSharePending, setScreenSharePending] = useState(false);
   const [recording, setRecording] = useState(false);
   const [endingMeeting, setEndingMeeting] = useState(false);
+  const [leavingMeeting, setLeavingMeeting] = useState(false);
   const [recordingMode, setRecordingMode] = useState<'local' | 'server' | null>(null);
   const [serverRecordingId, setServerRecordingId] = useState<string | null>(null);
   const [handRaised, setHandRaised] = useState(false);
@@ -473,6 +474,7 @@ export default function MeetingRoomV2() {
   const [menuUserId, setMenuUserId] = useState<number | null>(null);
   const [participantMenuPosition, setParticipantMenuPosition] = useState<{top:number;left:number}>({top:0,left:0});
   const endingMeetingRef = useRef(false);
+  const leavingMeetingRef = useRef(false);
   const [privateMessageTarget, setPrivateMessageTarget] = useState<{ userId:number; name:string; avatar?:string } | null>(null);
   const [privateMessageDraft, setPrivateMessageDraft] = useState('');
   const [privateMessageSending, setPrivateMessageSending] = useState(false);
@@ -2066,39 +2068,52 @@ export default function MeetingRoomV2() {
   };
 
   const leaveMeeting = async (endForAll = false) => {
-    if (!meeting?.id || (endForAll && endingMeeting)) return;
+    if (!meeting?.id || leavingMeetingRef.current || endingMeetingRef.current) return;
     if (endForAll && !canEndForAll) {
-      setNotice('Seul l’hôte actif peut terminer la réunion pour tout le monde.');
-      return;
+      throw new Error('Seul l’hôte actif peut terminer la réunion pour tout le monde.');
     }
 
+    leavingMeetingRef.current = true;
+    setLeavingMeeting(true);
     if (endForAll) {
       endingMeetingRef.current = true;
       setEndingMeeting(true);
-      setMoreMenuOpen(false);
-      setNotice('Fin de la réunion en cours…');
     }
+    setMoreMenuOpen(false);
 
     try {
-      if (endForAll) await collaborationService.endMeeting(meeting.id);
-    } catch (cause) {
       if (endForAll) {
-        endingMeetingRef.current = false;
-        setEndingMeeting(false);
+        // Wait for the durable backend transition. It is safe to retry an
+        // already-ended meeting if the HTTP response was lost.
+        try {
+          const result = await collaborationService.endMeeting(meeting.id);
+          if (!result.success) throw new Error('La clôture n’a pas été confirmée.');
+        } catch (cause) {
+          const status = await meetingService.getMyMeetingStatus(meeting.id).catch(() => null);
+          if (status?.status !== 'ended') throw cause;
+        }
+      } else {
+        // HTTP remains available even if Android suspended Socket.IO.
+        const result = await meetingService.leaveMeeting(meeting.id);
+        if (!result.success) throw new Error('La sortie n’a pas été confirmée.');
       }
-      setNotice(cause instanceof Error ? cause.message : 'Impossible de terminer la réunion.');
+    } catch (cause) {
+      endingMeetingRef.current = false;
+      leavingMeetingRef.current = false;
+      setEndingMeeting(false);
+      setLeavingMeeting(false);
       throw cause;
     }
 
-    // Do not block the exit UI on media/recording teardown. The socket leave is
-    // acknowledged server-side when possible; unmount/disconnect remains a fallback.
+    // The server has acknowledged the action. Media teardown must not delay
+    // navigation, and may run after component unmount.
     if (socket.connected) {
       socket.timeout(1500).emit('meeting:leave', { meetingId: meeting.id }, () => undefined);
     }
     void stopActiveRecording().catch(() => undefined);
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
     screenStreamRef.current?.getTracks().forEach((track) => track.stop());
-    try { window.MBoteRoomAndroid?.stopScreenCapture?.(); } catch { /* no-op */ }
+    try { window.MBoteRoomAndroid?.stopScreenCapture?.(); } catch { /* optional bridge */ }
 
     if (endForAll) {
       navigate(`/reunions/${meeting.id}/terminee`, { replace: true });
@@ -2881,15 +2896,15 @@ export default function MeetingRoomV2() {
             <button type="button" onClick={() => {setDevicePanelOpen(true);void refreshMediaDevices();setMoreMenuOpen(false);}}><Settings2/><span>Périphériques</span></button>
             <button type="button" onClick={() => {void inviteParticipants();setMoreMenuOpen(false);}}><UsersRound/><span>Inviter</span></button>
             <div/>
-            <button type="button" className="danger" onClick={confirmLeaveMeeting}><LogOut/><span>Quitter la réunion</span></button>
-            {canEndForAll ? <button type="button" className="danger" data-testid="end-meeting-for-all" disabled={endingMeeting} onClick={confirmEndMeeting}><PhoneOff/><span>{endingMeeting ? 'Fin en cours…' : 'Terminer pour tous'}</span></button> : null}
+            <button type="button" className="danger" disabled={leavingMeeting || endingMeeting} onClick={confirmLeaveMeeting}><LogOut/><span>{leavingMeeting ? 'Sortie en cours…' : 'Quitter la réunion'}</span></button>
+            {canEndForAll ? <button type="button" className="danger" data-testid="end-meeting-for-all" disabled={endingMeeting || leavingMeeting} onClick={confirmEndMeeting}><PhoneOff/><span>{endingMeeting ? 'Fin en cours…' : 'Terminer pour tous'}</span></button> : null}
           </div> : null}
         </div>
         </div>
 
         <div className="room-v2-leave-actions">
-          <button type="button" className="room-v2-leave" onClick={confirmLeaveMeeting}><LogOut size={18}/> Quitter</button>
-          {canEndForAll ? <button type="button" className="room-v2-end" data-testid="end-meeting-direct" disabled={endingMeeting} onClick={confirmEndMeeting}><PhoneOff size={18}/>{endingMeeting ? 'Fin en cours…' : 'Terminer pour tous'}</button> : null}
+          <button type="button" className="room-v2-leave" disabled={leavingMeeting || endingMeeting} onClick={confirmLeaveMeeting}><LogOut size={18}/>{leavingMeeting ? 'Sortie…' : 'Quitter'}</button>
+          {canEndForAll ? <button type="button" className="room-v2-end" data-testid="end-meeting-direct" disabled={endingMeeting || leavingMeeting} onClick={confirmEndMeeting}><PhoneOff size={18}/>{endingMeeting ? 'Fin en cours…' : 'Terminer pour tous'}</button> : null}
         </div>
       </footer>
 

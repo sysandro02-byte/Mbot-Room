@@ -909,6 +909,38 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
     } catch (error) { next(error); }
   });
 
+  // Durable leave endpoint. It is intentionally independent of Socket.IO:
+  // Android may suspend signalling before a participant taps "Quitter".
+  app.post('/api/meetings/:meetingId/leave', ...protectedApi, async (request: AuthedRequest, response, next) => {
+    try {
+      const meeting = await getMeetingById(Number(request.params.meetingId));
+      if (!meeting) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
+      response.setHeader('Cache-Control', 'no-store');
+      if (meeting.status === 'ended' || meeting.status === 'cancelled') {
+        return response.json({ success: true, status: 'ended', meetingId: meeting.id });
+      }
+      // This operation changes only the requesting user, never the meeting.
+      await query(
+        `UPDATE room_meeting_members
+            SET status='left',left_at=now(),updated_at=now()
+          WHERE meeting_id=$1 AND user_id=$2 AND status='accepted'`,
+        [meeting.id, request.user!.id],
+      );
+      // Clear all live sockets belonging to the departing account, and let
+      // realtime reassignment choose a new temporary host if necessary.
+      try {
+        await ejectParticipant?.(io, meeting.id, request.user!.id);
+      } catch (error) {
+        console.warn('[meeting:leave] Signalling cleanup failed', {
+          meetingId: meeting.id, error: String(error),
+        });
+      }
+      response.json({ success: true, status: 'left', meetingId: meeting.id });
+      void disconnectMeetingMediaUser(meeting.id, request.user!.id).catch((error) =>
+        console.warn('[meeting:leave] SFU cleanup failed', { meetingId: meeting.id, error: String(error) }));
+    } catch (error) { next(error); }
+  });
+
   app.post('/api/meetings/:meetingId/end', ...protectedApi, async (request: AuthedRequest, response, next) => {
     try {
       const meeting = await getMeetingById(Number(request.params.meetingId));
@@ -916,14 +948,26 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
       if (meeting.host_id !== request.user!.id && meeting.temporary_host_id !== request.user!.id && request.user!.role !== 'admin') {
         return sendApiError(response, 403, 'MEETING_HOST_REQUIRED', 'Seul l’hôte actif peut terminer la réunion pour tout le monde.');
       }
+      response.setHeader('Cache-Control', 'no-store');
+      if (meeting.status === 'ended') {
+        return response.json({ success: true, alreadyEnded: true, meeting: publicMeeting(meeting) });
+      }
+      if (meeting.status === 'cancelled') {
+        return sendApiError(response, 410, 'MEETING_CANCELLED', 'Cette réunion a été annulée.');
+      }
 
       const updated = await query(
         `UPDATE room_meetings
             SET status='ended',is_active=false,ended_at=COALESCE(ended_at,now()),temporary_host_id=NULL,updated_at=now()
-          WHERE id=$1
+          WHERE id=$1 AND status NOT IN ('ended','cancelled')
           RETURNING *`,
         [meeting.id],
       );
+      if (!updated.rows[0]) {
+        const latest = await getMeetingById(meeting.id);
+        if (latest?.status === 'ended') return response.json({ success: true, alreadyEnded: true, meeting: publicMeeting(latest) });
+        return sendApiError(response, 409, 'MEETING_CANNOT_END', 'Cette réunion ne peut plus être terminée.');
+      }
       const connectedMembers = await query(
         `SELECT user_id FROM room_meeting_members
           WHERE meeting_id=$1 AND status='accepted'`,
@@ -945,18 +989,23 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
       const ending = { meetingId: meeting.id, endedBy: request.user!.id };
       io.to(`meeting:${meeting.id}`).emit('meeting:ended', ending);
       io.to('admins').emit('meeting:ended', ending);
-      // Cover disconnected signalling / backgrounded WebViews on their user sockets.
-      for (const row of connectedMembers.rows) {
-        const userId = Number(row.user_id);
+      // Notify all participants before replying, but never wait for their
+      // signalling teardown or external media administration to succeed.
+      const memberIds = [...new Set(connectedMembers.rows.map((row) => Number(row.user_id)).filter(Boolean))];
+      for (const userId of memberIds) {
         io.to(`user:${userId}`).emit('meeting:ended', ending);
-        await ejectParticipant?.(io, meeting.id, userId).catch((error) => {
-          console.warn('[meeting:end] Signalling cleanup failed', { meetingId: meeting.id, userId, error });
-        });
       }
       io.to(`meeting:${meeting.id}:moderators`).emit('meeting:lobby-updated', { meetingId: meeting.id, status: 'ended' });
-      // Tear down LiveKit media after answering: the meeting must end even when
-      // LiveKit's admin API is temporarily unavailable.
       response.json({ success: true, meeting: publicMeeting(updated.rows[0]) });
+      void Promise.allSettled(memberIds.map(async (userId) => {
+        await ejectParticipant?.(io, meeting.id, userId);
+      })).then((results) => {
+        results.forEach((result, index) => {
+          if (result.status === 'rejected') console.warn('[meeting:end] Signalling cleanup failed', {
+            meetingId: meeting.id, userId: memberIds[index], error: String(result.reason),
+          });
+        });
+      });
       void terminateMeetingMediaRooms(meeting.id).catch((error) =>
         console.warn('[meeting:end] SFU room cleanup failed', { meetingId: meeting.id, error: String(error) }));
 

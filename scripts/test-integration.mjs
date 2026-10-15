@@ -1495,6 +1495,30 @@ try {
   const admittedMedia = await jsonRequest(`/api/meetings/${openMeeting.id}/media-session`, { headers: authHeaders(outsider.token) });
   assert.equal(admittedMedia.response.status, 200, JSON.stringify(admittedMedia.data));
 
+  // Leaving must be durable even with Socket.IO suspended, and it must revoke
+  // this participant's LiveKit access without ending the rest of the room.
+  const leaveOpen = await jsonRequest(`/api/meetings/${openMeeting.id}/leave`, {
+    method: 'POST', headers: authHeaders(outsider.token),
+  });
+  assert.equal(leaveOpen.response.status, 200, JSON.stringify(leaveOpen.data));
+  assert.equal(leaveOpen.data.status, 'left');
+  const leftOwnStatus = await jsonRequest(`/api/meetings/${openMeeting.id}/my-status`, {
+    headers: authHeaders(outsider.token),
+  });
+  assert.equal(leftOwnStatus.data.status, 'left', 'A user who quits must no longer be accepted');
+  const leftMedia = await jsonRequest(`/api/meetings/${openMeeting.id}/media-session`, {
+    headers: authHeaders(outsider.token),
+  });
+  assert.equal(leftMedia.response.status, 403, 'A user who quits loses LiveKit admission');
+  const otherStillWaiting = await jsonRequest(`/api/meetings/${openMeeting.id}/my-status`, {
+    headers: authHeaders(guestOpenJoin.data.token),
+  });
+  assert.equal(otherStillWaiting.data.status, 'requested', 'Leaving must not end the meeting for other participants');
+  const leaveAgain = await jsonRequest(`/api/meetings/${openMeeting.id}/leave`, {
+    method: 'POST', headers: authHeaders(outsider.token),
+  });
+  assert.equal(leaveAgain.response.status, 200, 'Leave must be idempotent');
+
   // A fresh explicit join must again wait; previous acceptance cannot bypass it.
   const rejoinOpen = await jsonRequest(`/api/meetings/${openMeeting.id}/join-request`, {
     method: 'POST', headers: authHeaders(outsider.token), body: JSON.stringify({ password: '' }),
@@ -1549,11 +1573,26 @@ try {
   assert.equal(removedOwnStatus.response.status, 200);
   assert.equal(removedOwnStatus.data.status, 'removed');
 
+  // An ordinary host exit cannot be interpreted as "Terminer pour tous".
+  const hostLeaves = await jsonRequest(`/api/meetings/${openMeeting.id}/leave`, {
+    method: 'POST', headers: authHeaders(host.token),
+  });
+  assert.equal(hostLeaves.response.status, 200, JSON.stringify(hostLeaves.data));
+  assert.equal(hostLeaves.data.status, 'left');
+  const stillLive = await jsonRequest(`/api/meetings/link/${openMeeting.meeting_link}`, {
+    headers: authHeaders(host.token),
+  });
+  assert.equal(stillLive.data.status, 'live', 'Host leave must not close the active meeting');
   const terminateOpenMeeting = await jsonRequest(`/api/meetings/${openMeeting.id}/end`, {
     method: 'POST', headers: authHeaders(host.token),
   });
   assert.equal(terminateOpenMeeting.response.status, 200, JSON.stringify(terminateOpenMeeting.data));
   assert.equal(terminateOpenMeeting.data.meeting?.status, 'ended');
+  const repeatEnd = await jsonRequest(`/api/meetings/${openMeeting.id}/end`, {
+    method: 'POST', headers: authHeaders(host.token),
+  });
+  assert.equal(repeatEnd.response.status, 200, 'Repeated end must be idempotent');
+  assert.equal(repeatEnd.data.alreadyEnded, true);
   const endedOwnStatus = await jsonRequest(`/api/meetings/${openMeeting.id}/my-status`, {
     headers: authHeaders(guestOpenJoin.data.token),
   });

@@ -44,7 +44,8 @@ const mediaRoomName = (meetingId: number, breakoutRoomId: string | null) =>
 const rebalanceTemporaryHost = async (io: Server, meetingId: number) => {
   const roomParticipants = meetings.get(meetingId);
   const meeting = await getMeetingById(meetingId);
-  if (!meeting || !roomParticipants) return;
+  // Closing a meeting must never elect another host after the closure.
+  if (!meeting || !roomParticipants || meeting.status === 'ended' || meeting.status === 'cancelled') return;
 
   const liveUserIds = new Set([...roomParticipants.values()].map((item) => item.userId));
   const originalHostOnline = liveUserIds.has(meeting.host_id);
@@ -181,6 +182,9 @@ export const ejectMeetingParticipant = async (io: Server, meetingId: number, use
     if (client) await removeSocketFromMeeting(io, client);
     else meetings.get(meetingId)?.delete(socketId);
   }
+  // An exiting host must hand control to the co-host / eligible participant
+  // without accidentally ending the meeting for the other participants.
+  if (targetSocketIds.length) await rebalanceTemporaryHost(io, meetingId);
 };
 
 export const registerRealtime = (io: Server) => {
@@ -388,7 +392,15 @@ export const registerRealtime = (io: Server) => {
       const meetingId = Number(socket.data.meetingId || 0);
       try {
         await removeSocketFromMeeting(io, socket);
-        if (meetingId) await rebalanceTemporaryHost(io, meetingId);
+        if (meetingId) {
+          // Explicit leave is different from a temporary network disconnect.
+          await query(
+            `UPDATE room_meeting_members SET status='left',left_at=now(),updated_at=now()
+              WHERE meeting_id=$1 AND user_id=$2 AND status='accepted'`,
+            [meetingId, user.id],
+          );
+          await rebalanceTemporaryHost(io, meetingId);
+        }
         callback?.({ ok: true });
       } catch {
         callback?.(fail('REALTIME_LEAVE_FAILED', 'Impossible de quitter proprement la réunion.'));

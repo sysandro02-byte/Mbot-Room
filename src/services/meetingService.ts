@@ -237,6 +237,18 @@ export const meetingService = {
     return response.json();
   },
 
+  async leaveMeeting(meetingId: number): Promise<{ success: boolean; status: 'left' | 'ended'; meetingId: number }> {
+    const response = await apiFetch(apiUrl(`/api/meetings/${meetingId}/leave`), {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.success !== true) {
+      throw new Error(result.error || 'Impossible de quitter la réunion. Réessayez.');
+    }
+    return result;
+  },
+
   async getMyMeetingStatus(meetingId:number):Promise<{meetingId:number;status:'accepted'|'requested'|'removed'|'left'|'ended'}>{
     const response=await apiFetch(apiUrl(`/api/meetings/${meetingId}/my-status`),{headers:getAuthHeaders()},15_000);
     if(!response.ok)throw new Error('Vérification de votre accès indisponible.');
