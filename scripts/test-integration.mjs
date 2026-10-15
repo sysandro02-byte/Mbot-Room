@@ -1511,6 +1511,46 @@ try {
   const guestAdmittedMedia = await jsonRequest(`/api/meetings/${openMeeting.id}/media-session`, { headers: authHeaders(guestOpenJoin.data.token) });
   assert.equal(guestAdmittedMedia.response.status, 200);
 
+  // A moderator's lobby action must remove actual media-session permissions,
+  // not merely change the visible label in the participant list.
+  const moveGuest = await jsonRequest(`/api/meetings/${openMeeting.id}/participants/${guestOpenJoin.data.user.id}/move-to-lobby`, {
+    method: 'POST', headers: authHeaders(host.token),
+  });
+  assert.equal(moveGuest.response.status, 200, JSON.stringify(moveGuest.data));
+  const movedGuestMedia = await jsonRequest(`/api/meetings/${openMeeting.id}/media-session`, {
+    headers: authHeaders(guestOpenJoin.data.token),
+  });
+  assert.equal(movedGuestMedia.response.status, 403, 'Moving guest to lobby revokes SFU credentials');
+  const pendingGuestLobby = await jsonRequest(`/api/meetings/${openMeeting.id}/lobby`, { headers: authHeaders(host.token) });
+  assert.ok(pendingGuestLobby.data.some((entry) =>
+    Number(entry.user_id) === Number(guestOpenJoin.data.user.id) && entry.status === 'requested'));
+
+  const readmitGuest = await jsonRequest(`/api/meetings/${openMeeting.id}/lobby/respond`, {
+    method: 'POST', headers: authHeaders(host.token),
+    body: JSON.stringify({ userId: guestOpenJoin.data.user.id, status: 'accepted' }),
+  });
+  assert.equal(readmitGuest.response.status, 200);
+  const removedGuest = await jsonRequest(`/api/meetings/${openMeeting.id}/participants/${guestOpenJoin.data.user.id}`, {
+    method: 'DELETE', headers: authHeaders(host.token),
+  });
+  assert.equal(removedGuest.response.status, 204);
+  const removedGuestMedia = await jsonRequest(`/api/meetings/${openMeeting.id}/media-session`, {
+    headers: authHeaders(guestOpenJoin.data.token),
+  });
+  assert.equal(removedGuestMedia.response.status, 403, 'Removed guest must lose media access');
+
+  const terminateOpenMeeting = await jsonRequest(`/api/meetings/${openMeeting.id}/end`, {
+    method: 'POST', headers: authHeaders(host.token),
+  });
+  assert.equal(terminateOpenMeeting.response.status, 200, JSON.stringify(terminateOpenMeeting.data));
+  assert.equal(terminateOpenMeeting.data.meeting?.status, 'ended');
+  const afterEnd = await jsonRequest(`/api/meetings/${openMeeting.id}/participants`, {
+    headers: authHeaders(host.token),
+  });
+  assert.equal(afterEnd.response.status, 200);
+  assert.ok(afterEnd.data.every((entry) => entry.status !== 'accepted'),
+    'End for all must clear accepted membership, not just mark a timestamp');
+
   const recordingCapability = await jsonRequest('/api/recording/status');
   assert.equal(recordingCapability.response.status, 200, JSON.stringify(recordingCapability.data));
   assert.equal(recordingCapability.data.ready, true);

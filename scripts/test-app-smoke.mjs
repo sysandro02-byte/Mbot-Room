@@ -446,6 +446,45 @@ try {
     await page.waitForTimeout(250);
 
     assert.ok(!page.url().includes('/login'), `${route} unexpectedly redirected to login`);
+    if(route==='/app/files'){
+      await page.locator('.files-category-tabs button').first().waitFor({state:'visible',timeout:10_000});
+      const categoryStyle=await page.locator('.files-category-tabs button').first().evaluate((element)=>{
+        const style=getComputedStyle(element);return {background:style.backgroundColor,image:style.backgroundImage,radius:style.borderRadius,height:element.getBoundingClientRect().height};
+      });
+      assert.ok(categoryStyle.image!=='none'||categoryStyle.background!=='rgba(0, 0, 0, 0)','File category controls must be styled on web');
+      assert.ok(categoryStyle.height>=40,'File category tabs need usable touch targets');
+      await page.getByRole('button',{name:'Images',exact:true}).first().click();
+      assert.equal(await page.getByRole('button',{name:'Images',exact:true}).first().getAttribute('aria-pressed'),'true');
+      await page.getByRole('button',{name:'Vue grille'}).click();
+      assert.ok(await page.locator('.files-grid.is-grid-view').count(),'File grid/list toggle must work');
+      await page.getByRole('button',{name:'Vue liste'}).click();
+      assert.ok(await page.locator('.files-grid:not(.is-grid-view)').count(),'File list view must be restored');
+    }
+    if(route==='/app/calendar'){
+      await page.locator('.calendar-advanced-grid article').first().waitFor({state:'visible',timeout:10_000});
+      const overlaps=await page.locator('.calendar-advanced-grid article').evaluateAll((articles)=>articles.some((article)=>{
+        const text=article.querySelector('span');
+        const toggle=article.querySelector('button');
+        if(!text||!toggle)return false;
+        const a=text.getBoundingClientRect(),b=toggle.getBoundingClientRect();
+        return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      }));
+      assert.equal(overlaps,false,'Calendar option labels must not overlap their switches');
+      assert.equal(await page.getByRole('switch',{name:'Salle d’attente obligatoire'}).isDisabled(),true);
+    }
+    if(route==='/app/meetings'){
+      const actions=page.locator('.meeting-pro-row-actions').first();
+      if(await actions.count()){
+        const intersects=await actions.locator(':scope > button').evaluateAll((buttons)=>buttons.some((button,index)=>{
+          const a=button.getBoundingClientRect();
+          return buttons.slice(index+1).some((other)=>{
+            const b=other.getBoundingClientRect();
+            return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+          });
+        }));
+        assert.equal(intersects,false,'Meeting actions must not overlap');
+      }
+    }
     if (route === '/admin') {
       await page.locator('.admin-topbar').waitFor({ state: 'visible', timeout: 10_000 });
       assert.equal(await page.locator('.global-app-header').count(), 0, 'Admin must render only its dedicated header');
