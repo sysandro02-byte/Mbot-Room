@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react';
+import { conversationService } from '../services/conversationService';
+import { socket } from '../lib/socket';
 import { authService } from '../services/authService';
 import { FolderOpen, Home, MessageCircle, Radio, UserRound, Video } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -12,7 +15,30 @@ const activeFor = (pathname: string, target: string) => {
 export default function AndroidNativeBottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
-  if (!isNativeAndroidApp() || authService.getCurrentUser()?.isGuest) return null;
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const nativeUser = isNativeAndroidApp() && !authService.getCurrentUser()?.isGuest;
+  useEffect(() => {
+    if (!nativeUser) return;
+    let active = true;
+    const refresh = () => {
+      void conversationService.getConversations()
+        .then((conversations) => {
+          if (active) setUnreadMessages(conversations.reduce((total, item) => total + Math.max(0, item.unreadCount || 0), 0));
+        }).catch(() => undefined);
+    };
+    refresh();
+    const timer = window.setInterval(refresh, 30_000);
+    socket.on('conversation:message', refresh);
+    const onFocus = () => { if (document.visibilityState === 'visible') refresh(); };
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      socket.off('conversation:message', refresh);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, [nativeUser, location.pathname]);
+  if (!nativeUser) return null;
 
   const hidden = location.pathname.startsWith('/admin')
     || location.pathname.startsWith('/login')
@@ -44,7 +70,14 @@ export default function AndroidNativeBottomNav() {
       aria-current={activeFor(location.pathname, path) ? 'page' : undefined}
       onClick={() => navigate(path)}
     >
-      <span className="android-native-nav-icon"><Icon size={22}/></span>
+      <span className="android-native-nav-icon" style={{ position: 'relative' }}>
+        <Icon size={22}/>
+        {path === '/app/messages' && unreadMessages > 0 && <span
+          aria-label={unreadMessages + ' messages non lus'}
+          style={{ position: 'absolute', top: -7, right: -11, display: 'grid', placeItems: 'center', minWidth: 18, height: 18, padding: '0 4px', borderRadius: 99, border: '2px solid white', background: '#f34356', color: 'white', fontSize: 10, fontWeight: 800, lineHeight: 1 }}>
+          {unreadMessages > 9 ? '9+' : unreadMessages}
+        </span>}
+      </span>
       <span className="android-native-nav-label">{label}</span>
     </button>)}
   </nav>;
