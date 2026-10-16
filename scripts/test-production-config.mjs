@@ -103,6 +103,11 @@ for (const relativePath of resilientClientFiles) {
   }
 }
 
+const sfuRoutes = fs.readFileSync(new URL('../server/sfuRoutes.ts', import.meta.url), 'utf8');
+if (!/video:\s*method\s*===\s*'DeleteRoom'\s*\?\s*\{\s*roomCreate:\s*true\s*\}\s*:\s*\{\s*room,\s*roomAdmin:\s*true\s*\}/.test(sfuRoutes)) {
+  throw new Error('LiveKit DeleteRoom must use roomCreate, while RemoveParticipant uses room-scoped roomAdmin');
+}
+
 const meetingRoutes = fs.readFileSync(new URL('../server/meetingRoutes.ts', import.meta.url), 'utf8');
 if (!meetingRoutes.includes('openai/gpt-oss-120b') || !meetingRoutes.includes('openai/gpt-oss-20b')) {
   throw new Error('Luna must keep the supported Groq fallback models when the configured model is unavailable');
