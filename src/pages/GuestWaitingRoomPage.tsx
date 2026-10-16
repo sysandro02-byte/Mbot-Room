@@ -16,6 +16,7 @@ import {
 import { socket } from '../lib/socket';
 import { authService } from '../services/authService';
 import { getMeetingAccessCode, Meeting, meetingService } from '../services/meetingService';
+import { waitingDeviceLabel } from '../lib/waitingDevices';
 import './GuestWaitingRoomPage.css';
 
 type BackgroundMode = 'none' | 'blur' | 'office' | 'gradient' | 'custom';
@@ -50,10 +51,6 @@ function formatMeetingId(value: string): string {
   return normalized.match(/.{1,3}/g)?.join(' ') || normalized;
 }
 
-function getDeviceLabel(device: MediaDeviceInfo, fallback: string, index: number): string {
-  return device.label || `${fallback} ${index + 1}`;
-}
-
 function isImageFile(file: File): boolean {
   return ['image/png', 'image/jpeg', 'image/webp'].includes(file.type);
 }
@@ -69,8 +66,10 @@ export default function GuestWaitingRoomPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const customBackgroundInputRef = useRef<HTMLInputElement | null>(null);
   const deviceSettingsRef = useRef<HTMLElement | null>(null);
-  const microphoneEnabledRef = useRef(true);
-  const cameraEnabledRef = useRef(true);
+  const microphoneEnabledRef = useRef(locationState?.joinOptions?.mic !== false);
+  const cameraEnabledRef = useRef(locationState?.joinOptions?.camera !== false);
+  const mediaRequestRef = useRef(0);
+  const supportsSpeakerSelection = typeof HTMLMediaElement !== 'undefined' && 'setSinkId' in HTMLMediaElement.prototype;
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [meetingError, setMeetingError] = useState('');
   const [lobbyStatus, setLobbyStatus] = useState<LobbyStatus>('waiting');
@@ -79,8 +78,8 @@ export default function GuestWaitingRoomPage() {
   const [selectedMicrophone, setSelectedMicrophone] = useState('');
   const [selectedCamera, setSelectedCamera] = useState('');
   const [selectedSpeaker, setSelectedSpeaker] = useState('');
-  const [microphoneEnabled, setMicrophoneEnabled] = useState(true);
-  const [cameraEnabled, setCameraEnabled] = useState(true);
+  const [microphoneEnabled, setMicrophoneEnabled] = useState(microphoneEnabledRef.current);
+  const [cameraEnabled, setCameraEnabled] = useState(cameraEnabledRef.current);
   const [microphoneLevel, setMicrophoneLevel] = useState(0);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('none');
   const [customBackgroundUrl, setCustomBackgroundUrl] = useState('');
@@ -88,10 +87,12 @@ export default function GuestWaitingRoomPage() {
   const [permissionStatus, setPermissionStatus] = useState<PermissionStatus>('checking');
   const [mediaError, setMediaError] = useState('');
   const [isTestingSpeaker, setIsTestingSpeaker] = useState(false);
+  const [isChangingDevice, setIsChangingDevice] = useState(false);
   const [confirmExitOpen, setConfirmExitOpen] = useState(false);
   const [isLeavingWaitingRoom, setIsLeavingWaitingRoom] = useState(false);
 
   const stopMedia = useCallback(() => {
+    mediaRequestRef.current += 1;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     setStream(null);
@@ -108,7 +109,7 @@ export default function GuestWaitingRoomPage() {
     setDevices({ microphones, cameras, speakers });
     setSelectedMicrophone((currentValue) => currentValue && microphones.some((device) => device.deviceId === currentValue) ? currentValue : microphones[0]?.deviceId || '');
     setSelectedCamera((currentValue) => currentValue && cameras.some((device) => device.deviceId === currentValue) ? currentValue : cameras[0]?.deviceId || '');
-    setSelectedSpeaker((currentValue) => currentValue && speakers.some((device) => device.deviceId === currentValue) ? currentValue : speakers[0]?.deviceId || '');
+    setSelectedSpeaker((currentValue) => currentValue && speakers.some(device => device.deviceId === currentValue) ? currentValue : '');
   }, []);
 
   useEffect(() => {
@@ -148,11 +149,12 @@ export default function GuestWaitingRoomPage() {
     return new MediaStream(tracks);
   }, []);
 
-  const openMedia = useCallback(async (microphoneDeviceId?: string, cameraDeviceId?: string) => {
+  const openMedia = useCallback(async (microphoneDeviceId?: string, cameraDeviceId?: string): Promise<boolean> => {
+    const requestId = ++mediaRequestRef.current;
     if (!navigator.mediaDevices?.getUserMedia) {
       setPermissionStatus('denied');
       setMediaError("Votre navigateur ne prend pas en charge l'accès à la caméra et au microphone.");
-      return;
+      return false;
     }
 
     setPermissionStatus('checking');
@@ -162,7 +164,7 @@ export default function GuestWaitingRoomPage() {
       ? { deviceId: { exact: microphoneDeviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
       : { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
     const videoConstraint: MediaTrackConstraints = cameraDeviceId
-      ? { deviceId: { exact: cameraDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }
+      ? { deviceId: { exact: cameraDeviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
       : { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' };
 
     try {
@@ -177,6 +179,14 @@ export default function GuestWaitingRoomPage() {
         nextStream = await requestPartialMedia(audioConstraint, videoConstraint);
       }
 
+      if (requestId !== mediaRequestRef.current) {
+        nextStream.getTracks().forEach(track => track.stop());
+        return false;
+      }
+      if ((cameraDeviceId && !nextStream.getVideoTracks().length) || (microphoneDeviceId && !nextStream.getAudioTracks().length)) {
+        nextStream.getTracks().forEach(track => track.stop());
+        throw new Error('Le périphérique sélectionné est indisponible.');
+      }
       streamRef.current?.getTracks().forEach((track) => track.stop());
       nextStream.getAudioTracks().forEach((track) => {
         track.enabled = microphoneEnabledRef.current;
@@ -198,11 +208,14 @@ export default function GuestWaitingRoomPage() {
       const videoDeviceId = nextStream.getVideoTracks()[0]?.getSettings().deviceId;
       if (audioDeviceId) setSelectedMicrophone(audioDeviceId);
       if (videoDeviceId) setSelectedCamera(videoDeviceId);
+      return true;
     } catch (error) {
-      setPermissionStatus('denied');
+      if (requestId !== mediaRequestRef.current) return false;
+      setPermissionStatus(streamRef.current?.getTracks().some(track => track.readyState === 'live') ? 'partial' : 'denied');
       setMediaError(error instanceof DOMException && error.name === 'NotAllowedError'
         ? "L'accès à la caméra ou au microphone a été refusé. Autorisez les permissions dans votre navigateur."
         : error instanceof Error ? error.message : "Impossible d'accéder à vos périphériques.");
+      return false;
     }
   }, [refreshDevices, requestPartialMedia]);
 
@@ -236,7 +249,7 @@ export default function GuestWaitingRoomPage() {
   }, [locationState?.meeting, meetingId, navigate]);
 
   useEffect(() => {
-    void openMedia();
+    void openMedia(locationState?.joinOptions?.audioInputId, locationState?.joinOptions?.videoInputId);
 
     return () => {
       stopMedia();
@@ -244,10 +257,11 @@ export default function GuestWaitingRoomPage() {
   }, [openMedia, stopMedia]);
 
   useEffect(() => {
-    if (!videoRef.current) return;
-    videoRef.current.srcObject = stream;
-    void videoRef.current.play().catch(() => undefined);
-  }, [stream]);
+    const video = videoRef.current;
+    if (!video) return;
+    video.srcObject = stream;
+    if (stream && cameraEnabled) void video.play().catch(() => undefined);
+  }, [stream, cameraEnabled]);
 
   useEffect(() => {
     if (!stream || !microphoneEnabled || stream.getAudioTracks().length === 0) {
@@ -306,6 +320,7 @@ export default function GuestWaitingRoomPage() {
               camera: cameraEnabledRef.current,
               audioInputId: selectedMicrophone || locationState?.joinOptions?.audioInputId,
               videoInputId: selectedCamera || locationState?.joinOptions?.videoInputId,
+              audioOutputId: supportsSpeakerSelection ? selectedSpeaker : '',
               background: backgroundMode !== 'none',
               backgroundUrl: customBackgroundUrl || undefined,
             },
@@ -385,7 +400,9 @@ export default function GuestWaitingRoomPage() {
   const meetingAccessId = meeting ? getMeetingAccessCode(meeting) : String(locationState?.meetingId || meetingId);
   const hostName = meeting?.host_name || 'Hôte MBotéRoom';
   const secured = meeting?.settings?.encryption !== false;
-  const videoClassName = ['waiting-video-preview', `background-${backgroundMode}`, cameraEnabled ? '' : 'is-camera-off'].filter(Boolean).join(' ');
+  const micAvailable = Boolean(stream?.getAudioTracks().some(track => track.readyState === 'live'));
+  const cameraAvailable = Boolean(stream?.getVideoTracks().some(track => track.readyState === 'live'));
+  const videoClassName = ['waiting-video-preview', `background-${backgroundMode}`, cameraEnabled && cameraAvailable ? '' : 'is-camera-off'].filter(Boolean).join(' ');
   const customPreviewStyle = customBackgroundUrl ? ({ '--waiting-room-background': `url("${customBackgroundUrl}")` } as CSSProperties) : undefined;
 
   const toggleMicrophone = () => {
@@ -437,7 +454,10 @@ export default function GuestWaitingRoomPage() {
       audioElement = new Audio();
       audioElement.srcObject = destination.stream;
       const outputElement = audioElement as HTMLAudioElement & { setSinkId?: (sinkId: string) => Promise<void> };
-      if (selectedSpeaker && outputElement.setSinkId) await outputElement.setSinkId(selectedSpeaker);
+      if (selectedSpeaker) {
+        if (!outputElement.setSinkId) throw new Error('Sélection de sortie audio indisponible.');
+        await outputElement.setSinkId(selectedSpeaker);
+      }
       await audioElement.play();
       oscillator.start();
       oscillator.stop(audioContext.currentTime + 0.55);
@@ -531,27 +551,26 @@ export default function GuestWaitingRoomPage() {
         {meetingError ? <p className="waiting-error" role="alert">{meetingError}</p> : null}
 
         <section className={videoClassName + ' waiting-simple-preview'} style={customPreviewStyle} aria-label="Aperçu vidéo">
-          {cameraEnabled && stream?.getVideoTracks().length ? (
-            <video ref={videoRef} muted playsInline autoPlay />
-          ) : (
+          <video ref={videoRef} muted playsInline autoPlay hidden={!cameraEnabled || !cameraAvailable} aria-hidden="true" />
+          {!cameraEnabled || !cameraAvailable ? (
             <div className="video-disabled-state">
               <CircleOff size={40} aria-hidden="true" />
-              <strong>Caméra désactivée</strong>
-              <span>Vous pouvez rejoindre la réunion sans caméra.</span>
+              <strong>{cameraAvailable ? 'Caméra désactivée' : permissionStatus === 'checking' ? 'Connexion de la caméra…' : 'Caméra indisponible'}</strong>
+              <span>{cameraAvailable ? 'Vous pouvez rejoindre la réunion sans caméra.' : 'Vérifiez les autorisations ou choisissez une autre caméra.'}</span>
             </div>
-          )}
+          ) : null}
           <span className="waiting-simple-name">{guestName}</span>
           {mediaError ? <p className="video-error" role="alert">{mediaError}</p> : null}
         </section>
 
         <div className="waiting-simple-controls" aria-label="Contrôles avant la réunion">
-          <button type="button" className={microphoneEnabled ? 'is-active' : ''} onClick={toggleMicrophone}>
+          <button type="button" className={microphoneEnabled && micAvailable ? 'is-active' : ''} onClick={toggleMicrophone} disabled={permissionStatus === 'checking' || isChangingDevice} aria-pressed={microphoneEnabled && micAvailable}>
             {microphoneEnabled ? <Mic size={20}/> : <CircleOff size={20}/>}
-            <span>{microphoneEnabled ? 'Micro activé' : 'Micro coupé'}</span>
+            <span>{!micAvailable ? 'Activer le micro' : microphoneEnabled ? 'Micro activé' : 'Micro coupé'}</span>
           </button>
-          <button type="button" className={cameraEnabled ? 'is-active' : ''} onClick={toggleCamera}>
+          <button type="button" className={cameraEnabled && cameraAvailable ? 'is-active' : ''} onClick={toggleCamera} disabled={permissionStatus === 'checking' || isChangingDevice} aria-pressed={cameraEnabled && cameraAvailable}>
             {cameraEnabled ? <Camera size={20}/> : <CircleOff size={20}/>}
-            <span>{cameraEnabled ? 'Caméra activée' : 'Caméra coupée'}</span>
+            <span>{!cameraAvailable ? 'Activer la caméra' : cameraEnabled ? 'Caméra activée' : 'Caméra coupée'}</span>
           </button>
           <button type="button" className={showDeviceSettings ? 'is-active' : ''} onClick={openDeviceSettings}>
             <Settings size={20}/>
@@ -566,7 +585,7 @@ export default function GuestWaitingRoomPage() {
                 <span><Mic size={17}/> Microphone</span>
                 <select value={selectedMicrophone} onChange={changeMicrophone} aria-label="Sélectionner le microphone">
                   {devices.microphones.length ? devices.microphones.map((device, index) => (
-                    <option key={device.deviceId} value={device.deviceId}>{getDeviceLabel(device, 'Microphone', index)}</option>
+                    <option key={device.deviceId} value={device.deviceId}>{waitingDeviceLabel('audioinput', device.label, index)}</option>
                   )) : <option value="">Microphone par défaut</option>}
                 </select>
               </label>
@@ -579,20 +598,21 @@ export default function GuestWaitingRoomPage() {
               <span><Camera size={17}/> Caméra</span>
               <select value={selectedCamera} onChange={changeCamera} aria-label="Sélectionner la caméra">
                 {devices.cameras.length ? devices.cameras.map((device, index) => (
-                  <option key={device.deviceId} value={device.deviceId}>{getDeviceLabel(device, 'Caméra', index)}</option>
+                  <option key={device.deviceId} value={device.deviceId}>{waitingDeviceLabel('videoinput', device.label, index)}</option>
                 )) : <option value="">Caméra par défaut</option>}
               </select>
             </label>
 
             <div className="waiting-simple-setting-row waiting-simple-audio-test">
               <div><span><Volume2 size={17}/> Haut-parleurs</span><small>{devices.speakers.length ? 'Sortie détectée' : 'Sortie par défaut'}</small></div>
-              <select aria-label="Choisir la sortie audio connectée" value={selectedSpeaker} onChange={(event) => setSelectedSpeaker(event.target.value)}>
+              <select aria-label="Choisir la sortie audio connectée" value={selectedSpeaker} onChange={(event) => { setSelectedSpeaker(event.target.value); setMediaError(''); }} disabled={!supportsSpeakerSelection}>
                 <option value="">Sortie audio système</option>
                 {devices.speakers.filter((device)=>device.deviceId).map((device,index)=>(
-                  <option key={device.deviceId} value={device.deviceId}>{getDeviceLabel(device,'Sortie audio',index)}</option>
+                  <option key={device.deviceId} value={device.deviceId}>{waitingDeviceLabel('audiooutput',device.label,index)}</option>
                 ))}
               </select>
-              <button type="button" onClick={() => void testSpeaker()} disabled={isTestingSpeaker}>{isTestingSpeaker ? 'Test…' : 'Tester'}</button>
+              <button type="button" onClick={() => void testSpeaker()} disabled={isTestingSpeaker}>{isTestingSpeaker ? 'Test en cours…' : 'Tester le son'}</button>
+              {!supportsSpeakerSelection ? <small className="waiting-audio-note">Le navigateur utilise la sortie audio du téléphone. Changez-la dans les paramètres Android.</small> : null}
             </div>
 
             <div className="waiting-simple-backgrounds">
@@ -602,9 +622,10 @@ export default function GuestWaitingRoomPage() {
                 <BackgroundButton mode="blur" active={backgroundMode === 'blur'} label="Flou" icon={<MonitorUp />} onClick={selectBackgroundMode} />
                 <BackgroundButton mode="gradient" active={backgroundMode === 'gradient'} label="Dégradé" icon={<Sparkles />} onClick={selectBackgroundMode} />
                 <button className={backgroundMode === 'custom' ? 'background-option background-option-custom is-active' : 'background-option background-option-custom'} type="button" onClick={() => customBackgroundUrl ? selectBackgroundMode('custom') : customBackgroundInputRef.current?.click()}>
-                  <FileImage size={18}/> Image
+                  <FileImage size={18}/> {customBackgroundUrl ? 'Image choisie' : 'Image'}
                 </button>
               </div>
+              <small className="waiting-background-note">Effets visibles dans l’aperçu uniquement : le remplacement de fond n’est pas encore appliqué au flux diffusé.</small>
               <input ref={customBackgroundInputRef} className="waiting-hidden-file" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleCustomBackground} />
             </div>
           </section>
