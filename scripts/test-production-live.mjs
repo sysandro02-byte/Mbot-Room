@@ -441,7 +441,9 @@ try {
     await joinPage.goto(`${appUrl}/rejoindre-une-reunion`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
     await joinPage.locator('#guest-name').waitFor({ state: 'visible', timeout: 30_000 });
     await joinPage.locator('.guest-bottom-sheet button[type="submit"]').click();
-    await joinPage.locator('.guest-bottom-sheet .auth-error').waitFor({ state: 'visible' });
+    // Validation errors are intentionally promoted to MBotéRoom's global modal.
+    await joinPage.locator('.app-message-modal').waitFor({ state: 'visible', timeout: 10_000 });
+    await joinPage.locator('.app-message-modal .app-message-confirm').click();
     await joinPage.locator('.guest-bottom-sheet .terms-consent-button').click();
     await joinPage.locator('.terms-modal-body p').first().waitFor({ state: 'visible', timeout: 30_000 });
     await joinPage.locator('.terms-modal-body').evaluate((node) => {
