@@ -121,13 +121,17 @@ const runNativeAndroidCase = async (session) => {
             const banner = document.querySelector('.android-home-banner');
             const copy = document.querySelector('.android-home-banner-copy');
             const image = banner?.querySelector('img');
-            const copyRect = copy?.getBoundingClientRect();
-            const imageRect = image?.getBoundingClientRect();
+            const start = document.querySelector('.android-home-start')?.getBoundingClientRect();
+            const join = document.querySelector('.android-home-join')?.getBoundingClientRect();
+            const quickTiles = Array.from(document.querySelectorAll('.android-home-quick:not(.android-home-quick-extra) button'));
+            const tileRects = quickTiles.map((tile) => tile.getBoundingClientRect());
             return {
               viewport: window.innerWidth,
               overflow: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth),
               bannerHeight: banner?.getBoundingClientRect().height || 0,
-              copyOverlap: Boolean(copyRect && imageRect && copyRect.right > imageRect.left + 2),
+              imageVisible: Boolean(image && image.getBoundingClientRect().width > 0),
+              buttonsSameRow: Boolean(start && join && Math.abs(start.top - join.top) < 2),
+              quickFourColumns: tileRects.length === 4 && tileRects.every((rect) => Math.abs(rect.top - tileRects[0].top) < 2),
               textClipped: Boolean(copy && copy.scrollHeight > copy.clientHeight + 2),
             };
           });
@@ -135,7 +139,9 @@ const runNativeAndroidCase = async (session) => {
             'Android home overflows at ' + width + 'px: ' + JSON.stringify(homeLayout));
           assert.ok(homeLayout.bannerHeight > 0 && homeLayout.bannerHeight < 260,
             'Android home banner height invalid at ' + width + 'px: ' + JSON.stringify(homeLayout));
-          assert.equal(homeLayout.copyOverlap, false, 'Android banner copy overlaps illustration at ' + width + 'px');
+          assert.equal(homeLayout.imageVisible, true, 'Android conference illustration hidden at ' + width + 'px');
+          assert.equal(homeLayout.buttonsSameRow, true, 'Android create/join buttons must share a row at ' + width + 'px');
+          assert.equal(homeLayout.quickFourColumns, true, 'Android quick links must occupy 4 columns at ' + width + 'px');
           assert.equal(homeLayout.textClipped, false, 'Android banner copy clipped at ' + width + 'px');
         }
         if (originalViewport) await page.setViewportSize(originalViewport);
