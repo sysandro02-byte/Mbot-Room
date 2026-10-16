@@ -63,6 +63,18 @@ if (!loginSource.includes("searchParams.get('token')") || !loginSource.includes(
   throw new Error('Forgot-password page must render and submit the password reset form');
 }
 
+const offlinePolicy = fs.readFileSync(new URL('../src/lib/offline.ts', import.meta.url), 'utf8');
+if (!offlinePolicy.includes('auth|push|rtc|sfu|health|meetings')) {
+  throw new Error('Meeting links and admission status must never be reused from offline API caches');
+}
+const guestLogin = fs.readFileSync(new URL('../src/pages/Login.tsx', import.meta.url), 'utf8');
+if (!guestLogin.includes('pendingLink') || !guestLogin.includes('}/salle-attente')) {
+  throw new Error('Guest login must restore to the waiting room after the auth event');
+}
+const appRoutes = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+if (!appRoutes.includes('safeLink)}/salle-attente')) {
+  throw new Error('Protected routes must restore guests to the lobby, not directly to media');
+}
 const apiClient = fs.readFileSync(new URL('../src/lib/api.ts', import.meta.url), 'utf8');
 if (!apiClient.includes('https://mbote-room-api.onrender.com')) {
   throw new Error('Hosted frontend must have a production Render API fallback');
