@@ -408,7 +408,7 @@ export default function GuestWaitingRoomPage() {
 
   const toggleMicrophone = () => {
     if (!micAvailable) {
-      void openMedia(selectedMicrophone || undefined, selectedCamera || undefined);
+      void changeDevice('audio', selectedMicrophone || devices.microphones[0]?.deviceId || '');
       return;
     }
     const nextValue = !microphoneEnabled;
@@ -419,7 +419,7 @@ export default function GuestWaitingRoomPage() {
 
   const toggleCamera = () => {
     if (!cameraAvailable) {
-      void openMedia(selectedMicrophone || undefined, selectedCamera || undefined);
+      void changeDevice('video', selectedCamera || devices.cameras[0]?.deviceId || '');
       return;
     }
     const nextValue = !cameraEnabled;
@@ -443,8 +443,8 @@ export default function GuestWaitingRoomPage() {
     // Stop the old track first: several Android devices cannot open two cameras simultaneously.
     previous?.stop();
     const request = kind === 'video'
-      ? { audio: false, video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } }
-      : { audio: { deviceId: { exact: deviceId }, echoCancellation: true, noiseSuppression: true }, video: false };
+      ? { audio: false, video: { ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'user' }), width: { ideal: 1280 }, height: { ideal: 720 } } }
+      : { audio: { ...(deviceId ? { deviceId: { exact: deviceId } } : {}), echoCancellation: true, noiseSuppression: true }, video: false };
     try {
       const acquired = await navigator.mediaDevices.getUserMedia(request);
       const track = kind === 'video' ? acquired.getVideoTracks()[0] : acquired.getAudioTracks()[0];
@@ -465,6 +465,7 @@ export default function GuestWaitingRoomPage() {
       setPermissionStatus(updated.getAudioTracks().length && updated.getVideoTracks().length ? 'ready' : 'partial');
       await refreshDevices();
     } catch {
+      if (currentStream !== streamRef.current) return;
       // Restore the previous device if Android refuses the new one.
       try {
         const recovered = await navigator.mediaDevices.getUserMedia(kind === 'video'
