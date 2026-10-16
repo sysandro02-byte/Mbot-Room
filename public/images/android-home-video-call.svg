@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="308" viewBox="0 0 420 308" role="img" aria-label="Illustration d'une réunion vidéo en groupe">
+<defs>
+  <linearGradient id="screen" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#116aa0"/><stop offset="1" stop-color="#06172e"/></linearGradient>
+  <linearGradient id="shirt" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e1effa"/><stop offset=".9" stop-color="#8fbadf"/></linearGradient>
+  <linearGradient id="skin" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b56739"/><stop offset="1" stop-color="#7b3d25"/></linearGradient>
+  <clipPath id="frame"><rect x="0" y="0" width="420" height="308" rx="22"/></clipPath>
+  <filter id="shade"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-opacity=".25"/></filter>
+</defs>
+<g clip-path="url(#frame)">
+  <rect width="420" height="308" fill="url(#screen)"/>
+  <circle cx="195" cy="88" r="160" fill="#16a5cd" opacity=".12"/>
+  <path d="M0 255 Q135 220 240 280 L240 320 H0Z" fill="#42a9cf" opacity=".2"/>
+  <path d="M75 317 Q80 225 123 215 L255 206 Q298 234 309 317Z" fill="url(#shirt)"/>
+  <path d="M163 212 L197 253 231 214" fill="none" stroke="#fff" stroke-width="7"/>
+  <ellipse cx="190" cy="143" rx="76" ry="101" fill="#1e141b"/>
+  <ellipse cx="185" cy="143" rx="49" ry="65" fill="url(#skin)"/>
+  <path d="M137 131 Q121 103 129 80 Q139 37 189 45 Q259 50 246 125 Q232 96 210 87 Q184 103 139 96Z" fill="#1d1219"/>
+  <path d="M163 137 Q172 130 182 137 M196 136 Q206 129 217 135" stroke="#2c1a16" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <circle cx="173" cy="140" r="3.4" fill="#1d1219"/><circle cx="205" cy="140" r="3.4" fill="#1d1219"/>
+  <path d="M184 155 L180 165 191 165" stroke="#693722" stroke-width="2" fill="none"/>
+  <path d="M167 177 Q188 194 213 173" fill="#fff" stroke="#823e33" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M106 120 Q91 141 100 165 L112 188 132 184 Q131 155 121 126" fill="#1d1219"/>
+  <path d="M249 117 Q275 139 268 171 L256 191 239 187" fill="#1d1219"/>
+  <path d="M129 246 Q81 216 59 176 Q52 164 55 160 Q62 151 75 162 L86 176 69 125 Q68 114 75 116 L98 158 84 111 Q84 100 94 104 L115 152 108 113 Q110 104 119 108 L137 159 143 143 Q157 133 160 145 Q151 175 152 189 L161 228Z" fill="url(#skin)"/>
+  <path d="M325 20 H413 V104 H325Z" fill="#edfaff" rx="11"/>
+  <rect x="328" y="21" width="84" height="82" rx="9" fill="#9fbfda"/>
+  <circle cx="370" cy="48" r="19" fill="#502e26"/>
+  <ellipse cx="370" cy="52" rx="12" ry="15" fill="#ad734f"/>
+  <path d="M344 97 Q348 66 369 70 Q393 69 397 97" fill="#2b4d70"/>
+  <path d="M361 57 Q370 66 379 57" stroke="#fff" stroke-width="2" fill="none"/>
+  <rect x="328" y="110" width="84" height="85" rx="9" fill="#eecdb7"/>
+  <ellipse cx="369" cy="147" rx="24" ry="29" fill="#24121a"/>
+  <ellipse cx="369" cy="147" rx="13" ry="17" fill="#a56543"/>
+  <path d="M334 194 Q343 165 369 170 Q395 167 407 194Z" fill="#eaf6fb"/>
+  <path d="M356 155 Q367 163 379 155" fill="none" stroke="#fff" stroke-width="2"/>
+  <rect x="328" y="203" width="84" height="85" rx="9" fill="#9ac4ce"/>
+  <circle cx="370" cy="233" r="20" fill="#20141a"/>
+  <ellipse cx="370" cy="237" rx="14" ry="17" fill="#84482f"/>
+  <path d="M334 285 Q336 259 370 261 Q400 259 406 285Z" fill="#dfeffa"/>
+  <path d="M361 244 Q370 252 380 244" fill="none" stroke="#fff" stroke-width="2"/>
+  <g filter="url(#shade)">
+    <circle cx="176" cy="278" r="22" fill="#061d54"/><circle cx="226" cy="278" r="22" fill="#061d54"/>
+    <circle cx="276" cy="278" r="22" fill="#ed4b5e"/><circle cx="326" cy="278" r="22" fill="#112c55" stroke="#f4fcff" stroke-width="2"/>
+    <rect x="172.5" y="265" width="7" height="15" rx="3.5" fill="white"/><path d="M169 275v4q7 12 15 0v-4M176 286v5" stroke="white" fill="none" stroke-width="2"/>
+    <rect x="214" y="270" width="15" height="16" rx="3" fill="white"/><path d="M228 274l7-4v17l-7-4" fill="white"/>
+    <path d="M267 280 Q276 270 285 280" fill="none" stroke="white" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="316" cy="278" r="2.2" fill="white"/><circle cx="326" cy="278" r="2.2" fill="white"/><circle cx="336" cy="278" r="2.2" fill="white"/>
+  </g>
+</g></svg>
