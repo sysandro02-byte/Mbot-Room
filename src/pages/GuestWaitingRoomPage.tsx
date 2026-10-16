@@ -406,33 +406,89 @@ export default function GuestWaitingRoomPage() {
   const customPreviewStyle = customBackgroundUrl ? ({ '--waiting-room-background': `url("${customBackgroundUrl}")` } as CSSProperties) : undefined;
 
   const toggleMicrophone = () => {
+    if (!micAvailable) {
+      void openMedia(selectedMicrophone || undefined, selectedCamera || undefined);
+      return;
+    }
     const nextValue = !microphoneEnabled;
     microphoneEnabledRef.current = nextValue;
     setMicrophoneEnabled(nextValue);
-    streamRef.current?.getAudioTracks().forEach((track) => {
-      track.enabled = nextValue;
-    });
+    streamRef.current?.getAudioTracks().forEach(track => { track.enabled = nextValue; });
   };
 
   const toggleCamera = () => {
+    if (!cameraAvailable) {
+      void openMedia(selectedMicrophone || undefined, selectedCamera || undefined);
+      return;
+    }
     const nextValue = !cameraEnabled;
     cameraEnabledRef.current = nextValue;
     setCameraEnabled(nextValue);
-    streamRef.current?.getVideoTracks().forEach((track) => {
-      track.enabled = nextValue;
-    });
+    streamRef.current?.getVideoTracks().forEach(track => { track.enabled = nextValue; });
   };
 
-  const changeMicrophone = async (event: ChangeEvent<HTMLSelectElement>) => {
-    const deviceId = event.target.value;
-    setSelectedMicrophone(deviceId);
-    await openMedia(deviceId, selectedCamera || undefined);
+  const changeDevice = async (kind: 'audio' | 'video', deviceId: string) => {
+    if (isChangingDevice || !navigator.mediaDevices?.getUserMedia) return;
+    const currentStream = streamRef.current;
+    if (!currentStream) {
+      void openMedia(kind === 'audio' ? deviceId : undefined, kind === 'video' ? deviceId : undefined);
+      return;
+    }
+    setIsChangingDevice(true);
+    setMediaError('');
+    const previous = kind === 'video' ? currentStream.getVideoTracks()[0] : currentStream.getAudioTracks()[0];
+    const previousId = previous?.getSettings().deviceId || '';
+    const otherTracks = currentStream.getTracks().filter(track => track.kind !== kind && track.readyState === 'live');
+    // Stop the old track first: several Android devices cannot open two cameras simultaneously.
+    previous?.stop();
+    const request = kind === 'video'
+      ? { audio: false, video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } } }
+      : { audio: { deviceId: { exact: deviceId }, echoCancellation: true, noiseSuppression: true }, video: false };
+    try {
+      const acquired = await navigator.mediaDevices.getUserMedia(request);
+      const track = kind === 'video' ? acquired.getVideoTracks()[0] : acquired.getAudioTracks()[0];
+      if (!track) {
+        acquired.getTracks().forEach(item => item.stop());
+        throw new Error('Périphérique indisponible.');
+      }
+      if (currentStream !== streamRef.current) {
+        acquired.getTracks().forEach(item => item.stop());
+        return;
+      }
+      track.enabled = kind === 'video' ? cameraEnabledRef.current : microphoneEnabledRef.current;
+      const updated = new MediaStream([...otherTracks, track]);
+      streamRef.current = updated;
+      setStream(updated);
+      if (kind === 'video') setSelectedCamera(track.getSettings().deviceId || deviceId);
+      else setSelectedMicrophone(track.getSettings().deviceId || deviceId);
+      setPermissionStatus(updated.getAudioTracks().length && updated.getVideoTracks().length ? 'ready' : 'partial');
+      await refreshDevices();
+    } catch {
+      // Restore the previous device if Android refuses the new one.
+      try {
+        const recovered = await navigator.mediaDevices.getUserMedia(kind === 'video'
+          ? { audio: false, video: previousId ? { deviceId: { ideal: previousId } } : true }
+          : { audio: previousId ? { deviceId: { ideal: previousId } } : true, video: false });
+        const restored = kind === 'video' ? recovered.getVideoTracks()[0] : recovered.getAudioTracks()[0];
+        if (restored && currentStream === streamRef.current) {
+          restored.enabled = kind === 'video' ? cameraEnabledRef.current : microphoneEnabledRef.current;
+          const updated = new MediaStream([...otherTracks, restored]);
+          streamRef.current = updated;
+          setStream(updated);
+        } else recovered.getTracks().forEach(track => track.stop());
+      } catch { /* Keep any remaining live tracks. */ }
+      setMediaError('Impossible de changer ce périphérique. Vérifiez les autorisations.');
+    } finally {
+      setIsChangingDevice(false);
+    }
   };
 
-  const changeCamera = async (event: ChangeEvent<HTMLSelectElement>) => {
-    const deviceId = event.target.value;
-    setSelectedCamera(deviceId);
-    await openMedia(selectedMicrophone || undefined, deviceId);
+  const changeMicrophone = (event: ChangeEvent<HTMLSelectElement>) => {
+    void changeDevice('audio', event.target.value);
+  };
+
+  const changeCamera = (event: ChangeEvent<HTMLSelectElement>) => {
+    void changeDevice('video', event.target.value);
   };
 
   const testSpeaker = async () => {
