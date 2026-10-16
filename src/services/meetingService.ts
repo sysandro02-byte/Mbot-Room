@@ -258,9 +258,19 @@ export const meetingService = {
   async getMeetingByLink(meetingLink: string): Promise<Meeting> {
     const response = await apiFetch(apiUrl(`/api/meetings/link/${encodeURIComponent(meetingLink)}`), { headers: getAuthHeaders() });
     if (!response.ok) {
-      throw new Error('Réunion introuvable');
+      const payload = await response.json().catch(() => null);
+      const fallback = response.status === 401 ? 'Votre session a expiré. Reconnectez-vous pour accéder à la réunion.'
+        : response.status === 403 ? 'Vous n’avez pas encore accès à cette réunion.'
+        : response.status === 404 ? 'Réunion introuvable. Vérifiez le lien ou le code transmis par l’hôte.'
+        : response.status === 410 ? 'Cette réunion est terminée.'
+        : 'Le serveur des réunions est momentanément indisponible. Réessayez.';
+      throw new Error(typeof payload?.error === 'string' ? payload.error : fallback);
     }
-    return response.json();
+    const result = await response.json().catch(() => null);
+    if (!result || !Number(result.id) || !result.meeting_link) {
+      throw new Error('La réponse du serveur de réunions est invalide. Vérifiez la configuration de l’API MBotéRoom.');
+    }
+    return result as Meeting;
   },
 
   async lookupMeetingAccess(value: string, password: string): Promise<Meeting> {
