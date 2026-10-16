@@ -324,10 +324,12 @@ export default function GuestWaitingRoomPage() {
     };
 
     const checkLobby = async () => {
+      const sequence = ++pollSequence;
       try {
         // A failed poll must never masquerade as an unprocessed request.
+        // Only the newest response may change the participant's current route.
         const access = await meetingService.getMyMeetingStatus(meeting.id);
-        if (cancelled) return;
+        if (cancelled || sequence !== pollSequence) return;
         setMeetingError('');
         if (access.status === 'ended') {
           setLobbyStatus('ended');
