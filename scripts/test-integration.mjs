@@ -1446,6 +1446,22 @@ try {
   assert.equal(openMeetingResponse.response.status, 201, JSON.stringify(openMeetingResponse.data));
   const openMeeting = openMeetingResponse.data;
   assert.equal(openMeeting.settings.waitingRoom, true, 'Server overrides obsolete direct-entry setting');
+  // Regression: direct browser refresh and invitation links must resolve the
+  // public link, numeric database ID, meeting access ID and six-char code.
+  for (const identifier of [
+    openMeeting.meeting_link,
+    String(openMeeting.id),
+    String(openMeeting.settings.meetingAccessId),
+    openMeeting.meeting_link.slice(-6),
+  ]) {
+    const resolved = await jsonRequest(`/api/meetings/link/${encodeURIComponent(identifier)}`, {
+      headers: authHeaders(host.token),
+    });
+    assert.equal(resolved.response.status, 200, `Invitation ${identifier}: ${JSON.stringify(resolved.data)}`);
+    assert.equal(resolved.data.id, openMeeting.id, `Invitation ${identifier} resolved to the wrong meeting`);
+  }
+  const missingInvite = await jsonRequest('/api/meetings/link/0000000000', { headers: authHeaders(host.token) });
+  assert.equal(missingInvite.response.status, 404, 'Unknown meeting IDs must remain unavailable');
   const openLookup = await jsonRequest('/api/meetings/join-lookup', {
     method: 'POST',
     headers: authHeaders(outsider.token),
