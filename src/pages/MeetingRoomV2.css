@@ -974,3 +974,162 @@
   .room-v2-confirm-modal{border-radius:20px!important;padding:18px 15px!important}
   .room-v2-leave-actions{display:none}
 }
+
+
+/* Meeting room V3: compact header, explicit configured timer, and theme. */
+.room-v2-shell{--meeting-heading-bg:#05192c;--meeting-tabs-bg:#07182c;--meeting-controls-bg:#07192b;--meeting-stage-bg:#05101e;--meeting-tile-bg:#0a1727;--meeting-nav-text:#e6f3fb}
+.room-v2-header{
+  box-sizing:border-box;
+  flex-shrink:0;
+  height:64px;
+  grid-template-columns:minmax(110px,176px) minmax(120px,1fr) auto;
+  gap:12px;
+  padding:0 14px;
+  background:var(--meeting-heading-bg);
+}
+.room-v2-brand img{width:min(158px,100%);height:34px}
+.room-v2-meeting-heading{padding-left:12px}
+.room-v2-meeting-heading strong{font-size:14px}
+.room-v2-meeting-heading span{font-size:10px}
+.room-v2-meeting-status{gap:7px}
+.room-v2-theme-toggle{
+  flex:0 0 auto;
+  width:34px;height:34px;display:grid;place-items:center;
+  border:1px solid rgba(112,177,216,.45);border-radius:50%;
+  background:#0b3049;color:#d6f7ff;cursor:pointer;
+}
+.room-v2-theme-toggle:hover,.room-v2-theme-toggle:focus-visible{border-color:#08c9d8;outline-offset:2px}
+.room-v2-live-pill{min-width:0;max-width:174px;position:relative;padding:7px 10px 10px!important;gap:5px;border-radius:14px;white-space:nowrap}
+.room-v2-live-pill>span:not(.room-v2-timer-progress){font-size:10px!important}
+.room-v2-live-pill small{font-size:9px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.room-v2-live-pill .room-v2-timer-progress{
+  position:absolute;display:block!important;bottom:4px;left:10px;right:10px;
+  height:3px;overflow:hidden;border-radius:999px;background:rgba(117,168,200,.22);
+}
+.room-v2-timer-progress>span{display:block;height:100%;border-radius:inherit;background:#08dabc;transition:width .6s linear}
+.room-v2-mode-tabs{box-sizing:border-box;flex:0 0 44px;height:44px;gap:6px;padding:0 10px;background:var(--meeting-tabs-bg)}
+.room-v2-mode-tabs button{min-width:0;height:32px;gap:6px;padding:0 12px;border-radius:17px;font-size:10px}
+.room-v2-mode-tabs svg{width:15px;height:15px}
+.room-v2-grid-icon{width:14px;height:14px;gap:3px}
+.room-v2-grid-icon::before,.room-v2-grid-icon::after{box-shadow:0 7px currentColor}
+.room-v2-speaker-icon{transform:scale(.82)}
+.room-v2-body{background:var(--meeting-stage-bg)}
+.room-v2-tile{background:var(--meeting-tile-bg)}
+.room-v2-controls{background:var(--meeting-controls-bg)}
+.room-v2-notice{top:110px}
+.room-v2-catchup-offer{top:112px}
+.room-v2-shell.theme-light{
+  --room-bg:#f1f6fb;--room-panel:#fff;--room-card:#fff;--room-card-2:#edf5f9;
+  --room-border:#cbdce8;--room-text:#122941;--room-muted:#50687a;
+  --meeting-heading-bg:#ffffff;--meeting-tabs-bg:#f3f8fc;
+  --meeting-controls-bg:#ffffff;--meeting-stage-bg:#eaf2f8;--meeting-tile-bg:#f5faff;
+  --meeting-nav-text:#19334b;
+  background:#f0f6fa;color:#172f45;
+}
+.room-v2-shell.theme-light .room-v2-header,
+.room-v2-shell.theme-light .room-v2-mode-tabs,
+.room-v2-shell.theme-light .room-v2-controls{border-color:#cbdce8}
+.room-v2-shell.theme-light .room-v2-meeting-heading{border-color:#cfdee7}
+.room-v2-shell.theme-light .room-v2-meeting-heading strong{color:#142f45}
+.room-v2-shell.theme-light .room-v2-meeting-heading span,
+.room-v2-shell.theme-light .room-v2-live-pill small{color:#526c80}
+.room-v2-shell.theme-light .room-v2-secure-status{color:#224258!important}
+.room-v2-shell.theme-light .room-v2-secure-status svg{color:#236d86}
+.room-v2-shell.theme-light .room-v2-live-pill{background:#e8f7f7;border-color:#90d6d2;color:#087b72!important}
+.room-v2-shell.theme-light .room-v2-theme-toggle{background:#f4f8fd;color:#245573;border-color:#c7dbe9}
+.room-v2-shell.theme-light .room-v2-mode-tabs button{background:#fff;border-color:#c7dce8;color:#264358}
+.room-v2-shell.theme-light .room-v2-mode-tabs button.active{background:linear-gradient(130deg,#08afb6,#06858d);border-color:#058b92;color:#fff}
+.room-v2-shell.theme-light .room-v2-tile{border-color:#b9d6e7;color:#143047;box-shadow:0 3px 15px rgba(29,68,96,.09)}
+.room-v2-shell.theme-light .room-v2-control{color:#23425b}
+.room-v2-shell.theme-light .room-v2-control>span{border-color:#c1d9e8;background:#e9f3fa}
+.room-v2-shell.theme-light .room-v2-control.active{color:#03787e}
+.room-v2-shell.theme-light .room-v2-control.active>span{color:#fff;border-color:#0da8ad;background:#07959b}
+.room-v2-shell.theme-light .room-v2-more-menu,
+.room-v2-shell.theme-light .room-v2-device-panel,
+.room-v2-shell.theme-light .room-v2-desktop-rail,
+.room-v2-shell.theme-light .room-v2-panel{background:#fff;color:#19384e;border-color:#c9dfed}
+.room-v2-shell.theme-light .room-v2-more-menu button,
+.room-v2-shell.theme-light .room-v2-rail-participants strong{color:#17384d}
+.room-v2-shell.theme-light .room-v2-more-menu button:hover{background:#e8f3f9}
+.room-v2-shell.theme-light .room-v2-rail-participants,
+.room-v2-shell.theme-light .room-v2-hand-queue{background:#fff;border-color:#bfd9e7;color:#13374d}
+.room-v2-shell.theme-light .room-v2-rail-participants>label,
+.room-v2-shell.theme-light .room-v2-device-panel select{background:#f3f9fd;border-color:#c2d9e6;color:#19394b}
+.room-v2-shell.theme-light .room-v2-rail-participants>label input{color:#19394b}
+.room-v2-shell.theme-light .room-v2-device-panel>small,
+.room-v2-shell.theme-light .room-v2-rail-participants small{color:#526a7b}
+.room-v2-shell.theme-light .room-v2-notice,
+.room-v2-shell.theme-light .room-v2-hand-toast{background:#f3f9fc;color:#173d50;border-color:#63cbd0}
+.room-v2-shell.theme-light .room-v2-reaction-panel{background:#fff;border-color:#bcd8e5}
+.room-v2-shell.theme-light .room-v2-reaction-panel button{color:#1d384a}
+.room-v2-shell.theme-light .room-v2-reaction-panel button:hover{background:#e9f3f7}
+.room-v2-shell.theme-light .room-v2-role-badge,.room-v2-shell.theme-light .room-v2-tile-meta{color:#fff}
+/* Scrolling is deliberately avoided: all eight meeting actions stay accessible. */
+@media(max-width:760px){
+  .room-v2-header{
+    height:92px;flex:0 0 92px;
+    display:grid;grid-template-columns:minmax(0,1fr) auto;
+    grid-template-rows:44px 34px;gap:0 6px;
+    padding:5px 10px 7px;
+  }
+  .room-v2-brand{grid-column:1;grid-row:1;min-width:0}
+  .room-v2-brand img{width:min(142px,100%);height:32px}
+  .room-v2-meeting-status{grid-column:2;grid-row:1;gap:5px}
+  .room-v2-meeting-heading{grid-column:1/-1;grid-row:2;min-width:0;padding:3px 4px 0;border:0;border-top:1px solid rgba(107,166,209,.16)}
+  .room-v2-meeting-heading strong{font-size:12px}
+  .room-v2-meeting-heading span{font-size:9px}
+  .room-v2-live-pill{padding:5px 8px 9px!important;border-radius:13px}
+  .room-v2-live-pill>span:not(.room-v2-timer-progress){font-size:9px!important}
+  .room-v2-live-pill small{font-size:8px}
+  .room-v2-theme-toggle{width:32px;height:32px}
+  .room-v2-secure-status{display:none!important}
+  .room-v2-mode-tabs{flex:0 0 42px;height:42px;justify-content:flex-start;gap:5px;padding:0 8px}
+  .room-v2-mode-tabs button{min-width:0;flex:0 0 auto;height:30px;padding:0 9px;gap:5px;border-radius:16px;font-size:9px}
+  .room-v2-share-tab{min-width:0!important}
+  .room-v2-panel{top:134px;bottom:128px}
+  .room-v2-stage{padding:6px}
+  .room-v2-notice{top:140px}
+  .room-v2-catchup-offer,.room-v2-lobby-alert{top:140px}
+  .room-v2-controls{
+    box-sizing:border-box;flex:0 0 auto;min-height:0;
+    display:block;padding:7px 8px calc(8px + env(safe-area-inset-bottom,0px));
+    overflow:visible;
+  }
+  .room-v2-control-strip{
+    display:grid;grid-template-columns:repeat(8,minmax(0,1fr));
+    width:100%;min-width:0;gap:2px;
+    justify-content:stretch;align-items:stretch;
+    padding:0;overflow:visible;scrollbar-width:none;
+  }
+  .room-v2-control-strip>*{min-width:0!important;width:100%;align-self:stretch}
+  .room-v2-controls .room-v2-control{width:100%;min-width:0;min-height:58px;height:58px;gap:4px;padding:3px 0}
+  .room-v2-controls .room-v2-control>span{width:34px;height:34px;min-height:34px;flex-shrink:0}
+  .room-v2-controls .room-v2-control svg{width:18px;height:18px}
+  .room-v2-controls .room-v2-control small{
+    width:100%;max-width:100%;white-space:normal;
+    overflow-wrap:anywhere;text-align:center;
+    line-height:1.08;font-size:8px;font-weight:750;
+  }
+  .room-v2-reaction-wrap,.room-v2-more-wrap{display:flex;align-items:stretch;justify-content:center}
+  .room-v2-leave-actions{display:none}
+  .room-v2-more-menu{bottom:calc(73px + env(safe-area-inset-bottom,0px));max-height:65dvh}
+  .room-v2-device-panel,.room-v2-reaction-panel{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
+  .room-v2-caption-overlay,.room-v2-hand-toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+}
+@media(max-width:540px){
+  .room-v2-control-strip{grid-template-columns:repeat(4,minmax(0,1fr));gap:2px 4px}
+  .room-v2-controls .room-v2-control{min-height:53px;height:53px}
+  .room-v2-controls .room-v2-control>span{width:31px;height:31px;min-height:31px}
+  .room-v2-controls .room-v2-control small{font-size:9px}
+  .room-v2-more-menu{bottom:calc(125px + env(safe-area-inset-bottom,0px))}
+  .room-v2-device-panel,.room-v2-reaction-panel{bottom:calc(129px + env(safe-area-inset-bottom,0px))}
+  .room-v2-caption-overlay,.room-v2-hand-toast{bottom:calc(138px + env(safe-area-inset-bottom,0px))}
+  .room-v2-panel{bottom:130px}
+}
+@media(max-width:345px){
+  .room-v2-brand img{width:min(112px,100%);height:27px}
+  .room-v2-live-pill{padding-inline:6px!important}
+  .room-v2-live-pill small{font-size:7px}
+  .room-v2-mode-tabs button{padding:0 7px;font-size:8px}
+  .room-v2-mode-tabs svg{width:12px}
+}
