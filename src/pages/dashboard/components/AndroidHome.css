@@ -1,121 +1,141 @@
-/* Page d'accueil propre à la WebView Android. Aucun sélecteur ne touche le site web. */
-body.mboteroom-native-android .android-home.android-home-redesign {
-  --ah-navy:#102349;--ah-teal:#089fa4;--ah-blue:#0661a8;
-  --ah-muted:#64748b;--ah-surface:#fff;--ah-line:#dce8ec;
+/* Accueil reproduisant la maquette Android, sans modifier l'interface web. */
+body.mboteroom-native-android .android-home.android-home-redesign.android-home-reference {
+  --ah-ink:#07183f;--ah-muted:#5d6c8b;--ah-teal:#009fa9;--ah-card:#ffffff;
   box-sizing:border-box;width:100%;max-width:680px;min-width:0;
-  margin:0 auto;padding:16px 16px calc(106px + env(safe-area-inset-bottom,0px));
-  background:#f7fbfc;color:var(--ah-navy);
-  font-family:Inter,Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;
+  margin:0 auto;padding:17px 14px calc(110px + env(safe-area-inset-bottom,0px));
+  background:linear-gradient(165deg,#f4fbff 0%,#f8fcff 78%,#f2faff 100%);
+  color:var(--ah-ink);font-family:Inter,Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;
 }
-.android-home-redesign,.android-home-redesign *{box-sizing:border-box}
-.android-home-redesign button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.android-home-redesign button:focus-visible{outline:3px solid #0da6a9;outline-offset:3px}
-.android-home-redesign button:active{transform:scale(.99)}
-.android-home-topbar{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
-.android-home-brand{flex:1;min-width:0;font-size:clamp(21px,6vw,27px);line-height:1.05;font-weight:650;letter-spacing:-.9px;white-space:nowrap}
-.android-home-brand>span{color:var(--ah-navy)}
-.android-home-brand>strong{color:#008fa4}
-.android-home-brand>small{display:block;overflow:hidden;margin-top:4px;color:var(--ah-muted);font-size:10px;font-weight:500;letter-spacing:0;text-overflow:ellipsis;white-space:nowrap}
-.android-home-top-actions{display:flex;flex:0 0 auto;align-items:center;gap:4px}
-.android-home-avatar,.android-home-round{position:relative;display:grid;flex:none;place-items:center;width:36px;height:38px;border:0;border-radius:12px;background:transparent;color:var(--ah-navy)}
-.android-home-avatar{width:38px;height:38px;overflow:hidden;border-radius:50%;background:linear-gradient(145deg,#0ca7aa,#2859cb);color:white;font-size:14px;font-weight:800}
-.android-home-avatar img{width:100%;height:100%;object-fit:cover}
-.android-home-round svg{width:21px;height:21px;stroke-width:2.1}
-.android-home-round b{position:absolute;right:-2px;top:-3px;display:grid;min-width:17px;height:17px;padding:0 3px;place-items:center;border:2px solid #f7fbfc;border-radius:99px;background:#e43f57;color:#fff;font-size:9px}
-.android-home-welcome{margin-top:19px}
-.android-home-welcome h1{margin:0;overflow-wrap:break-word;font-size:clamp(24px,7.1vw,32px);font-weight:800;line-height:1.13;letter-spacing:-.7px}
-.android-home-welcome p{margin:4px 0 0;color:var(--ah-muted);font-size:14px;line-height:1.3}
-.android-home-welcome small{display:block;margin-top:4px;color:var(--ah-muted);font-size:12px;line-height:1.35}
-.android-home-main-actions{display:grid;gap:10px;margin-top:19px}
-.android-home-start,.android-home-join{display:grid;width:100%;min-width:0;grid-template-columns:46px minmax(0,1fr) 19px;align-items:center;gap:12px;text-align:left}
-.android-home-start{min-height:88px;padding:14px;border:0;border-radius:19px;background:linear-gradient(112deg,#08c2b8,#058fba 58%,#07559b);color:#fff;box-shadow:0 8px 20px rgba(5,92,139,.15)}
-.android-home-join{min-height:84px;padding:12px;border:1.5px solid #19b3bb;border-radius:19px;background:var(--ah-surface);color:var(--ah-navy);box-shadow:0 6px 18px rgba(30,75,105,.04)}
-.android-home-start-icon,.android-home-join-icon{display:grid;width:46px;height:46px;place-items:center;border-radius:15px}
-.android-home-start-icon{background:rgba(255,255,255,.16)}
-.android-home-join-icon{background:#e9f8fa;color:var(--ah-navy)}
-.android-home-start-icon svg,.android-home-join-icon svg{width:25px;height:25px}
-.android-home-start>svg,.android-home-join>svg{width:19px;height:19px}
-.android-home-action-copy{display:flex;min-width:0;flex-direction:column;gap:4px}
-.android-home-action-copy strong{font-size:15px;font-weight:800;line-height:1.25;overflow-wrap:break-word}
-.android-home-action-copy small{font-size:11px;line-height:1.4}
-.android-home-start .android-home-action-copy small{color:rgba(255,255,255,.9)}
-.android-home-join .android-home-action-copy small{color:var(--ah-muted)}
-.android-home-highlights{margin-top:17px;min-width:0}
-.android-home-banner{display:grid;width:100%;min-width:0;min-height:137px;grid-template-columns:minmax(0,1fr) minmax(82px,27%);align-items:center;gap:8px;padding:15px;border:0;border-radius:19px;background:linear-gradient(120deg,#e2f8f8,#eaf6fc);color:var(--ah-navy);text-align:left;box-shadow:0 3px 14px rgba(25,80,108,.04)}
-.android-home-banner-copy{display:flex;min-width:0;flex-direction:column;justify-content:center;gap:6px}
-.android-home-banner-copy strong{font-size:16px;font-weight:850;line-height:1.18;overflow-wrap:break-word}
-.android-home-banner-copy small{color:#546783;font-size:11px;line-height:1.35;overflow-wrap:break-word}
-.android-home-banner-link{display:flex;align-items:center;gap:1px;margin-top:2px;color:#057f91;font-size:11px;font-weight:800}
-.android-home-banner>img{display:block;max-width:100%;width:100%;max-height:129px;object-fit:contain;object-position:center}
-.android-home-dots{display:flex;min-height:22px;align-items:center;justify-content:center;gap:7px}
-.android-home-dots button{width:7px;height:7px;padding:0;border:0;border-radius:99px;background:#bacdd5;transition:width .15s ease,background .15s ease}
-.android-home-dots button.active{width:19px;background:#068d9b}
-.android-home-section{margin-top:17px}
-.android-home-section>h2,.android-home-section-title h2{margin:0;font-size:19px;font-weight:800;letter-spacing:-.35px}
-.android-home-section-title{display:flex;align-items:center;justify-content:space-between;gap:9px;margin-bottom:10px}
-.android-home-section-title button{display:flex;flex:none;align-items:center;gap:1px;min-height:35px;padding:4px;border:0;background:transparent;color:#028b98;font-size:12px;font-weight:800}
-.android-home-section-title button svg{width:16px;height:16px}
-.android-home-next{display:grid;width:100%;min-height:87px;grid-template-columns:50px minmax(0,1fr) 26px;align-items:center;gap:10px;padding:11px;border:1px solid var(--ah-line);border-radius:17px;background:var(--ah-surface);color:var(--ah-navy);text-align:left}
-.android-home-next-icon{display:grid;width:50px;height:50px;place-items:center;border-radius:14px;background:#e7f8f9;color:#079ba2}
-.android-home-next-icon svg{width:26px;height:26px}
-.android-home-next-copy{display:flex;min-width:0;flex-direction:column;gap:4px}
-.android-home-next-copy strong{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;font-size:13px;line-height:1.25;overflow-wrap:anywhere}
-.android-home-next-copy>span{color:var(--ah-muted);font-size:11px;line-height:1.3}
-.android-home-next-copy small{display:flex;align-items:center;gap:5px;color:#3a5680;font-size:10px}
-.android-home-next-copy small svg{width:13px;height:13px}
-.android-home-next-arrow{display:grid;width:26px;height:26px;place-items:center;border-radius:50%;background:#f1f7f9}
-.android-home-next-arrow svg{width:17px}
-.android-home-quick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
-.android-home-quick button{display:flex;min-width:0;flex-direction:column;align-items:center;gap:6px;padding:0;border:0;background:transparent;color:var(--ah-navy)}
-.android-home-quick button>span{display:grid;width:100%;height:58px;place-items:center;border-radius:15px}
-.android-home-quick button>span svg{width:25px;height:25px}
-.android-home-quick small{max-width:100%;color:inherit;font-size:11px;line-height:1.2;overflow-wrap:break-word;text-align:center}
-.android-home-quick .teal{background:#e0f7f4;color:#078f97}
-.android-home-quick .blue{background:#e7f0fd;color:#0c66b7}
-.android-home-quick .indigo{background:#eceffd;color:#4962bd}
-.android-home-quick .gold{background:#fff3df;color:#b57912}
-.android-home-premium{display:grid;width:100%;min-height:70px;grid-template-columns:35px minmax(0,1fr) 20px;align-items:center;gap:10px;margin-top:19px;padding:12px 14px;border:0;border-radius:17px;background:#fff3d9;color:var(--ah-navy);text-align:left}
-.android-home-premium-mark{font-size:27px;color:#b57a15}
-.android-home-premium>span:nth-child(2){display:flex;min-width:0;flex-direction:column;gap:4px}
-.android-home-premium strong{font-size:12px;line-height:1.3}
-.android-home-premium small{font-size:10px;color:#806e4b}
-.android-home-premium>svg{width:18px}
-
-/* Les petites diagonales et le réglage de taille du texte ne coupent jamais les titres. */
+.android-home-reference,.android-home-reference *{box-sizing:border-box}
+.android-home-reference button{font:inherit;-webkit-tap-highlight-color:transparent;cursor:pointer}
+.android-home-reference button:focus-visible{outline:3px solid #14b6c1;outline-offset:3px}
+.android-home-reference button:active{transform:scale(.986)}
+.android-home-reference .android-home-topbar{display:flex;align-items:center;gap:8px;min-width:0}
+.android-home-reference .android-home-logo{display:grid;flex:0 0 36px;width:36px;height:36px;place-items:center;border-radius:12px;background:linear-gradient(145deg,#0fd0bf,#0467a8);box-shadow:0 5px 9px rgba(5,77,133,.1);color:#fff}
+.android-home-reference .android-home-logo svg{width:25px;height:25px;fill:#fff;stroke-width:1.8}
+.android-home-reference .android-home-brand{flex:1 1 auto;min-width:0;line-height:1.06;font-size:clamp(18px,5.7vw,26px);font-weight:500;letter-spacing:-.9px;white-space:nowrap}
+.android-home-reference .android-home-brand>span{color:var(--ah-ink)}
+.android-home-reference .android-home-brand>strong{color:#0791b3;font-weight:800}
+.android-home-reference .android-home-brand>small{display:block;overflow:hidden;margin-top:3px;text-overflow:ellipsis;color:#516380;font-size:9px;line-height:1.2;font-weight:500;letter-spacing:0;white-space:nowrap}
+.android-home-reference .android-home-top-actions{display:flex;flex:none;align-items:center;gap:1px}
+.android-home-reference .android-home-avatar,.android-home-reference .android-home-round{position:relative;display:grid;flex:none;place-items:center;border:0;background:transparent;color:var(--ah-ink)}
+.android-home-reference .android-home-avatar{width:34px;height:34px;margin-right:4px;border-radius:50%;background:linear-gradient(135deg,#048fa6,#3460ff);color:#fff;font-size:14px;font-weight:800;overflow:hidden}
+.android-home-reference .android-home-avatar img{width:100%;height:100%;object-fit:cover}
+.android-home-reference .android-home-round{width:34px;height:38px;border-radius:12px}
+.android-home-reference .android-home-round svg{width:22px;height:22px;stroke-width:2.1}
+.android-home-reference .android-home-round b{position:absolute;right:0;top:0;display:grid;min-width:15px;height:15px;place-items:center;padding:0 2px;border:2px solid #f4fbff;border-radius:100px;background:#f03b56;color:#fff;font-size:8px}
+.android-home-reference .android-home-welcome{margin-top:29px}
+.android-home-reference .android-home-welcome h1{margin:0;font-size:clamp(24px,6.6vw,34px);line-height:1.12;font-weight:850;letter-spacing:-.8px;overflow-wrap:break-word}
+.android-home-reference .android-home-welcome h1 span{display:inline-block;font-size:.79em;vertical-align:5%}
+.android-home-reference .android-home-welcome p{margin:6px 0 0;color:var(--ah-muted);font-size:16px;line-height:1.25}
+.android-home-reference .android-home-welcome small{display:block;margin-top:8px;color:var(--ah-muted);font-size:12px;line-height:1.3}
+.android-home-reference .android-home-main-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:20px}
+.android-home-reference .android-home-start,.android-home-reference .android-home-join{display:grid;grid-template-columns:37px minmax(0,1fr) 12px;align-items:center;gap:6px;min-width:0;width:100%;min-height:107px;padding:10px 8px;border-radius:17px;text-align:left}
+.android-home-reference .android-home-start{border:0;background:linear-gradient(125deg,#02bfbf,#078dba 48%,#0953a0);color:#fff}
+.android-home-reference .android-home-join{border:1.5px solid #07acb9;background:#fff;color:var(--ah-ink)}
+.android-home-reference .android-home-start-icon,.android-home-reference .android-home-join-icon{display:grid;width:37px;height:43px;place-items:center;border-radius:14px}
+.android-home-reference .android-home-start-icon{background:rgba(255,255,255,.14)}
+.android-home-reference .android-home-join-icon{background:#e9f8fb}
+.android-home-reference .android-home-start-icon svg{width:24px;height:24px;fill:#fff}
+.android-home-reference .android-home-join-icon svg{width:24px;height:24px}
+.android-home-reference .android-home-action-copy{display:flex;flex-direction:column;gap:5px;min-width:0}
+.android-home-reference .android-home-action-copy strong{font-size:clamp(11px,3vw,14px);line-height:1.21;font-weight:850;overflow-wrap:break-word}
+.android-home-reference .android-home-action-copy small{font-size:clamp(9px,2.4vw,11px);line-height:1.32;overflow-wrap:break-word}
+.android-home-reference .android-home-start small{color:rgba(255,255,255,.92)}
+.android-home-reference .android-home-join small{color:var(--ah-muted)}
+.android-home-reference .android-home-action-arrow{width:13px;height:17px;stroke-width:3}
+.android-home-reference .android-home-highlights{position:relative;min-width:0;margin-top:13px}
+.android-home-reference .android-home-banner{position:relative;display:flex;align-items:center;isolation:isolate;width:100%;min-height:174px;overflow:hidden;padding:16px 12px 28px;border:0;border-radius:19px;background:linear-gradient(110deg,#12317d,#0878b5 65%,#0e497e);color:#fff;text-align:left}
+.android-home-reference .android-home-banner:before{position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,34,102,.7) 0%,rgba(3,62,128,.32) 49%,transparent 75%);content:""}
+.android-home-reference .android-home-banner-copy{position:relative;z-index:2;display:flex;width:49%;min-width:0;flex-direction:column;justify-content:center;gap:11px}
+.android-home-reference .android-home-banner-copy strong{font-size:clamp(15px,4.35vw,22px);line-height:1.13;letter-spacing:-.35px;font-weight:850;overflow-wrap:break-word}
+.android-home-reference .android-home-banner-copy small{font-size:clamp(10px,2.65vw,13px);line-height:1.32;color:rgba(255,255,255,.93);overflow-wrap:break-word}
+.android-home-reference .android-home-banner>img{position:absolute;z-index:0;right:0;bottom:0;width:55%;height:100%;max-width:none;max-height:none;object-fit:cover;object-position:51% 35%;border-radius:0}
+.android-home-reference .android-home-dots{position:absolute;z-index:3;bottom:8px;left:14px;display:flex;height:15px;align-items:center;justify-content:flex-start;gap:8px}
+.android-home-reference .android-home-dots button{display:block;flex:none;width:6px;height:6px;padding:0;border:0;border-radius:99px;background:rgba(255,255,255,.4)}
+.android-home-reference .android-home-dots button.active{width:8px;height:8px;background:#fff}
+.android-home-reference .android-home-section{min-width:0}
+.android-home-reference .android-home-shortcuts,.android-home-reference .android-home-meetings{margin-top:14px;padding:13px 12px 15px;border-radius:21px;background:var(--ah-card);box-shadow:0 7px 28px rgba(14,53,100,.04)}
+.android-home-reference .android-home-section-title{display:flex;align-items:center;justify-content:space-between;gap:7px;margin-bottom:12px}
+.android-home-reference .android-home-section-title h2{margin:0;font-size:clamp(15px,4.2vw,19px);font-weight:850;letter-spacing:-.45px}
+.android-home-reference .android-home-section-title>button{display:flex;flex:none;min-height:30px;align-items:center;gap:1px;padding:3px 0 3px 5px;border:0;background:transparent;color:#049daa;font-size:11px;font-weight:700}
+.android-home-reference .android-home-section-title>button svg{width:15px;height:15px;stroke-width:2.6}
+.android-home-reference .android-home-quick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:0}
+.android-home-reference .android-home-quick button{display:flex;min-width:0;min-height:95px;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;padding:10px 3px 7px;border:0;border-radius:15px;background:#f0f6fe;color:var(--ah-ink);text-align:center}
+.android-home-reference .android-home-quick button:nth-child(2){background:#f1f9ff}
+.android-home-reference .android-home-quick button:nth-child(3){background:#edf8ff}
+.android-home-reference .android-home-quick button:nth-child(4){background:#eef9f7}
+.android-home-reference .android-home-quick button>span{display:grid;flex:none;width:35px;height:35px;place-items:center;border-radius:100%;color:#fff;box-shadow:0 6px 14px rgba(12,60,117,.08)}
+.android-home-reference .android-home-quick button>span svg{width:20px;height:20px;stroke-width:2.5}
+.android-home-reference .android-home-quick .violet{background:linear-gradient(140deg,#ad4ef6,#7334f2)}
+.android-home-reference .android-home-quick .orange{background:linear-gradient(140deg,#ffab2e,#fb8d13)}
+.android-home-reference .android-home-quick .blue{background:linear-gradient(140deg,#4575ff,#2650ec)}
+.android-home-reference .android-home-quick .green{background:linear-gradient(140deg,#24c599,#0ca378)}
+.android-home-reference .android-home-quick .teal{background:linear-gradient(140deg,#05b9bc,#0580a8)}
+.android-home-reference .android-home-quick small{display:block;max-width:100%;font-size:clamp(10px,2.7vw,13px);line-height:1.22;overflow-wrap:break-word}
+.android-home-reference .android-home-quick-extra{margin-top:6px}
+.android-home-reference .android-home-meetings{margin-top:12px}
+.android-home-reference .android-home-next{display:grid;width:100%;min-height:75px;grid-template-columns:43px minmax(0,1fr) auto;align-items:center;gap:9px;padding:11px 9px;border:0;border-radius:17px;background:#eef7ff;color:var(--ah-ink);text-align:left}
+.android-home-reference .android-home-next-icon{display:grid;width:43px;height:43px;place-items:center;border-radius:14px;background:#d9f2fa;color:#029dbb}
+.android-home-reference .android-home-next-icon svg{width:24px;height:24px}
+.android-home-reference .android-home-next-copy{display:flex;min-width:0;flex-direction:column;gap:5px}
+.android-home-reference .android-home-next-copy strong{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2;font-size:clamp(12px,3.4vw,15px);line-height:1.2;overflow-wrap:break-word}
+.android-home-reference .android-home-next-copy>span{font-size:10px;line-height:1.3;color:var(--ah-muted)}
+.android-home-reference .android-home-next-copy small{display:flex;align-items:center;gap:4px;font-size:10px;color:#526580}
+.android-home-reference .android-home-next-copy small svg{width:12px;height:12px}
+.android-home-reference .android-home-next-actions{position:relative;display:flex;align-items:center;gap:3px}
+.android-home-reference .android-home-next-more{display:grid;width:23px;height:30px;place-items:center;padding:0;border:0;border-radius:7px;background:transparent;color:#425679}
+.android-home-reference .android-home-next-more svg{width:17px;height:17px}
+.android-home-reference .android-home-next-join{min-height:31px;padding:0 10px;border:1.5px solid #0ca6bb;border-radius:10px;background:#f2fcfe;color:#049bae;font-size:11px;font-weight:850;white-space:nowrap}
+.android-home-reference .android-home-next-menu{position:absolute;z-index:10;top:calc(100% + 6px);right:0;display:flex;min-width:140px;flex-direction:column;gap:1px;padding:6px;border:1px solid #dbe9f1;border-radius:12px;background:#fff;box-shadow:0 10px 26px rgba(10,38,80,.14)}
+.android-home-reference .android-home-next-menu button{padding:10px 8px;border:0;background:transparent;color:#0d2248;font-size:11px;text-align:left}
+.android-home-reference .android-home-next-menu button:active{background:#e8f9fb}
+.android-home-reference .android-home-next-empty{cursor:pointer}
+.android-home-reference .android-home-next-empty-arrow svg{width:19px;height:19px;color:#199baa}
 @media(max-width:359px){
-  body.mboteroom-native-android .android-home.android-home-redesign{padding-right:12px;padding-left:12px}
-  .android-home-top-actions{gap:1px}
-  .android-home-brand{font-size:21px}
-  .android-home-start,.android-home-join{grid-template-columns:40px minmax(0,1fr) 17px;gap:9px}
-  .android-home-start-icon,.android-home-join-icon{width:40px;height:40px}
-  .android-home-banner{grid-template-columns:minmax(0,1fr) 74px;gap:6px;padding:12px}
-  .android-home-banner-copy strong{font-size:15px}
-  .android-home-banner>img{max-height:100px}
-  .android-home-quick{gap:6px}
-  .android-home-quick small{font-size:10px}
+  body.mboteroom-native-android .android-home.android-home-redesign.android-home-reference{padding-right:10px;padding-left:10px}
+  .android-home-reference .android-home-logo{flex-basis:31px;width:31px;height:31px}
+  .android-home-reference .android-home-logo svg{width:22px}
+  .android-home-reference .android-home-brand{font-size:18px}
+  .android-home-reference .android-home-round{width:28px}
+  .android-home-reference .android-home-round svg{width:20px}
+  .android-home-reference .android-home-avatar{width:31px;height:31px;margin-right:0}
+  .android-home-reference .android-home-start,.android-home-reference .android-home-join{grid-template-columns:29px minmax(0,1fr) 9px;gap:4px;padding:8px 5px}
+  .android-home-reference .android-home-start-icon,.android-home-reference .android-home-join-icon{width:29px;height:38px}
+  .android-home-reference .android-home-start-icon svg,.android-home-reference .android-home-join-icon svg{width:20px;height:20px}
+  .android-home-reference .android-home-banner-copy{width:53%}
+  .android-home-reference .android-home-banner-copy strong{font-size:14px}
+  .android-home-reference .android-home-banner>img{width:51%}
+  .android-home-reference .android-home-next{grid-template-columns:36px minmax(0,1fr) auto;gap:6px;padding:8px}
+  .android-home-reference .android-home-next-icon{width:36px;height:36px}
+  .android-home-reference .android-home-next-join{padding:0 6px;font-size:10px}
 }
-@media(min-width:520px){
-  body.mboteroom-native-android .android-home.android-home-redesign{padding-left:24px;padding-right:24px}
-  .android-home-banner{grid-template-columns:minmax(0,1fr) 160px}
-  .android-home-banner>img{max-height:140px}
+@media(min-width:480px){
+  body.mboteroom-native-android .android-home.android-home-redesign.android-home-reference{padding-left:22px;padding-right:22px}
+  .android-home-reference .android-home-main-actions{gap:14px}
+  .android-home-reference .android-home-start,.android-home-reference .android-home-join{grid-template-columns:52px minmax(0,1fr) 18px;gap:12px;min-height:120px;padding:15px}
+  .android-home-reference .android-home-start-icon,.android-home-reference .android-home-join-icon{width:52px;height:52px}
+  .android-home-reference .android-home-action-copy strong{font-size:17px}
+  .android-home-reference .android-home-action-copy small{font-size:13px}
+  .android-home-reference .android-home-banner{min-height:230px;padding:25px}
+  .android-home-reference .android-home-banner-copy strong{font-size:24px}
+  .android-home-reference .android-home-banner-copy small{font-size:15px}
+  .android-home-reference .android-home-shortcuts,.android-home-reference .android-home-meetings{padding:19px}
+  .android-home-reference .android-home-quick button{min-height:112px}
 }
-@media(prefers-reduced-motion:reduce){.android-home-redesign *{transition:none!important}}
-
-/* L'apparence suit le choix effectif enregistré dans les préférences utilisateur. */
-html[data-mbote-theme="dark"] body.mboteroom-native-android .android-home.android-home-redesign{
-  --ah-navy:#eef7ff;--ah-muted:#9db3c7;--ah-surface:#102b3e;--ah-line:#285064;
-  background:#071d2c;color:#eef7ff;
+/* Préférences système et utilisateur, indépendantes du thème du site desktop. */
+html[data-mbote-theme="dark"] body.mboteroom-native-android .android-home.android-home-redesign.android-home-reference{
+  --ah-ink:#eff8ff;--ah-muted:#9db4c9;--ah-card:#102d40;
+  background:linear-gradient(160deg,#071e31,#092333);color:#eff8ff;
 }
-html[data-mbote-theme="dark"] .android-home-brand>strong{color:#40d3d5}
-html[data-mbote-theme="dark"] .android-home-join,
-html[data-mbote-theme="dark"] .android-home-next{box-shadow:none}
-html[data-mbote-theme="dark"] .android-home-join-icon,
-html[data-mbote-theme="dark"] .android-home-next-icon{background:#164859;color:#6fe1e1}
-html[data-mbote-theme="dark"] .android-home-banner{background:linear-gradient(110deg,#103c4a,#13364f)}
-html[data-mbote-theme="dark"] .android-home-banner-copy small,
-html[data-mbote-theme="dark"] .android-home-next-copy small{color:#b5c9d8}
-html[data-mbote-theme="dark"] .android-home-banner-link,
-html[data-mbote-theme="dark"] .android-home-section-title button{color:#67dbdf}
-html[data-mbote-theme="dark"] .android-home-next-arrow{background:#1a4055}
-html[data-mbote-theme="dark"] .android-home-premium{background:#47381d;color:#fff3dc}
-html[data-mbote-theme="dark"] .android-home-premium small{color:#efd4a0}
+html[data-mbote-theme="dark"] .android-home-reference .android-home-brand>strong{color:#58d6e5}
+html[data-mbote-theme="dark"] .android-home-reference .android-home-join{background:#10364b;border-color:#219eaa}
+html[data-mbote-theme="dark"] .android-home-reference .android-home-join-icon{background:#18536b}
+html[data-mbote-theme="dark"] .android-home-reference .android-home-quick button{background:#173649;color:#eff8ff}
+html[data-mbote-theme="dark"] .android-home-reference .android-home-next{background:#15394e}
+html[data-mbote-theme="dark"] .android-home-reference .android-home-next-icon{background:#1b5168;color:#63d7e6}
+html[data-mbote-theme="dark"] .android-home-reference .android-home-next-join{background:#143a4b;color:#76e5f5}
+html[data-mbote-theme="dark"] .android-home-reference .android-home-next-menu{background:#143347;border-color:#346078}
+html[data-mbote-theme="dark"] .android-home-reference .android-home-next-menu button{color:#eff8ff}
+html[data-mbote-theme="dark"] .android-home-reference .android-home-brand>small{color:#a6c1d7}
+@media(prefers-reduced-motion:reduce){.android-home-reference *{transition:none!important}}
