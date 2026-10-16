@@ -287,7 +287,7 @@ export default function GuestWaitingRoomPage() {
     if (!meeting || !currentUser?.id) return undefined;
 
     let cancelled = false;
-    let pollSequence = 0;
+    let statusCheckInFlight = false;
     let rejectionTimer: number | null = null;
     const applyLobbyStatus = (status?: 'accepted' | 'rejected' | 'requested') => {
       if (cancelled) return;
@@ -324,12 +324,14 @@ export default function GuestWaitingRoomPage() {
     };
 
     const checkLobby = async () => {
-      const sequence = ++pollSequence;
+      // Slow mobile connections must not start overlapping polling requests.
+      // Unlike latest-only sequence filtering, this cannot starve every response
+      // when the server takes longer than the three-second polling interval.
+      if (cancelled || statusCheckInFlight) return;
+      statusCheckInFlight = true;
       try {
-        // A failed poll must never masquerade as an unprocessed request.
-        // Only the newest response may change the participant's current route.
         const access = await meetingService.getMyMeetingStatus(meeting.id);
-        if (cancelled || sequence !== pollSequence) return;
+        if (cancelled) return;
         setMeetingError('');
         if (access.status === 'ended') {
           setLobbyStatus('ended');
@@ -343,9 +345,11 @@ export default function GuestWaitingRoomPage() {
           applyLobbyStatus(access.status === 'accepted' ? 'accepted' : 'requested');
         }
       } catch (error) {
-        if (!cancelled && sequence === pollSequence) setMeetingError(error instanceof Error
+        if (!cancelled) setMeetingError(error instanceof Error
           ? error.message
           : 'Vérification de votre accès indisponible. Nouvelle tentative automatique…');
+      } finally {
+        statusCheckInFlight = false;
       }
     };
 
