@@ -15,25 +15,31 @@ type Props={
 
 export default function TermsConsent({accepted,version,onAccepted,compact=false,autoOpen=false}:Props){
   const [open,setOpen]=useState(false);
-  const [document,setDocument]=useState<LegalDocument|null>(null);
+  const [termsDocument,setTermsDocument]=useState<LegalDocument|null>(null);
   const [loading,setLoading]=useState(false);
+  const [loadError,setLoadError]=useState('');
   const [readToEnd,setReadToEnd]=useState(false);
   const [checked,setChecked]=useState(false);
   const scrollRef=useRef<HTMLDivElement|null>(null);
   const autoOpenedRef=useRef(false);
 
   const load=async()=>{
-    if(document)return document;
+    if(termsDocument)return termsDocument;
     setLoading(true);
+    setLoadError('');
     try{
       const next=await legalService.getTerms();
-      setDocument(next);
+      if (!next?.body?.trim() || !next.version) throw new Error('Les conditions sont momentanément indisponibles.');
+      setTermsDocument(next);
       return next;
+    }catch(error){
+      setLoadError(error instanceof Error ? error.message : 'Chargement impossible, veuillez réessayer.');
+      return null;
     }finally{setLoading(false);}
   };
 
   const openTerms=async()=>{
-    setReadToEnd(false);setChecked(false);setOpen(true);
+    setReadToEnd(false);setChecked(false);setLoadError('');setOpen(true);
     await load().catch(()=>undefined);
   };
 
@@ -47,7 +53,7 @@ export default function TermsConsent({accepted,version,onAccepted,compact=false,
     if(!open)return;
     const node=scrollRef.current;
     if(node&&node.scrollHeight<=node.clientHeight+6)setReadToEnd(true);
-  },[document,open]);
+  },[termsDocument,open]);
 
   const onScroll=()=>{
     const node=scrollRef.current;
@@ -56,8 +62,8 @@ export default function TermsConsent({accepted,version,onAccepted,compact=false,
   };
 
   const confirm=()=>{
-    if(!document||!readToEnd||!checked)return;
-    onAccepted(true,document.version);
+    if(!termsDocument||!readToEnd||!checked)return;
+    onAccepted(true,termsDocument.version);
     setOpen(false);
   };
 
@@ -69,18 +75,20 @@ export default function TermsConsent({accepted,version,onAccepted,compact=false,
       </button>
     </div>
 
-    {open ? createPortal(<div className="terms-modal-backdrop" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)setOpen(false);}}>
+    {open ? createPortal(<div className="terms-modal-backdrop mbote-legal-backdrop" role="presentation" onMouseDown={(event)=>{if(event.target===event.currentTarget)setOpen(false);}}>
       <section className="terms-modal" role="dialog" aria-modal="true" aria-labelledby="terms-modal-title" onMouseDown={(event)=>event.stopPropagation()}>
-        <header><div><FileText size={22}/><div><h2 id="terms-modal-title">{document?.title||'Conditions d’utilisation'}</h2><small>{document?.version?'Version '+document.version:'Chargement…'}</small></div></div><button type="button" aria-label="Fermer" onClick={()=>setOpen(false)}><X size={19}/></button></header>
-        <div className="terms-modal-body" ref={scrollRef} onScroll={onScroll}>
-          {loading?<AppLoader label="Chargement des conditions…" compact />:document?.body.split(/\n{2,}/).map((paragraph,index)=><p key={index}>{paragraph}</p>)}
+        <header><div><FileText size={22}/><div><h2 id="terms-modal-title">{termsDocument?.title||'Conditions d’utilisation'}</h2><small>{termsDocument?.version?'Version '+termsDocument.version:'Chargement…'}</small></div></div><button type="button" aria-label="Fermer les conditions" onClick={()=>setOpen(false)}><X size={19}/></button></header>
+        <div className="terms-modal-body" ref={scrollRef} onScroll={onScroll} tabIndex={0} aria-label="Texte des conditions d’utilisation">
+          {loading?<AppLoader label="Chargement des conditions…" compact />:loadError
+            ? <div className="terms-modal-load-error" role="alert"><p>{loadError}</p><button type="button" onClick={()=>void load()}>Réessayer le chargement</button></div>
+            : termsDocument?.body.split(/\n{2,}/).map((paragraph,index)=><p key={index}>{paragraph}</p>)}
         </div>
         <div className="terms-modal-footer">
           <label className={!readToEnd?'is-disabled':''}><input type="checkbox" checked={checked} disabled={!readToEnd} onChange={(event)=>setChecked(event.target.checked)}/><span>J’ai lu ces conditions jusqu’à la fin et je les accepte.</span></label>
           {!readToEnd?<small>Faites défiler le texte jusqu’en bas pour pouvoir accepter.</small>:null}
-          <div><button type="button" onClick={()=>setOpen(false)}>Annuler</button><button className="primary" type="button" disabled={!document||!readToEnd||!checked} onClick={confirm}>Accepter les conditions</button></div>
+          <div><button type="button" onClick={()=>setOpen(false)}>Annuler</button><button className="primary" type="button" disabled={!termsDocument||!readToEnd||!checked} onClick={confirm}>Accepter les conditions</button></div>
         </div>
       </section>
-    </div>, document.body) : null}
+    </div>, window.document.body) : null}
   </>;
 }

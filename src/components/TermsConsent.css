@@ -103,3 +103,16 @@
  .terms-modal-footer{max-height:35dvh!important;overflow-y:auto!important}
  .terms-modal-footer>div{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}
 }
+
+/* Fixed body-level consent portal, isolated from Android bottom sheets. */
+.terms-modal-backdrop.mbote-legal-backdrop{position:fixed!important;inset:0!important;z-index:20000!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:12px!important;box-sizing:border-box!important}
+.terms-modal-backdrop.mbote-legal-backdrop>.terms-modal{position:relative!important;transform:none!important;width:min(720px,100%)!important;height:min(86dvh,760px)!important;max-height:calc(100dvh - 24px)!important;min-height:0!important;display:grid!important;grid-template-rows:auto minmax(0,1fr) auto!important;overflow:hidden!important}
+.terms-modal-backdrop.mbote-legal-backdrop .terms-modal-body{min-height:0!important;overflow-y:auto!important;overscroll-behavior:contain!important}
+.terms-modal-load-error{padding:16px;text-align:center}
+.terms-modal-load-error button{min-height:40px;border:1px solid #0a8088;background:#eefbf8;border-radius:10px;color:#07636b;padding:8px 14px;font-weight:700}
+@media(max-width:640px){
+ .terms-modal-backdrop.mbote-legal-backdrop>.terms-modal{height:min(86dvh,760px)!important;max-height:calc(100dvh - 24px)!important;border-radius:18px!important}
+ .terms-modal-backdrop.mbote-legal-backdrop .terms-modal h2{max-width:none!important;overflow-wrap:anywhere!important}
+ .terms-modal-backdrop.mbote-legal-backdrop .terms-modal-footer{max-height:35dvh!important;overflow-y:auto!important}
+ .terms-modal-backdrop.mbote-legal-backdrop .terms-modal-footer>div{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important}
+}

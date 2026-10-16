@@ -425,6 +425,48 @@ try {
     ],
   });
 
+  // Android-size UI regression: accepting terms and submitting a meeting
+  // invitation must reach the waiting room without triggering AppErrorBoundary.
+  const joinContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+    userAgent: 'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36 MBoteRoomAndroid/1.0',
+  });
+  try {
+    const joinPage = await joinContext.newPage();
+    const joinErrors = [];
+    joinPage.on('pageerror', (error) => joinErrors.push(error.message));
+    await joinPage.goto(`${appUrl}/rejoindre-une-reunion`, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await joinPage.locator('#guest-name').waitFor({ state: 'visible', timeout: 30_000 });
+    await joinPage.locator('.guest-bottom-sheet button[type="submit"]').click();
+    await joinPage.locator('.guest-bottom-sheet .auth-error').waitFor({ state: 'visible' });
+    await joinPage.locator('.guest-bottom-sheet .terms-consent-button').click();
+    await joinPage.locator('.terms-modal-body p').first().waitFor({ state: 'visible', timeout: 30_000 });
+    await joinPage.locator('.terms-modal-body').evaluate((node) => {
+      node.scrollTop = node.scrollHeight;
+      node.dispatchEvent(new Event('scroll', { bubbles: true }));
+    });
+    await joinPage.waitForFunction(() => {
+      const input = document.querySelector('.terms-modal-footer input[type="checkbox"]');
+      return input && !input.disabled;
+    }, undefined, { timeout: 10_000 });
+    await joinPage.locator('.terms-modal-footer input[type="checkbox"]').check();
+    await joinPage.locator('.terms-modal-footer button.primary').click();
+    await joinPage.locator('.guest-bottom-sheet .terms-consent-button.is-accepted').waitFor({ state: 'visible' });
+    await joinPage.locator('#guest-name').fill(`Invité Android Smoke ${runSuffix}`);
+    await joinPage.locator('#guest-code').fill(meeting.meeting_link);
+    await joinPage.locator('#guest-password').fill(password);
+    await joinPage.locator('.guest-bottom-sheet button[type="submit"]').click();
+    await joinPage.waitForURL((url) => /\/reunions\/[^/]+\/salle-attente$/.test(url.pathname), { timeout: 40_000 });
+    await joinPage.locator('.waiting-simple-card').waitFor({ state: 'visible', timeout: 25_000 });
+    assert.deepEqual(joinErrors, [], `Android guest join errors: ${joinErrors.join(' | ')}`);
+    console.log('ANDROID_JOIN_AND_TERMS_SMOKE_OK', JSON.stringify({ termsAccepted: true, waitingRoom: true }));
+  } finally {
+    await joinContext.close();
+  }
+
   hostRoom = await openMeeting(browser, host, meeting.id, 'host');
   guestRoom = await openMeeting(browser, guest, meeting.id, 'guest');
 

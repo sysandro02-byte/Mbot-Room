@@ -613,12 +613,11 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     if (!guestName.trim()) nextErrors.name = 'Votre nom est obligatoire.';
     const identifier = extractMeetingIdentifier(meetingCode);
     if (!identifier) nextErrors.meetingCode = "Saisissez un ID ou un lien de réunion valide.";
+    setFieldErrors(nextErrors);
     if (!termsAccepted || !termsVersion) {
-      setFormError("Vous devez lire et accepter les conditions d’utilisation avant de rejoindre en invité.");
+      setFormError("Ouvrez « Lire et accepter les conditions d’utilisation », faites défiler le texte puis cochez la case.");
       return;
     }
-
-    setFieldErrors(nextErrors);
     setFormError('');
     if (Object.keys(nextErrors).length) return;
 

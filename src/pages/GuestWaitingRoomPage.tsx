@@ -216,11 +216,11 @@ export default function GuestWaitingRoomPage() {
     const loadMeeting = async () => {
       try {
         // Restore the meeting after page reload, including private invitations.
+        // A numeric meeting link is not necessarily the internal database ID.
+        // Always restore the exact route identifier via the same backend lookup.
         const found: Meeting | null = locationState?.meeting?.id
           ? locationState.meeting as Meeting
-          : /^\d+$/.test(meetingId)
-            ? (await meetingService.getMeetings()).find((item) => String(item.id) === meetingId) || null
-            : await meetingService.getMeetingByLink(meetingId);
+          : await meetingService.getMeetingByLink(meetingId);
         if (cancelled) return;
         setMeeting(found);
         if (!found) setMeetingError('Réunion introuvable ou inaccessible.');
