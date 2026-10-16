@@ -92,7 +92,9 @@ const liveKitRoomAdminCall = async (room: string, method: 'RemoveParticipant'|'D
   const jwtHeader=base64url(JSON.stringify({alg:'HS256',typ:'JWT'}));
   const jwtPayload=base64url(JSON.stringify({
     iss:config.apiKey,sub:'mboteroom-server-moderation',nbf:now-5,exp:now+60,
-    video:{room,roomAdmin:true},
+    // LiveKit RoomService/DeleteRoom requires roomCreate, not roomAdmin.
+    // Keep roomAdmin scoped to the room for participant removal only.
+    video:method==='DeleteRoom'?{roomCreate:true}:{room,roomAdmin:true},
   }));
   const signature=crypto.createHmac('sha256',config.apiSecret).update(`${jwtHeader}.${jwtPayload}`).digest('base64url');
   const token=`${jwtHeader}.${jwtPayload}.${signature}`;
