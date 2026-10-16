@@ -775,7 +775,13 @@ export default function MeetingRoomV2() {
         // Admission is resolved from the authoritative per-user endpoint.
         const access = await meetingService.getMyMeetingStatus(found.id);
         if (access.status === 'requested') {
-          navigate(`/reunions/${encodeURIComponent(found.meeting_link)}/salle-attente`, { replace: true, state: location.state });
+          // React can paint once after navigate() but before the lazy waiting
+          // room renders. Do not show a false 'Réunion introuvable' meanwhile.
+          setRedirectingToLobby(true);
+          navigate(`/reunions/${encodeURIComponent(found.meeting_link)}/salle-attente`, {
+            replace: true,
+            state: { ...state, meeting: found },
+          });
           return;
         }
         if (access.status === 'removed') throw new Error('L’hôte a refusé ou retiré votre accès à cette réunion.');
