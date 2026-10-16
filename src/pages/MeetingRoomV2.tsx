@@ -2254,7 +2254,9 @@ export default function MeetingRoomV2() {
     },
   });
 
-  if (loading) return <main className="room-v2-loading">Connexion à la réunion…</main>;
+  if (loading || redirectingToLobby || (!meeting && !error)) {
+    return <main className="room-v2-loading" role="status">{redirectingToLobby ? 'Ouverture de la salle d’attente…' : 'Vérification de votre accès à la réunion…'}</main>;
+  }
   if (error || !meeting) return (
     <main className="room-v2-error">
       <ShieldCheck size={38} />
