@@ -501,6 +501,32 @@ try {
     await joinPage.locator('.guest-bottom-sheet button[type="submit"]').click();
     await joinPage.waitForURL((url) => /\/reunions\/[^/]+\/salle-attente$/.test(url.pathname), { timeout: 40_000 });
     await joinPage.locator('.waiting-simple-card').waitFor({ state: 'visible', timeout: 25_000 });
+    // Waiting room media controls must reflect actual captured tracks and
+    // survive off -> on cycles, including a persistent preview video element.
+    await joinPage.locator('.waiting-simple-controls>button').first().waitFor({ state: 'visible' });
+    await joinPage.locator('.waiting-simple-controls>button').first().waitFor({ state: 'attached' });
+    await joinPage.waitForFunction(() => {
+      const buttons = [...document.querySelectorAll('.waiting-simple-controls>button')];
+      return buttons.length >= 3 && !buttons[0].disabled && !buttons[1].disabled;
+    }, undefined, { timeout: 25_000 });
+    const waitingControls = joinPage.locator('.waiting-simple-controls>button');
+    await waitingControls.nth(0).click();
+    await joinPage.getByText('Micro coupé', { exact: true }).waitFor({ state: 'visible' });
+    await waitingControls.nth(0).click();
+    await joinPage.getByText('Micro activé', { exact: true }).waitFor({ state: 'visible' });
+    await waitingControls.nth(1).click();
+    await joinPage.getByText('Caméra coupée', { exact: true }).waitFor({ state: 'visible' });
+    assert.equal(await joinPage.locator('.waiting-simple-preview video').count(), 1,
+      'Video element must stay mounted when camera is disabled');
+    await waitingControls.nth(1).click();
+    await joinPage.getByText('Caméra activée', { exact: true }).waitFor({ state: 'visible' });
+    assert.equal(await joinPage.locator('.waiting-simple-preview video').isVisible(), true,
+      'Video preview should return when camera is re-enabled');
+    await waitingControls.nth(2).click();
+    await joinPage.getByLabel('Sélectionner la caméra').waitFor({ state: 'visible' });
+    await joinPage.getByLabel('Sélectionner le microphone').waitFor({ state: 'visible' });
+    await joinPage.getByRole('button', { name: 'Tester le son' }).waitFor({ state: 'visible' });
+    console.log('WAITING_ROOM_DYNAMIC_CONTROLS_OK', JSON.stringify({mic: true, camera: true, settings: true}));
     assert.deepEqual(joinErrors, [], `Android guest join errors: ${joinErrors.join(' | ')}`);
     console.log('ANDROID_JOIN_AND_TERMS_SMOKE_OK', JSON.stringify({ termsAccepted: true, waitingRoom: true }));
   } finally {
