@@ -467,8 +467,21 @@ export default function Login({ initialView = 'login' }: LoginProps) {
     return () => window.clearInterval(timer);
   }, [otpChallengeId, otpSecondsLeft]);
 
-  if (initialView !== 'forgot' && !(initialView === 'guest' && authService.getCurrentUser()?.isGuest) && authService.isAuthenticated() && !registrationSuccess) {
-    return <Navigate to={redirectTo} replace />;
+  if (initialView !== 'forgot' && authService.isAuthenticated() && !registrationSuccess) {
+    const signedIn = authService.getCurrentUser();
+    if (signedIn?.isGuest) {
+      // guestJoin saves the session before the navigation promise resumes.
+      // Never send this newly authenticated guest to /app (and subsequently
+      // straight into the meeting): their request is pending in the lobby.
+      const pendingLink = sessionStorage.getItem('mboteroom-guest-meeting-link') || '';
+      if (/^[a-zA-Z0-9_-]{3,128}$/.test(pendingLink)) {
+        return <Navigate to={`/reunions/${encodeURIComponent(pendingLink)}/salle-attente`} replace />;
+      }
+      // guestJoin is still completing: let its handler navigate with meeting
+      // state instead of triggering an unrelated protected-route redirect.
+    } else {
+      return <Navigate to={redirectTo} replace />;
+    }
   }
 
   const clearErrors = () => {
