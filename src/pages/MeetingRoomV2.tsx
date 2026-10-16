@@ -1,6 +1,7 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { cameraVideoConstraints } from '../lib/videoQuality';
+import { getMeetingClock } from '../lib/meetingClock';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Bot,
@@ -14,6 +15,8 @@ import {
   MessageCircle,
   Mic,
   MicOff,
+  Moon,
+  Sun,
   MonitorUp,
   MoreVertical,
   PhoneOff,
@@ -51,7 +54,7 @@ import { getMeetingAccessCode, getMeetingJoinUrl, LobbyParticipant, LunaCatchUpR
 import { mediaTransportService, type MediaTransportStatus } from '../services/mediaTransportService';
 import { createCompositeMeetingRecording, type CompositeRecordingSession } from '../lib/meetingRecording';
 import { getAppLocale } from '../lib/appLanguage';
-import { readCachedPreferences } from '../lib/userPreferences';
+import { PREFERENCES_EVENT, publishPreferences, readCachedPreferences } from '../lib/userPreferences';
 import './MeetingRoomV2.css';
 
 type Panel = 'participants' | 'lobby' | 'chat' | 'polls' | 'luna' | 'breakouts' | null;
@@ -452,6 +455,16 @@ export default function MeetingRoomV2() {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [participantSearch, setParticipantSearch] = useState('');
   const [clockTick, setClockTick] = useState(Date.now());
+  const [themePreference, setThemePreference] = useState<'dark' | 'light' | 'system'>(() => {
+    const theme = readCachedPreferences().theme;
+    return theme === 'dark' || theme === 'light' ? theme : 'system';
+  });
+  const [systemDark, setSystemDark] = useState(() =>
+    typeof window === 'undefined' || !window.matchMedia
+      ? true
+      : window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+  const meetingTheme = themePreference === 'system' ? (systemDark ? 'dark' : 'light') : themePreference;
   const [selectedAudioInputId, setSelectedAudioInputId] = useState(state?.joinOptions?.audioInputId||'');
   const [selectedVideoInputId, setSelectedVideoInputId] = useState(state?.joinOptions?.videoInputId||'');
   const [selectedAudioOutputId, setSelectedAudioOutputId] = useState(state?.joinOptions?.audioOutputId || '');
@@ -802,6 +815,31 @@ export default function MeetingRoomV2() {
   }, [currentUser?.id, currentUser?.isGuest, isAuthenticated, location.state, meetingId, navigate, state?.meeting]);
 
   useEffect(() => { void loadMeeting(); }, [loadMeeting]);
+
+  useEffect(() => {
+    const syncTheme = () => {
+      const theme = readCachedPreferences().theme;
+      setThemePreference(theme === 'dark' || theme === 'light' ? theme : 'system');
+    };
+    window.addEventListener(PREFERENCES_EVENT, syncTheme);
+    const media = window.matchMedia?.('(prefers-color-scheme: dark)');
+    const onSystemTheme = () => setSystemDark(media?.matches ?? true);
+    media?.addEventListener?.('change', onSystemTheme);
+    return () => {
+      window.removeEventListener(PREFERENCES_EVENT, syncTheme);
+      media?.removeEventListener?.('change', onSystemTheme);
+    };
+  }, []);
+
+  const toggleMeetingTheme = () => {
+    const next = meetingTheme === 'dark' ? 'light' : 'dark';
+    const preferences = { ...readCachedPreferences(), theme: next };
+    setThemePreference(next);
+    publishPreferences(preferences);
+    void appDataService.updatePreferences(preferences).catch(() =>
+      setNotice('Thème changé sur cet appareil, mais la synchronisation des préférences a échoué.')
+    );
+  };
 
   useEffect(() => {
     if (!meeting?.is_active) return undefined;
@@ -2285,11 +2323,7 @@ export default function MeetingRoomV2() {
   const screenShareActive = Boolean(screenSharing || remoteScreenParticipant);
   const screenPresenterName = screenSharing ? localName : remoteScreenParticipant?.name || '';
   const speakerViewEnabled = (viewMode === 'speaker' || viewMode === 'participants') && Boolean(featuredParticipant);
-  const meetingStartedAt = meeting.started_at || meeting.start_time;
-  const meetingStartedAtMs = new Date(meetingStartedAt).getTime();
-  const elapsedSeconds = meeting.is_active && Number.isFinite(meetingStartedAtMs)
-    ? Math.max(0, Math.floor((clockTick - meetingStartedAtMs) / 1000))
-    : 0;
+  const { elapsedSeconds, durationSeconds: configuredDurationSeconds, remainingSeconds, progressPercent, overtime } = getMeetingClock(meeting, clockTick);
   const raisedMembers = activeMembers.filter((member) => raisedHands.has(member.userId));
   const normalizedParticipantSearch = participantSearch.trim().toLowerCase();
   const visibleMembers = normalizedParticipantSearch
@@ -2297,7 +2331,7 @@ export default function MeetingRoomV2() {
     : activeMembers;
 
   return (
-    <main className={`room-v2-shell${moreMenuOpen ? ' more-menu-open' : ''}${confirmation ? ' has-confirmation' : ''}`}>
+    <main className={`room-v2-shell theme-${meetingTheme}${moreMenuOpen ? ' more-menu-open' : ''}${confirmation ? ' has-confirmation' : ''}`}>
       <header className="room-v2-header">
         <div className="room-v2-brand">
           <img src="/icons/mboteroom-wordmark.png" alt="MBotéRoom"/>
@@ -2307,10 +2341,18 @@ export default function MeetingRoomV2() {
           <span>ID {meeting.settings?.meetingAccessId || getMeetingAccessCode(meeting)}</span>
         </div>
         <div className="room-v2-meeting-status">
+          <button className="room-v2-theme-toggle" type="button" onClick={toggleMeetingTheme}
+            data-testid="meeting-theme-toggle" aria-label={meetingTheme === 'dark' ? 'Activer le mode clair' : 'Activer le mode sombre'}
+            title={meetingTheme === 'dark' ? 'Mode clair' : 'Mode sombre'}>
+            {meetingTheme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}
+          </button>
           <span className="room-v2-secure-status"><ShieldCheck size={18}/> <i/> Connecté</span>
           <span className={meeting.is_active ? 'room-v2-live-pill is-live' : 'room-v2-live-pill'}>
             <Radio size={16}/>
-            <span>{meeting.is_active ? 'En cours' : 'Programmée'}<small data-testid={meeting.is_active ? 'meeting-chrono' : undefined}>{meeting.is_active ? formatDuration(elapsedSeconds) : formatTime(meeting.start_time)}</small></span>
+            <span>{meeting.is_active ? (overtime ? 'Durée dépassée' : 'En cours') : 'Programmée'}<small data-testid={meeting.is_active ? 'meeting-chrono' : undefined} aria-label={meeting.is_active ? `Écoulé ${formatDuration(elapsedSeconds)}, durée prévue ${formatDuration(configuredDurationSeconds)}, restant ${formatDuration(remainingSeconds)}` : undefined}>{meeting.is_active ? `${formatDuration(elapsedSeconds)} / ${formatDuration(configuredDurationSeconds)}` : formatTime(meeting.start_time)}</small></span>
+            {meeting.is_active ? <span className="room-v2-timer-progress" role="progressbar" aria-label="Progression de la durée prévue" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progressPercent)}>
+              <span style={{width: `${progressPercent}%`}}/>
+            </span> : null}
           </span>
           {isModerator && !meeting.is_active ? <button className="room-v2-start" type="button" onClick={startMeeting}>Démarrer</button> : null}
           <button className="room-v2-header-icon" type="button" aria-label="Participants" onClick={() => setPanel(panel === 'participants' ? null : 'participants')}><UsersRound/></button>
@@ -2332,7 +2374,7 @@ export default function MeetingRoomV2() {
 
       <nav className="room-v2-mode-tabs" aria-label="Affichage de la réunion">
         <button type="button" className={panel === 'participants' ? 'active' : ''} onClick={() => setPanel(panel === 'participants' ? null : 'participants')} data-testid="participants-view-button"><UsersRound/><span>Participants</span></button>
-        <button type="button" className={viewMode === 'gallery' && !screenShareActive ? 'active' : ''} onClick={() => setViewMode('gallery')} data-testid="gallery-view-button"><span>Galerie</span></button>
+        <button type="button" className={viewMode === 'gallery' && !screenShareActive ? 'active' : ''} onClick={() => setViewMode('gallery')} data-testid="gallery-view-button"><span className="room-v2-grid-icon" aria-hidden="true"/><span>Galerie</span></button>
         <button type="button" className={viewMode === 'speaker' && !screenShareActive ? 'active' : ''} onClick={() => setViewMode('speaker')} data-testid="speaker-view-button"><span className="room-v2-speaker-icon" aria-hidden="true"/><span>Intervenant</span></button>
         {screenShareActive ? <button type="button" className="active room-v2-share-tab"><MonitorUp/><span>Partage d’écran</span></button> : null}
       </nav>
@@ -2901,7 +2943,7 @@ export default function MeetingRoomV2() {
       </div> : null}
 
       <footer className="room-v2-controls">
-        <div className="room-v2-control-strip">
+        <div className="room-v2-control-strip" aria-label="Commandes de réunion">
         <Control active={micEnabled} disabled={!canUseMic} title={!canUseMic ? 'Microphone désactivé par l’hôte' : undefined} label={micEnabled ? 'Micro' : 'Micro coupé'} onClick={() => void toggleMic()}>{micEnabled ? <Mic/> : <MicOff/>}</Control>
         <Control active={cameraEnabled} disabled={!canUseCamera} title={!canUseCamera ? 'Caméra désactivée par l’hôte' : undefined} label={cameraEnabled ? 'Caméra' : 'Caméra coupée'} onClick={() => void toggleCamera()}>{cameraEnabled ? <Camera/> : <CameraOff/>}</Control>
         <Control active={screenSharing} disabled={!canShareScreen || screenSharePending} title={!canShareScreen ? (guestMode && !guestScreenShareAllowed ? 'Partage d’écran non autorisé pour les invités' : 'Partage d’écran désactivé par l’hôte') : undefined} label={screenSharePending ? 'Démarrage…' : screenSharing ? 'Arrêter partage' : 'Partager'} onClick={() => void toggleScreenShare()}><MonitorUp/></Control>
