@@ -83,6 +83,7 @@ export default function GuestWaitingRoomPage() {
   const [microphoneLevel, setMicrophoneLevel] = useState(0);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('none');
   const [customBackgroundUrl, setCustomBackgroundUrl] = useState('');
+  const [customBackgroundName, setCustomBackgroundName] = useState('');
   const [showDeviceSettings, setShowDeviceSettings] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<PermissionStatus>('checking');
   const [mediaError, setMediaError] = useState('');
@@ -543,6 +544,7 @@ export default function GuestWaitingRoomPage() {
     if (customBackgroundUrl) URL.revokeObjectURL(customBackgroundUrl);
     const objectUrl = URL.createObjectURL(file);
     setCustomBackgroundUrl(objectUrl);
+    setCustomBackgroundName(file.name);
     setBackgroundMode('custom');
     setMediaError('');
   };
@@ -663,7 +665,7 @@ export default function GuestWaitingRoomPage() {
               <div><span><Volume2 size={17}/> Haut-parleurs</span><small>{devices.speakers.length ? 'Sortie détectée' : 'Sortie par défaut'}</small></div>
               <select aria-label="Choisir la sortie audio connectée" value={selectedSpeaker} onChange={(event) => { setSelectedSpeaker(event.target.value); setMediaError(''); }} disabled={!supportsSpeakerSelection}>
                 <option value="">Sortie audio système</option>
-                {devices.speakers.filter((device)=>device.deviceId).map((device,index)=>(
+                {devices.speakers.filter((device)=>device.deviceId && device.deviceId !== 'default').map((device,index)=>(
                   <option key={device.deviceId} value={device.deviceId}>{waitingDeviceLabel('audiooutput',device.label,index)}</option>
                 ))}
               </select>
@@ -677,10 +679,11 @@ export default function GuestWaitingRoomPage() {
                 <BackgroundButton mode="none" active={backgroundMode === 'none'} label="Aucun" icon={<CircleOff />} onClick={selectBackgroundMode} />
                 <BackgroundButton mode="blur" active={backgroundMode === 'blur'} label="Flou" icon={<MonitorUp />} onClick={selectBackgroundMode} />
                 <BackgroundButton mode="gradient" active={backgroundMode === 'gradient'} label="Dégradé" icon={<Sparkles />} onClick={selectBackgroundMode} />
-                <button className={backgroundMode === 'custom' ? 'background-option background-option-custom is-active' : 'background-option background-option-custom'} type="button" onClick={() => customBackgroundUrl ? selectBackgroundMode('custom') : customBackgroundInputRef.current?.click()}>
+                <button className={backgroundMode === 'custom' ? 'background-option background-option-custom is-active' : 'background-option background-option-custom'} type="button" onClick={() => customBackgroundInputRef.current?.click()} aria-pressed={backgroundMode === 'custom'}>
                   <FileImage size={18}/> {customBackgroundUrl ? 'Image choisie' : 'Image'}
                 </button>
               </div>
+              {customBackgroundName ? <small className="waiting-background-filename">Image sélectionnée : {customBackgroundName}</small> : null}
               <small className="waiting-background-note">Effets visibles dans l’aperçu uniquement : le remplacement de fond n’est pas encore appliqué au flux diffusé.</small>
               <input ref={customBackgroundInputRef} className="waiting-hidden-file" type="file" accept="image/png,image/jpeg,image/webp" onChange={handleCustomBackground} />
             </div>
