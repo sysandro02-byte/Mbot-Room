@@ -747,11 +747,18 @@ export default function MeetingRoomV2() {
       // Use the meeting already carried by navigation immediately. This removes the
       // unnecessary full meetings-list round trip before the room can render.
       let found: Meeting | null = state?.meeting?.id ? state.meeting as Meeting : null;
-      if (!found && /^\d+$/.test(meetingId)) {
-        const list = await meetingService.getMeetings();
-        found = list.find((item) => String(item.id) === meetingId) || null;
-      } else if (!found && meetingId) {
-        found = await meetingService.getMeetingByLink(meetingId);
+      if (!found && meetingId) {
+        // A numeric invitation is not necessarily the internal database ID.
+        // Resolve the actual meeting_link first; only legacy numeric database
+        // routes should fall back to the visible meetings list.
+        try {
+          found = await meetingService.getMeetingByLink(meetingId);
+        } catch (cause) {
+          if (!/^\d+$/.test(meetingId)) throw cause;
+          const list = await meetingService.getMeetings();
+          found = list.find((item) => String(item.id) === meetingId) || null;
+          if (!found) throw cause;
+        }
       }
       if (!found) throw new Error('Réunion introuvable ou inaccessible.');
 
