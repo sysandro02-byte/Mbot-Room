@@ -3,7 +3,7 @@ import { Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
 import { appDataService, type ClientPlatformSettings, type Contact, type Recording } from '../../services/appDataService';
-import { getMeetingPhase, HomeSlide, Meeting, meetingService } from '../../services/meetingService';
+import { getMeetingJoinUrl, getMeetingPhase, HomeSlide, Meeting, meetingService } from '../../services/meetingService';
 import { notificationService, RoomNotification } from '../../services/notificationService';
 import { socket } from '../../lib/socket';
 import { apiUrl } from '../../lib/api';
@@ -16,6 +16,7 @@ import { PremiumModal, StorageDataModal } from './components/HomeDashboardModals
 import './RealDashboardPage.css';
 import AndroidHome from './components/AndroidHome';
 import { isNativeAndroidApp } from '../../lib/nativePlatform';
+import { showAppMessage } from '../../lib/appMessage';
 
 const readCachedJson = async <T,>(path: string): Promise<T | null> => {
   const response = await readCachedApiResponse(apiUrl(path));
@@ -65,7 +66,27 @@ export default function RealDashboardPage() {
   const openRecording = async (recording: Recording) => { try { const access = await appDataService.getRecordingAccess(recording.id); const opened = window.open(access.url, '_blank', 'noopener,noreferrer'); if (!opened) window.location.assign(access.url); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Accès à l’enregistrement impossible.'); } };
   const openLunaTarget = (meeting: Meeting) => { if (getMeetingPhase(meeting) === 'ended') { navigate(`/reunions/${meeting.meeting_link}/terminee`, { state: { meeting } }); return; } navigate('/app/meetings'); };
 
-  if (isNativeAndroidApp()) return <><AndroidHome firstName={firstName} avatar={user?.avatar} meetings={upcoming} recentMeetings={recent} slides={homeSlides} loading={loading} unreadNotifications={unreadNotifications} onCreate={() => navigate('/app/meetings?new=1')} onJoin={() => navigate('/join')} onOpen={(meeting) => void openMeeting(meeting)} onAll={() => navigate('/app/meetings')} onNotifications={() => navigate('/app/notifications')} onPremium={() => setPremiumOpen(true)} onCalendar={() => navigate('/app/calendar')} onMessages={() => navigate('/app/messages')} onContacts={() => navigate('/app/contacts')} onFiles={() => navigate('/app/files')} onProfile={() => navigate('/app/profile')} onSearch={() => navigate('/app/search')} onSlideAction={(path) => navigate(path)} />
+  const shareMeeting = async (meeting?: Meeting) => {
+    if (!meeting) {
+      showAppMessage('Créez ou programmez une réunion pour partager son lien.', { tone: 'info' });
+      navigate('/app/meetings?new=1');
+      return;
+    }
+    const url = getMeetingJoinUrl(meeting);
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share({ title: meeting.title, text: 'Rejoignez ma réunion MBotéRoom', url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      showAppMessage('Lien de réunion copié dans le presse-papiers.', { tone: 'success' });
+    } catch (cause) {
+      if (cause instanceof Error && cause.name === 'AbortError') return;
+      showAppMessage('Partage indisponible. Ouvrez les détails de la réunion pour retrouver son lien.', { tone: 'warning' });
+    }
+  };
+
+  if (isNativeAndroidApp()) return <><AndroidHome firstName={firstName} avatar={user?.avatar} meetings={upcoming} recentMeetings={recent} slides={homeSlides} loading={loading} unreadNotifications={unreadNotifications} onCreate={() => navigate('/app/meetings?new=1')} onJoin={() => navigate('/join')} onPlan={() => navigate('/app/meetings?new=1&mode=schedule')} onGroups={() => navigate('/app/groups')} onShareLink={(meeting) => void shareMeeting(meeting)} canStartMeeting={(meeting) => Number(meeting.host_id) === Number(user?.id) || Number(meeting.co_host_id || 0) === Number(user?.id) || user?.role === 'admin'} onOpen={(meeting) => void openMeeting(meeting)} onAll={() => navigate('/app/meetings')} onNotifications={() => navigate('/app/notifications')} onPremium={() => setPremiumOpen(true)} onCalendar={() => navigate('/app/calendar')} onMessages={() => navigate('/app/messages')} onContacts={() => navigate('/app/contacts')} onFiles={() => navigate('/app/files')} onProfile={() => navigate('/app/profile')} onSearch={() => navigate('/app/search')} onSlideAction={(path) => navigate(path)} />
     <PremiumModal open={premiumOpen} paymentReady={Boolean(platformSettings?.premiumCheckoutReady)} checkoutUrl={platformSettings?.premiumCheckoutUrl || ''} onClose={() => setPremiumOpen(false)}/>
   </>;
 
