@@ -365,6 +365,15 @@ try {
   assert.ok(meeting.id);
   assert.ok(meeting.meeting_link);
 
+  // Production regression: an invitation can use the full link, numeric DB ID,
+  // or the six-character access code. All must resolve to the same meeting.
+  for (const identifier of [meeting.meeting_link, String(meeting.id), meeting.meeting_link.slice(-6)]) {
+    const resolved = await api(`/api/meetings/link/${encodeURIComponent(identifier)}`, {}, host.token);
+    assert.equal(resolved.response.status, 200, `Host invitation lookup failed for ${identifier}: ${JSON.stringify(resolved.data)}`);
+    assert.equal(Number(resolved.data.id), Number(meeting.id));
+    assert.equal(resolved.data.meeting_link, meeting.meeting_link);
+  }
+
   const guestJoin = await api('/api/auth/guest-join', {
     method: 'POST',
     headers: authBearer,
@@ -380,6 +389,13 @@ try {
   assert.equal(guestJoin.data.lobbyStatus, 'requested');
   assert.ok(guestJoin.data.token);
   guest = guestJoin.data;
+
+  for (const identifier of [String(meeting.id), meeting.meeting_link]) {
+    const resolved = await api(`/api/meetings/link/${encodeURIComponent(identifier)}`, {}, guest.token);
+    assert.equal(resolved.response.status, 200, `Guest invitation lookup failed for ${identifier}: ${JSON.stringify(resolved.data)}`);
+    assert.equal(Number(resolved.data.id), Number(meeting.id));
+  }
+  console.log('PRODUCTION_INVITATION_LOOKUP_OK', JSON.stringify({ numericId: meeting.id, fullLink: true, guestAccess: true }));
 
   const lobby = await api(`/api/meetings/${meeting.id}/lobby`, {}, host.token);
   assert.equal(lobby.response.status, 200, JSON.stringify(lobby.data));
@@ -424,6 +440,28 @@ try {
       '--no-sandbox',
     ],
   });
+
+  // Verify the actual custom domain resolves the invitation and reaches
+  // the preview using its production API config, not only Render's SPA.
+  const officialContext = await browser.newContext({ locale: 'fr-FR' });
+  try {
+    await officialContext.addInitScript(({ user, token }) => {
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('token', token);
+      localStorage.setItem('sessionExpiresAt', new Date(Date.now() + 2 * 60 * 60_000).toISOString());
+    }, { user: host.user, token: host.token });
+    const officialPage = await officialContext.newPage();
+    const officialErrors = [];
+    officialPage.on('pageerror', (error) => officialErrors.push(error.message);
+    await officialPage.goto(`https://mboteroom.loukatech.com/join/${encodeURIComponent(meeting.meeting_link)}`, {
+      waitUntil: 'domcontentloaded', timeout: 30_000,
+    });
+    await officialPage.locator('.real-join-preview').waitFor({ state: 'visible', timeout: 30_000 });
+    assert.deepEqual(officialErrors, [], `Official domain errors: ${officialErrors.join(' | ')}`);
+    console.log('OFFICIAL_DOMAIN_INVITATION_SMOKE_OK', JSON.stringify({ domain: 'mboteroom.loukatech.com', link: meeting.meeting_link }));
+  } finally {
+    await officialContext.close();
+  }
 
   // Android-size UI regression: accepting terms and submitting a meeting
   // invitation must reach the waiting room without triggering AppErrorBoundary.
