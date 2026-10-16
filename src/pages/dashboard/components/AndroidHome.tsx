@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Bell, CalendarDays, ChevronRight, FolderOpen, MessageCircle, Search, UsersRound, Video } from 'lucide-react';
 import type { HomeSlide, Meeting } from '../../../services/meetingService';
 import { getMeetingPhase } from '../../../services/meetingService';
@@ -60,9 +61,17 @@ export default function AndroidHome({
   onSearch,
   onSlideAction,
 }: Props) {
-  const hero = slides.find((slide) => slide.slot >= 1 && slide.slot <= 3 && slide.isActive !== false)
-    || slides.find((slide) => slide.isActive !== false)
-    || null;
+  const [activeSlide, setActiveSlide] = useState(0);
+  const availableSlides = slides
+    .filter((slide) => slide.slot >= 1 && slide.slot <= 3 && slide.isActive !== false)
+    .sort((a, b) => a.slot - b.slot);
+  const fallbackSlides = availableSlides.length ? availableSlides : slides.filter((slide) => slide.isActive !== false).slice(0, 1);
+  const hero = fallbackSlides[activeSlide % Math.max(fallbackSlides.length, 1)] || null;
+  useEffect(() => {
+    if (fallbackSlides.length < 2) return;
+    const timer = window.setInterval(() => setActiveSlide((index) => (index + 1) % fallbackSlides.length), 7000);
+    return () => window.clearInterval(timer);
+  }, [fallbackSlides.length]);
   const nextMeeting = meetings[0] || null;
   const isLive = Boolean(nextMeeting && getMeetingPhase(nextMeeting) === 'live');
 
@@ -86,7 +95,7 @@ export default function AndroidHome({
     <section className="android-home-welcome">
       <h1>Bonjour, {firstName}</h1>
       <p>Ravi{firstName.toLowerCase().endsWith('a') ? 'e' : ''} de vous revoir !</p>
-      <small>Des idées plus proches, un monde plus ouvert.</small>
+      <small>Organisez ou rejoignez votre prochaine réunion.</small>
     </section>
 
     <section className="android-home-main-actions">
@@ -102,19 +111,33 @@ export default function AndroidHome({
       </button>
     </section>
 
-    <button
-      type="button"
-      className="android-home-banner"
-      onClick={() => hero?.actionPath && onSlideAction(hero.actionPath)}
-      aria-label={hero?.title || 'Organisez vos échanges simplement'}
-    >
-      <span className="android-home-banner-copy">
-        <strong>{hero?.title || 'Organisez vos échanges simplement'}</strong>
-        <small>{hero?.body || 'Collaborez, partagez, avancez ensemble.'}</small>
-      </span>
-      <img src={hero?.imageUrl || '/images/mboteroom-home-banner.svg'} alt="" />
-    </button>
-    <div className="android-home-dots" aria-hidden="true"><i className="active"/><i/><i/></div>
+    <section className="android-home-highlights" aria-label="À découvrir">
+      <button
+        type="button"
+        className="android-home-banner"
+        onClick={() => hero?.actionPath ? onSlideAction(hero.actionPath) : onCreate()}
+        aria-label={(hero?.actionLabel || 'Découvrir') + ' : ' + (hero?.title || 'Organisez vos échanges simplement')}
+      >
+        <span className="android-home-banner-copy">
+          <strong>{hero?.title || 'Organisez vos échanges simplement'}</strong>
+          <small>{hero?.body || 'Créez et rejoignez vos réunions en quelques instants.'}</small>
+          <span className="android-home-banner-link">{hero?.actionLabel || 'Créer une réunion'} <ChevronRight size={14}/></span>
+        </span>
+        <img src={hero?.imageUrl || '/images/mboteroom-home-banner.svg'} alt="" loading="lazy" />
+      </button>
+      {fallbackSlides.length > 1 && <div className="android-home-dots" role="group" aria-label="Choisir une annonce">
+        {fallbackSlides.map((slide, index) => (
+          <button
+            key={slide.slot}
+            type="button"
+            className={index === activeSlide % fallbackSlides.length ? 'active' : ''}
+            aria-label={'Annonce ' + (index + 1) + ' sur ' + fallbackSlides.length}
+            aria-current={index === activeSlide % fallbackSlides.length ? 'true' : undefined}
+            onClick={() => setActiveSlide(index)}
+          />
+        ))}
+      </div>}
+    </section>
 
     <section className="android-home-section">
       <div className="android-home-section-title">
