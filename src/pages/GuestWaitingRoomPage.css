@@ -1246,3 +1246,37 @@ body.mboteroom-native-android .waiting-simple-exit{min-height:50px}
 .waiting-simple-audio-test select{max-width:100%;min-width:0;min-height:41px;padding:0 8px;border:1px solid #cddfea;border-radius:11px;background:#fff;color:#18435f;font-size:11px}
 .waiting-simple-audio-test button{min-height:41px}
 @media(max-width:650px){.waiting-simple-audio-test{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.waiting-simple-audio-test select{grid-column:1/-1}}
+
+
+/* Dynamic device states in the responsive waiting room. */
+.waiting-simple-preview video[hidden] { display:none!important; }
+.waiting-simple-controls>button:disabled,
+.waiting-simple-setting-row select:disabled {
+  opacity:.55;
+  cursor:not-allowed;
+}
+.waiting-simple-meter span { transition:height .1s ease,background-color .1s ease; }
+.waiting-audio-note,
+.waiting-background-note {
+  display:block;
+  grid-column:1 / -1;
+  width:100%;
+  color:#68778a;
+  font-size:11px;
+  line-height:1.5;
+}
+.waiting-simple-audio-test { flex-wrap:wrap; }
+.waiting-simple-audio-test>select { flex:1 1 160px; }
+.waiting-simple-audio-test>button { flex:0 0 auto; }
+.waiting-simple-audio-test .waiting-audio-note { margin-top:2px; }
+.waiting-simple-settings button:focus-visible,
+.waiting-simple-settings select:focus-visible,
+.waiting-simple-controls>button:focus-visible {
+  outline:3px solid #22b5b8;
+  outline-offset:2px;
+}
+@media(max-width:650px) {
+  .waiting-simple-controls>button { min-width:0; overflow-wrap:anywhere; text-align:center; }
+  .waiting-simple-audio-test>button { grid-column:1/-1; width:100%; }
+  .waiting-simple-audio-test>select { width:100%; }
+}
