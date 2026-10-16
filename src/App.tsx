@@ -80,7 +80,9 @@ function ProtectedRoute({ children, allowGuest = false }: { children: ReactNode;
   if (!allowGuest && authService.getCurrentUser()?.isGuest) {
     const link = sessionStorage.getItem('mboteroom-guest-meeting-link') || '';
     const safeLink = /^[a-zA-Z0-9_-]{3,128}$/.test(link) ? link : '';
-    return <Navigate to={safeLink ? `/reunions/${encodeURIComponent(safeLink)}` : '/rejoindre-une-reunion'} replace />;
+    // A guest session must always recover through the lobby. Only the live
+    // admission endpoint may promote them into the media room.
+    return <Navigate to={safeLink ? `/reunions/${encodeURIComponent(safeLink)}/salle-attente` : '/rejoindre-une-reunion'} replace />;
   }
   return children;
 }
