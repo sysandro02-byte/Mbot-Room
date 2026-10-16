@@ -787,6 +787,8 @@ export default function MeetingRoomV2() {
         if (access.status === 'removed') throw new Error('L’hôte a refusé ou retiré votre accès à cette réunion.');
         if (access.status === 'ended') throw new Error('Cette réunion est terminée.');
         if (access.status !== 'accepted') {
+          // No direct media access, and no misleading missing-room page.
+          setRedirectingToLobby(true);
           navigate(`/join/${encodeURIComponent(found.meeting_link)}`, { replace: true });
           return;
         }
