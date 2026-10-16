@@ -22,7 +22,12 @@ const shouldUseProductionFallback = () => {
   if (host === 'appassets.androidplatform.net' || /MBoteRoomAndroid/i.test(navigator.userAgent)) return true;
   if (host === 'localhost' || host === '127.0.0.1') return false;
   if (host === 'mbote-room-api.onrender.com') return false;
-  return host.endsWith('.vercel.app');
+  // The public custom domain is served by Vercel too: it has no /api rewrite.
+  // Without this fallback a missing VITE_API_URL silently calls the SPA instead
+  // of the Render backend and makes valid meeting invitations appear missing.
+  return host.endsWith('.vercel.app')
+    || host === 'mboteroom.loukatech.com'
+    || host === 'www.mboteroom.loukatech.com';
 };
 
 export const getApiBaseUrl = () => {
