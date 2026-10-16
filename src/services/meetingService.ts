@@ -250,9 +250,19 @@ export const meetingService = {
   },
 
   async getMyMeetingStatus(meetingId:number):Promise<{meetingId:number;status:'accepted'|'requested'|'removed'|'left'|'ended'}>{
-    const response=await apiFetch(apiUrl(`/api/meetings/${meetingId}/my-status`),{headers:getAuthHeaders()},15_000);
+    // Never accept a cached admission status. The host may have moved the user
+    // back to the lobby, revoked access, or ended the meeting in the meantime.
+    const response=await apiFetch(apiUrl(`/api/meetings/${meetingId}/my-status`),{
+      headers:getAuthHeaders(),
+      cache:'no-store',
+    },15_000);
     if(!response.ok)throw new Error('Vérification de votre accès indisponible.');
-    return response.json();
+    const data=await response.json().catch(()=>null);
+    if (!data || Number(data.meetingId)!==Number(meetingId)
+      || !['accepted','requested','removed','left','ended'].includes(data.status)) {
+      throw new Error('Statut de réunion invalide. Nouvelle vérification nécessaire.');
+    }
+    return data;
   },
 
   async getMeetingByLink(meetingLink: string): Promise<Meeting> {
