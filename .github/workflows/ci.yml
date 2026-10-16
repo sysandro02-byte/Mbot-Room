@@ -58,6 +58,8 @@ jobs:
         run: node --import tsx --test scripts/test-meeting-invitation.mjs
       - name: Android waiting-room device labels
         run: node --import tsx --test scripts/test-waiting-devices.mjs
+      - name: Configured meeting duration regressions
+        run: node --import tsx --test scripts/test-meeting-clock.mjs
       - name: Build
         run: npm run build
       - name: Production smoke checks
