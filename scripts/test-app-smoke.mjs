@@ -328,6 +328,48 @@ try {
   });
   assert.equal(registerLoginUser.response.status, 201, JSON.stringify(registerLoginUser.data));
 
+  // Guest join regression: /login must send a guest to the lobby, NOT /app
+  // or the guarded meeting room while their request is still pending.
+  const guestContext = await browser.newContext({ baseURL: baseUrl, viewport: { width: 390, height: 844 } });
+  try {
+    const guestPage = await guestContext.newPage();
+    await guestPage.goto('/login', { waitUntil: 'domcontentloaded', timeout: 20_000 });
+    await guestPage.locator('.join-meeting-card').click();
+    await guestPage.getByRole('dialog', { name: /rejoindre une réunion comme invité/i }).waitFor({ state: 'visible', timeout: 10_000 });
+    await guestPage.locator('#guest-name').fill('Invité salle attente smoke');
+    await guestPage.locator('#guest-code').fill(String(createMeeting.data.settings.meetingAccessId));
+    await guestPage.getByRole('button', { name: 'Lire et accepter les conditions d’utilisation' }).click();
+    const termsBox = guestPage.locator('.terms-modal-body');
+    await termsBox.waitFor({ state: 'visible', timeout: 10_000 });
+    await termsBox.evaluate((element) => element.scrollTo(0, element.scrollHeight));
+    await guestPage.locator('.terms-modal-footer input[type="checkbox"]').check({ timeout: 10_000 });
+    await guestPage.getByRole('button', { name: 'Accepter les conditions' }).click();
+    await guestPage.getByRole('button', { name: /Rejoindre la salle d.attente/i }).click();
+    await guestPage.waitForURL('**/salle-attente', { timeout: 20_000 });
+    await guestPage.getByText('En attente de l’hôte').waitFor({ state: 'visible', timeout: 12_000 });
+    assert.ok(!guestPage.url().endsWith('/app'), 'Guest must not be redirected to /app after login');
+    assert.equal(await guestPage.locator('.room-v2-error').count(), 0, 'A queued guest must never see the missing-meeting screen');
+    const lobby = await jsonRequest(`/api/meetings/${createMeeting.data.id}/lobby`, { headers: authHeaders(verified.data.token) });
+    assert.equal(lobby.response.status, 200, JSON.stringify(lobby.data));
+    const queued = lobby.data.find((member) => member.name === 'Invité salle attente smoke');
+    assert.ok(queued && queued.status === 'requested', 'Moderator must see the guest still pending in the lobby');
+    // Waiting room is a durable deep link, including browser refresh.
+    await guestPage.reload({ waitUntil: 'domcontentloaded' });
+    await guestPage.getByText('En attente de l’hôte').waitFor({ state: 'visible', timeout: 12_000 });
+    assert.equal(await guestPage.locator('.room-v2-error').count(), 0);
+    const admit = await jsonRequest(`/api/meetings/${createMeeting.data.id}/lobby/respond`, {
+      method: 'POST',
+      headers: authHeaders(verified.data.token),
+      body: JSON.stringify({ userId: queued.user_id, status: 'accepted' }),
+    });
+    assert.equal(admit.response.status, 200, JSON.stringify(admit.data));
+    await guestPage.waitForURL((url) => url.pathname === `/reunions/${createMeeting.data.meeting_link}`, { timeout: 15_000 });
+    await guestPage.waitForFunction(() => !document.querySelector('.room-v2-loading'), null, { timeout: 15_000 });
+    assert.equal(await guestPage.locator('.room-v2-error').count(), 0, 'Admitted guest should enter the real meeting, not an error page');
+  } finally {
+    await guestContext.close();
+  }
+
   // Android-size end-to-end login regression, no manual clicks or synthetic DOM events.
   // Prove welcome tap -> credentials -> server challenge -> OTP -> authenticated app.
   const signInContext = await browser.newContext({ baseURL: baseUrl, viewport: { width: 390, height: 844 } });
