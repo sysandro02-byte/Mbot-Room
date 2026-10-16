@@ -524,9 +524,11 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
   app.get('/api/meetings/link/:meetingLink', ...protectedApi, async (request: AuthedRequest, response, next) => {
     try {
       await reconcileStaleLiveMeetings();
-      const result = await query('SELECT * FROM room_meetings WHERE meeting_link=$1 AND status<>\'cancelled\' LIMIT 1', [request.params.meetingLink]);
-      if (!result.rows[0]) return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
-      const meeting = mapMeeting(result.rows[0]);
+      // Invites also arrive as numeric IDs or short meeting access codes.
+      // Resolve every supported identifier consistently with /join-lookup,
+      // then apply the same per-user visibility policy as a full room link.
+      const meeting = await findMeetingByValue(request.params.meetingLink);
+      if (!meeting || meeting.status === 'cancelled') return sendApiError(response, 404, 'MEETING_NOT_FOUND', 'Réunion introuvable.');
       const allowed = await visibleToUser(meeting, request.user!);
       if (!allowed && meeting.settings.externalAccess === false) return sendApiError(response, 403, 'MEETING_ACCESS_DENIED', 'Accès refusé à cette réunion.');
       response.json({ ...meeting, settings: sanitizeMeetingSettings(meeting.settings) });
