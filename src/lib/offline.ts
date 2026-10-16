@@ -47,7 +47,11 @@ export const isCacheableApiGet = (input: RequestInfo | URL, method = 'GET') => {
   if (!safeWindow() || method.toUpperCase() !== 'GET' || !('caches' in window)) return false;
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   if (!/\/api\//.test(url)) return false;
-  return !/\/api\/(?:auth|push|rtc|sfu|health)(?:\/|$)/.test(url);
+  // Meeting links, lobby status, members and admission are authorization state.
+  // Reusing even a successful cached response can incorrectly admit a participant
+  // or display a missing room when the host still sees the pending request.
+  // Always ask the server; a network failure must not grant meeting access.
+  return !/\/api\/(?:auth|push|rtc|sfu|health|meetings)(?:\/|$|\?)/.test(url);
 };
 
 export const cacheApiResponse = async (input: RequestInfo | URL, response: Response) => {
