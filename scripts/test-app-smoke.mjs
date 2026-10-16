@@ -364,7 +364,7 @@ try {
     });
     assert.equal(admit.response.status, 200, JSON.stringify(admit.data));
     await guestPage.waitForURL((url) => url.pathname === `/reunions/${createMeeting.data.meeting_link}`, { timeout: 15_000 });
-    await guestPage.waitForFunction(() => !document.querySelector('.room-v2-loading'), null, { timeout: 15_000 });
+    await guestPage.locator('.room-v2-shell').waitFor({ state: 'visible', timeout: 20_000 });
     assert.equal(await guestPage.locator('.room-v2-error').count(), 0, 'Admitted guest should enter the real meeting, not an error page');
   } finally {
     await guestContext.close();
