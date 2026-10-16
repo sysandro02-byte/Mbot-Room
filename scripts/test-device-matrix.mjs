@@ -113,6 +113,32 @@ const runNativeAndroidCase = async (session) => {
       if(route==='/app'){
         assert.equal(await page.locator('.android-home-redesign:visible').count(),1,'Native home must have exactly one design');
         assert.equal(await page.locator('.real-dashboard:visible').count(),0,'Legacy web home must not render in the native shell');
+        // Regression visuelle Android : la bannière ne doit plus s'étirer ou cacher son texte.
+        const originalViewport = page.viewportSize();
+        for (const width of [320, 360, 393]) {
+          await page.setViewportSize({ width, height: 740 });
+          const homeLayout = await page.evaluate(() => {
+            const banner = document.querySelector('.android-home-banner');
+            const copy = document.querySelector('.android-home-banner-copy');
+            const image = banner?.querySelector('img');
+            const copyRect = copy?.getBoundingClientRect();
+            const imageRect = image?.getBoundingClientRect();
+            return {
+              viewport: window.innerWidth,
+              overflow: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth),
+              bannerHeight: banner?.getBoundingClientRect().height || 0,
+              copyOverlap: Boolean(copyRect && imageRect && copyRect.right > imageRect.left + 2),
+              textClipped: Boolean(copy && copy.scrollHeight > copy.clientHeight + 2),
+            };
+          });
+          assert.ok(homeLayout.overflow <= homeLayout.viewport + 2,
+            'Android home overflows at ' + width + 'px: ' + JSON.stringify(homeLayout));
+          assert.ok(homeLayout.bannerHeight > 0 && homeLayout.bannerHeight < 260,
+            'Android home banner height invalid at ' + width + 'px: ' + JSON.stringify(homeLayout));
+          assert.equal(homeLayout.copyOverlap, false, 'Android banner copy overlaps illustration at ' + width + 'px');
+          assert.equal(homeLayout.textClipped, false, 'Android banner copy clipped at ' + width + 'px');
+        }
+        if (originalViewport) await page.setViewportSize(originalViewport);
       }
       if(route==='/app/messages'){
         assert.equal(await page.locator('.messages-pro-list:visible').count(),1,'Android inbox should be visible');
