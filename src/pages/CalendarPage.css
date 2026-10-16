@@ -199,3 +199,21 @@
  .calendar-board>header{padding:10px}
  .calendar-month-grid{grid-auto-rows:minmax(65px,1fr)}
 }
+
+/* Wide-calendar layout: do not squeeze three controls into a 400px form. */
+.calendar-pro-page,.calendar-pro-grid,.calendar-create-card,.calendar-board,.calendar-pro-right{min-width:0;box-sizing:border-box}
+.calendar-pro-grid{grid-template-columns:minmax(490px,0.95fr) minmax(0,1.35fr)}
+.calendar-advanced-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.calendar-advanced-grid article{min-width:0;min-height:104px;box-sizing:border-box;padding:13px}
+.calendar-advanced-grid article>div{display:grid;grid-template-columns:22px minmax(0,1fr) 44px;align-items:center;gap:8px}
+.calendar-advanced-grid article>div>span{min-width:0}
+.calendar-advanced-grid strong{font-size:12px;line-height:1.35;overflow-wrap:break-word}
+.calendar-advanced-grid small{font-size:10px;line-height:1.45;overflow-wrap:break-word}
+.calendar-advanced-grid article select{width:100%;box-sizing:border-box;min-height:38px;margin-top:12px;font-size:11px}
+.calendar-advanced-grid article:last-child{grid-column:1/-1;min-height:80px}
+.calendar-advanced-grid .switch{min-width:42px;width:42px;height:26px;justify-self:end}
+.calendar-board>header{flex-wrap:wrap}
+.calendar-board-controls{flex-wrap:wrap}
+@media(max-width:1250px){.calendar-pro-grid{grid-template-columns:minmax(0,1fr)}.calendar-advanced-grid{grid-template-columns:repeat(3,minmax(180px,1fr))}.calendar-advanced-grid article:last-child{grid-column:auto}}
+@media(max-width:740px){.calendar-advanced-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.calendar-advanced-grid article:last-child{grid-column:1/-1}.calendar-pro-hero-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:480px){.calendar-advanced-grid{grid-template-columns:1fr}.calendar-advanced-grid article:last-child{grid-column:auto}.calendar-pro-hero-stats{grid-template-columns:1fr}}

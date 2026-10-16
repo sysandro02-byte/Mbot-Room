@@ -1127,7 +1127,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
       await query(`UPDATE room_lobby SET status='rejected' WHERE meeting_id=$1 AND user_id=$2`, [meeting.id,userId]);
       io.to(`user:${userId}`).emit('meeting:removed', { meetingId: meeting.id });
       await ejectParticipant?.(io,meeting.id,userId);
-      void disconnectMeetingMediaUser(meeting.id,userId).catch((error) =>
+      await disconnectMeetingMediaUser(meeting.id,userId).catch((error) =>
         console.warn('[meeting:remove] SFU cleanup failed', { meetingId: meeting.id, error: String(error) }));
       io.to(`meeting:${meeting.id}`).emit('meeting:presence', { meetingId: meeting.id, removedUserId: userId });
       response.status(204).end();
@@ -1154,7 +1154,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
       await query(`UPDATE room_meeting_members SET role='participant',status='removed',left_at=now(),updated_at=now() WHERE meeting_id=$1 AND user_id=$2`, [meeting.id,userId]);
       io.to(`user:${userId}`).emit('meeting:banned', { meetingId: meeting.id });
       await ejectParticipant?.(io,meeting.id,userId);
-      void disconnectMeetingMediaUser(meeting.id,userId).catch((error) =>
+      await disconnectMeetingMediaUser(meeting.id,userId).catch((error) =>
         console.warn('[meeting:ban] SFU cleanup failed', { meetingId: meeting.id, error: String(error) }));
       response.json({ success: true });
     } catch (error) { next(error); }
@@ -1182,7 +1182,7 @@ export const registerMeetingRoutes = (app: express.Express, io: Server, ejectPar
       await query(`UPDATE room_meeting_members SET role='participant',status='left',left_at=now(),updated_at=now() WHERE meeting_id=$1 AND user_id=$2`, [meeting.id,userId]);
       io.to(`user:${userId}`).emit('meeting:moved-to-lobby', { meetingId: meeting.id });
       await ejectParticipant?.(io, meeting.id, userId);
-      void disconnectMeetingMediaUser(meeting.id,userId).catch((error) =>
+      await disconnectMeetingMediaUser(meeting.id,userId).catch((error) =>
         console.warn('[meeting:lobby] SFU cleanup failed', { meetingId: meeting.id, error: String(error) }));
       io.to(`meeting:${meeting.id}`).emit('meeting:presence', { meetingId: meeting.id, movedToLobbyUserId: userId });
       io.to(`meeting:${meeting.id}:moderators`).emit('meeting:lobby-updated', {

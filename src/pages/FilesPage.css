@@ -110,3 +110,18 @@ body.mboteroom-native-android .files-grid.is-grid-view .files-uploaded-card arti
  .files-tools>strong{font-size:17px}
  .files-card{padding:13px}
 }
+
+/* Desktop file manager uses the same designed controls as the Android view. */
+.files-page,.files-page-head,.files-page-head-actions,.files-grid{min-width:0;box-sizing:border-box}
+.files-storage-summary{margin:2px 0 4px}
+.files-category-tabs{margin:5px 0 2px;gap:9px}
+.files-category-tabs>button{font:inherit;font-size:12px;font-weight:800;white-space:nowrap;min-height:46px;padding:0 15px;border-radius:13px;cursor:pointer}
+.files-category-tabs>button svg{width:18px;height:18px;flex:none}
+.files-tools{margin:8px 0 4px;gap:12px}
+.files-tools>strong{font-size:19px}
+.files-tools label{white-space:nowrap}
+.files-tools>div button{flex:none}
+.files-card article{min-width:0}
+.files-card article>div{min-width:0}
+.files-card article strong{overflow-wrap:anywhere}
+@media(max-width:680px){.files-page-head-actions{display:flex;flex-wrap:wrap}.files-tools{flex-wrap:wrap}.files-tools>strong{width:100%}}

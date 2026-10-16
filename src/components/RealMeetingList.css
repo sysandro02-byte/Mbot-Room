@@ -181,3 +181,12 @@
  .meeting-pro-page .meeting-pro-row-actions .real-meeting-menu-trigger{flex:none}
  .meeting-pro-page .meeting-pro-side{grid-template-columns:1fr}
 }
+
+/* Meeting action area: safe responsive wrapping, no overlapping buttons. */
+.meeting-pro-row{grid-template-columns:70px minmax(0,1fr) 100px minmax(190px,auto);gap:12px}
+.meeting-pro-row>*{min-width:0}
+.meeting-pro-page .meeting-pro-row-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;min-width:0}
+.meeting-pro-page .meeting-pro-row-actions>button{flex:0 0 auto;min-width:94px;min-height:40px;font-size:10px;padding:0 12px;white-space:nowrap;box-sizing:border-box}
+.meeting-pro-page .meeting-pro-row-actions .real-meeting-menu-trigger{min-width:40px;width:40px}
+@media(max-width:1280px){.meeting-pro-row{grid-template-columns:70px minmax(0,1fr) 85px}.meeting-pro-page .meeting-pro-row-actions{grid-column:2/-1;justify-content:flex-start}}
+@media(max-width:700px){.meeting-pro-row{grid-template-columns:63px minmax(0,1fr)}.meeting-pro-participants{grid-column:2}.meeting-pro-page .meeting-pro-row-actions{grid-column:1/-1}.meeting-pro-page .meeting-pro-row-actions>button{flex:1 1 115px}}
