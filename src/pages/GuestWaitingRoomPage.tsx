@@ -287,6 +287,7 @@ export default function GuestWaitingRoomPage() {
     if (!meeting || !currentUser?.id) return undefined;
 
     let cancelled = false;
+    let pollSequence = 0;
     let rejectionTimer: number | null = null;
     const applyLobbyStatus = (status?: 'accepted' | 'rejected' | 'requested') => {
       if (cancelled) return;
