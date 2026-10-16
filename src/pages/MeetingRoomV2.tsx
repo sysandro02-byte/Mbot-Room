@@ -113,7 +113,8 @@ const requestAndroidDisplayCapture = async (): Promise<MediaStream> => {
     let settled = false;
     let disposed = false;
     let projectionStarted = false;
-    let lastFrameUrl = '';
+    let decodingFrame = false;
+    let queuedFrame: { dataUrl: string; width: number; height: number } | null = null;
     const clearCallbacks = () => {
       delete window.__mboteAndroidScreenStarted;
       delete window.__mboteAndroidScreenFrame;
@@ -131,21 +132,30 @@ const requestAndroidDisplayCapture = async (): Promise<MediaStream> => {
     };
     const timeout = window.setTimeout(() => {
       fail('La demande de partage d’écran Android a expiré.', 'AbortError');
-    }, 20_000);
+    }, 35_000);
 
-    window.__mboteAndroidScreenFrame = (dataUrl, width, height) => {
-      if (disposed || !dataUrl) return;
-      const nextWidth = Math.max(2, Math.floor(Number(width) || canvas.width));
-      const nextHeight = Math.max(2, Math.floor(Number(height) || canvas.height));
-      if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
-        canvas.width = nextWidth;
-        canvas.height = nextHeight;
-      }
-      lastFrameUrl = dataUrl;
+    // Android delivers JPEG frames asynchronously through evaluateJavascript.
+    // Decode only one at a time: repeated frames must not invalidate every
+    // previous image before its onload fires on slower Android WebViews.
+    const decodeFrame = (frame: { dataUrl: string; width: number; height: number }) => {
+      if (disposed) return;
+      decodingFrame = true;
       const image = new Image();
+      const advance = () => {
+        decodingFrame = false;
+        const pending = queuedFrame;
+        queuedFrame = null;
+        if (pending && !disposed) decodeFrame(pending);
+      };
       image.onload = () => {
-        if (disposed || lastFrameUrl !== dataUrl) return;
+        if (disposed) return;
         try {
+          const nextWidth = Math.max(2, Math.floor(frame.width || canvas.width));
+          const nextHeight = Math.max(2, Math.floor(frame.height || canvas.height));
+          if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+            canvas.width = nextWidth;
+            canvas.height = nextHeight;
+          }
           context.drawImage(image, 0, 0, canvas.width, canvas.height);
           if (projectionStarted && !settled) {
             const stream = canvas.captureStream(15);
@@ -159,10 +169,21 @@ const requestAndroidDisplayCapture = async (): Promise<MediaStream> => {
             resolve(stream);
           }
         } catch {
-          // A single late frame must not stop the projection.
-        }
+          // A malformed JPEG must not prevent later frames from recovering.
+        } finally { advance(); }
       };
-      image.src = dataUrl;
+      image.onerror = advance;
+      image.src = frame.dataUrl;
+    };
+
+    window.__mboteAndroidScreenFrame = (dataUrl, width, height) => {
+      if (disposed || !dataUrl) return;
+      const frame = { dataUrl, width, height };
+      if (decodingFrame) {
+        queuedFrame = frame;
+      } else {
+        decodeFrame(frame);
+      }
     };
 
     window.__mboteAndroidScreenStarted = (width, height) => {
