@@ -649,6 +649,8 @@ export default function Login({ initialView = 'login' }: LoginProps) {
         });
         return;
       }
+      // Prevent a previous guest's room link from winning the auth-event race.
+      sessionStorage.removeItem('mboteroom-guest-meeting-link');
       const result = await authService.guestJoin({
         name: guestName.trim(),
         meetingCode: identifier,
