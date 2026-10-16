@@ -57,7 +57,7 @@ import './MeetingRoomV2.css';
 type Panel = 'participants' | 'lobby' | 'chat' | 'polls' | 'luna' | 'breakouts' | null;
 type MeetingLocationState = {
   guestName?: string;
-  joinOptions?: { mic?: boolean; camera?: boolean; backgroundUrl?: string; audioInputId?: string; videoInputId?: string };
+  joinOptions?: { mic?: boolean; camera?: boolean; backgroundUrl?: string; audioInputId?: string; videoInputId?: string; audioOutputId?: string };
   meeting?: Partial<Meeting>;
 };
 
@@ -454,7 +454,7 @@ export default function MeetingRoomV2() {
   const [clockTick, setClockTick] = useState(Date.now());
   const [selectedAudioInputId, setSelectedAudioInputId] = useState(state?.joinOptions?.audioInputId||'');
   const [selectedVideoInputId, setSelectedVideoInputId] = useState(state?.joinOptions?.videoInputId||'');
-  const [selectedAudioOutputId, setSelectedAudioOutputId] = useState('');
+  const [selectedAudioOutputId, setSelectedAudioOutputId] = useState(state?.joinOptions?.audioOutputId || '');
   const [viewMode, setViewMode] = useState<'participants' | 'gallery' | 'speaker'>('gallery');
   const [pinnedSocketId, setPinnedSocketId] = useState<string | null>(null);
   const [micEnabled, setMicEnabled] = useState(initialMic);
