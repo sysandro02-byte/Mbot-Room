@@ -536,6 +536,47 @@ try {
   hostRoom = await openMeeting(browser, host, meeting.id, 'host');
   guestRoom = await openMeeting(browser, guest, meeting.id, 'guest');
 
+  // Responsive regression: at 320px no meeting action may be cropped.
+  // Inspect the real production room and restore its desktop viewport before
+  // exercising the participant/moderation panels below.
+  const desktopViewport = hostRoom.page.viewportSize();
+  await hostRoom.page.setViewportSize({ width: 320, height: 700 });
+  try {
+    await hostRoom.page.getByTestId('meeting-theme-toggle').waitFor({ state: 'visible' });
+    const mobileLayout = await hostRoom.page.evaluate(() => {
+      const buttons = [...document.querySelectorAll('.room-v2-control-strip .room-v2-control')];
+      const header = document.querySelector('.room-v2-header');
+      const tabs = document.querySelector('.room-v2-mode-tabs');
+      return {
+        viewport: window.innerWidth,
+        headerHeight: header?.getBoundingClientRect().height || 0,
+        tabsHeight: tabs?.getBoundingClientRect().height || 0,
+        buttons: buttons.map((button) => {
+          const box = button.getBoundingClientRect();
+          return { left: box.left, right: box.right, top: box.top, bottom: box.bottom, width: box.width };
+        }),
+      };
+    });
+    assert.equal(mobileLayout.buttons.length, 8, 'All eight mobile meeting commands must exist');
+    assert.ok(mobileLayout.headerHeight <= 95, 'Mobile logo/header should be compact');
+    assert.ok(mobileLayout.tabsHeight <= 44, 'View buttons should use compact navigation');
+    assert.ok(mobileLayout.buttons.every((box) =>
+      box.width >= 30 && box.left >= -1 && box.right <= mobileLayout.viewport + 1
+      && box.top >= -1 && box.bottom <= 701
+    ), `Mobile controls cropped: ${JSON.stringify(mobileLayout)}`);
+    const timer = await hostRoom.page.getByTestId('meeting-chrono').textContent();
+    assert.match(String(timer), /\d\d:\d\d\s*\/\s*30:00/, 'Timer must display configured 30 minutes');
+    const before = await hostRoom.page.locator('.room-v2-shell').getAttribute('class');
+    await hostRoom.page.getByTestId('meeting-theme-toggle').click();
+    await hostRoom.page.waitForFunction((oldClass) =>
+      document.querySelector('.room-v2-shell')?.className !== oldClass
+    , before, { timeout: 7000 });
+    await hostRoom.page.getByTestId('meeting-theme-toggle').click();
+    console.log('MOBILE_MEETING_LAYOUT_OK', JSON.stringify({ width: 320, actions: 8, headerHeight: mobileLayout.headerHeight, timer }));
+  } finally {
+    if (desktopViewport) await hostRoom.page.setViewportSize(desktopViewport);
+  }
+
   await Promise.all([
     waitForRemoteMedia(hostRoom.page, guestName),
     waitForRemoteMedia(guestRoom.page, host.user.name),
