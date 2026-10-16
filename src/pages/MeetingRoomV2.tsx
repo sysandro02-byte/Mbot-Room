@@ -439,6 +439,7 @@ export default function MeetingRoomV2() {
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [loading, setLoading] = useState(true);
+  const [redirectingToLobby, setRedirectingToLobby] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [panel, setPanel] = useState<Panel>(null);
