@@ -8,6 +8,7 @@ import './AndroidHome.css';
 type Props = {
   firstName: string;
   avatar?: string;
+  initials?: string;
   meetings: Meeting[];
   recentMeetings: Meeting[];
   slides: HomeSlide[];
@@ -53,7 +54,7 @@ const formatMeetingRange = (meeting: Meeting) => {
 const DEFAULT_VIDEO_IMAGE = '/images/android-home-video-call.svg';
 
 export default function AndroidHome({
-  firstName, avatar, meetings, slides, loading, unreadNotifications,
+  firstName, avatar, initials, meetings, slides, loading, unreadNotifications,
   onCreate, onJoin, onPlan, onGroups, onShareLink, canStartMeeting,
   onOpen, onAll, onNotifications, onCalendar, onMessages, onContacts,
   onFiles, onProfile, onSearch, onSlideAction,
@@ -64,7 +65,7 @@ export default function AndroidHome({
   const [brokenImage, setBrokenImage] = useState('');
 
   const activeSlides = slides
-    .filter((slide) => slide.isActive !== false && slide.slot >= 1 && slide.slot <= 3)
+    .filter((slide) => slide.isActive !== false && slide.slot >= 1 && slide.slot <= 4)
     .sort((left, right) => left.slot - right.slot);
   const visibleSlides = activeSlides.length ? activeSlides : slides.filter((slide) => slide.isActive !== false).slice(0, 1);
   const safeSlideIndex = activeSlide % Math.max(1, visibleSlides.length);
@@ -105,7 +106,7 @@ export default function AndroidHome({
       </div>
       <div className="android-home-top-actions">
         <button type="button" className="android-home-avatar" onClick={onProfile} aria-label="Mon profil">
-          {avatar ? <img src={avatar} alt="" /> : <span>{firstName.slice(0, 1).toUpperCase()}</span>}
+          {avatar ? <img src={avatar} alt="" /> : <span>{initials || firstName.slice(0, 1).toUpperCase()}</span>}
         </button>
         <button type="button" className="android-home-round" onClick={onSearch} aria-label="Rechercher"><Search/></button>
         <button type="button" className="android-home-round" onClick={onNotifications} aria-label="Notifications">
