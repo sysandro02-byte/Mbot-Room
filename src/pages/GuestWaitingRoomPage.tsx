@@ -343,7 +343,7 @@ export default function GuestWaitingRoomPage() {
           applyLobbyStatus(access.status === 'accepted' ? 'accepted' : 'requested');
         }
       } catch (error) {
-        if (!cancelled) setMeetingError(error instanceof Error
+        if (!cancelled && sequence === pollSequence) setMeetingError(error instanceof Error
           ? error.message
           : 'Vérification de votre accès indisponible. Nouvelle tentative automatique…');
       }
@@ -351,8 +351,9 @@ export default function GuestWaitingRoomPage() {
 
     const onLobbyStatus = (payload: { meetingId?: number; status?: 'accepted' | 'rejected' | 'requested' }) => {
       if (Number(payload?.meetingId || 0) !== Number(meeting.id)) return;
-      setMeetingError('');
-      applyLobbyStatus(payload.status);
+      // Socket events are notifications, not admission credentials. Verify the
+      // current database decision before entering the media room.
+      void checkLobby();
     };
 
     const legacyToken = authService.getToken();
