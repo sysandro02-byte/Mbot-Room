@@ -231,3 +231,76 @@ body.mboteroom-native-android .live-feed-host small{font-size:9px}
 body.mboteroom-native-android .live-feed-meta{font-size:9px;gap:4px}
 body.mboteroom-native-android .live-create-fab{position:fixed;display:flex;z-index:1550;align-items:center;justify-content:center;gap:7px;right:14px;bottom:calc(88px + env(safe-area-inset-bottom,0px));width:62px;height:62px;border:0;border-radius:50%;background:linear-gradient(145deg,#04c4c4,#084f98);color:#fff;box-shadow:0 14px 32px rgba(2,62,103,.27)}
 body.mboteroom-native-android .live-create-fab span{display:none}
+
+
+/* Compact host studio for mobile PWA and Android WebView. */
+.host-mode.live-room-page{background:#f3f7fa;color:#193349}
+.host-mode .live-room-topbar{box-sizing:border-box;min-height:62px;background:#071928;border-bottom:1px solid rgba(255,255,255,.10)}
+.host-mode .live-stage{background:#031321}
+.host-mode .live-main-video{display:block;object-position:center 40%}
+.live-studio-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.live-studio-heading>div{min-width:0}
+.live-studio-heading strong,.live-studio-heading small{display:block}
+.live-studio-heading strong{font-size:20px;color:#173348;letter-spacing:-.035em}
+.live-studio-heading small{max-width:48vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-top:2px;font-size:11px;color:#6b8190}
+.live-studio-online,.live-studio-connecting{display:inline-flex;flex:none;align-items:center;gap:7px;padding:7px 10px;border-radius:999px;background:#e1f8f2;color:#007b71;font-size:10px;font-weight:850}
+.live-studio-connecting{background:#e7eef6;color:#48617c}
+.live-studio-online i,.live-studio-connecting i{width:7px;height:7px;border-radius:50%;background:currentColor}
+.live-studio-section-label{margin:14px 0 8px;font-size:11px;font-weight:850;letter-spacing:.055em;text-transform:uppercase;color:#698293}
+.host-mode .live-host-dashboard{box-sizing:border-box;padding:16px clamp(12px,3vw,28px) 30px;background:#f3f7fa}
+.host-mode .live-host-stats{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.host-mode .live-host-stats span{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;min-height:78px;padding:11px 10px;border-radius:15px;border:1px solid #e0eaf0;box-shadow:0 3px 12px rgba(10,40,65,.035)}
+.host-mode .live-host-stats svg{width:19px;height:19px;margin-bottom:5px;color:#049e9c}
+.host-mode .live-host-stats strong{font-size:20px;line-height:1.1;color:#173448;font-variant-numeric:tabular-nums}
+.host-mode .live-host-stats small{margin-top:2px;font-size:10px;white-space:nowrap}
+.host-mode .live-capture-status{display:flex;align-items:center;min-height:34px;padding:6px 11px;border:1px solid #d0ebe9;background:#eaf9f6;color:#166c73;font-size:11px;line-height:1.35}
+.host-mode .live-host-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:0}
+.host-mode .live-host-controls button,.host-mode .live-quality-control{min-width:0;min-height:89px;padding:10px 5px;border-radius:17px;border:1px solid #e0e9ef;background:#fff;color:#31536a;box-shadow:0 3px 12px rgba(10,40,65,.035)}
+.host-mode .live-host-controls button.active{border-color:#a8e9df;background:#e3faf4;color:#007f78}
+.host-mode .live-host-controls button:disabled{opacity:.55}
+.host-mode .live-host-controls svg,.host-mode .live-quality-control>svg{width:24px;height:24px}
+.host-mode .live-host-controls span,.host-mode .live-quality-control span{font-size:12px;line-height:1.3;font-weight:850}
+.host-mode .live-host-controls small,.host-mode .live-quality-control small{font-size:10px;font-weight:600}
+.live-recording-state{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:10px 12px;border-radius:14px;border:1px solid #bde9e1;background:#eaf9f6;color:#14675f}
+.live-recording-state.warning{border-color:#f0d4b5;background:#fff9f0;color:#885d32}
+.live-recording-state>svg{flex:none}
+.live-recording-state>span{min-width:0;flex:1}
+.live-recording-state strong,.live-recording-state small{display:block}
+.live-recording-state strong{font-size:12px}
+.live-recording-state small{margin-top:2px;font-size:10px;line-height:1.4;overflow-wrap:anywhere}
+.live-recording-state details{font-size:10px;line-height:1.4;margin-top:3px}
+.live-recording-state summary{cursor:pointer;font-weight:800}
+.live-recording-state>button{flex:none;min-height:36px;padding:0 11px;border:1px solid currentColor;border-radius:10px;color:inherit;background:rgba(255,255,255,.7);font-size:11px;font-weight:850}
+.live-recording-state>button:disabled{opacity:.55}
+body.mboteroom-native-android .host-mode .live-host-dashboard{padding-bottom:calc(116px + env(safe-area-inset-bottom,0px))}
+@media(max-width:720px){
+  .host-mode .live-stage{min-height:0;height:clamp(270px,43dvh,420px)}
+  .host-mode .live-main-video{height:100%;min-height:0;object-fit:cover}
+  .host-mode .live-room-topbar{position:sticky;top:0;z-index:80;gap:8px;padding:9px 10px}
+  .host-mode .live-room-host strong{max-width:40vw}
+  .host-mode .live-host-stats{gap:6px}
+  .host-mode .live-host-stats span{min-height:72px;padding:9px 7px;border-radius:12px}
+  .host-mode .live-host-stats strong{font-size:18px}
+  .host-mode .live-host-stats small{font-size:9px}
+  .host-mode .live-host-stats svg{width:17px;height:17px}
+  .host-mode .live-host-controls{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .host-mode .live-host-controls button,.host-mode .live-quality-control{min-height:84px;padding:9px 4px;font-size:11px}
+  .host-mode .live-host-dashboard{padding:12px 10px calc(90px + env(safe-area-inset-bottom,0px))}
+  .live-studio-heading strong{font-size:17px}
+  .live-studio-heading small{max-width:45vw}
+  .live-studio-online,.live-studio-connecting{font-size:9px}
+}
+@media(max-width:350px){
+  .host-mode .live-host-stats small{white-space:normal;font-size:8px}
+  .live-recording-state{align-items:flex-start;flex-wrap:wrap}
+  .live-recording-state>button{margin-left:27px}
+}
+@media(prefers-color-scheme:dark){
+  .host-mode.live-room-page,.host-mode .live-host-dashboard{background:#0e2030;color:#e5f0f5}
+  .host-mode .live-studio-heading strong{color:#f0f7fa}
+  .host-mode .live-studio-heading small,.host-mode .live-studio-section-label{color:#9bb5c7}
+  .host-mode .live-host-stats span,.host-mode .live-host-controls button,.host-mode .live-quality-control{background:#173349;border-color:#2b526a;color:#e4f4fa}
+  .host-mode .live-host-stats strong{color:#f0f9fe}
+  .host-mode .live-host-stats small{color:#a6bece}
+  .host-mode .live-host-controls button.active{background:#104e4b;border-color:#209f98;color:#9bf1e8}
+}
