@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bell, CalendarDays, Camera, ChevronLeft, Eye, Gamepad2, Gift, Heart, LoaderCircle, Mic, Plus,
-  MicOff, MoreVertical, Music2, Radio, Search, Send, Share2, Sparkles, Square, UserPlus,
+  MicOff, MonitorUp, MoreVertical, Music2, Radio, Search, Send, Share2, Sparkles, Square, UserPlus,
   UsersRound, Video, VideoOff, X,
 } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -9,6 +9,7 @@ import AppShell from '../components/AppShell';
 import AppLoader from '../components/AppLoader';
 import { authService } from '../services/authService';
 import { collaborationService } from '../services/collaborationService';
+import { mediaTransportService } from '../services/mediaTransportService';
 import { liveCategoryLabel, liveMediaUrl, liveService, type LiveCategory, type LiveComment, type LiveParticipationRequest, type LiveSession, type LiveVisibility } from '../services/liveService';
 import { socket } from '../lib/socket';
 import { useMeetingLiveKit } from '../hooks/useMeetingLiveKit';
@@ -273,6 +274,8 @@ export function LiveRoomPage(){
   const [localStream,setLocalStream]=useState<MediaStream|null>(null);
   const [captureResolution,setCaptureResolution]=useState('Résolution automatique');
   const cameraStreamRef=useRef<MediaStream|null>(null);
+  // Preserve mute preferences when the capture stream is recreated.
+  const cameraPreferencesRef=useRef({audio:true,video:true});
   const screenStreamRef=useRef<MediaStream|null>(null);
   const [media,setMedia]=useState({audio:true,video:true,screen:false});
   const [videoQuality,setVideoQuality]=useState<VideoQuality>('auto');
@@ -291,6 +294,8 @@ export function LiveRoomPage(){
   const sharePendingRef=useRef(false);
   const [sharePending,setSharePending]=useState(false);
   const [recordingError,setRecordingError]=useState('');
+  const [recordingSetupRequired,setRecordingSetupRequired]=useState(false);
+  const [recordingChecking,setRecordingChecking]=useState(false);
   const [confirmEndOpen,setConfirmEndOpen]=useState(false);
   const mediaRetryAttemptsRef=useRef(0);
   const localVideoRef=useRef<HTMLVideoElement|null>(null);
@@ -440,7 +445,11 @@ export function LiveRoomPage(){
     }).then((stream)=>{
       if(cancelled){stream.getTracks().forEach((track)=>track.stop());return;}
       captured=stream;
-      cameraStreamRef.current=stream;setLocalStream(stream);setCaptureResolution(cameraResolutionLabel(stream.getVideoTracks()[0]));setMedia({audio:true,video:true,screen:false});
+      cameraStreamRef.current=stream;
+      stream.getAudioTracks().forEach((track)=>{track.enabled=cameraPreferencesRef.current.audio;});
+      stream.getVideoTracks().forEach((track)=>{track.enabled=cameraPreferencesRef.current.video;});
+      if(!screenStreamRef.current)setLocalStream(stream);
+      setCaptureResolution(cameraResolutionLabel(stream.getVideoTracks()[0]));
     }).catch(async(cause)=>{
       if(cancelled)return;
       if(videoQuality==='full-hd'||videoQuality==='high'){
@@ -450,9 +459,11 @@ export function LiveRoomPage(){
             video:cameraVideoConstraints('standard'),
           });
           if(cancelled){stream.getTracks().forEach((track)=>track.stop());return;}
-          captured=stream;cameraStreamRef.current=stream;setLocalStream(stream);
+          captured=stream;cameraStreamRef.current=stream;
+          stream.getAudioTracks().forEach((track)=>{track.enabled=cameraPreferencesRef.current.audio;});
+          stream.getVideoTracks().forEach((track)=>{track.enabled=cameraPreferencesRef.current.video;});
+          if(!screenStreamRef.current)setLocalStream(stream);
           setCaptureResolution(cameraResolutionLabel(stream.getVideoTracks()[0]));
-          setMedia({audio:true,video:true,screen:false});
           setNotice('La caméra utilise une résolution compatible avec votre appareil.');
           return;
         }catch{/* Hardware fallback failed; preserve original error. */}
@@ -471,14 +482,26 @@ export function LiveRoomPage(){
   const startLiveRecording=async(meetingId:number)=>{
     if(recordingIdRef.current||recordingAttemptRef.current)return;
     recordingAttemptRef.current=true;
+    setRecordingChecking(true);
     setRecordingError('');
+    setRecordingSetupRequired(false);
     try{
+      // Egress is a server capability. Avoid repeatedly sending a request
+      // that must fail until the operator configures recording and storage.
+      const capabilities=await mediaTransportService.getStatus();
+      if(!capabilities.serverRecordingReady){
+        setRecordingSetupRequired(true);
+        setRecordingError('LiveKit Egress et son stockage doivent être configurés sur le serveur. La diffusion reste active sans replay.');
+        return;
+      }
       const recording=await collaborationService.startServerRecording(meetingId,{layout:'speaker'});
       if(!recording.id)throw new Error('Le serveur n’a pas renvoyé de référence d’enregistrement.');
       recordingIdRef.current=recording.id;
-      setNotice('Enregistrement du Live activé.');
+      setNotice('Replay : enregistrement serveur actif.');
     }catch(cause){
-      setRecordingError(cause instanceof Error?cause.message:'Enregistrement serveur indisponible. Vérifiez la configuration LiveKit Egress.');
+      setRecordingError(cause instanceof Error?cause.message:'Le démarrage du replay a échoué.');
+    }finally{
+      setRecordingChecking(false);
     }
   };
 
@@ -517,13 +540,17 @@ export function LiveRoomPage(){
   const toggleMic=()=>{
     const tracks=cameraStreamRef.current?.getAudioTracks()||[];
     if(!tracks.length){setNotice('Le microphone n’est pas encore disponible.');return;}
-    tracks.forEach((track)=>{track.enabled=!media.audio;});setMedia((current)=>({...current,audio:!current.audio}));
+    const enabled=!cameraPreferencesRef.current.audio;
+    cameraPreferencesRef.current.audio=enabled;
+    tracks.forEach((track)=>{track.enabled=enabled;});setMedia((current)=>({...current,audio:enabled}));
   };
   const toggleCamera=()=>{
     if(media.screen){setNotice('Arrêtez le partage avant de modifier la caméra.');return;}
     const tracks=cameraStreamRef.current?.getVideoTracks()||[];
     if(!tracks.length){setNotice('La caméra n’est pas encore disponible.');return;}
-    tracks.forEach((track)=>{track.enabled=!media.video;});setMedia((current)=>({...current,video:!current.video}));
+    const enabled=!cameraPreferencesRef.current.video;
+    cameraPreferencesRef.current.video=enabled;
+    tracks.forEach((track)=>{track.enabled=enabled;});setMedia((current)=>({...current,video:enabled}));
   };
   const stopLiveScreenShare=()=>{
     const capture=screenStreamRef.current;
@@ -629,7 +656,7 @@ export function LiveRoomPage(){
         {!mainStream?<div className="live-video-wait">
           {liveKit.failed?<><Radio/><strong>{mediaWaitLabel}</strong><span>MBotéRoom va réessayer automatiquement. Vous pouvez aussi relancer maintenant.</span><button type="button" onClick={retryMedia}>Réessayer</button></>:<><LoaderCircle className="spin"/><strong>{mediaWaitLabel}</strong></>}
         </div>:null}
-        <div className="live-stage-stats"><span><Eye/> {fmtCount(live.viewerCount)}</span><span><Heart/> {fmtCount(live.likeCount)}</span><span><Send/> {fmtCount(comments.length)}</span></div>
+        {!publisher?<div className="live-stage-stats"><span><Eye/> {fmtCount(live.viewerCount)}</span><span><Heart/> {fmtCount(live.likeCount)}</span><span><Send/> {fmtCount(comments.length)}</span></div>:null}
 
         {!publisher?<aside className="live-viewer-actions">
           <button className={live.isLiked?'liked':''} onClick={()=>void like()}><Heart/><span>{fmtCount(live.likeCount)}</span></button>
@@ -641,19 +668,26 @@ export function LiveRoomPage(){
         <div className="live-comment-overlay">{comments.slice(-5).map((comment)=><div key={comment.id}><Avatar name={comment.name} src={comment.avatar}/><span><strong>{comment.name}</strong> {comment.text}</span></div>)}</div>
       </section>
 
-      {publisher?<section className="live-host-dashboard">
-        {recordingError&&live.isHost?<div className="live-recording-warning" role="alert">
-          <span><strong>Enregistrement indisponible</strong><small>{recordingError}</small></span>
-          <button type="button" onClick={()=>{recordingAttemptRef.current=false;void startLiveRecording(live.meetingId);}}>Réessayer</button>
+      {publisher?<section className="live-host-dashboard" aria-label="Console de diffusion">
+        <header className="live-studio-heading"><div><strong>Studio Live</strong><small>{live.title}</small></div><span className={liveKit.connected?'live-studio-online':'live-studio-connecting'}><i/>{liveKit.connected?'Diffusion connectée':'Connexion…'}</span></header>
+        {live.isHost&&live.recordingEnabled?<div className={recordingError?'live-recording-state warning':'live-recording-state'} role="status">
+          <Video size={18}/>
+          <span><strong>{recordingIdRef.current?'Enregistrement en cours':recordingChecking?'Vérification du replay…':recordingSetupRequired?'Replay non configuré':recordingError?'Replay indisponible':'Préparation du replay'}</strong>
+            <small>{recordingError?(recordingSetupRequired?'Configuration LiveKit Egress nécessaire':recordingError):recordingIdRef.current?'Le replay sera disponible après le direct.':'Le direct continue normalement.'}</small>
+            {recordingSetupRequired?<details><summary>Pourquoi ?</summary>{recordingError}</details>:null}
+          </span>
+          {recordingError?<button type="button" disabled={recordingChecking} onClick={()=>{recordingAttemptRef.current=false;void startLiveRecording(live.meetingId);}}>{recordingChecking?'Vérification…':recordingSetupRequired?'Vérifier':'Réessayer'}</button>:null}
         </div>:null}
+        <div className="live-studio-section-label">Statistiques en direct</div>
         <div className="live-host-stats"><span><Eye/><strong>{fmtCount(live.viewerCount)}</strong><small>spectateurs</small></span><span><Heart/><strong>{fmtCount(live.likeCount)}</strong><small>j’aime</small></span><span><Send/><strong>{comments.length}</strong><small>commentaires</small></span><span><Share2/><strong>{fmtCount(live.shareCount)}</strong><small>partages</small></span></div>
         <div className="live-capture-status" role="status">Qualité caméra réelle : {captureResolution} · diffusion adaptative selon le réseau</div>
+        <div className="live-studio-section-label">Commandes de diffusion</div>
         <div className="live-host-controls">
-          <button className={media.audio?'active':''} onClick={toggleMic}>{media.audio?<Mic/>:<MicOff/>}<span>Micro<small>{media.audio?'Activé':'Muet'}</small></span></button>
-          <button className={media.video?'active':''} disabled={media.screen} onClick={toggleCamera}>{media.video?<Video/>:<VideoOff/>}<span>Caméra<small>{media.video?'Activée':'Coupée'}</small></span></button>
-          <button className={media.screen?'active':''} disabled={sharePending} onClick={()=>void shareScreen()}><Camera/><span>{sharePending?'Démarrage…':media.screen?'Arrêter':'Partager'}<small>l’écran</small></span></button>
+          <button type="button" aria-pressed={media.audio} className={media.audio?'active':''} onClick={toggleMic}>{media.audio?<Mic/>:<MicOff/>}<span>Micro<small>{media.audio?'Activé':'Muet'}</small></span></button>
+          <button type="button" aria-pressed={media.video} className={media.video?'active':''} disabled={media.screen} onClick={toggleCamera}>{media.video?<Video/>:<VideoOff/>}<span>Caméra<small>{media.video?'Activée':'Coupée'}</small></span></button>
+          <button type="button" aria-pressed={media.screen} className={media.screen?'active':''} disabled={sharePending} onClick={()=>void shareScreen()}><MonitorUp/><span>{sharePending?'Démarrage…':media.screen?'Arrêter':'Partager'}<small>l’écran</small></span></button>
           <label className="live-quality-control"><Video/><span>Qualité<small>{videoQuality==='auto'?`Auto · ${activeVideoQuality==='high'?'HD':activeVideoQuality==='standard'?'standard':'éco'}`:videoQuality==='full-hd'?'Full HD 1080p':videoQuality==='high'?'HD 720p':videoQuality==='standard'?'Standard':'Éco'}</small></span><select aria-label="Qualité vidéo du Live" value={videoQuality} disabled={media.screen} onChange={(event)=>setVideoQuality(event.target.value as VideoQuality)}><option value="auto">Automatique</option><option value="data-saver">Économie</option><option value="standard">Standard</option><option value="high">HD 720p</option><option value="full-hd">Full HD 1080p</option></select></label>
-          <button onClick={()=>{setInviteOpen((value)=>!value);void liveService.getParticipationRequests(live.id).then(setRequests);}}><UserPlus/><span>Inviter<small>un invité</small></span></button>
+          <button onClick={()=>{setInviteOpen((value)=>!value);void liveService.getParticipationRequests(live.id).then(setRequests).catch(()=>setNotice('Impossible de charger les demandes.'));}}><UserPlus/><span>Inviter<small>un invité</small></span></button>
           <button className={!live.chatEnabled?'active danger':''} onClick={()=>void toggleChat()}><Send/><span>Chat<small>{live.chatEnabled?'Actif':'Muet'}</small></span></button>
         </div>
 

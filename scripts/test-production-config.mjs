@@ -185,9 +185,9 @@ if (!readiness.includes('MBOTE_ROOM_REQUIRE_LIVEKIT') || !readiness.includes('MB
   throw new Error('Readiness must support enforcing LiveKit and server recording when V1 credentials are enabled');
 }
 
-const appRoutes = fs.readFileSync(new URL('../server/appRoutes.ts', import.meta.url), 'utf8');
+const serverAppRoutes = fs.readFileSync(new URL('../server/appRoutes.ts', import.meta.url), 'utf8');
 const sfuRoutes = fs.readFileSync(new URL('../server/sfuRoutes.ts', import.meta.url), 'utf8');
-for (const source of [appRoutes, sfuRoutes]) {
+for (const source of [serverAppRoutes, sfuRoutes]) {
   if (!source.includes('MBOTEROOM_TURN_URL') || !source.includes('MBOTEROOM_TURN_USERNAME') || !source.includes('MBOTEROOM_TURN_CREDENTIAL')) {
     throw new Error('Runtime media readiness must recognize static Metered TURN configuration');
   }
